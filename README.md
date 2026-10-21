@@ -10,7 +10,7 @@
 
 The std lib API reference is not in this repo. It is generated from the compiler repo, [silk-lang/silk](https://github.com/silk-lang/silk), into `reference/stdlib` by `silk doc-reference`.
 
-`planning/` holds the outline of these docs and the to-do list of pages to update later.
+Pages that need an update later are tracked as [issues](https://github.com/silk-lang/docs/issues).
 
 ## Index
 
@@ -123,8 +123,3 @@ The std lib API reference is not in this repo. It is generated from the compiler
 - [Diagnostic codes](appendix/03-diagnostic-codes.md)
 - [Grammar summary](appendix/04-grammar-summary.md)
 - [Glossary](appendix/05-glossary.md)
-
-### Planning
-
-- [Silk docs outline](planning/outline.md)
-- [Silk docs: to-do](planning/todo.md)
