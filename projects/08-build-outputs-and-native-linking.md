@@ -92,10 +92,22 @@ The SDK reaches Clang as `-isysroot`, with `-mmacosx-version-min` from the profi
 | `{ kind = "explicit", target = "...", root = "...", linker = "...", origin = "...", support = [...] }` | An installed SDK or sysroot at `root` (`-isysroot` on macOS, `--sysroot` on Linux), the linker at `linker` (`--ld-path`), and optional GCC support installations, each `{ root, target, origin }` (`--gcc-install-dir`). `origin` is a label. |
 | `{ kind = "managed", name = "..." }` | Recognized, not supported: `UnsupportedProvider: x (project)`. |
 
-Any other shape is refused:
+Each kind takes only the keys shown. A key it does not take, here `name` under `kind = "native"`, is refused at its own line, and so is an extra key in a `support` entry (`build.platform-supply.support.<key>`):
+
+```toml
+[build.platform-supply]
+kind = "native"
+name = "x"
+```
 
 ```
-Invalid Silk project manifest /home/you/tiny/silk.toml: InvalidConfiguration: platform-supply (/home/you/tiny/silk.toml:build.platform-supply)
+Invalid Silk project manifest /home/you/hello/silk.toml:9: build.platform-supply.name is not a supported field
+```
+
+Any other shape, such as an unknown `kind`, a string instead of a table, or an `explicit` supply for a target it cannot serve, is refused at the line that writes `platform-supply`, or at the `[build.platform-supply]` header:
+
+```
+Invalid Silk project manifest /home/you/hello/silk.toml:8: InvalidConfiguration: platform-supply (/home/you/hello/silk.toml:build.platform-supply)
 ```
 
 ## Extra native link inputs
@@ -176,7 +188,7 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | --- | --- |
 | `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
 | `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. |
-| `components` | `[{ capability = "...", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: capability bindings, such as `execution-storage` operations bound to module declarations. |
+| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. The `operation` names are not checked. |
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
 | `requirements` | Must be empty: `build.composition.requirements is not supported by the native compiler yet`. |
 

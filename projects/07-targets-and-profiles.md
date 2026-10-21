@@ -119,7 +119,7 @@ The manifest page lists every field and its values. The native build applies the
 | `optimization` | `none` passes `-O0` to Clang; `speed` passes `-O2`. |
 | `debug` | `true` passes `-g`. |
 | `libc` | Chooses the runtime from the std lib catalog. Linux takes `gnu` or `none`; macOS takes `system` (or `none` for object and archive output only); wasm takes `none`. |
-| `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. See Build outputs and native linking. |
+| `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. `"default"` and `"none"` take no other key, so `{ kind = "default", name = "x" }` is refused as `profiles.u.runtime.name is not a supported field`. See Build outputs and native linking. |
 | `relocation` | `pic` or `static` code for object, archive and IR output. |
 | `deployment` | macOS minimum version for the link. Only `aarch64-apple-darwin` takes it. |
 | `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts only the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere. |

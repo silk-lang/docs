@@ -134,7 +134,7 @@ The compiler checks the whole manifest before it compiles anything, and stops at
 Invalid Silk project manifest /home/you/hello/silk.toml:8: build.artefact is not a supported field
 ```
 
-An unknown key, a composition problem and a profile problem name the line after the path, here line 8 of `silk.toml`. The other errors name only the file. A key inside an inline table or array that spans several lines is named at its own line, not at the line that opens the value.
+An unknown key, a composition problem, a `platform-supply` problem and a profile problem name the line after the path, here line 8 of `silk.toml`. The other errors name only the file. A key inside an inline table or array that spans several lines is named at its own line, not at the line that opens the value.
 
 | Problem | Message after `Invalid Silk project manifest <path>:` |
 | --- | --- |
@@ -153,6 +153,9 @@ An unknown key, a composition problem and a profile problem name the line after 
 | Unknown key in a component's `bindings` entry | `LINE: build.composition.components.bindings.<key> is not a supported field` |
 | A `defaults` entry that is not a string | `LINE: build.composition.defaults entries must be runtime names` |
 | `composition.requirements` lists anything | `LINE: build.composition.requirements is not supported by the native compiler yet` |
+| A component `capability` other than `"execution-storage"` | `LINE: build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"` |
+| Unknown key in `platform-supply` or in one of its `support` entries | `LINE: build.platform-supply.<key> is not a supported field` (or `build.platform-supply.support.<key>`) |
+| Any other bad `platform-supply` | `LINE: InvalidConfiguration: platform-supply (<path>:build.platform-supply)` |
 | Bad artifact | `build.artifact must be executable, shared-library, static-library, or object` |
 | Bad stage | `build.stage is not an admitted emission stage` |
 | Output dir escapes | `build.output-dir must be a non-empty manifest-relative directory that does not escape the project` |
@@ -173,24 +176,27 @@ Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profile
 | --- | --- |
 | A key profiles do not have | `profiles.fast.optimisation is not a supported field` |
 | A key `cpu` does not have | `profiles.fast.cpu.modle is not a supported field` |
+| A key `entry` or `runtime` does not have | `profiles.fast.entry.bogus is not a supported field`. `kind = "default"` and `"none"` take only `kind`; `"named"` takes `kind` and `name`. |
 | A value the field does not take | `InvalidInput: profiles.fast.optimization = "fast"` |
 | A value the target cannot use | `UnsupportedCombination: profiles.fast.libc = "system"` |
 | A value the native compiler cannot build yet | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
 | `[build].profile` names no profile | `InvalidInput: build.profile = "fats" names no [profiles.fats] table` |
 | A key bindings do not have | `build.bindings.extra is not a supported field`, or `profiles.fast.bindings.extra` for a profile's binding |
+| A key a binding's `origin` does not have | `build.bindings.origin.bogus is not a supported field`. `origin` takes `source`, `provenance` and `translator`. |
+| A key a binding's `value` does not have | `build.bindings.value.extra is not a supported field`. Inside an array the item number shows: `build.bindings.value.values.1.bogus` is the second element. |
 | A binding with a missing key | `InvalidInput: build.bindings: binding identity`, or `profiles.fast.bindings` for a profile's binding |
 | A bad profile name, quoted or not | ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` `` |
 
-LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. Targets and profiles lists every refused combination.
+LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes, except for the elements of an array `value`. Targets and profiles lists every refused combination.
 
 ## Keys that are not checked
 
-Unknown keys are refused at the top level and in `[package]`, dependency entries, `[build]`, `[build.composition]` and the entries of its lists, `[workspace]`, profiles, `cpu` tables and bindings. A misspelled `[packge]` table or a `description` key stops the build.
+Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `platform-supply` and its `support` entries, `[build.composition]` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `description` key stops the build.
 
-Two places are not checked:
+Two things are not checked:
 
 - `[changes]`. Builds ignore it; `silk changes` reads it.
-- The `origin` table of a binding. An extra key there, such as `origin = { source = "silk.toml", provenance = "literal", extra = 2 }`, is accepted and changes nothing.
+- The `operation` of a component binding. The names the compiler uses are `create`, `acquire`, `release` and `destroy`. Any other name, such as `operation = "frobnicate"`, is accepted without an error.
 
 ## See also
 
