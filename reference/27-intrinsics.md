@@ -14,6 +14,7 @@ PropertyClause  = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Na
 ## The namespace
 
 - `Intrinsic` needs no import. It is visible in every module.
+- Importing it is MOD0004. Any import whose path starts with `Intrinsic`, such as `import Intrinsic { replace }`, prints ``Module Intrinsic cannot be imported: `Intrinsic` is reserved for compiler intrinsics, which are written `Intrinsic.<name>` without an import``. The one importable module is `Intrinsic.application`, below.
 - No declaration can take the name: `struct Intrinsic {}` is a binding conflict (SEM0016).
 - Members are fixed by the compiler. An unknown member name is SEM0010.
 - A member is a value (called like a function), a type, or a property used in a `with` clause or a bound.

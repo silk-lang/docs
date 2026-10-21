@@ -119,9 +119,9 @@ The manifest page lists every field and its values. The native build applies the
 | `optimization` | `none` passes `-O0` to Clang; `speed` passes `-O2`. |
 | `debug` | `true` passes `-g`. |
 | `libc` | Chooses the runtime from the std lib catalog. Linux takes `gnu` or `none`; macOS takes `system` (or `none` for object and archive output only); wasm takes `none`. |
-| `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one. |
+| `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. See Build outputs and native linking. |
 | `relocation` | `pic` or `static` code for object, archive and IR output. |
-| `deployment` | macOS minimum version for the link. |
+| `deployment` | macOS minimum version for the link. Only `aarch64-apple-darwin` takes it. |
 | `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts only the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere. |
 | `codeModel` | `large` passes `-mcmodel=large`. x86-64 targets only. |
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
@@ -168,17 +168,24 @@ The other fields are valid values that the native compiler cannot build yet. Rat
 | `entry` | `{ kind = "none" }` or `{ kind = "named", ... }` | `profiles.fast.entry is not supported by the native compiler yet` |
 | `codeModel` | `"large"` on an arm64 target | `profiles.arm.codeModel = "large" is not supported by the native compiler yet` |
 
-`--profile-input` is checked the same way. Its errors still start with the manifest path, although the problem is in the JSON:
+`--profile-input` is checked the same way. Its errors name the flag, not the manifest, and the field as `--profile-input.<field>`:
+
+```sh
+silk build --profile-input '{"target":"x86_64-unknown-linux-gnu","safety":"unchecked"}'
+```
 
 ```
-Invalid Silk project manifest /home/you/tiny/silk.toml: --profile-input.safety = "unchecked" is not supported by the native compiler yet
+Invalid --profile-input: --profile-input.safety = "unchecked" is not supported by the native compiler yet
 ```
+
+The combinations below and bad values are refused the same way, as in `Invalid --profile-input: UnsupportedCombination: --profile-input.libc = "system"`. JSON that does not parse is `Invalid --profile-input JSON`. All of these exit with status 2.
 
 These combinations are refused when the manifest is read:
 
 | Combination | Message after `Invalid Silk project manifest <path>:LINE:` |
 | --- | --- |
 | `libc` not valid for the target | `UnsupportedCombination: profiles.fast.libc = "system"` |
+| `deployment` on a Linux target | `UnsupportedCombination: profiles.fast.deployment = "14.0"` |
 | wasm with `link`, `relocation`, `codeModel`, `unwind`, `deployment` or `sanitizers` changed from its defaults | `UnsupportedCombination: profiles.web.target = "wasm32-unknown-unknown"` |
 | `sanitizers` with both `address` and `thread` | `UnsupportedCombination: profiles.fast.sanitizers` |
 | `thread` sanitizer without `threading = "multi"` | `UnsupportedCombination: profiles.fast.threading` |

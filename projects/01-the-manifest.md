@@ -57,7 +57,7 @@ The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, bind
 | `composition` | table | std lib catalog | Runtime composition: which runtime module starts the program. Advanced. |
 | `native-bindings` | any | none | Reserved. Refused by this compiler. |
 
-`composition.requirements`, when it lists anything, is refused too. Build outputs and native linking covers the last four keys.
+`composition` takes `runtimes`, `defaults`, `components`, `retention` and `requirements`. `requirements`, when it lists anything, is refused. Build outputs and native linking covers the last four keys.
 
 ## &#91;dependencies\]
 
@@ -137,12 +137,14 @@ An unknown key and a profile problem name the line after the path, here line 8 o
 | Missing root | `package.root must be a non-empty string` |
 | Root outside source root | `package.root must be a module below the source root` |
 | Unknown `[build]` key | `LINE: build.<key> is not a supported field` |
+| Unknown `[build.composition]` key | `LINE: build.composition.<key> is not a supported field` |
+| `composition.requirements` lists anything | `build.composition.requirements is not supported by the native compiler yet` |
 | Bad artifact | `build.artifact must be executable, shared-library, static-library, or object` |
 | Bad stage | `build.stage is not an admitted emission stage` |
 | Output dir escapes | `build.output-dir must be a non-empty manifest-relative directory that does not escape the project` |
 | Bad target list | `build.targets must be a non-empty array of host or canonical target ids` |
 | `native-bindings` | `build.native-bindings is not supported by the native compiler yet` |
-| Unknown `[workspace]` key | `workspace.<key> is not a supported field` (no line) |
+| Unknown `[workspace]` key | `LINE: workspace.<key> is not a supported field` |
 | `output-dir` in a member | `build.output-dir cannot be set in a workspace member; set workspace.output-dir instead` |
 
 Problems in `[dependencies]` other than an unknown key, and in `exports`, print as `silk: invalid dependency ...` and `silk: invalid exports of ...` (exit 1). See **Dependencies** and **Libraries and exports**.
@@ -161,18 +163,20 @@ Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profile
 | A value the target cannot use | `UnsupportedCombination: profiles.fast.libc = "system"` |
 | A value the native compiler cannot build yet | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
 | `[build].profile` names no profile | `InvalidInput: build.profile = "fats" names no [profiles.fats] table` |
-| A bad binding | `InvalidInput: build.bindings: binding identity`, or `profiles.fast.bindings` for a profile's binding |
+| A key bindings do not have | `build.bindings.extra is not a supported field`, or `profiles.fast.bindings.extra` for a profile's binding |
+| A binding with a missing key | `InvalidInput: build.bindings: binding identity`, or `profiles.fast.bindings` for a profile's binding |
+| A bad profile name, quoted or not | ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` `` |
 
-A bad profile name has no line: ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` ``. Targets and profiles lists every refused combination.
+LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. Targets and profiles lists every refused combination.
 
 ## Keys that are not checked
 
-Unknown keys are refused at the top level and in `[package]`, dependency entries, `[build]`, `[workspace]`, profiles, `cpu` tables and bindings. A misspelled `[packge]` table or a `description` key stops the build.
+Unknown keys are refused at the top level and in `[package]`, dependency entries, `[build]`, `[build.composition]`, `[workspace]`, profiles, `cpu` tables and bindings. A misspelled `[packge]` table or a `description` key stops the build.
 
-Two tables are not checked:
+Two places are not checked:
 
 - `[changes]`. Builds ignore it; `silk changes` reads it.
-- `[build.composition]`. An unknown key there, such as `bogus = 1`, is accepted and changes nothing.
+- The entries of the `runtimes`, `components` and `retention` lists in `[build.composition]`. An extra key in a `runtimes` entry, such as `bogus = 1`, is accepted and changes nothing. An extra key in a `retention` entry makes the entry unreadable, and the build stops with `silk: the build selects no single runtime (ARTIFACT-001)`.
 
 ## See also
 

@@ -180,6 +180,8 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
 | `requirements` | Must be empty: `build.composition.requirements is not supported by the native compiler yet`. |
 
+Any other key is refused at its line, as in `Invalid Silk project manifest /home/you/hello/silk.toml:8: build.composition.bogus is not a supported field`.
+
 For example, `silk/native_start_sync` is a smaller hosted runtime for a `main` that returns `i32` and needs only `HostInput`:
 
 ```toml
@@ -219,6 +221,46 @@ Run summary: 0 succeeded, 1 failed
 ```
 
 A composition that leaves no single runtime, or a default it does not list, is `silk: the build selects no single runtime (ARTIFACT-001)`. Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/raw_start` case.
+
+## Building without a runtime
+
+A profile with `runtime = { kind = "none" }` builds with no runtime module, so nothing calls the Silk `main`. The program starts in a C `main` that you export:
+
+```toml
+[build]
+profile = "bare"
+
+[profiles.bare]
+target = "x86_64-unknown-linux-gnu"
+runtime = { kind = "none" }
+```
+
+```silk
+export "C" fn start() -> i32 as "main" {
+  return 7
+}
+```
+
+```sh
+silk run; echo "exit $?"
+```
+
+```
+Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/bare/bare (llvm, x86_64-unknown-linux-gnu, 2 symbols)
+exit 7
+```
+
+An executable that exports no C `main` is refused before Clang runs, with exit status 2. Here `main` is a plain `pub fn main() -> i32`, and `silk build` prints:
+
+```
+silk: an executable built with runtime = { kind = "none" } has no `main`; export one, as `export "C" fn start() -> i32 as "main"` does, or select a runtime
+build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
+Build summary: 0 succeeded, 1 failed
+```
+
+- `silk check` does not look for the C `main`; only an executable build does.
+- An `object` or `static-library` artifact, and a non-final stage, need no `main`.
+- When the package has native link inputs, one of them may define `main`, so the compiler leaves the check to the linker. A link without one fails with Clang's ``undefined reference to `main'`` and exit status 1.
 
 ## See also
 

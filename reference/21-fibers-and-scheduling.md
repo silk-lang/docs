@@ -5,7 +5,7 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 ## Execution model
 
 - All fibers of one scheduler run on one host thread. There is no parallelism and no preemption.
-- Native threads are separate from fibers. `NativeThread.spawn` in `silk/native_thread` runs a `Transferable` closure on its own operating-system thread, and `JoinHandle.join` waits for its result. `silk/atomic`, `silk/sync` and `silk/thread` hold the matching atomics, locks and thread properties. This page does not cover them.
+- Native threads are separate from fibers. `NativeThread.spawn` in `silk/native_thread` runs a `Transferable` closure on its own operating-system thread, and `JoinHandle.join` waits for its result. `silk/atomic`, `silk/sync` and `silk/thread` hold the matching atomics, locks and thread properties. `silk/work_queue` has queues that move owned values between threads, and `silk/thread_pool` runs `Transferable` lazy tasks on a work-stealing pool of native threads. This page does not cover them.
 - A task runs until it parks. It parks when it waits on an unfinished fiber, yields, waits on a timer, or forks a child.
 - When a task parks, the scheduler resumes another ready task. `LocalScheduler` keeps ready tasks in FIFO order.
 - A task that never parks keeps the thread until it finishes.

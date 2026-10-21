@@ -46,7 +46,7 @@ To bring in a package that already exists, move it into the folder and add it to
 | No manifest there | ``workspace.members entry `missing` names a directory without a silk.toml`` |
 | Outside the workspace | ``workspace.members entry `../elsewhere` must name a directory inside the workspace`` |
 | Same package name | ``workspace.members entry `loose/stray2` names a package whose name another member already has`` |
-| Unknown key | `workspace.<key> is not a supported field` |
+| Unknown key, such as `ouput-dir` on line 3 | `3: workspace.ouput-dir is not a supported field` |
 
 ## Members still depend explicitly
 

@@ -156,7 +156,7 @@ Check summary: 0 succeeded, 1 failed
 | MOD0001 | No module at that path: `Unknown module geometry.Pointt` |
 | MOD0002 | A module imports itself. Only the import is reported, with no follow-on SEM0016 in that module or in modules that import it |
 | MOD0003 | Another package's module that its `exports` does not list |
-| MOD0004 | An import of `Intrinsic`, or of a module under it. `Intrinsic` needs no import. See **The standard library** for reserved names |
+| MOD0004 | An import of `Intrinsic`, or of a module under it other than `Intrinsic.application`. `Intrinsic` needs no import. See **The standard library** for reserved names |
 | SEM0014 | The module has no such member: `Module geometry/Point has no member Nope` |
 | SEM0015 | The member exists but is private |
 | SEM0016 | Two bindings with the same name in one scope, such as a module and a type both called `Board` |

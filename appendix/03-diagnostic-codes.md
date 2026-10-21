@@ -283,7 +283,7 @@ Fix: Import an exported module, or add the module to `exports` in the dependency
 
 ### MOD0004
 
-An import under the reserved module names `silk` or `Intrinsic` that names no standard-library module or intrinsic.
+An import of the reserved `Intrinsic` module or a module below it other than `Intrinsic.application`. Intrinsics are written `Intrinsic.<name>` without an import.
 
 ```silk
 import Intrinsic { replace }
@@ -293,10 +293,10 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `silk` and `Intrinsic` are reserved module names, so a local module cannot use them
+/home/you/demo/src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `Intrinsic` is reserved for compiler intrinsics, which are written `Intrinsic.<name>` without an import
 ```
 
-Any import of `Intrinsic` or a path under it, such as `import Intrinsic.helpers { hi }`, is MOD0004. An unknown `silk.` path, such as `import silk.nope`, is MOD0001 instead. A local module named `silk` or `Intrinsic` at the top of the source root is refused before checking starts, with `silk: invalid module ...` and exit status 1.
+Any import whose path starts with `Intrinsic`, such as `import Intrinsic.helpers { hi }`, is MOD0004, except `import Intrinsic.application`. The message names the imported path: `Module Intrinsic.helpers cannot be imported: ...`. An unknown `silk.` path, such as `import silk.nope`, is MOD0001 instead. A local module named `silk` or `Intrinsic` at the top of the source root is refused before checking starts, with `silk: invalid module ...` and exit status 1.
 
 Fix: Remove the import and write `Intrinsic.replace(...)` directly; `Intrinsic` needs no import. Rename a local module that uses a reserved name. See The standard library, Intrinsics.
 

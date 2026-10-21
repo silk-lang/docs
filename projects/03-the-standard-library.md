@@ -47,13 +47,13 @@ silk: invalid dependency `silk` of app@0.1.0: the name is reserved for the toolc
 silk: invalid module /home/you/hello/src/silk of hello@0.1.0: `silk` and `Intrinsic` are reserved module names (`silk.` imports name the standard library and `Intrinsic` the compiler's intrinsics); rename it
 ```
 
-- `Intrinsic` is the compiler's own namespace. It needs no import, and no declaration may take its name. Importing it, as in `import Intrinsic { replace }`, is MOD0004:
+- `Intrinsic` is the compiler's own namespace. It needs no import, and no declaration may take its name. Any import whose path starts with `Intrinsic`, as in `import Intrinsic { replace }` or `import Intrinsic.helpers { hi }`, is MOD0004:
 
 ```
-/home/you/hello/src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `silk` and `Intrinsic` are reserved module names, so a local module cannot use them
+/home/you/hello/src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `Intrinsic` is reserved for compiler intrinsics, which are written `Intrinsic.<name>` without an import
 ```
 
-Write `Intrinsic.replace(...)` with no import instead. See **Intrinsics** in the reference.
+Write `Intrinsic.replace(...)` with no import instead. The one importable module is `Intrinsic.application`. See **Intrinsics** in the reference.
 
 ## The surface depends on the target
 
