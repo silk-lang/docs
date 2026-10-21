@@ -11,12 +11,18 @@ importers:
       '@effect/platform-browser':
         specifier: 4.0.0
         version: 4.0.0(effect@4.0.0)
+      '@tanstack/highlight':
+        specifier: 1.1.0
+        version: 1.1.0
       effect:
         specifier: 4.0.0
         version: 4.0.0
       foldkit:
         specifier: 0.169.0
         version: 0.169.0(@effect/platform-browser@4.0.0(effect@4.0.0))(effect@4.0.0)
+      silk-lang:
+        specifier: 0.1.0
+        version: 0.1.0(@tanstack/highlight@1.1.0)
     devDependencies:
       '@effect/tsgo':
         specifier: 0.50.0
@@ -683,6 +689,10 @@ packages:
     resolution: {integrity: sha512-yYU8cogLeSh/ms2jh8Fj7jaba/EWa7Ja6GoUqYZaraEuCI5YS6ms6ObZgjjedm+jm6XZjdNRWBpPP6Z86oOxcw==}
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7 || ^8
+
+  '@tanstack/highlight@1.1.0':
+    resolution: {integrity: sha512-mDn/fhny+WgSVHUH0sAcARlSfbXCQJWebu2NRmCOcD+3I4/73m2D9rcMISgIiXJrhl1vyk9hmAJn7sSnWAbfvQ==}
+    engines: {node: '>=18'}
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -1444,6 +1454,17 @@ packages:
     resolution: {integrity: sha512-6x6dK6zJdpTzF4sQeNYxwtvBzf6Eg4GtlesS94HOvTudUeyK2WXAaIfmDgsyslYrRBeFIlsi54AYsFGUuhmvrQ==}
     engines: {node: '>= 0.4'}
 
+  silk-lang@0.1.0:
+    resolution: {integrity: sha512-a/0X4/cHqeL1RMU9CkoFJZvFL79XUZ2yOHEPkTTvXqAMg7ccDMn4xvXj2rqL6EJ9JJHbotXgGRkLVcUL/+6zMg==}
+    peerDependencies:
+      '@tanstack/highlight': ^1.1.0
+      shiki: '>=1.0.0'
+    peerDependenciesMeta:
+      '@tanstack/highlight':
+        optional: true
+      shiki:
+        optional: true
+
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
@@ -2063,6 +2084,8 @@ snapshots:
       '@tailwindcss/oxide': 4.3.3
       tailwindcss: 4.3.3
       vite: 8.3.5(@types/node@26.4.0)(jiti@2.7.0)
+
+  '@tanstack/highlight@1.1.0': {}
 
   '@types/chai@5.2.3':
     dependencies:
@@ -2778,6 +2801,10 @@ snapshots:
       side-channel-list: 1.0.1
       side-channel-map: 1.0.1
       side-channel-weakmap: 1.0.2
+
+  silk-lang@0.1.0(@tanstack/highlight@1.1.0):
+    optionalDependencies:
+      '@tanstack/highlight': 1.1.0
 
   source-map-js@1.2.2: {}
 

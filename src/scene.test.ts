@@ -1,3 +1,4 @@
+import { HashSet } from 'effect'
 import { expect, given, role, scene } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
@@ -8,7 +9,9 @@ describe('site chrome', () => {
   test('the navigation links to docs, releases and GitHub', () => {
     scene(
       { update, view },
-      given(Model.make({ route: AppRoute.Home() })),
+      given(
+        Model.make({ route: AppRoute.Home(), copiedCodeIds: HashSet.empty() }),
+      ),
       expect(role('link', { name: 'Docs' })).toExist(),
       expect(role('link', { name: 'Releases' })).toExist(),
       expect(role('link', { name: 'GitHub' })).toExist(),
@@ -18,7 +21,12 @@ describe('site chrome', () => {
   test('the current section is marked in the navigation', () => {
     scene(
       { update, view },
-      given(Model.make({ route: AppRoute.Releases() })),
+      given(
+        Model.make({
+          route: AppRoute.Releases(),
+          copiedCodeIds: HashSet.empty(),
+        }),
+      ),
       expect(role('link', { name: 'Releases', current: 'page' })).toExist(),
     )
   })

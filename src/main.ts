@@ -1,35 +1,31 @@
-import { Effect, Schema, pipe } from 'effect'
+import { Effect, HashSet, Schema, pipe } from 'effect'
 import { Command, Runtime, type Update } from 'foldkit'
 import { type Document, type Html, type HtmlBuilder } from 'foldkit/html'
-import { defineMessageUnion } from 'foldkit/message'
 import { UrlRequest, load, pushUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
-import { Url, toString as urlToString } from 'foldkit/url'
+import { toString as urlToString } from 'foldkit/url'
 
 import * as Layout from './layout'
+import { Message } from './message'
+import * as Home from './page/home'
 import { AppRoute, homeRouter, urlToAppRoute } from './route'
 
 // MODEL
 
 export const Model = Schema.Struct({
   route: AppRoute,
+  copiedCodeIds: Schema.HashSet(Schema.String),
 })
 export type Model = typeof Model.Type
 
 // MESSAGE
 
-export const Message = defineMessageUnion({
-  ClickedLink: { request: UrlRequest },
-  ChangedUrl: { url: Url },
-  CompletedNavigateInternal: {},
-  CompletedLoadExternal: {},
-})
-export type Message = typeof Message.Type
+export { Message }
 
 // INIT
 
 export const init: Runtime.RoutingApplicationInit<Model, Message> = url => ({
-  model: { route: urlToAppRoute(url) },
+  model: { route: urlToAppRoute(url), copiedCodeIds: HashSet.empty() },
 })
 
 // COMMAND
@@ -46,6 +42,25 @@ const LoadExternal = Command.define('LoadExternal', {
   messages: [Message.CompletedLoadExternal],
   execute: ({ href }) =>
     load(href).pipe(Effect.as(Message.CompletedLoadExternal())),
+})
+
+export const CopyCode = Command.define('CopyCode', {
+  args: { codeId: Schema.String, text: Schema.String },
+  messages: [Message.SucceededCopyCode, Message.FailedCopyCode],
+  execute: ({ codeId, text }) =>
+    Effect.tryPromise(() => navigator.clipboard.writeText(text)).pipe(
+      Effect.as(Message.SucceededCopyCode({ codeId })),
+      Effect.catch(() => Effect.succeed(Message.FailedCopyCode())),
+    ),
+})
+
+export const WaitBeforeHidingCopied = Command.define('WaitBeforeHidingCopied', {
+  args: { codeId: Schema.String },
+  messages: [Message.CompletedWaitBeforeHidingCopied],
+  execute: ({ codeId }) =>
+    Effect.sleep('2 seconds').pipe(
+      Effect.as(Message.CompletedWaitBeforeHidingCopied({ codeId })),
+    ),
 })
 
 // UPDATE
@@ -70,6 +85,23 @@ export const update = (model: Model, message: Message) =>
     }),
     CompletedNavigateInternal: () => ({ model }),
     CompletedLoadExternal: () => ({ model }),
+    ClickedCopyCode: ({ codeId, text }) => ({
+      model,
+      commands: [CopyCode({ codeId, text })],
+    }),
+    SucceededCopyCode: ({ codeId }) =>
+      HashSet.has(model.copiedCodeIds, codeId)
+        ? { model }
+        : {
+            model: modifyFields(model, {
+              copiedCodeIds: HashSet.add(codeId),
+            }),
+            commands: [WaitBeforeHidingCopied({ codeId })],
+          },
+    FailedCopyCode: () => ({ model }),
+    CompletedWaitBeforeHidingCopied: ({ codeId }) => ({
+      model: modifyFields(model, { copiedCodeIds: HashSet.remove(codeId) }),
+    }),
   })
 
 // VIEW
@@ -106,18 +138,7 @@ const placeholder = (
 
 const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
   AppRoute.match(model.route, {
-    Home: () =>
-      Layout.page(
-        'Home',
-        [
-          placeholder(
-            'Composability, all the way down.',
-            'Silk is a systems language where effects, failures, and dependencies compose.',
-            h,
-          ),
-        ],
-        h,
-      ),
+    Home: () => Home.view(model.copiedCodeIds, h),
     Docs: () =>
       Layout.page(
         'Docs',
