@@ -239,7 +239,7 @@ Without the composition, `libc = "none"` finds no runtime in the std lib catalog
 
 ## WebAssembly
 
-`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: a bump allocator over linear memory and the byte routines LLVM calls. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name:
+`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name:
 
 ```silk
 export "C" fn add(left: i32, right: i32) -> i32 {
@@ -272,7 +272,7 @@ threading = "multi"
 maxMemory = "256MiB"
 ```
 
-The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `maxMemory` sets the memory's maximum; a threaded module defaults to 1 GiB. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.maxMemory = "100KiB"`. Clang 18.1 crashes while building a threaded module, so use a newer Clang for it.
+The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `maxMemory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.maxMemory = "100KiB"`. Clang 18.1 crashes while building a threaded module, so use a newer Clang for it.
 
 The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32 and runs it in Node.
 

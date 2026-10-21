@@ -198,7 +198,7 @@ Adding to a list may need a bigger buffer. In Silk that is never hidden. `append
 
 And the requirement climbs, exactly like the clock in chapter 8. `parseLine` and `parseBoard` call `add`, so they now say `? &mut Allocator` and list `OutOfMemoryError`. So does `addTask`. `execute` already had the allocator in its row, because `load` needed it, so `main` does not change at all.
 
-This is the payoff of treating memory as a service. You can see, from a signature alone, which functions may allocate. `trim`, `part`, `count` and `complete` cannot. And the allocator a test provides could be one that fails on purpose, to check what happens when memory runs out. See **Allocation and shared ownership** in the reference for `List`, `Box` and `Shared`.
+This is the payoff of treating memory as a service. You can see, from a signature alone, which functions may allocate. `trim`, `part`, `count` and `complete` cannot. And the allocator a test provides could be one that fails on purpose, to check what happens when memory runs out. A program can also provide a different allocator to one part of itself, such as an `Arena` from `silk/arena`, which hands out memory from large chunks and gives a phase's memory back all at once. See **Allocation and shared ownership** in the reference for `List`, `Box` and `Shared`.
 
 `BoardFull` is gone. The board only fills when memory does, and that is `OutOfMemoryError`, which `explain` already passes on.
 

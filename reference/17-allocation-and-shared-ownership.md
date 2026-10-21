@@ -1,6 +1,6 @@
 # Allocation and shared ownership
 
-Silk has no implicit global heap. Code that acquires storage states it with an `Allocator` requirement, and a caller supplies the allocator. This page covers that requirement, typed out-of-memory failure, and the standard owning containers `Box`, `List` and `Shared`.
+Silk has no implicit global heap. Code that acquires storage states it with an `Allocator` requirement, and a caller supplies the allocator. This page covers that requirement, typed out-of-memory failure, the standard owning containers `Box`, `List` and `Shared`, and the `Arena` provider.
 
 ## The Allocator service
 
@@ -66,6 +66,20 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 - The reference given to the callback cannot leave it. A callback that tries to return its reference fails to type-check (SEM0076).
 - The callback, and every function it calls directly, must not `run` an Effect. A `run` could suspend while the access is held. This is OWN0016, reported at the `run`.
 - `Shared` handles are not thread-transferable.
+
+## Arena
+
+`Arena<A>` in `silk/arena` is a bump allocator. It implements `Allocator`, so it is provided like any other allocator, and `Box`, `List`, `Bytes` and `Shared` work in it unchanged.
+
+- `Arena.make(child)` creates an arena over another allocator provider, `child`, which it owns. `Arena.withOptions(child, options)` takes chunk sizes as an `ArenaOptions { firstChunkBytes, maximumChunkBytes }`. `ArenaOptions.default()` is a 4 KiB first chunk that doubles up to 1 MiB. Creating an arena allocates nothing.
+- The arena asks its child for chunks and hands out allocations by moving a cursor through the current chunk. It fails with `OutOfMemoryError` only when the child refuses a chunk.
+- A request larger than half a chunk gets a chunk of its own.
+- An allocation does not borrow its arena. It stays valid after the arena is reset or dropped, and may move to another thread.
+- Dropping an allocation does not make its memory reusable. A chunk goes back to the child when the arena has been dropped or reset and the chunk's last allocation has dropped, on whichever thread drops it. A `List` that grows in an arena leaves its earlier buffers behind until then, and one long-lived allocation keeps its whole chunk.
+- `arena.reset(ArenaReset.Release)` stops allocating from the current chunk. `arena.reset(ArenaReset.RetainCapacity)` keeps the current chunk for the next allocations when nothing in it is still alive, and otherwise acts like `Release`.
+- `arena.available()` returns the bytes left in the current chunk.
+- The child can be any provider, including another arena.
+- On `wasm32-unknown-unknown`, dropping arena allocations is broken in this release. Once two allocations from one chunk are dropped, the module stops with `RuntimeError: memory access out of bounds`. Use arenas on native targets for now.
 
 ## Building collections
 
@@ -138,6 +152,47 @@ pub fn main() -> i32 {
 }
 ```
 
+An arena reused for three phases. Each phase's list is dropped before the reset, so `RetainCapacity` keeps the chunk. The `Box` made last outlives the arena. The program exits with 42:
+
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.arena { Arena, ArenaOptions, ArenaReset }
+import silk.box { Box }
+import silk.effect { Effect }
+import silk.list { List }
+
+effect fn phases() -> i32 ! OutOfMemoryError {
+  let options = ArenaOptions { firstChunkBytes: 1024, maximumChunkBytes: 4096 }
+  let mut arena = Arena.withOptions(Allocator.systemAllocatorProvider(), move options)
+  let mut total = 0
+  let mut round = 0
+  while round < 3 {
+    let mut values = List<i32>.make()
+    let mut at = 0
+    while at < 10 {
+      run List<i32>.append(&mut values, at) |> Effect.provideMut<Allocator>(&mut arena)
+      at = at + 1
+    }
+    total = total + List<i32>.get(&values, 9)
+    drop values
+    arena.reset(ArenaReset.RetainCapacity)
+    if arena.available() == 0 { return 2 }
+    round = round + 1
+  }
+  arena.reset(ArenaReset.Release)
+  if arena.available() != 0 { return 3 }
+  let kept = run Box<i32>.make(15) |> Effect.provideMut<Allocator>(&mut arena)
+  drop arena
+  return total + kept.get()[0]
+}
+
+effect fn recover(error: OutOfMemoryError) -> i32 { return 1 }
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(phases(), recover)
+}
+```
+
 A provider that refuses every request, to test the failure path:
 
 ```silk
@@ -186,7 +241,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Ownership and moves · Borrowing · Closures and callable types · Unsafe code and C interop · Intrinsics · Effects and run · Typed failures · Services and providers · Program entry and termination · `silk/allocator`, `silk/box`, `silk/list`, `silk/shared`, `silk/bytes`, `silk/layout`, `silk/raw_buffer`, `silk/slot`, `silk/effect`
+Ownership and moves · Borrowing · Closures and callable types · Unsafe code and C interop · Intrinsics · Effects and run · Typed failures · Services and providers · Program entry and termination · `silk/allocator`, `silk/arena`, `silk/box`, `silk/list`, `silk/shared`, `silk/bytes`, `silk/layout`, `silk/raw_buffer`, `silk/slot`, `silk/effect`
 
 ## Open questions
 

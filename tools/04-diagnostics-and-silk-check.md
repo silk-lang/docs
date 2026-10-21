@@ -76,6 +76,29 @@ Check summary: 0 succeeded, 1 failed
 
 The second error follows from the first: fix the duplicate and it goes away.
 
+A syntax error is reported once, where the source is damaged, and the parser carries on with the rest of the file. Here the parameter list of `half` is missing its `)`:
+
+```silk
+fn half(value: i32 -> i32 {
+  return value / 2
+}
+
+pub fn main() -> i32 {
+  let total: i32 = "8"
+  return half(total)
+}
+```
+
+```
+[x86_64-unknown-linux-gnu]
+/home/you/hello/src/main.silk:1:20: error[PAR0001] Expected `)`
+/home/you/hello/src/main.silk:6:20: error[SEM0037] Assignment expected i32 but received string<'static>
+check x86_64-unknown-linux-gnu: failed (exit 1)
+Check summary: 0 succeeded, 1 failed
+```
+
+The missing `)` gets one diagnostic, not one for each token the parser had to skip, and the type error in `main` is still found. When a declaration is damaged beyond repair, the parser skips to the next line that starts a declaration.
+
 When you check several targets, each target with errors gets its own header, and the same mistake usually appears under each:
 
 ```sh

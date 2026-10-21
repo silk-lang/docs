@@ -208,7 +208,7 @@ build llvm/wasm32-unknown-unknown: ok /home/you/squares/build/llvm/wasm32-unknow
 Build summary: 1 succeeded, 0 failed
 ```
 
-The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports two things: its `memory` and `main`. The compiler links in a small runtime of its own, a bump allocator over linear memory and the byte routines LLVM calls, so `Allocator.systemAllocatorProvider()` works here too.
+The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports two things: its `memory` and `main`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
 
 Any WebAssembly host can instantiate the module and call `main()`. In Node, save this as `run.mjs`:
 
@@ -241,7 +241,7 @@ echo $?
 
 An `export "C" fn` in the program is exported from the module under its name, next to `main`, so the host can call it with numbers. Only scalar and pointer arguments cross that boundary on wasm32; C statics, variadic functions and callbacks are refused.
 
-A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory and the wasi-threads `thread-spawn` function, and `silk/native_thread` runs each thread as a Worker under `wasm-runner.mjs`. `maxMemory` in the profile caps the memory, for example `maxMemory = "256MiB"`; threaded modules default to 1 GiB. The threaded build needs a Clang newer than 18: Clang 18.1 crashes while compiling or linking it.
+A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory and the wasi-threads `thread-spawn` function, and `silk/native_thread` runs each thread as a Worker under `wasm-runner.mjs`. `maxMemory` in the profile caps the memory, for example `maxMemory = "256MiB"`; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit. The threaded build needs a Clang newer than 18: Clang 18.1 crashes while compiling or linking it.
 
 ## Building without libc
 
