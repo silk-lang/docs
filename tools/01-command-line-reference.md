@@ -223,8 +223,8 @@ silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--fil
 | Status | Meaning |
 | --- | --- |
 | 0 | Success. For `format --check`: every file is already formatted |
-| 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, any `silk changes` error including a malformed `silk changes` command line |
-| 2 | The command could not start: a malformed command line (it prints the synopsis), an unknown command, no manifest, an unknown target or profile, an unknown workspace member, conflicting options, `test` without `--no-cache`, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
+| 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, a source file or folder named `silk` or `Intrinsic`, any `silk changes` error including a malformed `silk changes` command line |
+| 2 | The command could not start: a malformed command line (it prints the synopsis), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an unknown target or profile, an unknown workspace member, conflicting options, `test` without `--no-cache`, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
 | other | `silk run` only: the program's own status |
 
 In a workspace, each member gets a status and the command exits with the worst one: 2 over 1 over 0.

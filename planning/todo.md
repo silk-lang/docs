@@ -4,7 +4,7 @@ Things in the docs that will need an update later, and the page each one touches
 
 ## Distribution
 
-- [ ] **Homebrew and mise.** Install covers only install.sh and release archives today. Add `brew install` once silk-lang/homebrew-tap exists, and mise (`github:silk-lang/silk`). Pages: Get started / Install, the book's chapter 1.
+- [ ] **Homebrew and mise.** Install covers only install.sh and release archives today. silk#2038 added Homebrew and mise install instructions to the Silk repository; check them on a machine with brew and mise, then add them. Pages: Get started / Install, the book's chapter 1.
 - [ ] **Other package managers.** AUR (`silk-lang-bin`), a Nix flake, and later .deb/.rpm and Homebrew core. The name `silk` is taken in Homebrew core and AUR, so the docs should say `silk-lang`. Page: Install.
 - [ ] **Apple code signing.** Deferred. Install may need a Gatekeeper note until it lands.
 - [ ] **Release version in examples.** The book and reference were verified on dev.8624 and then on main builds. Rerun all examples on the next release and update version strings and output.
@@ -26,6 +26,7 @@ Things in the docs that will need an update later, and the page each one touches
 - [ ] **HTTP client facade (silk#2014, merged Oct 20).** The new `silk.http_client` (`Http`, `NativeHttp`) is the common case; the old low-level module is now `silk.http_exchange`. The HTTP client guide is written against it. Check that no other page uses the old name.
 - [ ] **wasm support.** Revisit the No-libc Linux and WebAssembly guide as wasm support grows.
 - [ ] **Compiler fixes.** Each fix from the findings list that changes documented behaviour gets a pass on the affected pages.
+- [ ] **Native threads, atomics and locks.** New in silk#2029 to silk#2039: `silk/atomic` (`Atomic`, `wait`, `notifyOne`, `notifyAll`), `silk/thread` (`Transferable`, `Concurrent`), `silk/native_thread` (`NativeThread`, `JoinHandle`), `silk/sync` (`Arc`, `Mutex`, `Parker`), and `Execution.makeTransferable` with `TransferableWake` in `silk/execution`. Only Fibers and scheduling points to them, and the Intrinsics page and the appendix list the atomic members and SEM0237. Needs a reference page (threads and thread properties), a guide, and a pass on the book's chapter 10 and the Concurrent I/O patterns guide, which say nothing runs in parallel (true of fibers only).
 
 ## Get started
 
@@ -39,8 +40,10 @@ Things in the docs that will need an update later, and the page each one touches
 
 - [ ] **wasm32 and no-libc executables** (silk#2024, silk#2025). Targets and profiles, Build outputs and the No-libc Linux and WebAssembly guide document them as not buildable yet.
 - [ ] **`shared-library` artifact.** Not implemented. Libraries and exports says so.
-- [ ] **Profile fields.** safety, threading, sanitizers, cpu, link, codeModel, unwind and entry are accepted but not applied yet. A fix is in progress. Update the profile table when it lands.
-- [ ] **Manifest and link errors.** Native link input errors are fixed (silk#2030): Build outputs now quotes the new messages, which name the manifest and the entry. Still pending: unknown keys being accepted silently and profile errors without a location. Update those error tables when the fixes merge.
+- [x] **Profile fields.** Fixed in silk#2040: `cpu` features, `codeModel = "large"` (x86-64) and `link = "static"` now reach Clang; sanitizers, native unwind, unchecked safety, multi threading and a non-default entry are refused. Targets and profiles, The manifest, and the Package parameters and Static control flow reference pages follow it.
+- [ ] **Refused profile fields.** Update Targets and profiles when the native compiler builds sanitizers, native unwinding, unchecked safety, multi threading, entry selection or the large code model on arm64.
+- [x] **Manifest and link errors.** Native link input errors are fixed (silk#2030). Unknown keys are refused with a line, and profile errors carry a location (silk#2040). The manifest page's error tables follow it.
+- [ ] **Manifest errors without a line.** An unknown `[workspace]` key and a bad profile name still print no line, an unknown key in `[build.composition]` is accepted silently, and a bad `--profile-input` is reported as `Invalid Silk project manifest <path>:`. The manifest page and Targets and profiles document this. Update them when they change.
 - [x] **`--clang` on package builds.** It only works on single-file builds today.
 
 ## Tools

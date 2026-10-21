@@ -51,7 +51,7 @@ EffectEnvironment  = 'effect' '<' Lifetime '>' 'fn' ...
 - Lifetimes are usually inferred at a call. They can be written explicitly: `pick<'p, 'p, 'p>(a, b, false)`.
 - Inference does not depend on parameter order.
 - A lifetime that appears only in the result and has several outlives bounds, as `'c` in `pick<'a: 'c, 'b: 'c, 'c>`, is inferred as the shortest of the argument lifetimes, not `'static`. `pick(&a, &b, false)` is valid.
-- Using such a result after one of its referents ends is OWN0019. Returning it from a function where one referent is local is SEM0212. Returning a borrow at a lifetime the input is not declared to outlive, as in `fn f<'a, 'b>(x: &'a i32) -> &'b i32 { return x }`, is SEM0129, a return type mismatch.
+- Using such a result after one of its referents ends is OWN0019. Returning it from a function where one referent is local is SEM0212. Returning a borrow at a lifetime the input is not declared to outlive, as in `fn f<'a, 'b>(x: &'a i32) -> &'b i32 { return x }`, is SEM0212 at the returned value.
 - A type takes lifetime arguments the same way: `View<'a>`, `string<'a>`.
 - Writing a lifetime argument pins the call. Its bounds must then hold (SEM0212).
 
@@ -82,7 +82,8 @@ Omitted lifetimes in a function signature follow these rules.
 
 ## Validity
 
-- A borrow must not be used after its referent stops being valid (OWN0019). This covers returning a reference to a local, storing one into a longer-lived container, and borrowing a temporary past its statement.
+- A borrow must not be used after its referent stops being valid (OWN0019). This covers storing one into a longer-lived container and borrowing a temporary past its statement. The error points at the use, with a note at the borrow.
+- Returning a reference to a local is SEM0212, reported at the borrow: the result's lifetime must outlive the function, and the local does not.
 - A borrow stored into a value bounded by a caller's lifetime, such as an out-parameter `&mut View<'s>`, must outlive that lifetime (SEM0212 or OWN0019).
 - A `Copy` or `Drop` impl head may not select by lifetime: no `'static`, no repeated lifetime, no bound (SEM0220).
 
@@ -262,7 +263,7 @@ pub fn main() -> i32 {
 }
 ```
 
-OWN0019, returning a borrow of a local:
+SEM0212, returning a borrow of a local. The error points at `&local`:
 
 ```silk
 fn bad(x: &i32) -> &i32 {
@@ -310,7 +311,7 @@ pub fn main() -> i32 {
 | SEM0209 | An explicit lifetime names no binder in scope |
 | SEM0210 | An omitted result lifetime has no unique input |
 | SEM0211 | Invalid lifetime binder, such as a duplicate or `'static` |
-| SEM0212 | A lifetime bound or type outlives bound does not hold |
+| SEM0212 | A lifetime bound or type outlives bound does not hold, including a returned borrow of a local |
 | SEM0220 | A `Drop` or `Copy` head names `'static`, repeats one lifetime, or bounds a lifetime |
 
 SEM0213 (type does not remain valid for a lifetime) is in the catalog, but the compiler has no producer for it. Type outlives failures report SEM0212.

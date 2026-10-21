@@ -26,7 +26,7 @@ NonParkingMarker  = 'with' 'Intrinsic' '.' 'nonParking' '(' ')'
 
 - Every owner live at the suspension point stays in the suspended frame: locals, parameters, partly moved aggregates and held outcomes.
 - Borrows of the frame's own locals may cross a suspension point. A `&mut` taken before a `run` is usable after it.
-- `Execution.make` takes a body of type `once Effect<'static; A>` that is also `Intrinsic.Detached`. A body that borrows a caller's local is rejected at the call with SEM0052 ("A generic call whose type arguments its values do not determine"), not a lifetime error.
+- `Execution.make` takes a body of type `once Effect<'static; A>` that is also `Intrinsic.Detached`. A body that borrows a caller's local is rejected at the call with SEM0139 ("A concrete executable that fails one sealed static-property obligation"), not a lifetime error. `silk check` reports it.
 - A `Shared<T>` handle is an ordinary owner. It may be held across suspension, and clones may live in several suspended frames.
 
 ## Local-shared access and suspension
@@ -403,11 +403,10 @@ SEM0139, a parking finalizer passed to `Effect.ensuringNonParking`. In the cance
 | Code | Meaning |
 | --- | --- |
 | OWN0016 | Code reached from a `Shared.with` or `Shared.withMut` callback runs an Effect or notifies an execution while the access is held |
-| SEM0139 | An executable fails a sealed property obligation, such as `Intrinsic.NonParking` |
+| SEM0139 | An executable fails a sealed property obligation, such as `Intrinsic.NonParking`, or an `Execution.make` body that borrows a caller's local and so is not `Intrinsic.Detached` |
 | SEM0225 | `main` may park, but the runtime starts it without a scheduler |
 | SEM0235 | Unknown property clause or field, such as `with Intrinsic.detached()` |
 | SEM0236 | Known property clause on an operation that does not take it, such as `with Intrinsic.machine(noReturn: true)` |
-| SEM0052 | Type arguments of a generic call cannot be determined; also reported when `Execution.make` receives a body that borrows a caller's local |
 
 ## See also
 

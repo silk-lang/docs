@@ -545,7 +545,6 @@ silk run -- list
 ```
 
 ```
-/home/you/tasks/src/main.silk:361:42: note[borrow-check] this body is not borrow-checked yet (regions); it may hide OWN0019, OWN0011, OWN0010, SEM0212
 Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 396 symbols)
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
@@ -553,8 +552,6 @@ Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm,
 2 open
 (nothing is saved yet)
 ```
-
-The first line is a note, not an error, and the build goes on. Line 361 is the body of `reminder`. The compiler can't yet fully check borrows in a body that pipes an effect into `Effect.catchAll`, so it tells you which checks it skipped there. Writing `run Effect.catchAll(Effect.log(...), ignoreLogError)` without the pipeline makes the note go away. `reminder` borrows nothing, so you can leave it as it is.
 
 To save typing, run the built binary through an alias:
 

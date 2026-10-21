@@ -120,38 +120,59 @@ Read only by `silk changes`, the release-notes tool. Its keys (`repository`, `di
 The compiler checks the whole manifest before it compiles anything, and stops at the first problem. Manifest errors exit with status 2.
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml: build.artefact is not a supported field
+Invalid Silk project manifest /home/you/hello/silk.toml:8: build.artefact is not a supported field
 ```
+
+An unknown key and a profile problem name the line after the path, here line 8 of `silk.toml`. The other errors name only the file.
 
 | Problem | Message after `Invalid Silk project manifest <path>:` |
 | --- | --- |
 | Not TOML | `the manifest is not valid TOML` |
 | No `[package]` and no `[workspace]` | `missing [package] table` |
+| Unknown top-level key or table, such as `[packge]` | `LINE: packge is not a supported field` |
+| Unknown `[package]` key | `LINE: package.<key> is not a supported field` |
+| Unknown key in a dependency entry | `LINE: dependencies.<name>.<key> is not a supported field` |
 | Bad name | `package.name must start with a lowercase letter and contain only lowercase letters, digits, or hyphens` |
 | Bad or missing version | `package.version must be a valid semantic version` |
 | Missing root | `package.root must be a non-empty string` |
 | Root outside source root | `package.root must be a module below the source root` |
-| Unknown `[build]` key | `build.<key> is not a supported field` |
+| Unknown `[build]` key | `LINE: build.<key> is not a supported field` |
 | Bad artifact | `build.artifact must be executable, shared-library, static-library, or object` |
 | Bad stage | `build.stage is not an admitted emission stage` |
 | Output dir escapes | `build.output-dir must be a non-empty manifest-relative directory that does not escape the project` |
 | Bad target list | `build.targets must be a non-empty array of host or canonical target ids` |
-| Unknown `[workspace]` key | `workspace.<key> is not a supported field` |
+| `native-bindings` | `build.native-bindings is not supported by the native compiler yet` |
+| Unknown `[workspace]` key | `workspace.<key> is not a supported field` (no line) |
 | `output-dir` in a member | `build.output-dir cannot be set in a workspace member; set workspace.output-dir instead` |
 
-Problems in `[dependencies]` and `exports` print as `silk: invalid dependency ...` and `silk: invalid exports of ...` (exit 1). See **Dependencies** and **Libraries and exports**.
+Problems in `[dependencies]` other than an unknown key, and in `exports`, print as `silk: invalid dependency ...` and `silk: invalid exports of ...` (exit 1). See **Dependencies** and **Libraries and exports**.
 
-Profile problems print only a class and a subject, with no file name, and exit 2:
+Profile problems name the profile and the key. A bad value is quoted after the key:
 
 ```
-InvalidInput: profile fields
+Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profiles.fast.optimization = "fast"
 ```
 
-That line means a `[profiles.<name>]` table has a key not in the table above. `InvalidInput: <field>` means a bad value; `UnsupportedCombination: <field>` means a value the target cannot use, such as `libc = "system"` on Linux.
+| Problem | Message after `Invalid Silk project manifest <path>:LINE:` |
+| --- | --- |
+| A key profiles do not have | `profiles.fast.optimisation is not a supported field` |
+| A key `cpu` does not have | `profiles.fast.cpu.modle is not a supported field` |
+| A value the field does not take | `InvalidInput: profiles.fast.optimization = "fast"` |
+| A value the target cannot use | `UnsupportedCombination: profiles.fast.libc = "system"` |
+| A value the native compiler cannot build yet | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
+| `[build].profile` names no profile | `InvalidInput: build.profile = "fats" names no [profiles.fats] table` |
+| A bad binding | `InvalidInput: build.bindings: binding identity`, or `profiles.fast.bindings` for a profile's binding |
+
+A bad profile name has no line: ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` ``. Targets and profiles lists every refused combination.
 
 ## Keys that are not checked
 
-Unknown keys are refused in `[build]`, `[workspace]`, profiles and bindings. They are accepted silently in `[package]`, in dependency entries and at the top level. A misspelled `[packge]` table or a `description` key changes nothing and reports nothing.
+Unknown keys are refused at the top level and in `[package]`, dependency entries, `[build]`, `[workspace]`, profiles, `cpu` tables and bindings. A misspelled `[packge]` table or a `description` key stops the build.
+
+Two tables are not checked:
+
+- `[changes]`. Builds ignore it; `silk changes` reads it.
+- `[build.composition]`. An unknown key there, such as `bogus = 1`, is accepted and changes nothing.
 
 ## See also
 

@@ -25,10 +25,11 @@ PropertyClause  = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Na
 | Category | Count | Members |
 | --- | --: | --- |
 | Scalar operations | 618 | `<scalar><Operation>`, see below |
-| Pointers | 16 | `pointerFromRef`, `pointerFromMutRef`, `pointerFromSlice`, `pointerFromMutSlice`, `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerAddress`, `pointerIsNull`, `pointerNull` |
+| Pointers | 19 | `pointerFromRef`, `pointerFromMutRef`, `pointerFromSlice`, `pointerFromMutSlice`, `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerAddress`, `pointerIsNull`, `pointerNull`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut` |
+| Atomics | 13 | `atomicLoad`, `atomicStore`, `atomicSwap`, `atomicCompareExchange`, `atomicCompareExchangeWeak`, `atomicFetchAdd`, `atomicFetchSubtract`, `atomicFetchBitAnd`, `atomicFetchBitOr`, `atomicFetchBitXor`, `atomicFetchMinimum`, `atomicFetchMaximum`, `atomicFence` |
 | Allocation and raw storage | 15 | `layoutOf`, `systemAllocationAcquire`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
 | Shared ownership | 4 | `sharedLayout`, `sharedFromAllocation`, `sharedClone`, `sharedWithMut` |
-| Execution | 10 | `executionLayout`, `executionFromAllocation`, `executionDrive`, `relinquish`, `executionCurrent`, `executionRefOf`, `executionLoad`, `executionStore`, `executionNotify`, `executionLive` |
+| Execution | 11 | `executionLayout`, `executionFromAllocation`, `executionDrive`, `relinquish`, `executionCurrent`, `executionRefOf`, `executionLoad`, `executionStore`, `executionCompareExchange`, `executionNotify`, `executionLive` |
 | Effect composition | 8 | `bindRequirement`, `bindRequirementMut`, `bindRequirementOwned`, `catchFailure`, `suspendEffect`, `finalizeEffect`, `finalizeEffectNonParking`, `useReleaseNonParking` |
 | Text and slices | 5 | `stringUtf8Bytes`, `stringFromUtf8Unchecked`, `stringByteLength`, `stringEqualsExact`, `sliceView` |
 | Places | 2 | `replace`, `borrowField` |
@@ -87,7 +88,8 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 
 ## Unsafe members
 
-- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `assembly`.
+- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `assembly`.
+- Every atomic member except `atomicFence` is unsafe. Each takes its memory order as a static string, such as `"acquire"`; an order or element type the operation does not admit is SEM0237.
 - So are these storage members: `rawBufferFrom`, `rawBufferSlot`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `sharedFromAllocation`, `stringFromUtf8Unchecked`, `executionFromAllocation`.
 - Call them inside `unsafe { }` or as `unsafe Intrinsic.member(...)`. Otherwise SEM0082.
 - No other member is unsafe. Scalar operations, target queries and reflection are safe.
@@ -113,6 +115,7 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 | `Copy`, `Drop` | `silk/ownership` |
 | Operator interfaces | `silk/ops`, `silk/equal`, `silk/order` |
 | Pointers | `silk/pointer` |
+| Atomics | `silk/atomic` |
 | Allocation, raw storage | `silk/allocator`, `silk/layout`, `silk/raw_buffer`, `silk/slot`, `silk/box`, `silk/list` |
 | Shared ownership | `silk/shared` |
 | Execution | `silk/execution` |
@@ -205,6 +208,7 @@ pub fn main() -> i32 {
 | SEM0215 | Invalid pointer qualifier conversion, such as `pointerRequalify` changing the pointee |
 | SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause, such as `with Intrinsic.detached()` |
 | SEM0236 | Known property on a declaration that does not take it, such as `Intrinsic.machine(...)` on a plain function |
+| SEM0237 | An atomic member with a memory order or element type it does not admit, such as `atomicStore` with `"acquire"` |
 
 ## See also
 

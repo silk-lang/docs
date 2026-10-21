@@ -48,7 +48,7 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 ## Determinism and budgets
 
 - A static function cannot be `effect`, `unsafe`, `test`, `extern` or `export`, and has no failure or requirement row. It performs no I/O, so equal inputs always give equal results.
-- A `static fn` body runs only in static evaluation over static values. The runtime borrow and move checks do not cover it by design, and `silk check` prints no `note[borrow-check]` for it.
+- A `static fn` body runs only in static evaluation over static values. The runtime borrow and move checks do not cover it by design.
 - Work is measured in evaluator steps, not time. Each demand has fixed budgets:
 
 | Budget | Limit | Exceeded |

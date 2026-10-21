@@ -111,7 +111,7 @@ Named/full profiles conflict with target and optimization flags
 
 ## Profile fields
 
-The manifest page lists every field and its values. Today the native build applies these:
+The manifest page lists every field and its values. The native build applies these:
 
 | Field | Effect |
 | --- | --- |
@@ -122,19 +122,73 @@ The manifest page lists every field and its values. Today the native build appli
 | `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one. |
 | `relocation` | `pic` or `static` code for object, archive and IR output. |
 | `deployment` | macOS minimum version for the link. |
+| `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts only the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere. |
+| `codeModel` | `large` passes `-mcmodel=large`. x86-64 targets only. |
+| `link` | `static` links a static executable (`-static`) with code that is not position independent. |
+| `artifact` | Must name the same form as `[build].artifact`. Set the output form there. |
 
-The other fields (`cpu`, `entry`, `link`, `codeModel`, `safety`, `threading`, `sanitizers`, `unwind`) are checked for valid values and combinations, and except `sanitizers` and `cpu` features they are readable through `Compilation`. The native build does not act on them yet. `sanitizers = ["address"]`, for example, builds a program with no sanitizer and no warning. A profile's `artifact` does not change the output form either; set `[build].artifact` instead.
+`cpu.features` takes `aes`, `avx`, `avx2`, `sse2` and `sse4.2` on x86-64 Linux, and `crc`, `crypto`, `fp-armv8`, `lse` and `neon` on the arm64 targets. Code can test them with `Target.hasCpuFeature`. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
+
+```toml
+[profiles.fast]
+target = "x86_64-unknown-linux-gnu"
+
+[profiles.fast.cpu]
+features = ["avx2"]
+```
+
+`link = "static"` on Linux gives a static executable:
+
+```toml
+[profiles.fast]
+target = "x86_64-unknown-linux-gnu"
+link = "static"
+```
+
+```sh
+silk build --profile fast
+file build/llvm/x86_64-unknown-linux-gnu/fast/tiny
+```
+
+```
+Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/fast/tiny (llvm, x86_64-unknown-linux-gnu, 182 symbols)
+build llvm/x86_64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/x86_64-unknown-linux-gnu/fast/tiny
+Build summary: 1 succeeded, 0 failed
+build/llvm/x86_64-unknown-linux-gnu/fast/tiny: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=cdea8134f07c4bd5d436d11d6e872dbe1703a0cd, for GNU/Linux 3.2.0, not stripped
+```
+
+The other fields are valid values that the native compiler cannot build yet. Rather than ignore them, it refuses a profile that changes them from the default:
+
+| Field | Refused value | Message after `Invalid Silk project manifest <path>:LINE:` |
+| --- | --- | --- |
+| `sanitizers` | any non-empty list | `profiles.fast.sanitizers is not supported by the native compiler yet` |
+| `unwind` | `"native"` | `profiles.fast.unwind = "native" is not supported by the native compiler yet` |
+| `safety` | `"unchecked"` | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
+| `threading` | `"multi"` | `profiles.fast.threading = "multi" is not supported by the native compiler yet` |
+| `entry` | `{ kind = "none" }` or `{ kind = "named", ... }` | `profiles.fast.entry is not supported by the native compiler yet` |
+| `codeModel` | `"large"` on an arm64 target | `profiles.arm.codeModel = "large" is not supported by the native compiler yet` |
+
+`--profile-input` is checked the same way. Its errors still start with the manifest path, although the problem is in the JSON:
+
+```
+Invalid Silk project manifest /home/you/tiny/silk.toml: --profile-input.safety = "unchecked" is not supported by the native compiler yet
+```
 
 These combinations are refused when the manifest is read:
 
-| Combination | Message |
+| Combination | Message after `Invalid Silk project manifest <path>:LINE:` |
 | --- | --- |
-| `libc` not valid for the target | `UnsupportedCombination: libc` |
-| wasm with `link`, `relocation`, `codeModel`, `unwind`, `deployment` or `sanitizers` changed from its defaults | `UnsupportedCombination: target` |
-| `sanitizers` with both `address` and `thread` | `UnsupportedCombination: sanitizers` |
-| `thread` sanitizer without `threading = "multi"` | `UnsupportedCombination: threading` |
-| macOS executable with `link = "static"` | `UnsupportedCombination: link` |
-| `target = "host"` | `UnsupportedCombination: target` |
+| `libc` not valid for the target | `UnsupportedCombination: profiles.fast.libc = "system"` |
+| wasm with `link`, `relocation`, `codeModel`, `unwind`, `deployment` or `sanitizers` changed from its defaults | `UnsupportedCombination: profiles.web.target = "wasm32-unknown-unknown"` |
+| `sanitizers` with both `address` and `thread` | `UnsupportedCombination: profiles.fast.sanitizers` |
+| `thread` sanitizer without `threading = "multi"` | `UnsupportedCombination: profiles.fast.threading` |
+| macOS executable with `link = "static"` | `UnsupportedCombination: profiles.mac.link = "static"` |
+| `target = "host"` | `UnsupportedCombination: profiles.fast.target = "host"` |
+| `cpu.model` other than the target's default | `UnsupportedCombination: profiles.fast.cpu.model = "znver3"` |
+| a `cpu.features` entry the target does not have | `UnsupportedCombination: profiles.fast.cpu.features` |
+| `artifact` different from `[build].artifact` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [build].artifact = "executable"; set [build].artifact to choose the artifact, and omit the profile's artifact or write it as "executable"` |
+
+The profile names in these messages are the ones used to produce them; yours shows its own. LINE is the line of the field, or of the `[profiles.<name>]` header when the field is missing, as for the thread sanitizer without `threading`.
 
 ## Linux without libc
 

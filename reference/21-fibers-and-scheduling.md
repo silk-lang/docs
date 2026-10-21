@@ -5,6 +5,7 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 ## Execution model
 
 - All fibers of one scheduler run on one host thread. There is no parallelism and no preemption.
+- Native threads are separate from fibers. `NativeThread.spawn` in `silk/native_thread` runs a `Transferable` closure on its own operating-system thread, and `JoinHandle.join` waits for its result. `silk/atomic`, `silk/sync` and `silk/thread` hold the matching atomics, locks and thread properties. This page does not cover them.
 - A task runs until it parks. It parks when it waits on an unfinished fiber, yields, waits on a timer, or forks a child.
 - When a task parks, the scheduler resumes another ready task. `LocalScheduler` keeps ready tasks in FIFO order.
 - A task that never parks keeps the thread until it finishes.
@@ -22,7 +23,8 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 - `Fiber<A, E>.forkChild(child)` starts a child task and returns its `Fiber<A, E>`.
 - The type arguments must be written. Without them it is SEM0052.
 - `child` is a `once Effect<'static; A ! E ? &mut Scheduler | &mut MonotonicClock>`. A child may require less, but nothing else.
-- A child that requires another service, or borrows from the parent, does not fit the parameter (SEM0076). Pass owned values such as `Shared` handles instead.
+- A child that requires another service does not fit the parameter (SEM0076).
+- A child that borrows from the parent is not `'static` (SEM0212). The error points at the parent's borrow, such as `&n` for a captured `view = &n`, or at the `run` of the fork when the child Effect borrows a parameter. Pass owned values such as `Shared` handles instead.
 - `forkChild` requires `? &mut Scheduler`. Forking without it in the row is SEM0071.
 - `forkChild` can fail with `OutOfMemoryError` (allocation or publication refused) or `TaskIdExhaustedError` (no task identity left).
 - The child does not start at the fork. The scheduler resumes the parent first. The child body starts on a later activation, for example when the parent parks.
@@ -269,7 +271,8 @@ pub fn main() -> i32 {
 | OWN0001 | Fiber used after `join` or `await` consumed it |
 | SEM0052 | `forkChild` called without explicit type arguments |
 | SEM0071 | `forkChild` run without `? &mut Scheduler` in the row |
-| SEM0076 | Child Effect does not fit `forkChild`: extra requirement or borrowed capture |
+| SEM0076 | Child Effect does not fit `forkChild`: it requires another service |
+| SEM0212 | Child Effect borrows from the parent, so it is not `'static` |
 | SEM0225 | Parking code reachable from `main` without a scheduler (reported at `main`, by `silk build` only) |
 
 ## See also

@@ -282,7 +282,6 @@ silk run
 ```
 
 ```
-/home/you/wordfreq/src/main.silk:148:90: note[borrow-check] this body is not borrow-checked yet (regions); it may hide OWN0019, OWN0011, OWN0010, SEM0212
 Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/wordfreq (llvm, x86_64-unknown-linux-gnu, 444 symbols)
 16 words
 6 distinct words after dropping 3 stop words
@@ -294,7 +293,7 @@ Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/wordfreq (ll
 1 ran
 ```
 
-The first line is a note, not an error. Line 148 is `report`. Its words are views into `lower`, and those views are stored in a list and a map. The compiler can't yet fully check borrows that flow through such containers, so it names the checks it skipped. The program is correct as written: `lower` lives until the end of `report`, longer than every view of it.
+In `report`, the words are views into `lower`, and those views are stored in a list and a map. The compiler checks borrows that flow through containers like these. The program passes because `lower` lives until the end of `report`, longer than every view of it.
 
 There are 16 words. After "the", "and" and "on" are dropped, 6 remain. "cat" and "sat" appear twice, and the ties are in alphabetical order.
 

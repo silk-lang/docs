@@ -40,8 +40,20 @@ silk: --stdlib /tmp is not a standard library directory: it has no compositions.
 silk: invalid dependency `silk` of app@0.1.0: the name is reserved for the toolchain
 ```
 
-- An import path that starts with `silk.` always means the std lib. A local `src/silk/extra.silk` cannot be imported: `import silk.extra` is MOD0001.
-- `Intrinsic` is the compiler's own namespace. It needs no import, and no declaration may take its name. See **Intrinsics** in the reference.
+- An import path that starts with `silk.` always means the std lib. `import silk.nope` is MOD0001: `Unknown module silk.nope`.
+- A package cannot have a module named `silk` or `Intrinsic` at the top of its source root, as a file (`src/silk.silk`) or a folder (`src/silk/extra.silk`). The package is refused before anything is checked, even if nothing imports the module, and the command exits with status 1:
+
+```
+silk: invalid module /home/you/hello/src/silk of hello@0.1.0: `silk` and `Intrinsic` are reserved module names (`silk.` imports name the standard library and `Intrinsic` the compiler's intrinsics); rename it
+```
+
+- `Intrinsic` is the compiler's own namespace. It needs no import, and no declaration may take its name. Importing it, as in `import Intrinsic { replace }`, is MOD0004:
+
+```
+/home/you/hello/src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `silk` and `Intrinsic` are reserved module names, so a local module cannot use them
+```
+
+Write `Intrinsic.replace(...)` with no import instead. See **Intrinsics** in the reference.
 
 ## The surface depends on the target
 

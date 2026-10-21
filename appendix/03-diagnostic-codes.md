@@ -14,9 +14,9 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | --- | --- | --- |
 | LEX | Lexing literals | LEX0001-LEX0012. This compiler reports none of them; see LEX. |
 | PAR | Parsing | PAR0001-PAR0007 |
-| MOD | Module and package resolution | MOD0001-MOD0003 |
+| MOD | Module and package resolution | MOD0001-MOD0004 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0020 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0236 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0237 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired; they are never reused.
 
@@ -218,6 +218,8 @@ pub fn main() -> i32 { return 0 }
 
 Message template, not filled by this compiler: `Module {module} imports itself`.
 
+Only the import is reported. The names it would have bound cause no further errors, in the module itself or in modules that import it.
+
 Fix: Remove the import. Names in the same module are already in scope. See Modules and imports.
 
 ### MOD0003
@@ -278,6 +280,25 @@ pub fn salt() -> i32 { return 0 }
 ```
 
 Fix: Import an exported module, or add the module to `exports` in the dependency's `silk.toml`. See Modules and imports, The manifest.
+
+### MOD0004
+
+An import under the reserved module names `silk` or `Intrinsic` that names no standard-library module or intrinsic.
+
+```silk
+import Intrinsic { replace }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `silk` and `Intrinsic` are reserved module names, so a local module cannot use them
+```
+
+Any import of `Intrinsic` or a path under it, such as `import Intrinsic.helpers { hi }`, is MOD0004. An unknown `silk.` path, such as `import silk.nope`, is MOD0001 instead. A local module named `silk` or `Intrinsic` at the top of the source root is refused before checking starts, with `silk: invalid module ...` and exit status 1.
+
+Fix: Remove the import and write `Intrinsic.replace(...)` directly; `Intrinsic` needs no import. Rename a local module that uses a reserved name. See The standard library, Intrinsics.
 
 ## OWN: ownership and borrowing
 
@@ -3640,7 +3661,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0236)
+## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0237)
 
 ### SEM0187
 
@@ -4272,6 +4293,27 @@ pub fn main() -> i32 { return naked() }
 ```
 
 Fix: Put `Intrinsic.machine` and `Intrinsic.foreign` only on `extern "C"` or `export "C"` functions. See Unsafe code and C interop, Intrinsics.
+
+### SEM0237
+
+An atomic intrinsic call whose memory order or element type the operation does not admit.
+
+```silk
+unsafe fn publish(pointer: *mut u32) -> () {
+  unsafe { Intrinsic.atomicStore<u32>(pointer, 1, "acquire") }
+}
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:51: error[SEM0237] This atomic operation does not admit this memory order or element type
+```
+
+The column points at the memory order. A store takes `"relaxed"`, `"release"` or `"sequentiallyConsistent"`, not `"acquire"`. The same code covers an arithmetic operation on a float, such as `Intrinsic.atomicFetchAdd<f64>`, a compare-exchange whose failure order is `"release"`, and a misspelled order such as `"seqCst"`.
+
+Fix: Use an order the operation admits: `"release"` here. Most code should use `silk/atomic` instead of the intrinsics. See Intrinsics.
 
 ## Codes this compiler does not report
 

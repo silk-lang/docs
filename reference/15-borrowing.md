@@ -70,7 +70,7 @@ A loan ends after the last use of every reference derived from it. Code after th
 - A guard may read bindings but cannot consume one (OWN0008).
 - `match &mut` on a temporary is OWN0009. Bind the value to a local first.
 - A reference cannot be the subject itself (SEM0226). Match its referent: `match &r.*` or `match &mut r.*`.
-- The scrutinee stays borrowed for the whole arm. Writing the scrutinee's owner inside the arm is OWN0011.
+- The scrutinee stays borrowed while the arm still uses a binding. Writing the scrutinee's owner before the binding's last use is OWN0011. After it, the write is accepted.
 
 See Patterns and match for patterns and `match place`.
 
@@ -81,6 +81,7 @@ See Patterns and match for patterns and `match place`.
 - A callee signature can store one argument's loan into another. With `fn keep<'k>(out: &mut Holder<'k>, v: &'k i32)`, the caller's loan on `v`'s referent lasts as long as `'k`.
 - This holds for the caller's local lifetimes too. `keep(&mut h, &a)` inside an inner block, followed by `h.view.*` after the block, is OWN0019, just like `h.view = &a`. Parameter order does not matter: `fn stash<'a>(src: &'a i32, out: &mut Holder<'a>)` can be called from local code.
 - Inside a function whose parameters name the lifetime, that loan lasts to the end of the function.
+- A store through an out-parameter is checked the same way. With `src: &'a mut i32` and `out: &mut Holder<'a>`, `out.view = &src.*` followed by `src.* = 9` is OWN0011, and a later read of `out.view.*` is OWN0019. Storing through a call, as in `put(&mut out.*, &src.*)`, gives the same two errors.
 - A reference to a local stored where it would outlive the local is OWN0019, or SEM0212 when the call's lifetimes cannot be satisfied.
 
 ## Examples
@@ -269,7 +270,3 @@ pub fn main() -> i32 {
 ## See also
 
 Ownership and moves · Lifetimes · Patterns and match · Functions and methods · Structs, tuples and arrays · Allocation and shared ownership · `silk/slice`
-
-## Open questions
-
-- `out.view = &src.*` followed by `src.* = 9`, with `src: &'a mut i32` and `out: &mut Holder<'a>`, is accepted. `silk check` only prints `note[borrow-check] this body is not borrow-checked yet (stored-loans); it may hide OWN0019, OWN0011, OWN0010` at the start of the function body. The same store through a call is OWN0011.

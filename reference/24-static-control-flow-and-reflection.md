@@ -122,7 +122,7 @@ All of these are fixed by the build request (`--target`, `--release`, `--profile
 | `debug` | `bool` constant: whether debug information is requested |
 
 - These enums are scalar enums, so they compare with `==` and `!=`.
-- A named profile sets them from its fields, for example `optimization = "speed"` and `safety = "unchecked"`. See Package parameters for profiles.
+- A named profile sets them from its fields, for example `optimization = "speed"` and `debug = false`. The native compiler refuses a profile that sets `safety`, `threading`, `unwind`, `sanitizers` or `entry` away from its default, so those queries return the defaults in every build that compiles. See Package parameters for profiles.
 
 ## Exact function types
 

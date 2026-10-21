@@ -108,13 +108,13 @@ Value tables:
 - Integer values are decimal strings, not TOML numbers. `"-0"` reads as `0`.
 - An array binding lists one value table per element: `value = { kind = "array", values = [{ kind = "integer", value = "3" }, { kind = "integer", value = "4" }] }` binds a `[i32; 2]` parameter.
 - `provenance` is `"literal"`, or `"translated-public"` with a `translator` key.
-- `"secret"`, `"physical-supply"` and `"runtime"` are forbidden. One such binding anywhere in the manifest, even in an unselected profile, stops every build with `ForbiddenProvenance: binding`.
+- `"secret"`, `"physical-supply"` and `"runtime"` are forbidden. One such binding anywhere in the manifest, even in an unselected profile, stops every build with `ForbiddenProvenance: build.bindings: binding` (or `profiles.<name>.bindings`), after the manifest path and the line of the binding's `[[...]]` header. A binding with a missing or extra key is `InvalidInput: build.bindings: binding identity`.
 - A binding for an unknown parameter, a value of the wrong kind, or an integer out of range is refused with SEM0214 at the binding's `parameter` line in `silk.toml`, naming the parameter, as in ``silk.toml:10: error[SEM0214] invalid package parameter binding: the value bound to `x` does not have its parameter's type``. An unknown name reads "module `main.silk` declares no package parameter `y`". An array of the wrong length or element kind is refused the same way.
 - Every binding is type-checked, including one that loses on precedence.
 
 ## Profiles and precedence
 
-- `[profiles.<name>]` is a named build profile. `target` is required. Other fields include `optimization`, `safety`, `threading`, `debug`, `libc` and `artifact`; `silk/compilation` and `silk/target` read them.
+- `[profiles.<name>]` is a named build profile. `target` is required. Other fields include `optimization`, `safety`, `threading`, `debug`, `libc` and `artifact`; `silk/compilation` and `silk/target` read them. The native compiler refuses `safety = "unchecked"` and `threading = "multi"` for now; see Targets and profiles in the Projects section.
 - `[build].profile` names the default profile. `--profile <name>` selects another. An unknown name is refused.
 - A build of a named profile, selected by `--profile` or by `[build].profile`, writes its output to `build/llvm/<triple>/<name>/`. Other builds use `debug/` or `release/`.
 - `--profile-input <json>` supplies a complete profile, with the same fields and `bindings`, as JSON.

@@ -221,16 +221,18 @@ effect fn root<'text>(title: string<'text>) -> () ! OutOfMemoryError | TaskIdExh
 }
 ```
 
-(This version imports `silk.string { String }` instead of the logger.) It fails the same way, at the same argument:
+(This version imports `silk.string { String }` instead of the logger.) It fails on the same line, but with a lifetime error:
 
 ```
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:14:49: error[SEM0076] A callable value whose signature cannot satisfy the expected callable type
+/home/you/scratch/src/main.silk:14:15: error[SEM0212] A lifetime that must outlive another but is not known to
 check x86_64-unknown-linux-gnu: failed (exit 1)
 Check summary: 0 succeeded, 1 failed
 ```
 
-So when you see SEM0076 at a `forkChild`, ask two questions. Does the child need a service other than the two allowed? Does it borrow something? The fix is always the same shape: give the child owned values, and do the logging or the borrowing in the parent.
+Column 15 is the `run` of the fork. SEM0212 means one lifetime has to outlive another and does not. Here the child must be `'static`, but `measure(title)` borrows `title`, which is only valid during `'text`.
+
+So a failed `forkChild` comes in two kinds. SEM0076 means the child needs a service other than the two allowed. SEM0212 means it borrows something. The fix is always the same shape: give the child owned values, and do the logging or the borrowing in the parent.
 
 That leaves a puzzle. How do fibers report back if they cannot borrow? With `Shared<T>` from `silk/shared`. A `Shared` is an owned, counted handle to one value on the heap. Each fiber gets its own clone of the handle, and they all point at the same value. `Shared.withMut(&handle, callback)` lends the value to a callback for a moment. The callback must be an ordinary `fn` that runs no effects, so nobody can park while holding the value. See **Allocation and shared ownership** in the reference.
 
@@ -675,7 +677,7 @@ A quarter of a virtual second, checked in 175 microseconds. This is the payoff o
 
 - You can fork child fibers with `Fiber<A, E>.forkChild`, and collect them with `join` (failures pass through) or `await` (an `Outcome` as data).
 - You can run a root fiber with `LocalScheduler.execute`, providing a `MonotonicClock` for its timers, and sleep with `Effect.sleep`.
-- You know the two fiber rules: only `Scheduler` and `MonotonicClock`, only owned `'static` data. SEM0076 at a fork means one was broken.
+- You know the two fiber rules: only `Scheduler` and `MonotonicClock` (SEM0076 at a fork), and only owned `'static` data (SEM0212).
 - You can share results between fibers with `Shared`, `Shared.clone` and `Shared.withMut`.
 - You know that dropping a handle does not cancel a fiber, but the end of its parent does.
 - You can test timing code instantly with a virtual-time `MonotonicClock` provider.

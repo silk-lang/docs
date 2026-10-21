@@ -50,7 +50,7 @@ Packages that depend on a library compile its source with their own. The artifac
 | `"shared-library"` | `lib<name>.so`, or `lib<name>.dylib` on macOS | Not built yet: `SILK_GAP artifact-form: the shared-library form is not native yet`, exit 2. |
 | `"executable"` (default) | `<name>` | A program. |
 
-Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`.
+Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`. A profile's `artifact` must name the same form as `[build].artifact`, or the manifest is refused. See **Targets and profiles**.
 
 - A library has no runtime. Its roots are its `export "C"` functions and statics, plus what they reach. A library with no C exports builds an empty archive (`0 symbols`).
 - The archive holds the compiled Silk code, not libc. Link it with a C toolchain that supplies libc.
