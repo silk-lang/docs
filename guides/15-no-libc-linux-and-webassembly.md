@@ -1,6 +1,6 @@
 # No-libc Linux and WebAssembly
 
-Silk compiles for six targets. Four are ordinary hosted systems with a C library. The other two have no C library at all: Linux without libc (`x86_64-unknown-linux-gnu-no-libc` and its `aarch64` twin, in the reference's naming) and WebAssembly (`wasm32-unknown-unknown`). This guide writes one program, `squares`, that selects different code for each kind of target, checks it for all three, and shows what this release can and cannot build.
+Silk compiles for six targets. Four are ordinary hosted systems with a C library. The other two have no C library at all: Linux without libc (`x86_64-unknown-linux-gnu-no-libc` and its `aarch64` twin, in the reference's naming) and WebAssembly (`wasm32-unknown-unknown`). This guide writes one program, `squares`, that selects different code for each kind of target, checks it for all three, builds a WebAssembly module and runs it.
 
 ## What changes without libc
 
@@ -189,16 +189,63 @@ Check summary: 0 succeeded, 1 failed
 
 ```
 [wasm32-unknown-unknown]
-<silk>/lib/silk/stdlib/silk/os_random.silk:41:14: error[SEM0177] OsRandom requires a supported Darwin or GNU libc profile
+/home/you/squares/src/main.silk:26:18: error[SEM0177] OsRandom requires a supported Darwin or GNU libc profile
 check wasm32-unknown-unknown: failed (exit 1)
 Check summary: 0 succeeded, 1 failed
 ```
 
-SEM0177 means library code asked the compiler to stop. The location is inside the std lib, but the mistake is the call in your code. On such a target, write a `Random` provider over whatever entropy the host gives you.
+SEM0177 means library code asked the compiler to stop. The check runs inside `OsRandom.make`, and the error is reported at your call to it. On such a target, write a `Random` provider over whatever entropy the host gives you.
 
-## Building: what works today
+## Build and run the WebAssembly module
 
-This release checks both targets but cannot produce a program for either. These are the messages you get:
+```sh
+silk build --profile web
+```
+
+```
+Compiled src/main.silk -> build/llvm/wasm32-unknown-unknown/web/squares (llvm, wasm32-unknown-unknown, 31 symbols)
+build llvm/wasm32-unknown-unknown: ok /home/you/squares/build/llvm/wasm32-unknown-unknown/web/squares
+Build summary: 1 succeeded, 0 failed
+```
+
+The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports two things: its `memory` and `main`. The compiler links in a small runtime of its own, a bump allocator over linear memory and the byte routines LLVM calls, so `Allocator.systemAllocatorProvider()` works here too.
+
+Any WebAssembly host can instantiate the module and call `main()`. In Node, save this as `run.mjs`:
+
+```js
+import { readFile } from 'node:fs/promises'
+
+const bytes = await readFile('build/llvm/wasm32-unknown-unknown/web/squares')
+const { instance } = await WebAssembly.instantiate(bytes, {})
+console.log(instance.exports.main())
+```
+
+```sh
+node run.mjs
+```
+
+```
+385
+```
+
+The std lib also ships a runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`. It runs `main` and exits with its result as the process status, which keeps only the low 8 bits: 385 becomes 129.
+
+```sh
+node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/llvm/wasm32-unknown-unknown/web/squares
+echo $?
+```
+
+```
+129
+```
+
+An `export "C" fn` in the program is exported from the module under its name, next to `main`, so the host can call it with numbers. Only scalar and pointer arguments cross that boundary on wasm32; C statics, variadic functions and callbacks are refused.
+
+A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory and the wasi-threads `thread-spawn` function, and `silk/native_thread` runs each thread as a Worker under `wasm-runner.mjs`. `maxMemory` in the profile caps the memory, for example `maxMemory = "256MiB"`; threaded modules default to 1 GiB. The threaded build needs a Clang newer than 18: Clang 18.1 crashes while compiling or linking it.
+
+## Building without libc
+
+The no-libc profile checks but does not build yet:
 
 ```sh
 silk build --profile bare
@@ -210,19 +257,7 @@ build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
 Build summary: 0 succeeded, 1 failed
 ```
 
-```sh
-silk build --profile web
-```
-
-```
-Cannot link an executable for target wasm32-unknown-unknown on host x86_64-unknown-linux-gnu
-build llvm/wasm32-unknown-unknown: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
-```
-
-The compiler links executables only for the host target. Stopping early with `[build] stage = "object"` does not help yet: code generation then stops at the C-ABI export in `silk/wasm_start` with `unsupported[c-abi-target] not supported by the native compiler yet`. The same happens for a library-style module that exports its own `export "C"` functions.
-
-Nothing in the Silk repository's test scripts or CI workflows runs WebAssembly output, so there is no reference runtime to point to. When wasm32 builds land, the result is a module with no imports from the host that exports `main`. Any WebAssembly host can instantiate it and call `main()` to get the `i32`. Until then, use the wasm32 and no-libc profiles to check code, and keep the code they check portable.
+The compiler cannot generate the raw runtime's entry point yet. Until it can, use the `bare` profile to check code, and keep the code it checks portable.
 
 ## API reference
 
@@ -232,5 +267,7 @@ Nothing in the Silk repository's test scripts or CI workflows runs WebAssembly o
 - `silk/raw_process_inputs`: `ProcessInputs` (no-libc Linux only)
 - `silk/raw_mapping`: `Mapping` (no-libc Linux only)
 - `silk/raw_start`, `silk/wasm_start`, `silk/native_start`: runtime modules, no public items
+- `silk/native_thread`: `NativeThread` (hosted targets, and wasm32 with `threading = "multi"`)
+- `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`: runs a wasm32 module in Node or a browser
 - `silk/writer`: `Writer`, `WriterError`; `silk/os_writer`: `StdoutWriter` (hosted only)
 - `silk/format`: `Format`; `silk/slice`: `Slice`

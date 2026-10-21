@@ -118,8 +118,14 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 
 - A static failure is reported at the failing operation, which is usually inside the `static fn`, not at the demanding site.
 - A runtime argument is reported at the argument.
-- When the failing operation is in another module, such as `silk/static_text` or `silk/reflect`, the error is reported at the outermost call in the evaluated module that reached it. `static if StaticText.byteAt("abc", 7) == 0` reports SEM0176 at the `StaticText.byteAt` call. `const B: u8 = pick()`, where the user's `static fn pick` calls `StaticText.byteAt("abc", 7)`, reports it at `pick()`.
+- When the failing operation is in another module, such as `silk/static_text` or `silk/reflect`, the error is reported at the outermost call in the evaluated module that reached it. `static if StaticText.byteAt("abc", 7) == 0` reports SEM0176 at the `StaticText.byteAt` call. `const B: u8 = pick()`, where the user's `static fn pick` calls `StaticText.byteAt("abc", 7)`, reports it at `pick()`. In both cases a `note: ... related location` line follows at the same position.
 - `compileError(message)` fails the evaluation that reaches it with SEM0177. The diagnostic's message is the `message` text. `message` must be static text, such as a literal or a `string` constant.
+- The SEM0177 is reported at the `compileError`. When a call selected it through a static argument, a note points at that call. In the second example below, changing `scaled(3, 1)` on line 24 to `scaled(-1, 1)` reports:
+
+  ```
+  /home/you/demo/src/main.silk:8:26: error[SEM0177] factor must not be negative
+    note: /home/you/demo/src/main.silk:24:50: related location
+  ```
 - `compileError` in an untaken branch, or in an unselected `static if` arm, reports nothing. This makes it a static assertion.
 - `compileError` in ordinary runtime code that is not inside a static selection is refused as not supported.
 

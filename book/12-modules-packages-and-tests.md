@@ -108,7 +108,7 @@ silk test -p taskcore --no-cache
 
 ```
 Package taskcore (/home/you/tasks-workspace/taskcore)
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 493 symbols)
+Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 503 symbols)
   lib::addsTwoNumbers
     PASS  1 us
 
@@ -569,7 +569,7 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 664 symbols)
+Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 680 symbols)
   Board::duplicateTitlesAreRefused
     PASS  21 us
   Store::damagedLinesAreReported
@@ -591,7 +591,7 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1582 symbols)
+Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::finishingRecordsTheClockTime
     PASS  96 us
   tests::slowRemindersAreCancelled
@@ -612,7 +612,7 @@ silk test --no-cache --filter Reminders
 ```
 
 ```
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1582 symbols)
+Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::slowRemindersAreCancelled
     PASS  231 us
 
@@ -628,7 +628,7 @@ silk test --no-cache --filter Store::
 ```
 
 ```
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 664 symbols)
+Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 680 symbols)
   Store::damagedLinesAreReported
     PASS  8 us
   Store::fileFormatRoundTrips
@@ -651,7 +651,7 @@ silk test --workspace --no-cache
 
 ```
 Package taskcore (/home/you/tasks-workspace/taskcore)
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 664 symbols)
+Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 680 symbols)
   Board::duplicateTitlesAreRefused
     PASS  15 us
   Store::damagedLinesAreReported
@@ -664,7 +664,7 @@ Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskc
 Tests  4 passed, 0 failed (0 cached, 4 executed, 4 selected, 4 discovered)
 Time   125 us
 Package tasks (/home/you/tasks-workspace/tasks)
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1582 symbols)
+Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::finishingRecordsTheClockTime
     PASS  83 us
   tests::slowRemindersAreCancelled
@@ -720,23 +720,25 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1582 symbols)
+Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::finishingRecordsTheClockTime
-    PASS  89 us
+    PASS  101 us
   tests::slowRemindersAreCancelled
-    FAIL  210 us
+    assertion failed: all three reminders went off
+    FAIL  193 us
   tests::unknownTaskIsReported
     PASS  15 us
 
 Tests  2 passed, 1 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   399 us
+Time   395 us
 unhandled error: silk/testing.AssertionError<'static>
   at silk/testing.Testing.expect (silk/testing:32:7)
   at tests.slowRemindersAreCancelled (tests:84:3)
   at silk/effect.Effect.flatMap (silk/effect:303:19)
+  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
-The run exits with status 1. A failed `Testing.expect` is a typed failure, `AssertionError`, and the stack shows where it came from. This release does not print the message you passed to `expect`, so read the stack instead: `tests:84:3` is line 84 of `tests.silk`, the failing expectation. Change the 3 back to 2.
+The run exits with status 1. The line under the test's name is the message you passed to `expect`. A failed `Testing.expect` is a typed failure, `AssertionError`, and the stack after the summary shows where it came from: `tests:84:3` is line 84 of `tests.silk`, the failing expectation. Change the 3 back to 2.
 
 ## Formatting
 

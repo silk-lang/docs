@@ -601,6 +601,8 @@ test effect fn finishingRecordsTheClockTime() ! AssertionError<'static> | LogErr
 
 This is the same `execute` and the same `explain` that `main` runs. Only the providers changed. Because `provideMut` lends the providers and gives them back after `run`, the test can then look inside `files` and `logger` to check what happened. `wordsOf` builds a `Words` from byte literals, and `sameBytes` compares two byte slices. Both are short helpers in the snapshot.
 
+The test creates every provider it needs. A test cannot have a `?` row of its own, because the test runner provides no services, and `silk check` refuses one with SEM0218.
+
 A second test checks a failure. `Effect.result`, from chapter 7, turns the outcome into a value the test can match:
 
 ```silk
@@ -634,14 +636,14 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 732 symbols)
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 744 symbols)
   main::finishingRecordsTheClockTime
-    PASS  57 us
+    PASS  56 us
   main::unknownTaskIsReported
-    PASS  12 us
+    PASS  13 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   124 us
+Time   154 us
 ```
 
 Both tests run in microseconds and touch no files. If you leave off the flag, `silk test` exits with status 2 and prints only one line on stderr:

@@ -204,7 +204,7 @@ silk run
 
 ```
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/format.silk:814:11: error[SEM0177] {versoin}; available visible fields: version
+/home/you/tasks/src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
 run x86_64-unknown-linux-gnu: failed (exit 1)
 Run summary: 0 succeeded, 1 failed
 ```
@@ -217,14 +217,14 @@ silk check
 
 ```
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/format.silk:814:11: error[SEM0177] {versoin}; available visible fields: version
+/home/you/tasks/src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
 check x86_64-unknown-linux-gnu: failed (exit 1)
 Check summary: 0 succeeded, 1 failed
 ```
 
-`silk check` type-checks the package for each target without producing a program, so it is fast. Each error line has a file, a line and a column, then the error code in brackets, then a message. Here `<silk>` stands for the folder where Silk is installed.
+`silk check` type-checks the package for each target without producing a program, so it is fast. Each error line has a file, a line and a column, then the error code in brackets, then a message.
 
-This one is a hard first error, so here is how to read it. It points into `silk/format.silk`, the standard library module that checks templates. That module runs while your code compiles. When it finds a placeholder with no matching field, it asks the compiler to stop the build. SEM0177 means library code requested the failure, and the message is the text the library gave: the placeholder it could not fill, `{versoin}`, and the fields you did pass, here just `version`. The mistake is still in your code, not in the standard library. When you see SEM0177 pointing into `format.silk`, compare the placeholder in the message with the fields it lists.
+Line 9, column 7 is the start of the `Effect.log` call. The template is checked by the standard library module `silk/format`, which runs while your code compiles. When it finds a placeholder with no matching field, it asks the compiler to stop the build, and the compiler reports the stop at your call. SEM0177 means library code requested the failure, and the message is the text the library gave: the placeholder it could not fill, `{versoin}`, and the fields you did pass, here just `version`. Compare the two and the typo is plain.
 
 Fix the spelling back to `{version}` and check again:
 

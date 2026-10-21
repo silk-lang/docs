@@ -67,7 +67,7 @@ effect fn describe(text: string) -> () ! WriterError ? &mut Writer {
 
 The second argument is a borrowed record. `{text}` picks the field named `text`. You can use a tuple instead and write `{}` for each field in order: `Format.format("{} has {} tasks\n", &("Julia", 3))`. One template uses names or positions, not both, and a positional template must use every field exactly once.
 
-The template is checked while the program compiles. `{{` and `}}` write literal braces. Each value must implement `Display`, which the std lib provides for every integer type, `f32`, `f64` and `string`. There is no `Display` for `bool` or `char`, so the program uses a small `boolText` helper that returns `"yes"` or `"no"`.
+The template is checked while the program compiles. `{{` and `}}` write literal braces. Each value must implement `Display`, which the std lib provides for every integer type, `f32`, `f64`, `bool`, `char` and `string`. A `bool` prints as `true` or `false`, and a `char` as the character itself.
 
 `describe` needs `? &mut Writer`, and nothing in it says where the bytes go. `main` decides that by providing `StdoutWriter` from `silk/os_writer`. A test could provide a writer that collects bytes instead. The guide "Output, logging and standard input" shows that, and `Effect.log` takes the same templates.
 
@@ -83,12 +83,24 @@ silk check
 
 ```
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/format.silk:814:11: error[SEM0177] {count}; available visible fields: name, cuont
+/home/you/textinfo/src/main.silk:8:7: error[SEM0177] template field {count} not found; available visible fields: name, cuont
 check x86_64-unknown-linux-gnu: failed (exit 1)
 Check summary: 0 succeeded, 1 failed
 ```
 
-The message names the missing placeholder and lists the fields you did pass. In this release the location points into the std lib's `format.silk`, not at your call, so search your code for the template that contains `{count}`. A value without `Display`, such as a `bool`, also stops the build inside `format.silk`, with SEM0121 "A concrete specialization whose conditional requirements cannot be proved".
+The error points at the call, and the message names the missing placeholder and lists the fields you did pass. A positional template is checked the same way. With `Format.format("{} has {} tasks, {} done\n", &("Julia", 3))` the check reports:
+
+```
+/home/you/textinfo/src/main.silk:8:7: error[SEM0177] template placeholder 3 `{}` has no positional field; the arguments have 2
+```
+
+A value whose type has no `Display` stops the build at the call too, with SEM0121. For a struct `Plain` without an `impl Display`:
+
+```
+/home/you/textinfo/src/main.silk:10:7: error[SEM0121] `main.Plain: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Plain`
+```
+
+Implement `Display` for the type, as the next sections show, or pass one of its fields instead.
 
 ## Width and alignment
 
@@ -236,11 +248,11 @@ The pattern names the field `offset: bad` because `offset` is already a local. R
 effect fn normalize() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut Allocator {
   let composed = "caf\u{E9}"
   let decomposed = "cafe\u{301}"
-  run Format.format("raw equal: {equal}\n", &.{ equal: boolText(composed == decomposed) })
+  run Format.format("raw equal: {equal}\n", &.{ equal: composed == decomposed })
   let left = run Unicode.normalizeNfc(composed)
   let right = run Unicode.normalizeNfc(decomposed)
   run Format.format("NFC equal: {equal} (Unicode {version})\n", &.{
-    equal: boolText(String.view(&left) == String.view(&right)),
+    equal: String.view(&left) == String.view(&right),
     version: Unicode.dataVersion(),
   })
 }
@@ -348,7 +360,7 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/textinfo (llvm, x86_64-unknown-linux-gnu, 370 symbols)
+Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/textinfo (llvm, x86_64-unknown-linux-gnu, 371 symbols)
 Silk: 4 bytes, 4 scalars
 naïve: 6 bytes, 5 scalars
 offset  scalar
@@ -360,8 +372,8 @@ offset  scalar
 valid: café
 invalid UTF-8 at byte 3
 U+0063 U+0061 U+0066 (chunk 0 ends mid-scalar) U+00E9 U+0021 done
-raw equal: no
-NFC equal: yes (Unicode 17.0.0)
+raw equal: false
+NFC equal: true (Unicode 17.0.0)
 Hello, naïve reader!: 21 bytes, 20 scalars
 1234 -> 1234
 12x: not a number at byte 2

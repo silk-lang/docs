@@ -46,16 +46,16 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 506 symbols)
+Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 520 symbols)
   Circle::diameterIsTwiceRadius
     PASS  <1 us
   lib::areaMultipliesSides
     PASS  <1 us
   lib::emptyRectHasNoArea
-    PASS  <1 us
+    PASS  1 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   38 us
+Time   50 us
 ```
 
 The runner is a separate executable, built under `build/test/llvm/<target>/<profile>/` with the package's name. It always runs on the host, so `--target` must name the host. Each test is printed as `module::name`, where the module is the file's path under the source root: `Circle` is `src/Circle.silk`.
@@ -73,23 +73,25 @@ test effect fn diameterIsTwiceRadius() -> () ! AssertionError<'static> {
 ```
 
 ```
-Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 506 symbols)
+Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 520 symbols)
   Circle::diameterIsTwiceRadius
-    FAIL  13 us
+    assertion failed: radius 5
+    FAIL  15 us
   lib::areaMultipliesSides
     PASS  <1 us
   lib::emptyRectHasNoArea
     PASS  <1 us
 
 Tests  2 passed, 1 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   85 us
+Time   60 us
 unhandled error: silk/testing.AssertionError<'static>
   at silk/testing.Testing.expect (silk/testing:32:7)
   at Circle.diameterIsTwiceRadius (Circle:9:3)
   at silk/effect.Effect.flatMap (silk/effect:303:19)
+  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
-The other tests still run, and the command exits with status 1. The trace after the summary shows where the failure came from: `Circle:9:3` is line 9, column 3 of `src/Circle.silk`. This release does not print the message you passed to `expect`, so the line number is what you go by. When one test effect checks several things, give each check its own line.
+The other tests still run, and the command exits with status 1. When the failure is an `AssertionError`, the runner prints `assertion failed:` and the message you passed to `expect` under the test's name. The trace after the summary shows where the failure came from: `Circle:9:3` is line 9, column 3 of `src/Circle.silk`. A test that fails with another typed failure prints only `FAIL` and the trace, which names that failure's type.
 
 ## Which tests are discovered
 
@@ -104,12 +106,12 @@ That matters most for programs. A test in `src/extra.silk` is not found while `m
   ```
 
   ```
-  Compiled src/extra.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 487 symbols)
+  Compiled src/extra.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 488 symbols)
     extra::extraRuns
       PASS  <1 us
   
   Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 1 discovered)
-  Time   21 us
+  Time   28 us
   ```
 - Import the test module from the root module, for example `import tests` in `main.silk`, so a plain `silk test` finds it. Chapter 12 of the book uses this layout, with tests in `src/tests.silk` and helpers in `src/tests/`.
 
@@ -122,12 +124,12 @@ silk test --no-cache --filter circle::
 ```
 
 ```
-Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 506 symbols)
+Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 520 symbols)
   Circle::diameterIsTwiceRadius
-    PASS  <1 us
+    PASS  1 us
 
 Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 3 discovered)
-Time   34 us
+Time   58 us
 ```
 
 `--file <path>` keeps the tests declared in one source file. The path is relative to the package directory, so it is `src/Circle.silk` even when you run the command from inside `src/`. Unlike `--root`, it does not change discovery; it only selects.
@@ -136,7 +138,7 @@ Both options only select. When a `--file` or `--filter` matches no test, nothing
 
 ```
 Tests  0 passed, 0 failed (0 cached, 0 executed, 0 selected, 3 discovered)
-Time   3 us
+Time   5 us
 silk test: no tests matched the --file or --filter selection
 ```
 
@@ -202,22 +204,28 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/greeter (llvm, x86_64-unknown-linux-gnu, 524 symbols)
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/greeter (llvm, x86_64-unknown-linux-gnu, 536 symbols)
   main::emptyNamesAreSkipped
     PASS  6 us
   main::onlyEmptyNamesLogNothing
     PASS  <1 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   39 us
+Time   45 us
 ```
 
 The same pattern works for any service. A fake for a service with no ready-made test provider is your own struct with an `impl` of the service, like the fixed clock and in-memory file system in chapter 8 of the book. The **Testing with providers** guide goes further, and **Services and providers** in the language reference has the rules.
 
-Provide every service inside the test. A test whose own header has a `?` row passes `silk check` but fails when `silk test` builds the runner, with an error that points into the std lib:
+Provide every service inside the test. The test runner provides none, so a test cannot have a `?` row of its own, and `silk check` refuses one:
+
+```silk
+test effect fn copies() -> () ! OutOfMemoryError ? &mut Allocator {
+  let text = run String.copy("hi")
+}
+```
 
 ```
-<silk>/lib/silk/stdlib/silk/test_runner.silk:207:18: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
+/home/you/hello/src/main.silk:4:50: error[SEM0218] Invalid test declaration: a test cannot have a requirement row; the test runner provides no services, so provide them inside the test
 ```
 
 For memory, create an allocator in the test with `Allocator.systemAllocatorProvider()` and provide it to the calls that need it.
@@ -229,10 +237,10 @@ Each package tests its own modules. At a workspace root, `silk test --no-cache` 
 ## Summary
 
 - Mark a top-level function with `test`. Use `test effect fn` and `Testing.expect` for checks that can fail.
-- Run tests with `silk test --no-cache`. A failure prints `FAIL`, a stack with the failing line, and exits 1.
+- Run tests with `silk test --no-cache`. A failure prints `FAIL`, the `expect` message for an assertion, a stack with the failing line, and exits 1.
 - Tests are discovered by following imports from the root module (and a library's exports). Use `--root` or an import to reach other files.
 - `--filter` matches `module::name` without regard to ASCII case; `--file` selects one file. A selection that matches nothing exits 1.
-- Test effectful code by providing fakes such as `Logger.inMemoryProvider()` with `Effect.provideMut`, and provide every service inside the test.
+- Test effectful code by providing fakes such as `Logger.inMemoryProvider()` with `Effect.provideMut`, and provide every service inside the test: a test has no `?` row (SEM0218).
 
 ## API reference
 

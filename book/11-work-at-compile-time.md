@@ -392,11 +392,12 @@ One of four done, five of twenty cells. Now make the mistake on purpose: change 
 ```
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:558:5: error[SEM0177] a progress bar is 1 to 40 cells wide
+  note: /home/you/tasks/src/main.silk:551:7: related location
 check x86_64-unknown-linux-gnu: failed (exit 1)
 Check summary: 0 succeeded, 1 failed
 ```
 
-Line 558 is the `compileError` itself, and the message is your own text. The call that selected the branch is not named. With one call site that is easy to trace. With many, search for calls whose static argument breaks the rule. Put the width back to 20.
+Line 558 is the `compileError` itself, and the message is your own text. The `note:` line is the call that selected the branch: line 551, the `bar(0, done, total)` in `showBoard`. With many call sites, that is the one to fix. Put the width back to 20.
 
 What if `width` were an ordinary parameter? Try a smaller case in the scratch project:
 
@@ -570,16 +571,20 @@ id,title,priority,done
 
 Add a field to `Row` and both the header and every line grow a column. They cannot disagree.
 
-Two mistakes are worth seeing here. First, `done` is a yes-or-no value, so `bool` seems the natural type. Change the field to `pub done: bool` and pass `done: !task.isOpen()`:
+Two changes are worth trying here. First, `done` is a yes-or-no value, so `bool` seems the natural type. Change the field to `pub done: bool` and pass `done: !task.isOpen()`:
 
 ```
-[x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/format.silk:423:21: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1425 symbols)
+build llvm/x86_64-unknown-linux-gnu: ok /home/you/tasks/build/llvm/x86_64-unknown-linux-gnu/debug/tasks
+Build summary: 1 succeeded, 0 failed
+id,title,priority,done
+1,Buy milk,normal,false
+2,Write the Silk book,high,false
+3,Water the plants,low,false
+4,Call the plumber,high,true
 ```
 
-You met this one in chapter 6. `bool` has no `Display`, so the template cannot print it, and the error is reported inside the standard library's `format.silk`. When the `static for` repeats the body for the `bool` field, that repetition fails. This is why `done` is a `string<'static>` holding `"yes"` or `"no"`.
+`bool` has `Display`, so the `static for` repetition for that field checks, and the column prints `true` and `false`. A field whose type has no `Display` would stop the build at the `csvLine` call with the SEM0121 you met in chapter 6. The export keeps `"yes"` and `"no"`, which read better in a spreadsheet, so put the `string<'static>` back.
 
 Second, forget a `pub`. Write `title: string<'text>` without it, and the program still builds. The export is quietly different:
 
@@ -602,16 +607,16 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1582 symbols)
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   main::finishingRecordsTheClockTime
-    PASS  95 us
+    PASS  117 us
   main::slowRemindersAreCancelled
-    PASS  197 us
+    PASS  189 us
   main::unknownTaskIsReported
-    PASS  13 us
+    PASS  16 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   372 us
+Time   441 us
 ```
 
 ## Summary

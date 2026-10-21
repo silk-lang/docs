@@ -102,6 +102,7 @@ A named profile is a complete build configuration. Select it with `--profile <na
 | `codeModel` | `"small"`, `"large"` | `"small"` |
 | `safety` | `"checked"`, `"unchecked"` | `"checked"` |
 | `threading` | `"single"`, `"multi"` | `"single"` |
+| `maxMemory` | wasm32 only: a size such as `"256MiB"` (bytes, `KiB`, `MiB`, `GiB`) | none (threaded wasm32: 1 GiB) |
 | `sanitizers` | array of `"address"`, `"thread"`, `"undefined"` | `[]` |
 | `unwind` | `"none"`, `"native"` | `"none"` |
 | `deployment` | macOS version such as `"14.0"` | none |

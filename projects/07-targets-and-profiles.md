@@ -23,7 +23,7 @@ What works for each target with this compiler:
 | The host's own target | yes | yes | yes |
 | Another macOS or Linux target | yes | no: `Cannot link an executable for target aarch64-apple-darwin on host x86_64-unknown-linux-gnu` | yes |
 | Linux without libc | yes | not yet (see below) | `artifact = "object"` builds |
-| `wasm32-unknown-unknown` | yes | no | only code with no C exports (see below) |
+| `wasm32-unknown-unknown` | yes | yes, a WebAssembly module, on any host (see below) | yes |
 
 To cross-compile, set `[build].stage = "object"` (or `llvm-ir`, `assembly`, `llvm-bitcode`), or `[build].artifact = "object"` or `"static-library"`, and link the result with your own toolchain:
 
@@ -126,6 +126,8 @@ The manifest page lists every field and its values. The native build applies the
 | `codeModel` | `large` passes `-mcmodel=large`. x86-64 targets only. |
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
 | `artifact` | Must name the same form as `[build].artifact`. Set the output form there. |
+| `threading` | `multi` on wasm32 builds with atomics and a shared memory (see below). Refused on other targets. |
+| `maxMemory` | wasm32 only: the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
 
 `cpu.features` takes `aes`, `avx`, `avx2`, `sse2` and `sse4.2` on x86-64 Linux, and `crc`, `crypto`, `fp-armv8`, `lse` and `neon` on the arm64 targets. Code can test them with `Target.hasCpuFeature`. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
 
@@ -164,7 +166,7 @@ The other fields are valid values that the native compiler cannot build yet. Rat
 | `sanitizers` | any non-empty list | `profiles.fast.sanitizers is not supported by the native compiler yet` |
 | `unwind` | `"native"` | `profiles.fast.unwind = "native" is not supported by the native compiler yet` |
 | `safety` | `"unchecked"` | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
-| `threading` | `"multi"` | `profiles.fast.threading = "multi" is not supported by the native compiler yet` |
+| `threading` | `"multi"`, except on wasm32 | `profiles.fast.threading = "multi" is not supported by the native compiler yet` |
 | `entry` | `{ kind = "none" }` or `{ kind = "named", ... }` | `profiles.fast.entry is not supported by the native compiler yet` |
 | `codeModel` | `"large"` on an arm64 target | `profiles.arm.codeModel = "large" is not supported by the native compiler yet` |
 
@@ -191,6 +193,7 @@ These combinations are refused when the manifest is read:
 | `thread` sanitizer without `threading = "multi"` | `UnsupportedCombination: profiles.fast.threading` |
 | macOS executable with `link = "static"` | `UnsupportedCombination: profiles.mac.link = "static"` |
 | `target = "host"` | `UnsupportedCombination: profiles.fast.target = "host"` |
+| `maxMemory` on a target other than wasm32 | `UnsupportedCombination: profiles.hostmem.maxMemory = "256MiB"` |
 | `cpu.model` other than the target's default | `UnsupportedCombination: profiles.fast.cpu.model = "znver3"` |
 | a `cpu.features` entry the target does not have | `UnsupportedCombination: profiles.fast.cpu.features` |
 | `artifact` different from `[build].artifact` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [build].artifact = "executable"; set [build].artifact to choose the artifact, and omit the profile's artifact or write it as "executable"` |
@@ -236,11 +239,42 @@ Without the composition, `libc = "none"` finds no runtime in the std lib catalog
 
 ## WebAssembly
 
-`silk check --target wasm32-unknown-unknown` works and shows the wasm std lib surface. Building is limited in this release:
+`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: a bump allocator over linear memory and the byte routines LLVM calls. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name:
 
-- An executable cannot be linked on any host.
-- The wasm runtime and every `export "C"` function stop with `unsupported[c-abi-target] not supported by the native compiler yet`.
-- An `object` or `static-library` artifact with no C exports builds, but holds no symbols.
+```silk
+export "C" fn add(left: i32, right: i32) -> i32 {
+  return left + right
+}
+
+pub fn main() -> i32 {
+  return 42
+}
+```
+
+```sh
+silk build --target wasm32-unknown-unknown
+```
+
+```
+Compiled src/main.silk -> build/llvm/wasm32-unknown-unknown/debug/web (llvm, wasm32-unknown-unknown, 32 symbols)
+build llvm/wasm32-unknown-unknown: ok /home/you/web/build/llvm/wasm32-unknown-unknown/debug/web
+Build summary: 1 succeeded, 0 failed
+```
+
+A host instantiates it with an empty import object and calls `main()` (42) or `add(2, 3)` (5). `node <silk>/lib/silk/stdlib/host/wasm-runner.mjs <module>` runs `main` and exits with its result. On wasm32, a C function takes and returns scalars and pointers only; C statics, variadic functions and callbacks are refused. `artifact = "object"` and `"static-library"` build too.
+
+A wasm32 profile may set `threading = "multi"`:
+
+```toml
+[profiles.threads]
+target = "wasm32-unknown-unknown"
+threading = "multi"
+maxMemory = "256MiB"
+```
+
+The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `maxMemory` sets the memory's maximum; a threaded module defaults to 1 GiB. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.maxMemory = "100KiB"`. Clang 18.1 crashes while building a threaded module, so use a newer Clang for it.
+
+The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32 and runs it in Node.
 
 ## See also
 

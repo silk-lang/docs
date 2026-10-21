@@ -326,15 +326,36 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/numberlines (llvm, x86_64-unknown-linux-gnu, 582 symbols)
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/numberlines (llvm, x86_64-unknown-linux-gnu, 594 symbols)
   main::numbersEveryLine
-    PASS  33 us
+    PASS  40 us
   main::warnsAboutInvalidUtf8
-    PASS  14 us
+    PASS  19 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   106 us
+Time   146 us
 ```
+
+When an expectation fails, the runner prints its message under the test's name. Expect four lines instead of three, `lines == 4`, and the run exits with status 1:
+
+```
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/numberlines (llvm, x86_64-unknown-linux-gnu, 594 symbols)
+  main::numbersEveryLine
+    assertion failed: three lines
+    FAIL  64 us
+  main::warnsAboutInvalidUtf8
+    PASS  15 us
+
+Tests  1 passed, 1 failed (0 cached, 2 executed, 2 selected, 2 discovered)
+Time   139 us
+unhandled error: silk/testing.AssertionError<'static>
+  at silk/testing.Testing.expect (silk/testing:32:7)
+  at main.numbersEveryLine (main:183:3)
+  at silk/effect.Effect.flatMap (silk/effect:303:19)
+  at silk/effect.Effect.flatMap (silk/effect:303:19)
+```
+
+The message is the text you passed to `expect`, unchanged, which is why it still says three. Put the 3 back.
 
 Without the flag, `silk test` exits with status 2 and prints `SILK_GAP test-result-cache: test-result reuse (TEST-008) is not native yet; pass --no-cache`. The guide "Testing with providers" goes further with fakes, and chapter 8 of the book introduces services and providers.
 

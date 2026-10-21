@@ -12,7 +12,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 
 | Family | Phase | Codes |
 | --- | --- | --- |
-| LEX | Lexing literals | LEX0001-LEX0012. This compiler reports none of them; see LEX. |
+| LEX | Lexing tokens and literals | LEX0001-LEX0012 |
 | PAR | Parsing | PAR0001-PAR0007 |
 | MOD | Module and package resolution | MOD0001-MOD0004 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0020 |
@@ -22,26 +22,262 @@ There is no LAY family. Gaps in the numbering are codes that were retired; they 
 
 Each example is the whole `src/main.silk` of a package named `demo` in `/home/you/demo`, run with `silk check` unless the entry says `silk build`. Output lines are quoted as printed. Codes the compiler never reports are listed in the last section.
 
-## LEX: literals
+## LEX: tokens and literals
 
-The catalog defines twelve lexical codes for malformed literals. This compiler never prints them: a malformed number is a PAR0002 parse error at the literal, and a malformed string, character, byte string or duration is an `unsupported` refusal (exit status 2). The table gives the catalog message, a failing literal and what `silk check` prints for it.
+The lexer reports these codes at the invalid token. `silk check` and `silk build` print them and exit with status 1. Parse errors inside an invalid token are not reported, so a lexical error is usually the only one for its line.
 
-| Code | Catalog message | Failing literal | Printed instead |
-| --- | --- | --- | --- |
-| LEX0001 | Unsupported byte sequence | `$5` | ``error[PAR0002] Unexpected `$`; expected valid syntax`` |
-| LEX0002 | Unknown static-literal modifier: {modifier} | `x"hello"` | `unsupported: this construct is not supported by the native compiler yet` |
-| LEX0003 | Unterminated {subject} literal | `"hello` | `unsupported: this construct is not supported by the native compiler yet` |
-| LEX0004 | Base-{radix} integer literal without digits | `0x` | ``error[PAR0002] Unexpected `0x`; expected valid syntax`` |
-| LEX0005 | Digit separator must sit between two digits | `1_000_` | ``error[PAR0002] Unexpected `1_000_`; expected valid syntax`` |
-| LEX0006 | Float literal exponent must have at least one digit | `1.5e` | ``error[PAR0002] Unexpected `1.5e`; expected valid syntax`` |
-| LEX0007 | Character literal must hold exactly one Unicode scalar, but holds {scalars} | `'ab'` | `unsupported: this construct is not supported by the native compiler yet` |
-| LEX0008 | Duration components require whole decimal amounts | `1.5s` | `unsupported: this construct is not supported by the native compiler yet` |
-| LEX0009 | Unknown duration unit {spelling} | `5sec` | `unsupported: this construct is not supported by the native compiler yet` |
-| LEX0010 | Duration unit {unit} may appear only once | `1h2h` | `unsupported: this construct is not supported by the native compiler yet` |
-| LEX0011 | Duration unit {unit} must not follow {previous} | `30s2m` | `unsupported: this construct is not supported by the native compiler yet` |
-| LEX0012 | Subordinate {unit} component {amount} exceeds {maximum} | `1h75m` | `unsupported: this construct is not supported by the native compiler yet` |
+### LEX0001
 
-For `$5` the parser also reports SEM0087 at the `5`, because it reads the number as an expression statement.
+A byte sequence that does not start any token.
+
+```silk
+pub fn main() -> i32 {
+  let value = $5
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0001] Unsupported byte sequence
+/home/you/demo/src/main.silk:2:16: error[SEM0087] An expression statement whose result cannot be intentionally ignored
+```
+
+The parser then reads the `5` as an expression statement and also reports SEM0087.
+
+Fix: Remove the stray character. Silk has no `$` operator; identifiers are ASCII letters, digits and `_`. See Lexical structure.
+
+### LEX0002
+
+An identifier-like modifier before a quote that is not a literal prefix.
+
+```silk
+pub fn main() -> i32 {
+  let value = x"hello"
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0002] An identifier-like modifier outside the closed literal vocabulary
+```
+
+Message template, not filled by this compiler: `Unknown static-literal modifier: {modifier}`.
+
+Fix: Use a known prefix, such as `b"hello"` for bytes, or none. See Lexical structure.
+
+### LEX0003
+
+A string or byte string literal with no closing delimiter.
+
+```silk
+pub fn main() -> i32 {
+  let value = "hello
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0003] A literal whose matching closing delimiter is absent
+```
+
+An unterminated byte string, `b"hello`, is the same code. An unclosed character, `'a`, reads as a lifetime and gives PAR0001 and PAR0002 instead.
+
+Message template, not filled by this compiler: `Unterminated {subject} literal`.
+
+Fix: Close the literal: `"hello"`. See Lexical structure.
+
+### LEX0004
+
+A base prefix with no digits after it.
+
+```silk
+pub fn main() -> i32 {
+  let value = 0x
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0004] Base-16 integer literal without digits
+```
+
+The message names the base: `0b` is Base-2 and `0o` is Base-8.
+
+Fix: Write at least one digit after the prefix: `0x0`. See Lexical structure.
+
+### LEX0005
+
+A digit separator that is not between two digits.
+
+```silk
+pub fn main() -> i32 {
+  let value = 1_000_
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0005] Digit separator must sit between two digits
+```
+
+A doubled separator, `1__0`, is the same code.
+
+Fix: Put each `_` between two digits: `1_000`. See Lexical structure.
+
+### LEX0006
+
+A float exponent with no digits.
+
+```silk
+pub fn main() -> i32 {
+  let value = 1.5e
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0006] Float literal exponent must have at least one digit
+```
+
+Fix: Write the exponent's digits: `1.5e3`. See Lexical structure.
+
+### LEX0007
+
+A character literal that does not hold exactly one Unicode scalar.
+
+```silk
+pub fn main() -> i32 {
+  let value = 'ab'
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0007] Character literal must hold exactly one Unicode scalar, but holds 2
+```
+
+An empty literal, `''`, holds 0.
+
+Fix: Use one character, `'a'`, or a string, `"ab"`. See Lexical structure, Values and primitive types.
+
+### LEX0008
+
+A duration amount that is not a whole decimal number.
+
+```silk
+pub fn main() -> i32 {
+  let value = 1.5s
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0008] Duration components require whole decimal amounts
+```
+
+Fix: Use whole amounts in smaller units: `1500ms`, or `1s500ms`. See Lexical structure.
+
+### LEX0009
+
+A suffix on a number that is not a duration unit.
+
+```silk
+pub fn main() -> i32 {
+  let value = 5sec
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:16: error[LEX0009] An identifier-like suffix outside the duration unit vocabulary
+```
+
+The column is the suffix. A letter that is no unit at all, as in `5q`, is the same code.
+
+Message template, not filled by this compiler: `Unknown duration unit {spelling}`.
+
+Fix: Use a unit from the vocabulary: `5s`. See Lexical structure.
+
+### LEX0010
+
+A duration unit written twice in one literal.
+
+```silk
+pub fn main() -> i32 {
+  let value = 1h2h
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:18: error[LEX0010] A duration unit repeated within one compact literal
+```
+
+Message template, not filled by this compiler: `Duration unit {unit} may appear only once`.
+
+Fix: Write each unit once: `3h`. See Lexical structure.
+
+### LEX0011
+
+Duration units that are not in descending order.
+
+```silk
+pub fn main() -> i32 {
+  let value = 30s2m
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:19: error[LEX0011] Duration components that do not descend from larger to smaller units
+```
+
+Message template, not filled by this compiler: `Duration unit {unit} must not follow {previous}`.
+
+Fix: Write the larger unit first: `2m30s`. See Lexical structure.
+
+### LEX0012
+
+A component after the first that reaches the next unit up.
+
+```silk
+pub fn main() -> i32 {
+  let value = 1h75m
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:17: error[LEX0012] A subordinate duration component outside its canonical field bound
+```
+
+Message template, not filled by this compiler: `Subordinate {unit} component {amount} exceeds {maximum}`.
+
+Fix: Carry into the larger unit: `2h15m`, or write the amount alone: `135m`. See Lexical structure.
 
 The well-formed spellings `0x0F`, `1_000_000`, `1.5e3`, `'a'`, `"hello"`, `b"hello"`, `1500ms`, `1h15m` and `2m30s` all pass `silk check`. See Lexical structure and Values and primitive types.
 
@@ -2006,7 +2242,40 @@ pub fn main() -> i32 {
 
 Message template, not filled by this compiler: `Invalid Effect.catch handler: {detail}`.
 
-Fix: Make the handler take the failure type it handles: `Effect.catch<Missing>(load(), recover)` with `recover(error: Missing)`. See Typed failures.
+The same code covers an `Effect.catchAll` handler whose parameter does not accept every failure of the handled Effect. When the parameter is a single type, the message names the missing failure:
+
+```silk
+import silk.effect { Effect }
+import silk.logger { Logger, LogError }
+import silk.os_logger { StdoutLogger }
+
+struct Oops {}
+
+effect fn work() -> i32 ! Oops | LogError ? &mut Logger {
+  run Effect.log("working\n", &())
+  fail Oops {}
+}
+
+effect fn explain(failure: Oops) -> i32 {
+  return 1
+}
+
+pub effect fn main() -> i32 ! LogError {
+  let mut logger = StdoutLogger.make()
+  let handled = Effect.catchAll(work(), explain)
+  return run move handled |> Effect.provideMut<Logger>(&mut logger)
+}
+```
+
+`silk check` and `silk build` print:
+
+```text
+/home/you/demo/src/main.silk:18:41: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union
+```
+
+When the parameter is already a union that misses a member, the message is the one-line meaning above. In the pipeline form, `work() |> Effect.catchAll(explain)`, the same mistake is SEM0052.
+
+Fix: Make the handler take the failure type it handles: `Effect.catch<Missing>(load(), recover)` with `recover(error: Missing)`. For `catchAll`, give the parameter every failure in the row: `failure: Oops | LogError`. See Typed failures.
 
 ### SEM0070
 
@@ -3520,7 +3789,51 @@ pub fn main() -> i32 {
 /home/you/demo/src/main.silk:3:5: error[SEM0177] this target is not supported
 ```
 
-Fix: The text is the author's message. Change the static condition, target or profile. See Static control flow and reflection.
+When the `compileError` sits in a function that a call selects through a static argument, a note names the selecting call:
+
+```silk
+fn bar(static width: usize) -> usize {
+  static if width == 0 {
+    compileError("a bar needs a width")
+  }
+  return width
+}
+pub fn main() -> i32 {
+  let w = bar(0)
+  return 0
+}
+```
+
+```text
+/home/you/demo/src/main.silk:3:5: error[SEM0177] a bar needs a width
+  note: /home/you/demo/src/main.silk:8:11: related location
+```
+
+The std lib's format templates use the same code. A template error is reported at your `Effect.log` or `Format.format` call, and its span covers the whole pipeline:
+
+```silk
+import silk.effect { Effect }
+import silk.logger { LogError }
+import silk.os_logger { StdoutLogger }
+
+pub effect fn main() -> () ! LogError {
+  let mut logger = StdoutLogger.make()
+  run Effect.log("{name} has {count} tasks\n", &.{ name: "Julia", cuont: 3 })
+    |> Effect.provideMut(&mut logger)
+}
+```
+
+```text
+/home/you/demo/src/main.silk:7:7: error[SEM0177] template field {count} not found; available visible fields: name, cuont
+```
+
+With a positional template, `"{} has {} tasks, {} open\n"` and `&("Julia", 3)`:
+
+```text
+/home/you/demo/src/main.silk:7:7: error[SEM0177] template placeholder 3 `{}` has no positional field; the arguments have 2
+```
+
+Fix: The text is the author's message. Change the static condition, target or profile, or the call that selected the branch. For a template, match each placeholder to a field. See Static control flow and reflection, and Text and formatting.
 
 ### SEM0178
 
@@ -4074,7 +4387,22 @@ pub fn main() -> i32 { return 0 }
 
 Message template, not filled by this compiler: `Invalid test declaration: {detail}`.
 
-Fix: Declare tests as `test fn name() -> ()` or a `test effect fn` with no parameters. See Functions and methods.
+A test with a requirement row is refused with the filled message, at the row:
+
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.string { String }
+test effect fn copies() -> () ! OutOfMemoryError ? &mut Allocator {
+  let text = run String.copy("hi")
+}
+pub fn main() -> i32 { return 0 }
+```
+
+```text
+/home/you/demo/src/main.silk:3:50: error[SEM0218] Invalid test declaration: a test cannot have a requirement row; the test runner provides no services, so provide them inside the test
+```
+
+Fix: Declare tests as `test fn name() -> ()` or a `test effect fn` with no parameters and no `?` row. Create and provide the services inside the test. See Functions and methods, and Testing in the Tools section.
 
 ### SEM0220
 

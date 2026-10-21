@@ -57,6 +57,7 @@ ExactType           = 'typeof' '(' Path ')'
 ## `compileError`
 
 - `compileError(message)` fails the build when static evaluation selects it. The diagnostic is SEM0177 at the `compileError` call, with `message` as its text.
+- When a call selects the branch through a static argument, a `note: ... related location` line follows and points at that call. See the example below.
 - `message` must be static text, such as a string literal or a `const` of type `string`.
 - The expression has type `never`, so it may end a branch of a function with a result.
 - It is allowed inside a `static if` or `static for` body and inside a `static fn`. In a `static fn` it fails only if a call actually reaches it, for example from a `const` initializer.
@@ -84,7 +85,7 @@ ExactType           = 'typeof' '(' Path ')'
 - `Reflect.fields<T>()` lists only `pub` fields, even when called in the module that declares `T`. Visibility is that of `silk/reflect`.
 - `Intrinsic.reflectFields<T>()` uses the calling module's visibility instead, so it also lists private fields of a local type. See Intrinsics.
 - Listing the fields of a nominal `union` with `Reflect.fields<U>()` is not supported. It is SEM0176 at the `Reflect.fields` call in the user's code. `Reflect.typeOf` of a `union` or of a non-aggregate such as `i32`, and `fieldLabel` of a positional field, are reported as unsupported.
-- A fault or unsupported construct reached while statically evaluating another module's function is reported at the outermost call in the user's module. For example, `static if Reflect.typeKind(Reflect.typeOf<i32>()) == 1` reports "unsupported: this construct is not supported by the native compiler yet" at the `Reflect.typeKind` call.
+- A fault or unsupported construct reached while statically evaluating another module's function is reported at the outermost call in the user's module. For example, `static if Reflect.typeKind(Reflect.typeOf<i32>()) == 1` reports "unsupported: this construct is not supported by the native compiler yet" at the `Reflect.typeKind` call, followed by a `note:` line at the same position.
 
 ## Target and build queries
 
@@ -247,7 +248,12 @@ pub fn main() -> i32 {
 }
 ```
 
-Calling `scaled(0, 21)` instead fails the build with SEM0177 and the message `factor must be nonzero`.
+Calling `scaled(0, 21)` instead, on line 32, fails the build with SEM0177. The note is the call that selected the branch:
+
+```
+/home/you/demo/src/main.silk:24:5: error[SEM0177] factor must be nonzero
+  note: /home/you/demo/src/main.silk:32:6: related location
+```
 
 ## Diagnostics
 
@@ -265,7 +271,7 @@ Calling `scaled(0, 21)` instead fails the build with SEM0177 and the message `fa
 | SEM0111 | A `typeof` generic function has unsupplied parameters |
 | SEM0130 | A non-unit function falls through after branch selection |
 | SEM0176 | Static evaluation needs runtime work: a runtime condition, a non-sequence in `static for`, or a reflection call in runtime code |
-| SEM0177 | A selected `compileError` |
+| SEM0177 | A selected `compileError`, with a note at the selecting call |
 
 ## See also
 

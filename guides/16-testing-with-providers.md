@@ -596,17 +596,17 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 715 symbols)
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 733 symbols)
   tests::logFailureComesAfterSending
-    PASS  68 us
+    PASS  55 us
   tests::missingFileSendsNothing
     PASS  25 us
   tests::outOfMemoryIsReported
-    PASS  27 us
+    PASS  32 us
   tests::sendsHeaderThenBody
-    PASS  37 us
+    PASS  40 us
   tests::slowPeerTimesOut
-    PASS  34 us
+    PASS  28 us
 
 Tests  5 passed, 0 failed (0 cached, 5 executed, 5 selected, 5 discovered)
 Time   308 us
@@ -619,27 +619,29 @@ The times vary from run to run; the results do not. `--no-cache` is required in 
 Suppose you expect the log line to say `in 0 ms`, as it did when you ran the program for real. Change line 75 of `src/tests.silk` to that and run again:
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 715 symbols)
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 733 symbols)
   tests::logFailureComesAfterSending
-    PASS  70 us
+    PASS  56 us
   tests::missingFileSendsNothing
     PASS  24 us
   tests::outOfMemoryIsReported
-    PASS  27 us
+    PASS  26 us
   tests::sendsHeaderThenBody
-    FAIL  76 us
+    assertion failed: log line uses virtual time
+    FAIL  73 us
   tests::slowPeerTimesOut
-    PASS  27 us
+    PASS  33 us
 
 Tests  4 passed, 1 failed (0 cached, 5 executed, 5 selected, 5 discovered)
-Time   329 us
+Time   359 us
 unhandled error: silk/testing.AssertionError<'static>
   at silk/testing.Testing.expect (silk/testing:32:7)
   at tests.sendsHeaderThenBody (tests:76:3)
   at silk/effect.Effect.flatMap (silk/effect:303:19)
+  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
-The command exits with status 1. The trace names the module and line of the failing `expect`: `tests:76:3` is line 76 of `src/tests.silk`. The message you passed to `expect` is not printed in this release, which is why each check gets its own line.
+The command exits with status 1. The line under the test's name is the message of the failing `expect`, and the trace after the summary names its module and line: `tests:76:3` is line 76 of `src/tests.silk`. A message that says what was expected, like `log line uses virtual time`, tells you what broke before you open the file.
 
 Forgetting to provide a fake is caught before anything runs. Remove the `Random` line from `send`, and `silk check` stops:
 
@@ -647,7 +649,7 @@ Forgetting to provide a fake is caught before anything runs. Remove the `Random`
 /home/you/beacon/src/tests.silk:59:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
 ```
 
-Provide every service inside the test or in a helper it calls, as `send` does. A test whose own header has a `?` row passes `silk check` but fails when `silk test` builds the runner; see the **Testing** page.
+Provide every service inside the test or in a helper it calls, as `send` does. The test runner provides no services, so a test whose own header has a `?` row is refused by `silk check` with SEM0218; see the **Testing** page.
 
 ## Choosing what to fake
 

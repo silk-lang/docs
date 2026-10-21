@@ -24,15 +24,10 @@ There is no streaming in either direction. You cannot write to the child's stand
 `ChildProcess.request(&path)` makes a request for one program. The path is a `Path` from `silk/filesystem`, and here it is the real path on the host. There is no search through `PATH`, so name the program in full: `/bin/echo`, not `echo`. `Path.make("echo")` fails with "invalid path", because a `Path` is always absolute.
 
 ```silk
-// A request for `program` with no arguments.
-effect fn bare(program: string) -> ProcessRequest ! FileError | OutOfMemoryError ? &mut Allocator {
-  let path = run Path.make(program)
-  return run ChildProcess.request(&path)
-}
-
 // A request for `program` with the given arguments, in order.
 effect fn command(program: string, args: &[&[u8]]) -> ProcessRequest ! FileError | OutOfMemoryError ? &mut Allocator {
-  let mut request = run bare(program)
+  let path = run Path.make(program)
+  let mut request = run ChildProcess.request(&path)
   let mut index: usize = 0
   while index < args.length {
     run ChildProcess.addArgument(&mut request, args[index])
@@ -46,7 +41,7 @@ effect fn command(program: string, args: &[&[u8]]) -> ProcessRequest ! FileError
 
 `addArgument` and `setVariable` are declared on `ChildProcess`, not on `ProcessRequest`, so call them as `ChildProcess.addArgument(&mut request, ...)`. `request.addArgument(...)` is SEM0010, "A known actor called with an unknown operation name".
 
-`bare` exists because `command("/bin/cat", &[])` does not compile. An empty array literal needs a type, and in this release even an annotated `let none: [&[u8]; 0] = []` is rejected with SEM0029.
+For a program with no arguments, pass an empty array. An empty array literal takes its type from what it is assigned to, so name the type in a `let`: `let none: [&[u8]; 0] = []`, then `command("/bin/cat", &none)`. Written directly as an argument, `command("/bin/cat", &[])` is SEM0029, "An empty array literal needs an expected Array type", because the parameter is a slice, not an array.
 
 ## Reading the outcome
 
@@ -157,8 +152,11 @@ effect fn demo() -> ()
   let echo = run command("/bin/echo", &[b"two  spaces", b"$HOME", b"*.silk"])
   run report("echo", &echo)
 
+  // An empty argument list. `[]` takes its type from the annotation.
+  let none: [&[u8]; 0] = []
+
   // The environment starts empty. The child sees only what you set.
-  let mut env = run bare("/usr/bin/env")
+  let mut env = run command("/usr/bin/env", &none)
   run ChildProcess.setVariable(&mut env, b"GREETING", b"hello")
   run ChildProcess.setVariable(&mut env, b"LANG", b"C")
   run report("env", &env)
@@ -172,7 +170,7 @@ effect fn demo() -> ()
   run report("sh kill", &killed)
 
   // The child's standard input is closed, so cat sees the end at once.
-  let cat = run bare("/bin/cat")
+  let cat = run command("/bin/cat", &none)
   run report("cat", &cat)
 
   // The working directory is inherited unless you choose one.
@@ -182,7 +180,7 @@ effect fn demo() -> ()
   run report("pwd in /tmp", &pwd)
 
   // A program that does not exist is a ProcessError, not an outcome.
-  let missing = run bare("/usr/bin/no-such-tool")
+  let missing = run command("/usr/bin/no-such-tool", &none)
   run tryRun("missing", &missing)
 }
 
@@ -222,7 +220,7 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/runcheck (llvm, x86_64-unknown-linux-gnu, 428 symbols)
+Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/runcheck (llvm, x86_64-unknown-linux-gnu, 427 symbols)
 echo
   exit code 0
   stdout: two  spaces $HOME *.silk

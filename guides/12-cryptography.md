@@ -59,18 +59,11 @@ fn hex<'a>(bytes: &[u8], out: &'a mut [u8]) -> string<'a> {
   // Hex digits are ASCII, so the bytes are valid UTF-8.
   return unsafe String.fromUtf8Unchecked(Slice.view(&out, 0, bytes.length * 2))
 }
-
-fn yesNo(value: bool) -> string<'static> {
-  if value { return "yes" }
-  return "no"
-}
 ```
 
 `Broken` is the program's one failure type. Each step that can go wrong fails with it and names itself.
 
 `hex` writes two hex digits per byte into a buffer you lend it and returns the filled part as text. The std lib has no hex formatter, and templates cannot print a byte array, so you write this once. `Slice.view` from `silk/slice` borrows the first `bytes.length * 2` bytes. `String.fromUtf8Unchecked` is `unsafe` because it skips validation; the digits are ASCII, so that is safe here. Use the checked `String.fromUtf8` when you do not know the bytes.
-
-`yesNo` exists because `bool` has no `Display` implementation, so a `bool` cannot fill a template placeholder.
 
 ## Hash some bytes
 
@@ -111,7 +104,7 @@ effect fn checkWebhook() -> () ! LogError ? &mut Logger {
   state.update(b"{\"event\":")
   state.update(b"\"push\"}")
   let received = state.finish()
-  run Effect.log("webhook tag matches: {ok}\n", &.{ ok: yesNo(sameBytes(&sent, &received)) })
+  run Effect.log("webhook tag matches: {ok}\n", &.{ ok: sameBytes(&sent, &received) })
 }
 
 fn sameBytes(left: &[u8], right: &[u8]) -> bool {
@@ -126,7 +119,7 @@ fn sameBytes(left: &[u8], right: &[u8]) -> bool {
 }
 ```
 
-`HmacSha256.authenticate(key, message)` returns the 32-byte tag in one call. The incremental form gives the same tag however you split the message.
+`HmacSha256.authenticate(key, message)` returns the 32-byte tag in one call. The incremental form gives the same tag however you split the message. The result of `sameBytes` is a `bool`, and a template prints it as `true` or `false`.
 
 The HMAC types compute tags. They do not compare them. Comparing with an early-exit loop leaks, through timing, how many leading bytes matched. `sameBytes` instead ORs together the XOR of every byte pair, so it always looks at the whole tag. `u8.bitOr` and `u8.bitXor` come from `silk/u8`.
 
@@ -157,8 +150,8 @@ effect fn checkRelease() -> () ! LogError | Broken ? &mut Logger {
     Result.Success { value } => true
     Result.Failure { error } => false
   }
-  run Effect.log("signature on 1.4.2 valid: {good}\n", &.{ good: yesNo(good) })
-  run Effect.log("signature on 1.4.3 valid: {forged}\n", &.{ forged: yesNo(forged) })
+  run Effect.log("signature on 1.4.2 valid: {good}\n", &.{ good: good })
+  run Effect.log("signature on 1.4.3 valid: {forged}\n", &.{ forged: forged })
 }
 ```
 
@@ -286,13 +279,13 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/sealnote (llvm, x86_64-unknown-linux-gnu, 470 symbols)
+Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/sealnote (llvm, x86_64-unknown-linux-gnu, 481 symbols)
 sha256   ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 sha3-256 3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532
 hmac     7eaf83970d7ec8ac8821fb679caa6197a556926ca35aaee7893bc5f4461a6bba
-webhook tag matches: yes
-signature on 1.4.2 valid: yes
-signature on 1.4.3 valid: no
+webhook tag matches: true
+signature on 1.4.2 valid: true
+signature on 1.4.3 valid: false
 agreed on a 32-byte key
 opened: meet at the north gate
 tampered: rejected

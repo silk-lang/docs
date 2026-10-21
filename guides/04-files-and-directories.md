@@ -265,16 +265,16 @@ pub effect fn main() -> i32 ! LogError | HostInputError | OutOfMemoryError ? &mu
 
 `word(args, i)` returns argument `i` as a `string`, or `""` if it is missing or not UTF-8. `HostInput.arguments()` copies all arguments into a `List<Bytes>`.
 
-`Effect.catchAll` hands every failure of `execute` to `explain`, including `LogError`, so `explain` must accept all six. Leave `LogError` out of its parameter and the check stops with a message that does not name the problem:
+`Effect.catchAll` hands every failure of `execute` to `explain`, including `LogError`, so `explain` must accept all six. Leave `LogError` out of its parameter and the check stops at the handler:
 
 ```
 [x86_64-unknown-linux-gnu]
-/home/you/notes/src/main.silk:190:58: unsupported: this construct is not supported by the native compiler yet
-check x86_64-unknown-linux-gnu: failed (exit 2)
+/home/you/notes/src/main.silk:190:58: error[SEM0067] An `Effect.catch` handler that does not fit the failures it handles
+check x86_64-unknown-linux-gnu: failed (exit 1)
 Check summary: 0 succeeded, 1 failed
 ```
 
-Column 58 is `explain`. When you see this message at a `catchAll`, compare the handler's parameter with the effect's `!` row. The two must also agree on the result type: `execute` returns `i32` like `explain`. With `execute` returning `()`, the `run` in `main` fails with SEM0040, "A union conversion whose source has members its target lacks", because the result would be `() | i32`.
+Column 58 is `explain`. The message does not say which failure is missing when the parameter is a union, so compare the handler's parameter with the effect's `!` row. The two must also agree on the result type: `execute` returns `i32` like `explain`. With `execute` returning `()`, the `run` in `main` fails with SEM0040, "A union conversion whose source has members its target lacks", because the result would be `() | i32`.
 
 The imports:
 
@@ -416,18 +416,20 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/notes (llvm, x86_64-unknown-linux-gnu, 827 symbols)
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/notes (llvm, x86_64-unknown-linux-gnu, 843 symbols)
   main::addRefusesToOverwrite
-    PASS  3 ms
+    PASS  4 ms
 
 Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 1 discovered)
-Time   3 ms
+Time   4 ms
 ```
 
-Afterwards, `ls /tmp` shows no `notes-test-` directory. Change the expected text to `b"eggs"` and the test fails, and the directory is still removed. The failure report names the failing `expect` by line, but in this release it does not print the message you passed:
+Afterwards, `ls /tmp` shows no `notes-test-` directory. Change the expected text to `b"eggs"` and the test fails, and the directory is still removed. The report prints the message of the failing `expect` under the test's name, and the trace names its line:
 
 ```
+Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/notes (llvm, x86_64-unknown-linux-gnu, 843 symbols)
   main::addRefusesToOverwrite
+    assertion failed: the first text was kept
     FAIL  4 ms
 
 Tests  0 passed, 1 failed (0 cached, 1 executed, 1 selected, 1 discovered)
@@ -439,6 +441,7 @@ unhandled error: silk/testing.AssertionError<'static>
   at silk/effect.Effect.provideMut (silk/effect:679:12)
   at silk/effect.Effect.provideMut (silk/effect:679:12)
   at main.addRefusesToOverwrite (main:275:3)
+  at silk/effect.Effect.flatMap (silk/effect:303:19)
   at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 

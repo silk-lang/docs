@@ -43,14 +43,14 @@ silk check
 
 ```
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/format.silk:423:21: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
+/home/you/scratch/src/main.silk:13:7: error[SEM0121] `main.Status: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Status`
 check x86_64-unknown-linux-gnu: failed (exit 1)
 Check summary: 0 succeeded, 1 failed
 ```
 
-The error points into the standard library, not at your code, and its message is abstract. That is worth decoding once, because you will see it again. `Effect.log` walks the template at compile time. For each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface. That is the "conditional requirement" in the message. `Status` doesn't implement `Display`, so the compiler can't prove the requirement for this use of `Format.display`. It reports the place where the requirement lives, which is `format.silk`.
+The error points at the `Effect.log` call. `Effect.log` walks the template at compile time, and for each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface from `silk/format`. The message reads as a claim the compiler had to prove, `main.Status: silk/format.Display`, "`Status` in module `main` implements `Display`", and the reason it could not: there is no implementation.
 
-So when a template fails inside `format.silk`, check two things: the placeholder names, and whether every value you pass has `Display`. Numbers and strings have it. So do your own types once you write an impl. Note that `bool` and `char` have no `Display` either, so print them through a small function that picks a string.
+So when a template fails, check two things: the placeholder names, and whether every value you pass has `Display`. Numbers, strings, `bool` and `char` have it. So do your own types once you write an impl.
 
 ## Interfaces and impls
 
@@ -442,7 +442,7 @@ The first five lines match chapter 5 exactly, though the code that prints them c
 
 ## Summary
 
-- You can implement a standard interface such as `Display` so templates print your types, and you know that SEM0121 inside `format.silk` means a value lacks `Display`.
+- You can implement a standard interface such as `Display` so templates print your types, and you know that SEM0121 naming `silk/format.Display` means a value lacks `Display`.
 - You can give your types `<`, `>=`, `==` and friends with `Order` and `Equal`, and you compare them through references: `&a >= &b`.
 - You can declare an interface, implement it with full bodies or with `name: function` bindings, and read SEM0083 when an impl doesn't fit.
 - You can write a generic function with a bound, `count<F: Filter>`, which compiles to a direct call for each type.

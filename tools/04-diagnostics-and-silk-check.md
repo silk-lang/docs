@@ -98,7 +98,7 @@ Diagnostics go to standard error and the result lines to standard output, so in 
 
 Most diagnostics point into your own source. Two kinds point elsewhere:
 
-- **Into the std lib.** Some std lib functions check their arguments while your code compiles. When a check fails, the diagnostic is located inside the std lib module that made it, with the install shown here as `<silk>`. A misspelled placeholder in a log template is reported in `<silk>/lib/silk/stdlib/silk/format.silk` as SEM0177, with the message the library gave. The mistake is still at your call; compare the message with what you passed. Chapter 1 of the book walks through this case.
+- **At your call, for a std lib check.** Some std lib functions check their arguments while your code compiles. When a check fails, the diagnostic is located at your call, with the message the library gave. A misspelled placeholder in a log template is SEM0177 at the `Effect.log` call: `template field {versoin} not found; available visible fields: version`. Chapter 1 of the book walks through this case. A diagnostic can still point into the std lib, with the install shown as `<silk>`, when the std lib's own code is what the compiler cannot handle.
 - **Into a dependency.** An error in a package you depend on is located in that package's file.
 
 A message is sometimes a general description rather than a specific one, such as `Two bindings in one scope claiming the same spelling`. That is the code's catalog meaning, printed when the compiler could not fill in the details. It often follows an earlier error; fix the first diagnostic in the list and check again.
@@ -117,7 +117,13 @@ The letters of a code say which part of the compiler found the problem. A syntax
 
 `SEM` is by far the largest family. The ownership rules behind `OWN` codes are in **Ownership and moves** and **Borrowing** in the language reference.
 
-In this release, `silk check` reports most lexical mistakes as PAR0002 at the bad token, for example ``Unexpected `0x`; expected valid syntax``. The `LEX` codes show up in `silk format`, which lists the codes of a file it cannot format.
+`silk check` and `silk build` report a lexical mistake at the bad token and skip parse errors inside it:
+
+```
+/home/you/hello/src/main.silk:2:15: error[LEX0004] Base-16 integer literal without digits
+```
+
+`silk format` refuses such a file and lists its codes, parse errors included: `cannot format damaged source (LEX0004, PAR0002)`.
 
 ## Lines that are not coded diagnostics
 
@@ -170,6 +176,6 @@ For CI, `silk check` on its own is enough: it exits 1 on any error. Use `--json`
 
 - A diagnostic reads `path:line:column: error[CODE] message`, under a `[target]` header, followed by an indented `note:` line for each related location.
 - The code family tells you the phase: `LEX`, `PAR`, `MOD`, `SEM` or `OWN`.
-- A location inside the std lib usually means a library check rejected something at your call.
+- A std lib check that rejects your arguments is reported at your call. A location inside the std lib is rare and usually an `unsupported` line.
 - `silk check --json` writes one JSON object per diagnostic on standard error, with byte offsets and related locations.
 - Fix the first diagnostic first; later ones are often consequences.
