@@ -91,7 +91,7 @@ A binding is a TOML table in `[[build.bindings]]` or `[[profiles.<name>.bindings
 | `module` | The root module's path without `.silk`, such as `"main"` for `src/main.silk` |
 | `parameter` | The parameter's name |
 | `value` | A typed value table, below |
-| `origin` | `{ source = "...", provenance = "..." }`, plus `translator` for translated values |
+| `origin` | `{ source = "...", provenance = "..." }`, plus `translator` when `provenance` is `"translated-public"` |
 
 Value tables:
 
@@ -108,7 +108,8 @@ Value tables:
 - Integer values are decimal strings, not TOML numbers. `"-0"` reads as `0`.
 - An array binding lists one value table per element: `value = { kind = "array", values = [{ kind = "integer", value = "3" }, { kind = "integer", value = "4" }] }` binds a `[i32; 2]` parameter.
 - `provenance` is `"literal"`, or `"translated-public"` with a `translator` key.
-- `"secret"`, `"physical-supply"` and `"runtime"` are forbidden. One such binding anywhere in the manifest, even in an unselected profile, stops every build with `ForbiddenProvenance: build.bindings: binding` (or `profiles.<name>.bindings`), after the manifest path and the line of the binding's `[[...]]` header. A binding with a missing key is `InvalidInput: build.bindings: binding identity`, at the line of its header. An extra key is refused at its own line and named: `build.bindings.extra is not a supported field`. An extra key inside the `value` or `origin` table is refused at its own line too, named by its path: `build.bindings.value.extra`, `build.bindings.origin.bogus`. Inside an array value the element's number shows, counted from 0: `build.bindings.value.values.1.bogus is not a supported field` is an extra key in the second element. A profile's binding reads `profiles.<name>.bindings.value.extra`.
+- Only `"translated-public"` takes a `translator`. A `"literal"` binding with one is refused at the line of its `origin`: `InvalidInput: build.bindings: origin.translator: only provenance "translated-public" names a translator`.
+- `"secret"`, `"physical-supply"` and `"runtime"` are forbidden, with or without a `translator`. So is `"translated-public"` without a `translator`. One such binding anywhere in the manifest, even in an unselected profile, stops every build with `ForbiddenProvenance: build.bindings: binding` (or `profiles.<name>.bindings`), after the manifest path and the line of the binding's `[[...]]` header. A binding with a missing key is `InvalidInput: build.bindings: binding identity`, at the line of its header. An extra key is refused at its own line and named: `build.bindings.extra is not a supported field`. An extra key inside the `value` or `origin` table is refused at its own line too, named by its path: `build.bindings.value.extra`, `build.bindings.origin.bogus`. Inside an array value the element's number shows, counted from 0: `build.bindings.value.values.1.bogus is not a supported field` is an extra key in the second element. A profile's binding reads `profiles.<name>.bindings.value.extra`.
 - A binding for an unknown parameter, a value of the wrong kind, or an integer out of range is refused with SEM0214 at the binding's `parameter` line in `silk.toml`, naming the parameter, as in ``silk.toml:10: error[SEM0214] invalid package parameter binding: the value bound to `x` does not have its parameter's type``. An unknown name reads "module `main.silk` declares no package parameter `y`". An array of the wrong length or element kind is refused the same way.
 - Every binding is type-checked, including one that loses on precedence.
 

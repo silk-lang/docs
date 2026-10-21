@@ -188,7 +188,7 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | --- | --- |
 | `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
 | `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. |
-| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. The `operation` names are not checked. |
+| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `build.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. |
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
 | `requirements` | Must be empty: `build.composition.requirements is not supported by the native compiler yet`. |
 

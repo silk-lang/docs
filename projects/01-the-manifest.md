@@ -153,6 +153,7 @@ An unknown key, a composition problem, a `platform-supply` problem and a profile
 | Unknown key in a component's `bindings` entry | `LINE: build.composition.components.bindings.<key> is not a supported field` |
 | A `defaults` entry that is not a string | `LINE: build.composition.defaults entries must be runtime names` |
 | `composition.requirements` lists anything | `LINE: build.composition.requirements is not supported by the native compiler yet` |
+| A component binding `operation` other than `create`, `acquire`, `release` or `destroy` | `LINE: build.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy` |
 | A component `capability` other than `"execution-storage"` | `LINE: build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"` |
 | Unknown key in `platform-supply` or in one of its `support` entries | `LINE: build.platform-supply.<key> is not a supported field` (or `build.platform-supply.support.<key>`) |
 | Any other bad `platform-supply` | `LINE: InvalidConfiguration: platform-supply (<path>:build.platform-supply)` |
@@ -183,11 +184,12 @@ Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profile
 | `[build].profile` names no profile | `InvalidInput: build.profile = "fats" names no [profiles.fats] table` |
 | A key bindings do not have | `build.bindings.extra is not a supported field`, or `profiles.fast.bindings.extra` for a profile's binding |
 | A key a binding's `origin` does not have | `build.bindings.origin.bogus is not a supported field`. `origin` takes `source`, `provenance` and `translator`. |
+| A `translator` on a binding whose `provenance` is not `"translated-public"` | `InvalidInput: build.bindings: origin.translator: only provenance "translated-public" names a translator` |
 | A key a binding's `value` does not have | `build.bindings.value.extra is not a supported field`. Inside an array the item number shows: `build.bindings.value.values.1.bogus` is the second element. |
 | A binding with a missing key | `InvalidInput: build.bindings: binding identity`, or `profiles.fast.bindings` for a profile's binding |
 | A bad profile name, quoted or not | ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` `` |
 
-LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes, except for the elements of an array `value`. Targets and profiles lists every refused combination.
+LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. A `translator` refusal is at the line of the binding's `origin`. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes, except for the elements of an array `value`. Targets and profiles lists every refused combination.
 
 ## Keys that are not checked
 
@@ -196,7 +198,7 @@ Unknown keys are refused everywhere the compiler reads: the top level, `[package
 Two things are not checked:
 
 - `[changes]`. Builds ignore it; `silk changes` reads it.
-- The `operation` of a component binding. The names the compiler uses are `create`, `acquire`, `release` and `destroy`. Any other name, such as `operation = "frobnicate"`, is accepted without an error.
+- A component binding with no `operation`, or with one that is not a string, such as `operation = 3`. It is accepted without an error. A string `operation` must be `create`, `acquire`, `release` or `destroy`, spelled in lowercase.
 
 ## See also
 
