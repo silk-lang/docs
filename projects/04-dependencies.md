@@ -123,7 +123,18 @@ silk: invalid dependency `app` of text-utils@0.1.0: text-utils@0.1.0 depends on 
 silk: invalid dependency `text_utils` of other@0.1.0: the build already has a different version or copy of this package
 ```
 
-Extra keys in a dependency entry, such as `version = "1"`, are ignored without a warning.
+An extra key in a dependency entry, such as `version = "1"`, is a manifest error (exit 2), named at the line that writes it:
+
+```toml
+[dependencies]
+text_utils = { path = "../text-utils", package = "text-utils", version = "1" }
+```
+
+```
+Invalid Silk project manifest /home/you/app/silk.toml:8: dependencies.text_utils.version is not a supported field
+```
+
+When the entry's table spans several lines, the line is the one with the extra key, not the one with the dependency name.
 
 ## See also
 

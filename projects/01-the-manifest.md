@@ -57,7 +57,17 @@ The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, bind
 | `composition` | table | std lib catalog | Runtime composition: which runtime module starts the program. Advanced. |
 | `native-bindings` | any | none | Reserved. Refused by this compiler. |
 
-`composition` takes `runtimes`, `defaults`, `components`, `retention` and `requirements`. `requirements`, when it lists anything, is refused. Build outputs and native linking covers the last four keys.
+`composition` takes `runtimes`, `defaults`, `components`, `retention` and `requirements`. `requirements`, when it lists anything, is refused. The entries of its lists take only these keys:
+
+| List | Entry keys |
+| --- | --- |
+| `runtimes` | `name`, `module` |
+| `defaults` | none: each entry is a runtime name (a string) |
+| `components` | `capability`, `bindings` |
+| a component's `bindings` | `operation`, `module`, `declaration` |
+| `retention` | `module`, `declaration` |
+
+Build outputs and native linking covers what they do.
 
 ## &#91;dependencies\]
 
@@ -123,7 +133,7 @@ The compiler checks the whole manifest before it compiles anything, and stops at
 Invalid Silk project manifest /home/you/hello/silk.toml:8: build.artefact is not a supported field
 ```
 
-An unknown key and a profile problem name the line after the path, here line 8 of `silk.toml`. The other errors name only the file.
+An unknown key, a composition problem and a profile problem name the line after the path, here line 8 of `silk.toml`. The other errors name only the file. A key inside an inline table or array that spans several lines is named at its own line, not at the line that opens the value.
 
 | Problem | Message after `Invalid Silk project manifest <path>:` |
 | --- | --- |
@@ -138,7 +148,10 @@ An unknown key and a profile problem name the line after the path, here line 8 o
 | Root outside source root | `package.root must be a module below the source root` |
 | Unknown `[build]` key | `LINE: build.<key> is not a supported field` |
 | Unknown `[build.composition]` key | `LINE: build.composition.<key> is not a supported field` |
-| `composition.requirements` lists anything | `build.composition.requirements is not supported by the native compiler yet` |
+| Unknown key in a `runtimes`, `components` or `retention` entry | `LINE: build.composition.runtimes.<key> is not a supported field` (or `components`, `retention`) |
+| Unknown key in a component's `bindings` entry | `LINE: build.composition.components.bindings.<key> is not a supported field` |
+| A `defaults` entry that is not a string | `LINE: build.composition.defaults entries must be runtime names` |
+| `composition.requirements` lists anything | `LINE: build.composition.requirements is not supported by the native compiler yet` |
 | Bad artifact | `build.artifact must be executable, shared-library, static-library, or object` |
 | Bad stage | `build.stage is not an admitted emission stage` |
 | Output dir escapes | `build.output-dir must be a non-empty manifest-relative directory that does not escape the project` |
@@ -171,12 +184,12 @@ LINE is the line of the key, or of the table header when the problem is the tabl
 
 ## Keys that are not checked
 
-Unknown keys are refused at the top level and in `[package]`, dependency entries, `[build]`, `[build.composition]`, `[workspace]`, profiles, `cpu` tables and bindings. A misspelled `[packge]` table or a `description` key stops the build.
+Unknown keys are refused at the top level and in `[package]`, dependency entries, `[build]`, `[build.composition]` and the entries of its lists, `[workspace]`, profiles, `cpu` tables and bindings. A misspelled `[packge]` table or a `description` key stops the build.
 
 Two places are not checked:
 
 - `[changes]`. Builds ignore it; `silk changes` reads it.
-- The entries of the `runtimes`, `components` and `retention` lists in `[build.composition]`. An extra key in a `runtimes` entry, such as `bogus = 1`, is accepted and changes nothing. An extra key in a `retention` entry makes the entry unreadable, and the build stops with `silk: the build selects no single runtime (ARTIFACT-001)`.
+- The `origin` table of a binding. An extra key there, such as `origin = { source = "silk.toml", provenance = "literal", extra = 2 }`, is accepted and changes nothing.
 
 ## See also
 

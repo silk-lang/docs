@@ -195,7 +195,7 @@ These combinations are refused when the manifest is read:
 | a `cpu.features` entry the target does not have | `UnsupportedCombination: profiles.fast.cpu.features` |
 | `artifact` different from `[build].artifact` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [build].artifact = "executable"; set [build].artifact to choose the artifact, and omit the profile's artifact or write it as "executable"` |
 
-The profile names in these messages are the ones used to produce them; yours shows its own. LINE is the line of the field, or of the `[profiles.<name>]` header when the field is missing, as for the thread sanitizer without `threading`.
+The profile names in these messages are the ones used to produce them; yours shows its own. LINE is the line of the field, or of the `[profiles.<name>]` header when the field is missing, as for the thread sanitizer without `threading`. A field inside an inline table written over several lines, such as `features` in `cpu = { model = "x86-64",` followed by `features = ["avx512"] }` on the next line, is reported at the line that writes it.
 
 ## Linux without libc
 

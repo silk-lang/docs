@@ -175,12 +175,26 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | Key | Meaning |
 | --- | --- |
 | `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
-| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. |
-| `components` | Capability bindings, such as `execution-storage` operations bound to module declarations. |
+| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. |
+| `components` | `[{ capability = "...", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: capability bindings, such as `execution-storage` operations bound to module declarations. |
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
 | `requirements` | Must be empty: `build.composition.requirements is not supported by the native compiler yet`. |
 
-Any other key is refused at its line, as in `Invalid Silk project manifest /home/you/hello/silk.toml:8: build.composition.bogus is not a supported field`.
+Any other key is refused at its line, as in `Invalid Silk project manifest /home/you/hello/silk.toml:8: build.composition.bogus is not a supported field`. So is a key the entries of these lists do not take, even inside an array written over several lines:
+
+```toml
+[build]
+composition = { runtimes = [
+  { name = "synchronous", module = "silk/native_start_sync" },
+  { name = "hosted", modul = "silk/native_start" },
+], defaults = ["synchronous"] }
+```
+
+```
+Invalid Silk project manifest /home/you/hello/silk.toml:10: build.composition.runtimes.modul is not a supported field
+```
+
+Line 10 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`build.composition.retention.decl is not a supported field`), and in a component's `bindings` entry as `build.composition.components.bindings.<key>`.
 
 For example, `silk/native_start_sync` is a smaller hosted runtime for a `main` that returns `i32` and needs only `HostInput`:
 
