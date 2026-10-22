@@ -447,11 +447,13 @@ const placeholder = (
     ],
   )
 
-const notFound = (path: string, h: HtmlBuilder<Message>): Html =>
+// The same markup serves as the static 404.html for every missing path, so it
+// does not name the path.
+const notFound = (h: HtmlBuilder<Message>): Html =>
   Layout.page(
     'Home',
     [
-      placeholder('Not found', `Nothing lives at ${path}.`, h),
+      placeholder('Not found', 'There is no page at this address.', h),
       h.p(
         [h.Class('mx-auto max-w-[1440px] px-5 pb-16 md:px-20')],
         [
@@ -474,11 +476,11 @@ const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
     Docs: () => DocsPage.indexView(model, h),
     DocPage: ({ directory, slug }) =>
       Option.match(Catalog.findPage(directory, slug), {
-        onNone: () => notFound(`/docs/${directory}/${slug}`, h),
+        onNone: () => notFound(h),
         onSome: page => DocsPage.pageView(model, page, h),
       }),
     Releases: () => Releases.view(model.copiedCodeIds, h),
-    NotFound: ({ path }) => notFound(path, h),
+    NotFound: () => notFound(h),
   })
 
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
