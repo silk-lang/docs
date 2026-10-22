@@ -263,7 +263,7 @@ impl StandardInput for ScriptedInput {
 
 `StandardInput.filled(n)` and `StandardInput.endOfInput()` build the two outcomes. A provider follows the same rules as the native one: an empty buffer gets `filled(0)`, and after the end, every read reports the end again.
 
-**Output.** `CapturingWriter` appends every write to a `Bytes`. `writeAll` may only fail with `WriterError` and has no allocator in its row, so the writer carries its own `SystemAllocator` and maps `OutOfMemoryError` to `Writer.failure()`:
+**Output.** `CapturingWriter` appends every write to a `Bytes`. `writeAll` may only fail with `WriterError` and has no allocator in its row, so the writer carries its own `SystemAllocator` and maps `OutOfMemoryError` to `Writer.failure()`. A `Writer` also implements `writeVectored`, which writes several slices as one; a provider with no faster way to do that hands it to `Writer.writeEach`, which calls `writeAll` for each slice:
 
 ```silk
 // A Writer that keeps everything written to it.
@@ -281,6 +281,9 @@ impl Writer for CapturingWriter {
   effect fn writeAll(self: &mut Self, bytes: &[u8]) -> () ! WriterError ? &mut Writer {
     let appending = Effect.catchAll(appendBytes(&mut self.out, bytes), writerFull)
     run move appending |> Effect.provideMut<Allocator>(&mut self.allocator)
+  }
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> () ! WriterError ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
   }
   effect fn flush(self: &mut Self) -> () ! WriterError ? &mut Writer {
     return ()

@@ -103,9 +103,17 @@ static if Target.arch() == Arch.Wasm32 {
     }
   }
 
+  effect fn writeVectored(self: &mut RawStdout, vals: &[&[u8]]) -> () ! WriterError {
+    return run Writer.writeEach(&mut self, vals)
+  }
+
   effect fn flush(self: &mut RawStdout) -> () ! WriterError {}
 
-  impl Writer for RawStdout { writeAll: RawStdout.writeAll flush: RawStdout.flush }
+  impl Writer for RawStdout {
+    writeAll: RawStdout.writeAll
+    writeVectored: RawStdout.writeVectored
+    flush: RawStdout.flush
+  }
 
   pub fn main(inputs: &ProcessInputs) -> i32 {
     let mut out = RawStdout {}
@@ -130,7 +138,7 @@ static if Target.arch() == Arch.Wasm32 {
 The rest is three versions of `main`, chosen by a module-level `static if`. `Target.arch()` from `silk/target` and `Compilation.libc()` from `silk/compilation` are static functions: the compiler knows their answers before it type-checks, so only the selected arm exists in the build. That is why each arm can import modules the others cannot use. See **Static control flow and reflection** in the reference.
 
 - On wasm32, `main` returns the number. The host reads it as the call's result. `silk/wasm_start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225: "Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements".
-- On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. With that provider, the same `report` runs unchanged.
+- On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. `writeVectored`, which writes several slices as one, has no faster way here and hands each slice to `writeAll` through `Writer.writeEach`. With that provider, the same `report` runs unchanged.
 - Everywhere else, `StdoutWriter` from `silk/os_writer` does the job.
 
 `silk/target` also has `operatingSystem()`, `abi()`, `endianness()`, `pointerBits` and `hasCpuFeature("...")`. `silk/compilation` reports the rest of the build request, such as `artifact()`, `safety()` and `threading()`.
@@ -155,10 +163,10 @@ silk check --profile bare
 
 ```
 Checking squares (x86_64-unknown-linux-gnu)
-  load     47 modules, 1 in package          0.05s
-  check    2 modules                         0.32s
-  borrow   72 bodies                         0.00s
-Finished squares in 0.38s
+  load     47 modules, 1 in package          0.07s
+  check    2 modules                         0.35s
+  borrow   74 bodies                         0.00s
+Finished squares in 0.42s
 ```
 
 ```sh
@@ -266,11 +274,12 @@ silk build --profile bare
 
 ```
 Compiling squares (x86_64-unknown-linux-gnu, bare)
-  load     47 modules, 1 in package          0.05s
-  check    1 module                          0.39s
-  codegen  failed: 77 functions, 1 error     0.02s
+  load     47 modules, 1 in package          0.07s
+  check    1 module                          0.40s
+  codegen  failed: 77 functions, 1 error     0.01s
+[x86_64-unknown-linux-gnu]
 <silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
-Failed squares in 0.47s
+Failed squares in 0.51s
 ```
 
 The command exits with status 2.

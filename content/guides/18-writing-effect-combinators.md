@@ -323,20 +323,47 @@ Failed weather in 0.23s
 
 Column 26 is the `withBudget(...)` argument. `withBudget` takes its action as `once Effect` and keeps it, so the effect it returns can run only once, and `retrying` needs one that can run again. `budgetedRead(&mut station.*)` builds a fresh `withBudget` effect each time it runs, and holds only a `&mut` borrow, so it is a `mut Effect`.
 
-An `effect { ... }` block would normally do the same job without a named function. In this release, passing `effect { return run withBudget(500, readStation(&mut station.*)) }` to `retrying` stops with an error inside `retrying`. It happens when the function that passes the block also calls `Effect.log`, as `attempt` does:
+An `effect { ... }` block does the same job without a named function. Pass it straight to `retrying`:
+
+```silk
+  let reading = retrying(
+    effect { return run withBudget(500, readStation(&mut station.*)) },
+    move transient, 3, 100,
+  )
+  let outcome = run Effect.result(inVirtualTime(move reading))
+```
+
+The output is the same as with `budgetedRead`. Each time `retrying` runs the block, the block builds a fresh `withBudget` effect, and it holds only a `&mut` borrow of `station`, so it is a `mut Effect` too.
+
+One case still needs a named `effect fn`: a block passed from a generic function, one with type parameters of its own, that also calls `Effect.log`. Here `wrapped<T>` logs a line and passes a block to a one-line combinator, `again`:
+
+```silk
+effect fn again<'env, A, E, ?R>(mut action: mut Effect<'env; A ! E ? R>) -> A ! E ? R {
+  return run action
+}
+
+effect fn one() -> i32 {
+  return 1
+}
+
+effect fn wrapped<T>(value: T) -> T ! LogError ? &mut Logger {
+  run Effect.log("start\n", &.{})
+  let got = run again(effect { return run one() })
+  run Effect.log("{v}\n", &.{ v: got })
+  return move value
+}
+```
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.11s
-  check    failed: 2 modules                 1.88s
+  load     53 modules, 1 in package          0.07s
+  check    failed: 2 modules                 0.27s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:66:10: unsupported[signature-form] not supported by the native compiler yet
-Failed weather in 1.99s
+/home/you/weather/src/main.silk:6:10: unsupported[signature-form] not supported by the native compiler yet
+Failed weather in 0.34s
 ```
 
-The command exits with status 2.
-
-Use a named `effect fn` until that is fixed.
+The command exits with status 2. Line 6 is `run action` inside `again`. Without the type parameter, or without the `Effect.log` calls, the same code checks and runs. Passing `again(one())` instead of the block works too.
 
 ## Borrowing while an effect is alive
 

@@ -250,22 +250,22 @@ silk check --timings
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.11s
-  check    2 modules                         0.25s
+  load     53 modules, 1 in package          0.06s
+  check    2 modules                         0.21s
   borrow   126 bodies                        0.00s
   Slowest modules to check
-      244.0ms  silk/native_start.silk
-       6.49ms  main.silk
+      206.4ms  silk/native_start.silk
+       3.61ms  main.silk
   Slowest bodies to borrow-check
-       0.38ms  silk/execution_storage.acquire
-       0.30ms  silk/native_start.(EntryResult<Effect<'env; () ! E ? &mut HostInput>> for Application< Effect<'env; () ! E ? &mut HostInput>, >).code
-       0.30ms  silk/native_diagnostics.makePool
-       0.29ms  silk/native_start.start
-       0.26ms  silk/native_host_input.NativeHostInput.capture
-Finished hello in 0.36s
+       1.00ms  silk/list.releaseBuffer
+       0.28ms  silk/native_start.start
+       0.26ms  silk/execution_storage.acquire
+       0.22ms  silk/native_diagnostics.makePool
+       0.21ms  silk/native_start.(EntryResult<Effect<'env; () ! E ? &mut HostInput>> for Application<Effect<'env; () ! E ? &mut HostInput>>).code
+Finished hello in 0.27s
 ```
 
-`silk build --timings` also lists the slowest functions to emit. Std lib modules appear in the lists because they are checked with your program. A body is named by its module and its name as written: `silk/native_diagnostics.makePool` for a function, `silk/list.List<T>.appendBytes` for a method. A body inside a conformance shows the conformance in parentheses, as the `code` body of `silk/native_start` does above. A header written over several lines keeps a space where each line break was, as in `Application< Effect<...>, >`. `--quiet` turns the lists off.
+`silk build --timings` also lists the slowest functions to emit. Std lib modules appear in the lists because they are checked with your program. A body is named by its module and its name as written: `silk/native_diagnostics.makePool` for a function, `silk/list.List<T>.appendBytes` for a method. A body inside a conformance shows the conformance in parentheses, as the `code` body of `silk/native_start` does above. A header written over several lines is shown on one line, with its spacing and trailing commas dropped. `--quiet` turns the lists off.
 
 ## Replay edits
 

@@ -292,6 +292,7 @@ Compiling tiny (x86_64-unknown-linux-gnu, bare)
   check    1 module                          0.00s
   codegen  0 functions                       0.00s
   borrow   1 body                            0.00s
+[x86_64-unknown-linux-gnu]
 silk: an executable built with runtime = { kind = "none" } has no `main`; export one, as `export "C" fn start() -> i32 as "main"` does, or select a runtime
 Failed tiny in 0.06s
 ```

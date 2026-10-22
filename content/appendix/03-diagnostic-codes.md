@@ -305,7 +305,7 @@ pub fn main() -> i32 {
 /home/you/demo/src/main.silk:2:15: error[LEX0014] Numeric literals take no type suffix such as `u8`; write the type as an annotation instead, as in `let value: u8 = 7`
 ```
 
-The column is the start of the literal, and the message repeats its digits and suffix: `5usize` gives ``as in `let value: usize = 5` ``. Every integer and float type name is caught this way. A suffix after a fractional number, such as `1.5f32`, is read as a duration unit instead and gives LEX0008.
+The column is the start of the literal, and the message repeats its digits and suffix: `5usize` gives ``as in `let value: usize = 5` ``. Every integer and float type name is caught this way, after an integer or a float: `1.5f32` gives ``such as `f32`; write the type as an annotation instead, as in `let value: f32 = 1.5` ``. For `2.5e3u8` the message suggests `let value: u8 = 2.5e3`, which is SEM0037 in turn, because a float literal is not a `u8`.
 
 Fix: Drop the suffix and give the type where the value is used: `let value: u8 = 7`, or pass `7` to a `u8` parameter. See Lexical structure and Values and primitive types.
 
@@ -4851,7 +4851,7 @@ pub fn main() -> i32 { return naked() }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:19: error[SEM0236] This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine` apply only to `extern "C"` or `export "C"` functions
+/home/you/demo/src/main.silk:1:19: error[SEM0236] This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` only to other runtime functions
 ```
 
 Fix: Put `Intrinsic.machine` and `Intrinsic.foreign` only on `extern "C"` or `export "C"` functions. See Unsafe code and C interop, Intrinsics.
@@ -4916,14 +4916,20 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:16: error[SEM0239] A SIMD vector needs a numeric lane type and a power-of-two lane count with a total width of 16 to 512 bits; a mask needs 2 to 64 lanes
+/home/you/demo/src/main.silk:1:16: error[SEM0239] A SIMD vector needs a numeric lane type and a power-of-two lane count with a total width of 16 to 512 bits; a mask needs a power-of-two lane count from 2 to 64
 ```
 
 The column is the type. `simd<i32, 3>` is refused the same way, because 3 is not a power of two.
 
-The same message is printed for an `Intrinsic.simd*` member used on a lane type it does not take, such as `Intrinsic.simdSqrt<simd<u8, 16>>`, a `simdShuffle` index that is not below twice the lane count, and a `simdConvert` between different lane counts. There the shape itself may be valid. A mask also needs a power-of-two lane count, so `mask<3>` is refused even though the message only says 2 to 64.
+An `Intrinsic.simd*` member whose type arguments break one of its rules gets the same code with a message for that rule, at the call:
 
-Fix: Use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
+- ``Intrinsic.simdSqrt takes a SIMD vector with floating-point lanes, but simd<u8, 16> is not one``; `simdShiftLeft` asks for integer lanes and `simdMaskAny` for a mask.
+- ``Intrinsic.simdConvert needs simd<u8, 16> and simd<f32, 4> to have the same lane count, but they have 16 and 4``.
+- ``Intrinsic.simdBitcast needs simd<u32, 4> and simd<u32, 8> to have the same width in bits, but they have 128 and 256``.
+- ``Intrinsic.simdShuffle needs simd<u32, 4> and simd<i32, 4> to have the same lane type, but they have u32 and i32``.
+- ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices. A `shuffle` from a `silk/simd` module prints this too, at your call to it.
+
+Fix: For a shape, use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. For a member, give it the lanes it names, or vectors that agree in the measure it names. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
 
 ### SEM0240
 

@@ -110,7 +110,7 @@ MaskType      = 'mask' '<' Expression '>'
 - `T` is any integer or float type, including `isize` and `usize`. `bool` and `char` are refused; a vector of booleans is spelled `mask<N>`.
 - `N` is a static expression, such as `16` or `2 * N` for a constant `N`. It is a power of two from 2 to 64.
 - A vector is 16 to 512 bits wide in total: `simd<u8, 2>` and `simd<f64, 8>` are admitted, `simd<u64, 16>` is not. A mask has 2 to 64 lanes, also a power of two.
-- Any other shape is SEM0239 at the type.
+- Any other shape is SEM0239 at the type: "A SIMD vector needs a numeric lane type and a power-of-two lane count with a total width of 16 to 512 bits; a mask needs a power-of-two lane count from 2 to 64".
 - `simd` and `mask` are not reserved words. A variable may be called `mask`, as the mask modules' parameters are.
 - Vectors and masks are `Copy` values. They pass, return and sit in struct fields by value.
 - Lane `0` is at the lowest address in memory.
@@ -160,7 +160,7 @@ Integer modules add `wrappingAdd`, `wrappingSubtract`, `wrappingMultiply`, `satu
 - `shiftLeft` and `shiftRight` take a vector of counts and trap with `invalid shift count` when a count is negative or not less than the lane width. `shiftRight` copies the sign bit on signed lanes and inserts zeros on unsigned ones. Rotations take counts modulo the lane width.
 - Float `minimum` and `maximum` give NaN when either lane is NaN, and treat `-0.0` as less than `0.0`.
 - A `to...` conversion converts each lane as the scalar `to...` function does, and traps with `arithmetic overflow` when a lane doesn't fit.
-- `shuffle` takes its indices as a `static` array. An index below `LANES` picks from `left`; `LANES` to `2 * LANES - 1` picks from `right`. A runtime index is SEM0176; an index out of range is SEM0239.
+- `shuffle` takes its indices as a `static` array. An index below `LANES` picks from `left`; `LANES` to `2 * LANES - 1` picks from `right`. A runtime index is SEM0176. An index out of range is SEM0239, reported at the call. `u32x4.shuffle(a, a, [0, 1, 2, 8])` prints "Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8". The message names the intrinsic that `shuffle` calls.
 - `firstSet` returns `LANES` when no lane is set. In `toBits`, lane `i` is bit `i`.
 
 Other admitted shapes, such as `simd<u8, 64>`, `simd<u32, 2>` or `simd<usize, 2>`, have no module. Reach them through the `Intrinsic.simd*` members; see Intrinsics.
@@ -176,7 +176,7 @@ Other admitted shapes, such as `simd<u8, 64>`, `simd<u32, 2>` or `simd<usize, 2>
 
 Vectors of every admitted shape compile on every target, whatever its preferred width. On wasm32 without `simd128` they compile to scalar code. Test `preferredBytes()` in a `static if` to pick a block width, and `hardware()` to keep a plain loop where vectors would only be emulated.
 
-The features come from the profile's `cpu` table; see Targets and profiles. With the default x86-64 model, `preferredBytes()` is `16`. `cpu.model = "x86-64-v3"` or `features = ["avx2"]` makes it `32`, and `cpu.model = "x86-64-v4"` or `features = ["avx512bw"]` makes it `64`. A wasm32 profile turns on hardware vectors with `features = ["bulk-memory", "simd128"]`.
+The features come from the profile's `cpu` table; see Targets and profiles. With the default x86-64 model, `preferredBytes()` is `16`. `cpu.model = "x86-64-v3"` or `features = ["avx2"]` makes it `32`, and `cpu.model = "x86-64-v4"` or `features = ["avx512bw"]` makes it `64`. A wasm32 profile turns on hardware vectors with `features = ["simd128"]`.
 
 ## Examples
 
@@ -368,5 +368,3 @@ Lexical structure · Expressions and operators · Bindings and statements · Str
 ## Open questions
 
 - `f64 + 1` reports SEM0012 ("Expected f64 but received i32", an argument-mismatch code) where SEM0135 might be expected.
-- SEM0239 has one message for every SIMD refusal, the shape rule: "A SIMD vector needs a numeric lane type and a power-of-two lane count with a total width of 16 to 512 bits; a mask needs 2 to 64 lanes". It is also what `Intrinsic.simdShiftLeft` on `simd<f32, 4>` or a `shuffle` index of 8 on four lanes prints, though their shapes are valid.
-- The same message says a mask needs 2 to 64 lanes, but `mask<3>` is refused too: the lane count must also be a power of two.

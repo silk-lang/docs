@@ -73,7 +73,16 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 - Each takes the vector or mask type as its first type argument: `Intrinsic.simdSplat<simd<u32, 4>>(10)`. `simdShuffle`, `simdConvert` and `simdBitcast` take a second, the result type: `Intrinsic.simdShuffle<simd<u32, 4>, simd<u32, 2>>(a, a, [0, 1])`.
 - `simdShuffle` may change the lane count: four-lane operands can give two or eight lanes. Its indices are static (SEM0176 otherwise) and below twice the operand lane count.
 - `simdConvert` keeps the lane count; `simdBitcast` keeps the total width.
-- A member used with a lane type it does not take, such as `simdSqrt` on integers or `simdMaskAny` on a vector, is SEM0239.
+- A member used with type arguments it does not take is SEM0239, at the call. The message says which rule failed:
+
+| Refusal | Message |
+| --- | --- |
+| Lanes the member does not take | ``Intrinsic.simdShiftLeft takes a SIMD vector with integer lanes, but simd<f32, 4> is not one``; `simdSqrt` asks for floating-point lanes, `simdMaskAny` for ``a mask`` |
+| `simdConvert` between lane counts | ``Intrinsic.simdConvert needs simd<u8, 16> and simd<f32, 4> to have the same lane count, but they have 16 and 4`` |
+| `simdBitcast` between widths | ``Intrinsic.simdBitcast needs simd<u32, 4> and simd<u32, 8> to have the same width in bits, but they have 128 and 256`` |
+| `simdShuffle` to another lane type | ``Intrinsic.simdShuffle needs simd<u32, 4> and simd<i32, 4> to have the same lane type, but they have u32 and i32`` |
+| `simdShuffle` index out of range | ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices |
+
 - The `silk/simd` modules wrap these for the 128-bit and 256-bit shapes. Other admitted shapes, such as `simd<u8, 64>` or `simd<u32, 2>`, are reachable only here. The types, operators and modules are in Values and primitive types, under SIMD vectors and masks.
 
 ## Type and property members
@@ -93,7 +102,7 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 - `with Intrinsic.machine(naked: true, noReturn: true)` appears only on startup entry points in the standard library.
 - `with Intrinsic.nonParking()` takes no fields. On an ordinary function or service operation it is the only accepted property.
 - The property vocabulary is closed: `Intrinsic.foreign(memory:, locality:, noCapture:, callbacks:)`, `Intrinsic.machine(naked:, noReturn:)` and `Intrinsic.nonParking()`. A function or service operation header with any other property, or any other field, is SEM0235 at the clause, in both `silk check` and `silk build`. Examples: `with Intrinsic.detached()`, `with Intrinsic.nonParking(strict: true)`.
-- `Intrinsic.foreign(...)` and `Intrinsic.machine(...)` apply only to `extern "C"` and `export "C"` functions. On a plain function, or on an interface or service operation, either is SEM0236 at the clause: "This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine` apply only to `extern "C"` or `export "C"` functions".
+- `Intrinsic.foreign(...)` and `Intrinsic.machine(...)` apply only to `extern "C"` and `export "C"` functions. On a plain function, or on an interface or service operation, either is SEM0236 at the clause: "This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` only to other runtime functions".
 - SEM0235 takes precedence: a clause with an unknown field, such as `Intrinsic.machine(naked: true, bogus: 1)` on a plain function, is SEM0235.
 
 ## Unsafe members
@@ -237,7 +246,7 @@ pub fn main() -> i32 {
 | SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause, such as `with Intrinsic.detached()` |
 | SEM0236 | Known property on a declaration that does not take it, such as `Intrinsic.machine(...)` on a plain function |
 | SEM0237 | An atomic member with a memory order or element type it does not admit, such as `atomicStore` with `"acquire"` |
-| SEM0239 | A SIMD member with a vector shape or lane type it does not admit, such as `simdSqrt<simd<u8, 16>>` |
+| SEM0239 | A SIMD member with a vector shape or lane type it does not admit, such as `simdSqrt<simd<u8, 16>>`, or vectors that differ in lane count, width or lane type where they must match |
 
 ## See also
 
