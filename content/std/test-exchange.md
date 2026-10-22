@@ -36,7 +36,11 @@ Public declarations: 18.
 pub struct Plan<'a>
 ```
 
-A cursor over one borrowed plan.
+A cursor over one borrowed plan file that the `silk test` driver wrote.
+
+### Gotchas
+It does not stop at the first error. After a failure it reads as empty, and [`failed`](#failed)
+stays true. Check [`failed`](#failed) or the `bool` results before a test body runs.
 
 ::Anchor{id="Entry"}
 
@@ -68,7 +72,8 @@ pub fn openPlan<'a>(bytes: &'a [u8]) -> Plan<'a>
 
 Opens a plan and checks its magic, version, mode and nonce framing.
 
-If a check fails, the returned plan is already rejected. See [`failed`](#failed).
+If a check fails, the returned plan is already rejected: it reads as empty, and [`failed`](#failed)
+returns `true`.
 
 ::Anchor{id="isPerTest"}
 
@@ -251,5 +256,7 @@ pub effect fn finishReceipt(
 Appends the counts and the status, and returns the receipt bytes.
 
 In uncached mode the receipt is padded to exactly 256 bytes.
+
+Category: Testing.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

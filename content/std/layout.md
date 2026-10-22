@@ -46,7 +46,8 @@ A byte size and an alignment that describe one block of memory.
 ### Details
 
 Make a layout with [`Layout.of`](#Layout.impl.of), [`Layout.make`](#Layout.impl.make), or [`Layout.repeat`](#Layout.impl.repeat). These functions make
-sure that `alignment` is a power of two. A struct literal does not check the fields.
+sure that `alignment` is a power of two and never zero. A struct literal does not check the
+fields. A layout only describes memory. It does not allocate or initialize memory.
 
 ::Anchor{id="Layout.bytes"}
 
@@ -156,5 +157,7 @@ pub struct LayoutOverflow
 ```
 
 The error value of [`Layout.repeat`](#Layout.impl.repeat) when the total byte size is more than the maximum `usize`.
+
+Category: Memory.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

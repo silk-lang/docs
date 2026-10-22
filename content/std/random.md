@@ -65,10 +65,19 @@ pub service Random
 
 The effect for random bytes that are safe for secrets.
 
+### When to use
+
+Require `&mut Random` for anything that an attacker must not guess: keys, nonces, tokens,
+passwords, and session IDs. For simulations, games, and tests that must repeat, use
+`silk.insecure_random`.
+
 ### Details
 
-A provider fills each requested byte. For an empty slice, it does nothing and does not use
-randomness. If it cannot get random bytes, it must stop the program.
+A provider implements [`Random.fillBytes`](#Random.fillBytes). [`Random.nextU64`](#Random.impl.nextU64), [`Random.nextBool`](#Random.impl.nextBool), and
+[`Random.below`](#Random.impl.below) use it, and the number of bytes that each one reads is fixed, so a test
+provider gives the same results each time. /// A provider fills each requested byte. For an
+empty slice, it does nothing and does not use randomness. If it cannot get random bytes, it must
+stop the program.
 
 ::Anchor{id="Random.fillBytes"}
 
@@ -124,5 +133,7 @@ Returns an absent option if `upperExclusive` is 0.
 
 It reads `u64` values and drops values that would make some results more likely than others,
 so it can read more than one `u64`. For 0, it reads nothing.
+
+Category: System.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

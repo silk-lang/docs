@@ -503,6 +503,22 @@ A Zstandard decoder for one complete input. It owns all its storage.
 Dropping it releases the storage. Each regular frame starts with a new history, new entropy
 tables, and a new checksum, but the limits count across all frames.
 
+### When to use
+Use it to read `.zst` files or HTTP bodies with `Content-Encoding: zstd`. Make a decoder with
+[`Zstd.make`](#Zstd.impl.make), and call [`Zstd.step`](#Zstd.impl.step) until it returns `Finished`. It does not compress.
+
+### Details
+It supports all block types and all entropy modes, and more than one frame, including
+skippable frames. [`Zstd.make`](#Zstd.impl.make) allocates all storage one time. [`Zstd.step`](#Zstd.impl.step) does not allocate
+and keeps no borrow of your buffers. The end of a frame is not the end of the input: the decoder
+returns `Finished` only when the input is marked final, all of it is consumed, and each frame is
+complete.
+
+### Gotchas
+Output is not verified until `Finished`, because a checksum or a truncated frame can fail later.
+A failure is permanent: drop the decoder and make a new one for another stream. Dictionaries are
+not supported.
+
 ::Anchor{id="Zstd.impl"}
 
 ## Implementation `Zstd`
@@ -554,5 +570,7 @@ with an empty output makes no progress.
 
 #### Gotchas
 Output is not verified until `Finished`. A failure is permanent for this decoder.
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

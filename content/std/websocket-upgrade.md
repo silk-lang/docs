@@ -100,7 +100,7 @@ effect fn program() -> i32
       return 1
     }
   }
-  let offer = match move inspect(&head, Limits.default()) {
+  let offer = match move inspect(&head, Limits.defaults()) {
     Result<Offer, UpgradeError>.Success { value } => move value
     Result<Offer, UpgradeError>.Failure { error: _ } => {
       return 1
@@ -155,7 +155,7 @@ effect fn program() -> i32
       return 1
     }
   }
-  return match move inspect(&oldHead, Limits.default()) {
+  return match move inspect(&oldHead, Limits.defaults()) {
     Result<Offer, UpgradeError>.Success { value: _ } => 1
     Result<Offer, UpgradeError>.Failure { error } => {
       if rejectionStatus(&error) != 426 {
@@ -257,12 +257,12 @@ impl Copy for Limits
 impl Limits
 ```
 
-::Anchor{id="Limits.impl.default"}
+::Anchor{id="Limits.impl.defaults"}
 
-### Associated function `default`
+### Associated function `defaults`
 
 ```silk
-pub fn default() -> Limits
+pub fn defaults() -> Limits
 ```
 
 Returns the default limits: 32 protocols, 128 bytes for each protocol, 4096 extension bytes,
@@ -879,7 +879,13 @@ More fields for the response, such as `WWW-Authenticate`.
 pub interface DecisionHandler<D, ?R>
 ```
 
-Decides if a handshake is accepted. See [`withUpgrade`](#withUpgrade).
+Decides if a WebSocket handshake is accepted. [`withUpgrade`](#withUpgrade) calls it with the [`Offer`](#Offer) after
+the request passed [`inspect`](#inspect), and checks the [`Decision`](#Decision) before any output.
+
+### Gotchas
+`Origin` is only a hint from the browser. It is not authentication. Check it in the decision if
+you need it. Extensions such as `permessage-deflate` are not supported, so an `Accept` with
+`extensions: true` fails with `UnsupportedNegotiation`.
 
 ::Anchor{id="DecisionHandler.decide"}
 
@@ -995,5 +1001,7 @@ Sends the response for a handshake error, with no body.
 ### Details
 It sends the status of [`rejectionStatus`](#rejectionStatus). For `UnsupportedVersion`, it also sends
 `Sec-WebSocket-Version: 13`. Call it only before a 101 response starts.
+
+Category: HTTP.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

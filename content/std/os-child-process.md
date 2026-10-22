@@ -11,7 +11,8 @@ by a signal, are normal outcomes. If a call fails, it releases its resources and
 child, so no zombie process stays.
 
 ## Errors
-`ProcessError` and `OutOfMemoryError`, as described in `silk.child_process`.
+- `ProcessError` if the child cannot start, the wait fails, or the output cannot be captured.
+- `OutOfMemoryError` if the `Allocator` cannot supply the request or the captured output.
 
 ## Gotchas
 - A call blocks the thread until the child ends.
@@ -77,7 +78,25 @@ Public declarations: 1.
 pub struct OsChildProcess
 ```
 
-The native `ChildProcess` provider. It has no state. Each call owns its resources.
+The native `ChildProcess` provider: it runs real programs. It has no state. Each call owns its
+resources.
+
+### When to use
+Provide it for `ChildProcess` in a native program. Code that runs programs uses
+`silk.child_process`, so a test can provide a fake instead.
+
+### Details
+Each call starts the program, waits for it to end, and captures all of its standard output
+and standard error. An exit code that is not 0, and an end by a signal, are normal outcomes.
+If a call fails, it releases its resources and waits for the child, so no zombie process
+stays.
+
+### Gotchas
+- A call blocks the thread until the child ends.
+- Do not wait for a child of this provider in other code.
+- A trap in the parent can leave resources open.
+- On GNU/Linux, if the child cannot start and also cannot report why, the outcome looks like
+  an exit with code 127.
 
 ::Anchor{id="OsChildProcess.impl"}
 
@@ -112,5 +131,7 @@ impl ChildProcess for OsChildProcess
 ```silk
 execute: OsChildProcess.execute
 ```
+
+Category: Native platform.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

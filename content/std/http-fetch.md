@@ -842,6 +842,11 @@ pub struct FetchError
 
 The error from a fetch, with context. It owns its data.
 
+### Details
+
+It tells the phase and the reason, with the status and the URI when they are known, and how
+many body bytes the destination got.
+
 ::Anchor{id="FetchError.phase"}
 
 ### Field `phase`
@@ -1182,7 +1187,13 @@ limits.
 pub struct FetchOptions
 ```
 
-The settings of a fetch. Start from [`FetchOptions.defaults`](#FetchOptions.impl.defaults).
+The settings of a fetch: redirects, content decoding, the pool, the proxy, one deadline for the
+whole operation, and all limits. Start from [`FetchOptions.defaults`](#FetchOptions.impl.defaults).
+
+### Gotchas
+
+The deadline is not renewed between redirects or phases. The defaults do not follow redirects
+and do not decode content. Set `redirect` and `content` to change that.
 
 ::Anchor{id="FetchOptions.redirect"}
 
@@ -1335,6 +1346,28 @@ pub struct Fetch<C>
 A fetch client around a [`FetchClient`](#FetchClient). Make it with [`Fetch.make`](#Fetch.impl.make), and pass it to the fetch
 functions.
 
+### When to use
+
+Use it when you need more control than `silk.http_client`: a sink for a large body, a body that
+you stream, content decoding, a proxy, or a connection pool. Use the `Context` of
+`silk.http_fetch_native` as the client.
+
+### Details
+
+Each fetch function sends one request, follows redirects, decodes the content, and delivers the
+body. The prefix of the function name tells the destination: `toSink*` gives the body to a
+[`Sink`](#Sink) in chunks, in order; `collect*` reads the whole body into memory, up to
+`maxBodyBytes`, and returns it only if it is complete; `discard*` reads and checks the body and
+keeps nothing. The suffix tells the request body: `Empty`; `Bytes`, sent again after a redirect
+that keeps the body; `OneShot`, a producer that runs one time, so a redirect that must send the
+body again fails with `ReplayUnavailable`; or `Replay`, a factory that makes a new producer for
+each attempt.
+
+### Gotchas
+
+The deadline is not renewed between redirects or phases. The default [`FetchOptions`](#FetchOptions) do not
+follow redirects and do not decode content.
+
 ::Anchor{id="Fetch.impl"}
 
 ## Implementation `Fetch<C>`
@@ -1361,7 +1394,8 @@ Returns a fetch client that uses `client` to get connections.
 pub interface Sink<E, ?R>
 ```
 
-A destination for the body chunks of a `toSink*` function.
+A destination for the body chunks of a `toSink*` function. The chunks arrive in order. A
+failure of the sink becomes a [`DestinationFailure`](#DestinationFailure).
 
 ::Anchor{id="Sink.write"}
 
@@ -2088,5 +2122,7 @@ where
 
 Sends a request whose body comes from a new producer from `factory` for each attempt, and reads
 and checks the body of the final response without keeping it. More than `maxDiscardBytes` fails.
+
+Category: HTTP.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

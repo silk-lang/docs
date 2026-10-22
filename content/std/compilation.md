@@ -1,14 +1,11 @@
 Build choices of the current compilation, such as safety, threading, and artifact kind, for use
-in
-static evaluation.
+in static evaluation.
 
 ## When to use
 Use [`Compilation`](#Compilation) to select code for the build request, for example with `static if`. Use
 [`Compilation.safety`](#Compilation.impl.safety) to select checked or unchecked library code, and
-[`Compilation.threading`](#Compilation.impl.threading)
-to select single-thread or multi-thread code. Use `silk.target` for facts about the machine,
-such
-as the architecture and the pointer width.
+[`Compilation.threading`](#Compilation.impl.threading) to select single-thread or multi-thread code. Use `silk.target` for
+facts about the machine, such as the architecture and the pointer width.
 
 ## Details
 Each value comes from the compilation profile, which is fixed before specialization. The values
@@ -387,8 +384,7 @@ An entry or runtime request: the platform default, none, or a named symbol or pa
 ### Details
 
 [`Compilation.entry`](#Compilation.impl.entry) and [`Compilation.runtime`](#Compilation.impl.runtime) return this type. A name is a logical
-identity,
-not a file path.
+identity, not a file path.
 
 ::Anchor{id="Selection.Default"}
 
@@ -642,5 +638,7 @@ pub static fn hasSanitizer(value: Sanitizer) -> bool
 ```
 
 Returns `true` if the build requests the sanitizer `value`.
+
+Category: Core.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

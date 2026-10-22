@@ -84,8 +84,8 @@ Returns a new sequence with the elements of `self` and then `value`.
 
 #### Details
 
-This function consumes `self`. To grow a sequence in a loop, assign the result back to the same
-binding, as in `result = StaticSequence.append<i32>(move result, 1)`.
+This function consumes `self`. To grow a sequence in a loop, assign the result back to the
+same binding, as in `result = StaticSequence.append<i32>(move result, 1)`.
 
 ::Anchor{id="StaticSequence.impl.concat"}
 
@@ -124,5 +124,7 @@ Returns the element at the zero-based position `index`.
 
 If `index` is not less than the length, static evaluation stops and the compiler reports an
 error.
+
+Category: Core.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

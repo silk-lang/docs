@@ -59,7 +59,16 @@ impl Copy for Seed
 pub service InsecureSeed
 ```
 
-The effect that returns the same [`Seed`](#Seed) on each read. It needs only shared access.
+The effect that returns the same 128-bit [`Seed`](#Seed) on each read. It needs only shared access.
+
+### When to use
+Read [`InsecureSeed.get`](#InsecureSeed.get) while you set up a runtime or a data structure that needs a seed, for
+example to make hash collisions harder to cause. Provide [`InsecureSeed.fixed`](#InsecureSeed.impl.fixed) for repeatable
+runs, or [`InsecureSeed.fromRandom`](#InsecureSeed.impl.fromRandom) when secure randomness is available.
+
+### Gotchas
+It is not a sequence of random values and is not secure. The hash collections of the standard
+library do not read it. Give them a seed with `silk.hash.Hash.seed`.
 
 ::Anchor{id="InsecureSeed.get"}
 
@@ -69,7 +78,7 @@ The effect that returns the same [`Seed`](#Seed) on each read. It needs only sha
 effect fn get() -> Seed ? &InsecureSeed
 ```
 
-Returns the seed of the provider.
+Returns the seed of the provider. Each read returns the same seed.
 
 ::Anchor{id="InsecureSeed.impl"}
 
@@ -117,7 +126,8 @@ Returns a provider with the seed `first`, `second`. It does not use randomness.
 pub effect fn fromRandom() -> FixedInsecureSeed ? &mut Random
 ```
 
-Returns a provider with a seed from two `u64` values of `Random`.
+Returns a provider with a seed from two `u64` values of `Random`. It reads `Random` one time,
+and the provider keeps the same seed after that.
 
 ::Anchor{id="FixedInsecureSeed"}
 
@@ -153,5 +163,7 @@ impl InsecureSeed for FixedInsecureSeed
 ```silk
 get: FixedInsecureSeed.fixedGet
 ```
+
+Category: System.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

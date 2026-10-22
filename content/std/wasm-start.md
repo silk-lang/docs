@@ -7,8 +7,11 @@ calls the exported `main` function with no arguments and gets an `i32` exit stat
 ## Details
 `main` in the application can return one of these types:
 
-| `main` returns | Exit status | |---|---| | `i32` | The value | | `()` | `0` | | `Effect<() !
-E>` | `0` on success, `1` on a failure (the payload is dropped first) |
+| `main` returns | Exit status |
+|---|---|
+| `i32` | The value |
+| `()` | `0` |
+| `Effect<() ! E>` | `0` on success, `1` on a failure (the payload is dropped first) |
 
 The application runs inside its own `Execution`. Nested transfers complete before the exported
 `main` returns. If the application is still parked at the end, or the `Execution` cannot be
@@ -27,5 +30,7 @@ thread `NativeThread.spawn` starts.
 Public declarations: 0.
 
 This module declares no public items.
+
+Category: Native platform.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

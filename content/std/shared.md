@@ -68,10 +68,25 @@ pub struct Shared<T>
 
 A strong handle to one value of type `T` that other handles can also own.
 
+### When to use
+
+Use it when several values that you own separately, such as stored callbacks or computations
+that run later, must all use the same mutable state, and a borrow cannot live long enough. For
+one owner, use the value directly or `silk.box.Box`.
+
 ### Details
 
 Drop is automatic. The value is dropped when the last handle is dropped. A handle cannot move to
 another thread.
+
+[`Shared.make`](#Shared.impl.make) allocates one time. [`Shared.clone`](#Shared.impl.clone), [`Shared.with`](#Shared.impl.with), and [`Shared.withMut`](#Shared.impl.withMut) do
+not allocate. Access is exclusive for the duration of the callback, also for [`Shared.with`](#Shared.impl.with). A
+nested access to the same value through any handle traps before the nested callback starts.
+
+### Gotchas
+
+Handles that refer to each other in a cycle are never dropped, so the value leaks until you
+break the cycle. There are no weak handles.
 
 ::Anchor{id="Shared.impl"}
 
@@ -152,5 +167,7 @@ callback. The callback cannot change the value through its `&T`.
 
 A nested access to the same value through any handle traps, also when both accesses use
 `with`.
+
+Category: Memory.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

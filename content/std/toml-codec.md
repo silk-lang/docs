@@ -6,10 +6,12 @@ or `i64`, and [`TomlCodec.deserializeOne`](#TomlCodec.impl.deserializeOne) to re
 [`TomlCodec.writeOne`](#TomlCodec.impl.writeOne) to write a value after a key when you write TOML by hand.
 
 ## Details
-| Type | Write | Read | |------|-------|------| | `bool` | [`Serialize`](#Serialize) | [`Decode`](#Decode) from
-`Boolean` | | `i32`, `i64` | [`Serialize`](#Serialize) | [`Decode`](#Decode) from `Integer`, with `0x`, `0o`, `0b`
-and `_` | | `f64` | [`Serialize`](#Serialize) | [`Deserialize`](#Deserialize) from `Float`, with `inf` and `nan` | |
-`string`, `String` | [`Serialize`](#Serialize) | [`Deserialize`](#Deserialize) from `String` (only `String`) |
+| Type | Write | Read |
+|------|-------|------|
+| `bool` | [`Serialize`](#Serialize) | [`Decode`](#Decode) from `Boolean` |
+| `i32`, `i64` | [`Serialize`](#Serialize) | [`Decode`](#Decode) from `Integer`, with `0x`, `0o`, `0b` and `_` |
+| `f64` | [`Serialize`](#Serialize) | [`Deserialize`](#Deserialize) from `Float`, with `inf` and `nan` |
+| `string`, `String` | [`Serialize`](#Serialize) | [`Deserialize`](#Deserialize) from `String` (only `String`) |
 
 To support your own type, implement the interfaces for it.
 
@@ -72,6 +74,9 @@ pub interface Serialize
 
 A type that can write itself as one TOML value.
 
+The standard library implements it for `bool`, `i32`, `i64`, `f64`, `string`, and `String`.
+Implement it for your own type to write the type with [`TomlCodec.writeOne`](#TomlCodec.impl.writeOne).
+
 ::Anchor{id="Serialize.serialize"}
 
 ### Operation `serialize`
@@ -97,6 +102,9 @@ pub interface Decode
 
 A type that can read itself from a TOML value without allocation.
 
+The standard library implements it for `bool` (from `Boolean`), and `i32` and `i64` (from
+`Integer`, with `0x`, `0o`, `0b` and `_`). Read it with [`TomlCodec.decodeOne`](#TomlCodec.impl.decodeOne).
+
 ::Anchor{id="Decode.decode"}
 
 ### Operation `decode`
@@ -117,6 +125,9 @@ pub interface Deserialize
 ```
 
 A type that can read itself from a TOML value and allocate.
+
+The standard library implements it for `f64` (from `Float`, with `inf` and `nan`; an `Integer`
+is not converted) and `String` (from `String`). Read it with [`TomlCodec.deserializeOne`](#TomlCodec.impl.deserializeOne).
 
 ::Anchor{id="Deserialize.deserialize"}
 
@@ -374,5 +385,7 @@ impl Deserialize for String
 ```silk
 effect fn deserialize(value: &Value) -> Self ! TomlError | OutOfMemoryError ? &mut Allocator
 ```
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

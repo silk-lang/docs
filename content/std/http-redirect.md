@@ -431,7 +431,20 @@ impl Copy for HistoryLimits
 pub struct Policy
 ```
 
-The redirect rules. Start from [`Policy.defaults`](#Policy.impl.defaults), or make one with [`Policy.make`](#Policy.impl.make).
+The redirect rules: which statuses to follow, how the method and the body change, which origins
+are allowed, and which headers are kept. Start from [`Policy.defaults`](#Policy.impl.defaults), or make one with
+[`Policy.make`](#Policy.impl.make).
+
+### Details
+
+A 303 changes the method to GET, or keeps HEAD, and drops the body. A 301 or 302 changes POST to
+GET and drops the body when `post301302` is `ToGet`. All other cases keep the method and the
+body.
+
+### Gotchas
+
+The default policy does not follow redirects. It denies a change of origin and a change from
+HTTPS to HTTP.
 
 ::Anchor{id="RedirectComponent"}
 
@@ -820,6 +833,10 @@ pub struct RedirectError
 ```
 
 The error from a redirect. It holds no response, credentials, or body.
+
+### Details
+
+It tells the part, the reason, and the URIs and status, when they are known.
 
 ::Anchor{id="RedirectError.component"}
 
@@ -1441,7 +1458,8 @@ pub interface HybridAttemptClient<
 >
 ```
 
-Like [`AttemptClient`](#AttemptClient), but each attempt can use a proxy route or a direct connection.
+Connects and runs one attempt of a redirect operation, over a proxy route or a direct
+connection. Implement it to give your own connections to the `with*HybridResponse` functions.
 
 ### Details
 The client selects the form before it connects, and calls one handler. A direct connection
@@ -1513,7 +1531,9 @@ Handles the final response.
 pub interface HybridResponseHandler<RoutedP, DirectP, A, E, ?R>
 ```
 
-Like [`ResponseHandler`](#ResponseHandler), for a route or a direct connection.
+Handles the final response of a redirect operation, over a proxy route or a direct connection.
+It reads the final response while the exchange is open. The URI and the exchange cannot be kept
+after the call.
 
 ### When to use
 Give it to a `with*HybridResponse` function.
@@ -1709,7 +1729,13 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Like [`withEmptyResponse`](#withEmptyResponse), with a client that can use a route or a direct connection.
+Follows redirects for a request without a body, and gives the final response to `handler`, with
+a client that can use a proxy route or a direct connection.
+
+### Details
+Each attempt is a new request with the same deadline. The body of each redirect response is
+closed or drained as `policy` says. `handler` runs one time, and only if a final response
+arrives.
 
 ::Anchor{id="withBytesResponse"}
 
@@ -1816,7 +1842,13 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Like [`withBytesResponse`](#withBytesResponse), with a client that can use a route or a direct connection.
+Follows redirects for a request with the body `bytes`, and gives the final response to
+`handler`, with a client that can use a proxy route or a direct connection.
+
+### Details
+Each attempt that keeps the body sends `bytes` from the start. After a redirect that drops the
+body, all later attempts have no body. A body that is not empty needs a scratch buffer that is
+not empty.
 
 ::Anchor{id="withOneShotResponse"}
 
@@ -1933,7 +1965,16 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Like [`withOneShotResponse`](#withOneShotResponse), with a client that can use a route or a direct connection.
+Follows redirects for a request whose body comes from a producer that runs one time, with a
+client that can use a proxy route or a direct connection.
+
+### When to use
+Use it when the body cannot be made again, for example a stream.
+
+### Details
+The first attempt uses the producer, also when `Require100` gets an early final response. A
+later redirect that keeps the body fails with `ReplayUnavailable`. A redirect that drops the
+body continues without it.
 
 ::Anchor{id="withReplayResponse"}
 
@@ -2059,7 +2100,15 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Like [`withReplayResponse`](#withReplayResponse), with a client that can use a route or a direct connection.
+Follows redirects for a request whose body comes from a new producer for each attempt, with a
+client that can use a proxy route or a direct connection.
+
+### When to use
+Use it for a body that you can read again, such as a file, with a [`ReplayFactory`](#ReplayFactory).
+
+### Details
+Each producer lives for one attempt. After a redirect that drops the body, the factory is not
+used again.
 
 ::Anchor{id="writeBody"}
 
@@ -2560,5 +2609,7 @@ names of the policy, and the content headers of a kept body. Then `Authorization
 ### Gotchas
 The request preparation makes `Host`, the framing fields, `Expect`, and `Proxy-Authorization`
 again for the next request. A bad `Connection` value fails with its `ValueError`.
+
+Category: HTTP.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

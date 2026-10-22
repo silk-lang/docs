@@ -7,10 +7,10 @@ write moved, such as HTTP or TLS. Most code uses it through `silk.buffered_duple
 `silk.writer.Writer` when each write must complete or fail as a whole.
 
 ## Details
-[`ByteDuplex.readSome`](#ByteDuplex.impl.readSome) and [`ByteDuplex.writeSome`](#ByteDuplex.impl.writeSome) can move fewer bytes than the caller
-offers. A successful read or write of a non-empty slice moves at least one byte. The bytes after
-that count stay with the caller. `ReadTransfer.End` means that the peer ended the stream. It is
-not a message of the protocol.
+[`ByteDuplex.readSome`](#ByteDuplex.impl.readSome), [`ByteDuplex.writeSome`](#ByteDuplex.impl.writeSome), and [`ByteDuplex.writeSomeVectored`](#ByteDuplex.impl.writeSomeVectored) can move
+fewer bytes than the caller offers. A successful read or write of a non-empty slice moves at
+least one byte. The bytes after that count stay with the caller. `ReadTransfer.End` means that
+the peer ended the stream. It is not a message of the protocol.
 
 Each operation takes a deadline: an absolute time on the active `MonotonicClock`, or none.
 
@@ -103,6 +103,18 @@ pub union ByteIoError
 ```
 
 The error from a [`ByteDuplex`](#ByteDuplex) operation.
+
+### Details
+
+`Timeout` means that the deadline passed, `Closed` that the transport or its write direction is
+closed, and `Provider` that the transport failed for its own reason. `InvalidTransferCount`
+means that the provider reported a count that is not possible. The safe operation then closes
+the transport.
+
+### Gotchas
+
+After `InvalidTransferCount`, do not try again with the same buffer. If an operation is canceled
+during a transfer, it is not known how many bytes moved. Close the transport.
 
 ::Anchor{id="ByteIoError.Timeout"}
 
@@ -264,14 +276,33 @@ The peer ended the stream. Later reads also return `End`.
 pub service ByteDuplex
 ```
 
-The effect for one two-way byte stream that the code uses alone.
+The effect for one two-way byte stream that the code uses alone, such as a TCP connection,
+with partial reads and writes and deadlines.
+
+### When to use
+
+Require `&mut ByteDuplex` in protocol code that must know exactly how many bytes each read and
+write moved, such as HTTP or TLS. Most code uses it through `silk.buffered_duplex`. Use
+`silk.writer.Writer` when each write must complete or fail as a whole.
 
 ### Details
 
+A read or write can move fewer bytes than the caller offers. A successful read or write of a
+non-empty slice moves at least one byte. `ReadTransfer.End` means that the peer ended the
+stream. Each operation takes a deadline: an absolute time on the active `MonotonicClock`, or
+none.
+
 A provider implements the `...Raw` operations. Callers use the safe operations with the same
-names without `Raw`: [`ByteDuplex.readSome`](#ByteDuplex.impl.readSome), [`ByteDuplex.writeSome`](#ByteDuplex.impl.writeSome), [`ByteDuplex.flush`](#ByteDuplex.impl.flush),
-[`ByteDuplex.shutdownWrite`](#ByteDuplex.impl.shutdownWrite), and [`ByteDuplex.close`](#ByteDuplex.impl.close). A direct call to a `...Raw` operation is
-`unsafe`, because its count is not checked.
+names without `Raw`: [`ByteDuplex.readSome`](#ByteDuplex.impl.readSome), [`ByteDuplex.writeSome`](#ByteDuplex.impl.writeSome),
+[`ByteDuplex.writeSomeVectored`](#ByteDuplex.impl.writeSomeVectored), [`ByteDuplex.flush`](#ByteDuplex.impl.flush), [`ByteDuplex.shutdownWrite`](#ByteDuplex.impl.shutdownWrite), and
+[`ByteDuplex.close`](#ByteDuplex.impl.close). A direct call to a `...Raw` operation is `unsafe`, because its count is
+not checked.
+
+### Gotchas
+
+If a provider reports a count that is not possible, the safe operation closes the transport and
+fails with `InvalidTransferCount`. If an operation is canceled during a transfer, it is not
+known how many bytes moved. Close the transport.
 
 ::Anchor{id="ByteDuplex.readSomeRaw"}
 
@@ -298,6 +329,26 @@ unsafe effect fn writeSomeRaw(
 ```
 
 The provider write. It sends bytes from the start of `input` and returns their count.
+
+::Anchor{id="ByteDuplex.writeSomeVectoredRaw"}
+
+### Operation `writeSomeVectoredRaw`
+
+```silk
+unsafe effect fn writeSomeVectoredRaw(
+    inputs: &[&[u8]],
+    deadline: Option<Instant>
+  ) -> usize ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
+```
+
+The provider vectored write. It sends bytes from the slices of `inputs`, in order, as if they
+were one slice, and returns their count. The safe wrapper calls it only when the slices hold
+at least one byte.
+
+#### Details
+
+A provider can send several slices in one operation, such as one `writev` system call. A
+provider with no such operation writes [`ByteDuplex.firstNonEmpty`](#ByteDuplex.impl.firstNonEmpty) with its own write.
 
 ::Anchor{id="ByteDuplex.flushRaw"}
 
@@ -394,6 +445,54 @@ active `MonotonicClock`. `Option.none()` means no time limit.
   The transport is closed, also if the close fails.
 - `ByteIoError.Closed` or `ByteIoError.Provider` from the provider.
 
+::Anchor{id="ByteDuplex.impl.writeSomeVectored"}
+
+### Associated function `writeSomeVectored`
+
+```silk
+pub effect fn writeSomeVectored(
+    inputs: &[&[u8]],
+    deadline: Option<Instant>
+  ) -> usize ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
+```
+
+Writes at least one byte from the slices of `inputs`, in order, as if they were one slice, and
+returns how many bytes it wrote.
+
+#### When to use
+
+Use it for a message that is in several parts, such as buffered bytes and a large body, so
+that a provider such as a socket can send the parts in one operation without a copy.
+
+#### Details
+
+The count can end inside any slice. The bytes after it are not written. When the slices hold
+no bytes, it returns 0 and does not use the provider. `deadline` is an absolute time on the
+active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `ByteIoError.Timeout` if the deadline passes.
+- `ByteIoError.InvalidTransferCount` if the provider reports 0 or more than the sum of the
+  slice lengths. The transport is closed, also if the close fails.
+- `ByteIoError.Closed` or `ByteIoError.Provider` from the provider.
+
+::Anchor{id="ByteDuplex.impl.firstNonEmpty"}
+
+### Associated function `firstNonEmpty`
+
+```silk
+pub fn firstNonEmpty<'a>(inputs: &[&'a [u8]]) -> &'a [u8]
+```
+
+Returns the first slice of `inputs` that is not empty, or an empty slice.
+
+#### When to use
+
+Use it to implement `writeSomeVectoredRaw` in a provider that has no faster way to write
+several slices: write the returned slice with the provider's own write. A partial write of
+the first part is a valid vectored write.
+
 ::Anchor{id="ByteDuplex.impl.flush"}
 
 ### Associated function `flush`
@@ -489,5 +588,7 @@ pub fn provider(operation: ByteIoOperation, code: i32) -> ByteIoError
 ```
 
 Returns `ByteIoError.Provider` for `operation` with a provider-defined `code`.
+
+Category: Input and output.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -72,12 +72,27 @@ Public declarations: 1.
 pub service MonotonicClock
 ```
 
-The effect for a clock that never goes back.
+The effect for a clock that never goes back, for durations, timeouts, and waits.
+
+### When to use
+
+Require `&mut MonotonicClock` to measure how long something takes, to compute a deadline, or to
+wait. Use `silk.system_clock` when you need the date and time of day.
 
 ### Details
 
-A provider implements all four operations on one timeline. Exclusive access lets a test provider
-move its own time forward and record waits.
+[`MonotonicClock.now`](#MonotonicClock.now) returns an `Instant` from an origin that is not specified, such as the
+start of the computer. Durations are `u64` nanoseconds. A duration literal such as `300ms` has
+this type. /// A provider implements all four operations on one timeline. Exclusive access lets
+a test provider move its own time forward and record waits.
+
+### Gotchas
+
+A mark or a deadline has a meaning only for the clock that made it. `Instant` is also the type
+of system time, and the compiler cannot stop you from mixing marks of different clocks, or a
+mark with system time. The native provider blocks the thread when it waits. A task scheduler
+provides a clock whose waits pause only one task. If a provider returns a value that is not
+valid, the program traps, because this effect has no error type.
 
 ::Anchor{id="MonotonicClock.now"}
 
@@ -160,5 +175,7 @@ Every `u64` duration works when the result fits in an `Instant`.
 
 It traps if the seconds of the result do not fit in `i64`. Use `start` from the same clock
 that will use the deadline.
+
+Category: System.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

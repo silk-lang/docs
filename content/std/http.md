@@ -515,6 +515,11 @@ pub struct ValueError
 
 The error from checking an HTTP value. It tells which rule failed, and where.
 
+### Details
+
+`reason` gives the rule, `component` the part of the value, and `fieldIndex` and `offset` the
+position.
+
 ::Anchor{id="ValueError.reason"}
 
 ### Field `reason`
@@ -622,6 +627,11 @@ pub struct Method<'text>
 ```
 
 An HTTP method, such as `GET`. It keeps its exact spelling, and is compared with case.
+
+### Details
+
+Any valid token is a method, so `get` and `GET` are different methods. It borrows its text. The
+`make` and `parse` functions check the token.
 
 ::Anchor{id="Method.impl.Copy"}
 
@@ -884,6 +894,11 @@ pub struct Header<'value>
 ```
 
 An HTTP header field. It borrows its name and value, and keeps their exact bytes.
+
+### Gotchas
+
+[`Header.make`](#Header.impl.make) takes the value without the spaces around it on the wire. It rejects CR, LF,
+NUL, DEL, other control bytes, and leading or trailing spaces or tabs.
 
 ::Anchor{id="Header.impl.Copy"}
 
@@ -1217,5 +1232,7 @@ pub fn view<'value>(self: &'value Self) -> ResponseHead<'value>
 ```
 
 Returns the head as a [`ResponseHead`](#ResponseHead) that borrows this value.
+
+Category: HTTP.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

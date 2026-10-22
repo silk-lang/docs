@@ -92,6 +92,10 @@ pub enum Format
 
 The container format of the compressed data.
 
+The decoder does not detect the format. Choose it yourself: `Gzip` for `.gz` files and
+`Content-Encoding: gzip`, `Zlib` for `Content-Encoding: deflate`, and `Raw` for DEFLATE data
+with no header.
+
 ::Anchor{id="Format.Raw"}
 
 ### `Raw`
@@ -483,9 +487,24 @@ pub struct Decoder
 
 A DEFLATE, zlib, or gzip decoder that owns its history and tables.
 
+### When to use
+Use it to decompress `.gz` files, zlib streams, or HTTP bodies with `Content-Encoding: gzip` or
+`deflate`, in steps and with fixed memory. Make one with [`Decoder.make`](#Decoder.impl.make), call
+[`Decoder.step`](#Decoder.impl.step) until it returns `Finished`, and call [`Decoder.reset`](#Decoder.impl.reset) to decode another
+stream with the same storage. It does not compress.
+
+### Details
+[`Decoder.make`](#Decoder.impl.make) allocates a 32 KiB history and the Huffman tables one time. Later calls do not
+allocate and do not keep a borrow of your buffers. The [`Limits`](#Limits) apply to the full stream
+across all calls.
+
 Dropping it releases the storage. After `Finished`, each step returns `Finished` with no
 progress. After a failure, each step fails with `InvalidUse`. [`Decoder.reset`](#Decoder.impl.reset) starts a new
 stream with the same storage.
+
+### Gotchas
+Output is not verified until `Finished`, because the checksum comes at the end. Zlib streams
+with a preset dictionary are not supported.
 
 ::Anchor{id="Decoder.impl"}
 
@@ -554,6 +573,10 @@ call must set `finalInput` and give exactly the input that is not consumed yet.
 
 If the output has no space and the decoder has bytes to write, it returns `NeedOutput`.
 
+Raw and zlib stop at the end of the first stream and leave the bytes after it unconsumed. Gzip
+accepts more than one member. It finishes only when the input is marked final and all input is
+consumed.
+
 #### Errors
 - [`DecodeError`](#DecodeError) if the data is not valid, a [`Limits`](#Limits) value would be exceeded, or the final
   input ends early (`TruncatedInput`). The limit checks occur before the byte or member that
@@ -561,6 +584,9 @@ If the output has no space and the decoder has bytes to write, it returns `NeedO
 - `InvalidUse` if the decoder failed before, or the call changes the final input.
 
 #### Gotchas
-Output is not verified until `Finished`. After a failure, discard all output of the stream.
+Output is not verified until `Finished`, because the checksum comes at the end. After a
+failure, discard all output of the stream.
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

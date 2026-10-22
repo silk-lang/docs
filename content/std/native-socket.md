@@ -697,7 +697,7 @@ The `errno` value.
 pub union NativeSocketError
 ```
 
-The error of a socket operation.
+The error of a socket operation: the rule that failed, the system error, or the deadline.
 
 ::Anchor{id="NativeSocketError.AttemptsExhausted"}
 
@@ -1488,7 +1488,13 @@ Returns the path bytes.
 pub struct Connection
 ```
 
-An open socket connection. It provides `ByteDuplex`.
+An open socket connection. It provides `ByteDuplex`, so `silk.http_exchange`,
+`silk.http_server`, and `silk.buffered_duplex` can use it.
+
+### Details
+The socket is nonblocking. When it is not ready, an operation waits for the poll interval with
+`MonotonicClock`, then tries again. So an idle wait costs about one check for each interval. A
+flush means that the kernel accepted the bytes, not that the peer got them.
 
 ::Anchor{id="Listener"}
 
@@ -1821,7 +1827,17 @@ pub effect fn connectResolved<'env, A, E, ?CallbackRequirements>(
 where CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Connects as [`connectResolvedOwned`](#connectResolvedOwned), lends the connection to `callback`, and closes it after.
+Connects to the first of `endpoints` that accepts, lends the connection to `callback`, and
+closes it after, also on error or cancellation. A trap does not close it.
+
+### Errors
+- The error of `callback`.
+- `InvalidEndpoint` if `endpoints` is empty or longer than the attempt limit.
+- `AttemptsExhausted` if no endpoint accepts. It has the error of the last attempt.
+- `Timeout` if `deadline` passes. One deadline covers all attempts.
+
+### Gotchas
+With a deadline of `None`, the connect can wait forever.
 
 ::Anchor{id="connectUnix"}
 
@@ -1839,7 +1855,13 @@ pub effect fn connectUnix<'env, A, E, ?CallbackRequirements>(
 where CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Connects as [`connectUnixOwned`](#connectUnixOwned), lends the connection to `callback`, and closes it after.
+Connects to the Unix socket at `path`, lends the connection to `callback`, and closes it after,
+also on error or cancellation. A trap does not close it.
+
+### Errors
+- The error of `callback`.
+- `InvalidEndpoint` if `path` is not valid.
+- `Timeout` if `deadline` passes.
 
 ::Anchor{id="Connection.impl-2"}
 
@@ -1873,6 +1895,14 @@ readSomeRaw: Connection.readConnection
 writeSomeRaw: Connection.writeConnection
 ```
 
+::Anchor{id="Connection.impl.ByteDuplex.writeSomeVectoredRaw"}
+
+### Operation `writeSomeVectoredRaw`
+
+```silk
+writeSomeVectoredRaw: Connection.writeConnectionVectored
+```
+
 ::Anchor{id="Connection.impl.ByteDuplex.flushRaw"}
 
 ### Operation `flushRaw`
@@ -1896,5 +1926,7 @@ shutdownWriteRaw: Connection.shutdownConnection
 ```silk
 closeRaw: Connection.closeByteConnection
 ```
+
+Category: Networking.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

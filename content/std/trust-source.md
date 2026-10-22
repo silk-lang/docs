@@ -31,6 +31,15 @@ pub service TrustSource
 
 The effect that loads a trust snapshot. It needs exclusive access to the provider.
 
+### When to use
+Require it in code that needs trust anchors, such as a TLS client, so that the caller chooses
+where they come from. Provide `silk.memory_trust_source` for anchors in memory, or a native
+provider for the CA files of the system. No provider is installed by default.
+
+### Gotchas
+Loading anchors does not validate a certificate. A provider must return only the trust that it
+was configured with: no hidden system roots, environment variables, or caches.
+
 ::Anchor{id="TrustSource.load"}
 
 ### Operation `load`
@@ -43,12 +52,15 @@ effect fn load(
   ? &mut TrustSource | &mut Allocator
 ```
 
-Returns a new trust snapshot from the provider, within `limits`.
+Returns a new trust snapshot from the provider, within `limits`. The caller owns it. It stays
+valid after later loads and after the provider changes.
 
 #### Errors
 - `TrustSourceError` if the provider cannot load valid trust.
 - `OutOfMemoryError` if the `Allocator` fails.
 
 A failed load returns no snapshot and does not change the trust of the provider.
+
+Category: TLS and certificates.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

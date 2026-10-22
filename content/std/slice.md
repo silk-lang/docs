@@ -76,4 +76,6 @@ The view does not copy elements and does not allocate. It cannot live longer tha
 If `offset` is more than `values.length`, or `offset + length` is more than `values.length`,
 the program traps.
 
+Category: Collections.
+
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

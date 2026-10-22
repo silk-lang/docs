@@ -65,6 +65,10 @@ pub struct OsHostInput
 
 The native `HostInput` provider. It owns a snapshot of the arguments and the environment.
 
+A native `main` that requires `&mut HostInput` gets one from `silk.native_start`. The
+arguments and the environment come from the snapshot, so they do not change. The working
+directory is read from the process at each call. Each result is a new owned copy.
+
 ::Anchor{id="OsHostInput.impl"}
 
 ## Implementation `OsHostInput`
@@ -122,5 +126,7 @@ variable: OsHostInput.variable
 ```silk
 workingDirectory: OsHostInput.workingDirectory
 ```
+
+Category: Native platform.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

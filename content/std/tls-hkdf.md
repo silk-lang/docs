@@ -196,7 +196,21 @@ The largest accepted length in bytes.
 pub struct TlsHkdfSha256
 ```
 
-The TLS 1.3 key schedule with SHA-256. Secrets and transcript hashes are 32 bytes.
+The TLS 1.3 key schedule with SHA-256: `HKDF-Expand-Label` and `Derive-Secret` (RFC 8446,
+section 7.1). Secrets and transcript hashes are 32 bytes.
+
+### When to use
+Use it to derive TLS 1.3 secrets, keys, and IVs, or keys for a protocol that reuses the TLS key
+schedule, such as QUIC. For other uses, use `silk.hkdf`.
+
+### Details
+`expandLabel` adds the prefix `tls13 ` to the label and fills the output. `deriveSecret` hashes
+the handshake messages and expands with that hash. `deriveSecretFromHash` takes a transcript
+hash that you already have. Nothing allocates.
+
+### Gotchas
+Give the label without `tls13 `, because it is always added. You choose the labels and build
+the transcript. Secrets are not erased.
 
 ::Anchor{id="TlsHkdfSha256.impl"}
 
@@ -278,7 +292,21 @@ secret.
 pub struct TlsHkdfSha384
 ```
 
-The TLS 1.3 key schedule with SHA-384. Secrets and transcript hashes are 48 bytes.
+The TLS 1.3 key schedule with SHA-384: `HKDF-Expand-Label` and `Derive-Secret` (RFC 8446,
+section 7.1). Secrets and transcript hashes are 48 bytes.
+
+### When to use
+Use it to derive TLS 1.3 secrets, keys, and IVs, or keys for a protocol that reuses the TLS key
+schedule, such as QUIC. For other uses, use `silk.hkdf`.
+
+### Details
+`expandLabel` adds the prefix `tls13 ` to the label and fills the output. `deriveSecret` hashes
+the handshake messages and expands with that hash. `deriveSecretFromHash` takes a transcript
+hash that you already have. Nothing allocates.
+
+### Gotchas
+Give the label without `tls13 `, because it is always added. You choose the labels and build
+the transcript. Secrets are not erased.
 
 ::Anchor{id="TlsHkdfSha384.impl"}
 
@@ -351,5 +379,7 @@ Returns `Derive-Secret` with a SHA-384 transcript hash that you already computed
 #### Gotchas
 For an empty transcript, give the hash of no bytes. A hash of all zeros gives a different
 secret.
+
+Category: TLS and certificates.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

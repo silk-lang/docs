@@ -76,12 +76,20 @@ nanosecond before the origin.
 pub service SystemClock
 ```
 
-The effect for the current Unix time.
+The effect for the current date and time as Unix time.
+
+### When to use
+
+Require `&mut SystemClock` when you need the current time to show to a person, to store, or to
+send to another system, such as a timestamp in a log or a certificate check. To measure
+durations, use `silk.monotonic_clock`, because the system time can jump.
 
 ### Details
 
-Exclusive access lets a test provider change the time between calls. There is no operation to
-set the time.
+The time is an `Instant`: signed whole seconds since `1970-01-01T00:00:00Z` and a nanosecond
+part. The system time can go forward or back when the computer adjusts its clock. /// Exclusive
+access lets a test provider change the time between calls. There is no operation to set the
+time.
 
 ::Anchor{id="SystemClock.now"}
 
@@ -123,10 +131,14 @@ pub fn make(seconds: i64, nanoseconds: i64) -> Instant
 
 Returns the instant `seconds` plus `nanoseconds` nanoseconds.
 
+#### Details
+
+Whole seconds in `nanoseconds` move into the seconds, so `SystemClock.make(0, 5000000000)` is
+five seconds and `SystemClock.make(0, -1)` is one nanosecond before the origin.
+
 #### Gotchas
 
-`nanoseconds` must be from 0 to 999,999,999. Other values trap. They are not moved into the
-seconds.
+A total outside the `i64` seconds range traps with an integer overflow.
 
 ::Anchor{id="SystemClock.impl.seconds"}
 
@@ -147,5 +159,7 @@ pub fn nanoseconds(self: &Instant) -> i64
 ```
 
 Returns the nanosecond part of the instant, from 0 to 999,999,999.
+
+Category: System.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

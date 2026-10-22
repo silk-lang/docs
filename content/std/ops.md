@@ -2,8 +2,7 @@ The interfaces that give user types the arithmetic, bitwise, and logical operato
 
 ## When to use
 Implement [`Add`](#Add) to give a type `+`, [`Multiply`](#Multiply) to give it `*`, and so on. Add a bound such
-as
-`T: Add<T, T>` when a generic function applies an operator to its type parameter.
+as `T: Add<T, T>` when a generic function applies an operator to its type parameter.
 
 ## Details
 These names refer to the sealed `Intrinsic` operator interfaces (OP-009). The expression `a + b`
@@ -221,5 +220,7 @@ The interface behind `!value`.
 
 A conformance `impl Not<Output> for T` gives the member `not(value: T) -> Output`. The
 expression `!value` calls it with the operand by value.
+
+Category: Core.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

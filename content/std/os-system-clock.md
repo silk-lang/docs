@@ -45,7 +45,13 @@ Public declarations: 1.
 pub struct OsSystemClock
 ```
 
-The native `SystemClock` provider. It has no state. A failure is a trap.
+The native `SystemClock` provider: the time of day, as seconds since 1970. It has no state. A
+failure is a trap.
+
+### Gotchas
+- This clock can go back when the system time is set. Use `silk.os_monotonic_clock` to
+  measure durations.
+- On Linux, it needs glibc 2.17 or later.
 
 ::Anchor{id="OsSystemClock.impl"}
 
@@ -88,5 +94,7 @@ effect fn now(self: &mut Self) -> Instant
 ```silk
 effect fn getResolution(self: &mut Self) -> u64
 ```
+
+Category: Native platform.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

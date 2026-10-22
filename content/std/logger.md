@@ -3,7 +3,7 @@ The `Logger` effect: log messages with a level, a template, and values.
 ## When to use
 Require `&mut Logger` in code that logs, and call `Effect.logInfo`, `Effect.logWarning`, and the
 other `Effect.log...` functions. The program decides where the messages go when it provides the
-logger: `silk.os_logger.StdoutLogger` for a native program, or [`InMemoryLogger`](#InMemoryLogger) in a test.
+logger: `silk.os_logger.StderrLogger` for a native program, or [`InMemoryLogger`](#InMemoryLogger) in a test.
 
 ## Details
 Each call has a [`LogLevel`](#LogLevel), a template that is known at compile time, and a borrowed tuple or
@@ -130,12 +130,19 @@ mean different things for different providers.
 pub service Logger
 ```
 
-The effect that receives log messages.
+The effect that receives log messages with a level, a template, and values.
+
+### When to use
+
+Require `&mut Logger` in code that logs, and call `Effect.logInfo`, `Effect.logWarning`, and the
+other `Effect.log...` functions. The program decides where the messages go when it provides the
+logger: `silk.os_logger.StderrLogger` for a native program, or [`InMemoryLogger`](#InMemoryLogger) in a test.
 
 ### Details
 
-A provider implements `log`. It formats the message with the rules of `silk.format` and decides
-where it goes and what decoration it gets, such as a newline or a timestamp.
+The caller does not need a `Writer` or an `Allocator`. A provider implements `log`. It formats
+the message with the rules of `silk.format` and decides where it goes and what decoration it
+gets, such as a newline or a timestamp.
 
 ::Anchor{id="Logger.log"}
 
@@ -236,8 +243,8 @@ Returns the number of events that the in-memory logger committed.
 
 #### Details
 
-Failed attempts do not increase this count. Use [`attempts`](#Logger.impl.attempts) when rejected calls must also be
-observed.
+Failed attempts do not increase this count. Use [`Logger.attempts`](#Logger.impl.attempts) when rejected calls must
+also be observed.
 
 ::Anchor{id="Logger.impl.levelAt"}
 
@@ -285,9 +292,9 @@ Returns one UTF-8 byte from a committed message.
 
 #### Gotchas
 
-`eventIndex` must be less than [`length`](#Logger.impl.length). `byteIndex` must be less than
-[`messageLengthAt`](#Logger.impl.messageLengthAt) for that event. An unused event or invalid byte index traps. An event index
-of eight or more also traps.
+`eventIndex` must be less than [`length`](#Logger.impl.length). `byteIndex` must be less than [`messageLengthAt`](#Logger.impl.messageLengthAt)
+for that event. An unused event or invalid byte index traps. An event index of eight or more
+also traps.
 
 ::Anchor{id="Logger.impl.attempts"}
 
@@ -320,6 +327,11 @@ The provider copies each committed message into fixed internal storage. It recor
 calls separately from committed events. Capacity failure and configured failure do not commit an
 event.
 
+### Gotchas
+
+The accessors need an event index less than [`Logger.length`](#Logger.impl.length) and a byte index less than the
+message length.
+
 ::Anchor{id="InMemoryLogger.impl"}
 
 ## Implementation `InMemoryLogger`
@@ -343,5 +355,7 @@ impl Logger for InMemoryLogger
 ```silk
 log: InMemoryLogger.record
 ```
+
+Category: Input and output.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

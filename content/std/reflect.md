@@ -43,7 +43,7 @@ pub fn main() -> i32 {
 
 Import as `Reflect` with `import silk.reflect { Reflect }`.
 
-Public declarations: 7.
+Public declarations: 9.
 
 ::Anchor{id="namedKind"}
 
@@ -84,6 +84,27 @@ pub const anonymousPositionalKind: u8
 ```
 
 The [`Reflect.typeKind`](#Reflect.impl.typeKind) result for an anonymous tuple with positional fields.
+
+::Anchor{id="arrayKind"}
+
+## `arrayKind`
+
+```silk
+pub const arrayKind: u8
+```
+
+The [`Reflect.typeKind`](#Reflect.impl.typeKind) result for a fixed array, such as `[i32; 3]`. It has no fields.
+
+::Anchor{id="otherKind"}
+
+## `otherKind`
+
+```silk
+pub const otherKind: u8
+```
+
+The [`Reflect.typeKind`](#Reflect.impl.typeKind) result for every other type, such as `i32`, `string`, a slice, an
+enum, or a union. It has no fields.
 
 ::Anchor{id="labeledFieldKind"}
 
@@ -173,7 +194,8 @@ pub static fn typeKind<Owner>(descriptor: Intrinsic.Type<Owner>) -> u8
 ```
 
 Returns the kind of type that `descriptor` describes: [`namedKind`](#namedKind), [`positionalKind`](#positionalKind),
-[`anonymousNamedKind`](#anonymousNamedKind), or [`anonymousPositionalKind`](#anonymousPositionalKind).
+[`anonymousNamedKind`](#anonymousNamedKind), [`anonymousPositionalKind`](#anonymousPositionalKind), [`arrayKind`](#arrayKind), or [`otherKind`](#otherKind). Every
+type has a kind, so a generic function can branch on the kind of its type parameter.
 
 ::Anchor{id="Reflect.impl.fieldKind"}
 
@@ -234,5 +256,7 @@ runtime this function is a plain field access. The borrow lives as long as the b
 
 `field` must come from [`Reflect.fields`](#Reflect.impl.fields) for the same `Owner` type. This function cannot move
 a field out of an owned value.
+
+Category: Core.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

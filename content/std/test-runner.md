@@ -7,10 +7,12 @@ a receipt (see `silk.test_exchange`).
 
 The host passes these options. Each takes one value:
 
-| Option | Meaning | |---|---| | `--file` | Run only the tests in the file with exactly this
-path | | `--filter` | Run only the tests whose `module::name` contains this text | |
-`--silk-test-plan` | Path of the plan file. Required. | | `--silk-test-result` | Path of the
-receipt file. Required. |
+| Option | Meaning |
+|---|---|
+| `--file` | Run only the tests in the file with exactly this path |
+| `--filter` | Run only the tests whose `module::name` contains this text |
+| `--silk-test-plan` | Path of the plan file. Required. |
+| `--silk-test-result` | Path of the receipt file. Required. |
 
 The runner checks the complete plan before any test body runs.
 
@@ -31,5 +33,7 @@ pub effect fn main() -> i32 ? &mut HostInput
 ```
 
 Runs each selected test in order and returns the exit status (`0`, `1` or `2`).
+
+Category: Testing.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -15,7 +15,8 @@ the system returned a count that is not valid.
 
 ## Gotchas
 - The caller keeps the descriptor open and controls access from other threads.
-- [`NativeDescriptor.writeAll`](#NativeDescriptor.impl.writeAll) can fail after part of the bytes were written.
+- [`NativeDescriptor.writeAll`](#NativeDescriptor.impl.writeAll) and [`NativeDescriptor.writeAllGather`](#NativeDescriptor.impl.writeAllGather) can fail after part of
+  the bytes were written.
 - The module is empty on targets other than Darwin on aarch64, and Linux with GNU libc on x86_64
   or aarch64.
 
@@ -104,7 +105,22 @@ Returns the error code slot of the thread on Darwin. Read it at once after a fai
 pub struct NativeDescriptor
 ```
 
-Safe reads and writes on a descriptor that the caller owns.
+Safe reads and writes on a descriptor that the caller owns, for native providers.
+
+### When to use
+Use it to build a native provider, such as `silk.os_writer` or `silk.os_standard_input`.
+Application code uses the `Writer` and `StandardInput` effects instead.
+
+### Details
+One system call transfers at most 0x7ffff000 bytes. A call that a signal interrupts is made
+again. An empty buffer makes no system call. The functions never close the descriptor. Each
+function returns `false` on failure and writes the native error code to `error`, or 0 when the
+system returned a count that is not valid.
+
+### Gotchas
+- The caller keeps the descriptor open and controls access from other threads.
+- The type is empty on targets other than Darwin on aarch64, and Linux with GNU libc on x86_64
+  or aarch64.
 
 ::Anchor{id="NativeDescriptor.impl"}
 
@@ -157,5 +173,33 @@ zero if the system wrote nothing or returned a count that is not valid.
 #### Gotchas
 Part of `buffer` can be written before a failure. Do not write all of it again without a
 check.
+
+::Anchor{id="NativeDescriptor.impl.writeAllGather"}
+
+### Associated function `writeAllGather`
+
+```silk
+pub effect fn writeAllGather(fd: i32, head: &[u8], rest: &[&[u8]], error: &mut i32) -> bool
+```
+
+Writes all of `head` and then all bytes of each slice of `rest` to `fd`, in order, and returns
+whether it succeeded.
+
+#### When to use
+Use it to send buffered bytes and new slices together, without first copying the slices into
+the buffer. Pass an empty `head` when there is no buffer.
+
+#### Details
+Each system call is one `writev` of at most eight non-empty slices and at most 0x7ffff000
+bytes. After a partial write, the next call starts at the first byte that was not written.
+Empty slices add nothing to a call. A call that a signal interrupts is made again. On failure,
+`error` is the native error code, or zero if the system wrote nothing or returned a count that
+is not valid.
+
+#### Gotchas
+Part of the bytes can be written before a failure. Do not write all of them again without a
+check.
+
+Category: Native platform.
 
 Profiles: `aarch64-apple-darwin`.

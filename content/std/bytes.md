@@ -147,6 +147,16 @@ allocation for exactly `length + additional` bytes.
 - `OutOfMemoryError` if `length + additional` overflows `usize`, or the `Allocator` cannot
   supply the storage. The value does not change.
 
+::Anchor{id="Bytes.impl.capacity"}
+
+### Method `capacity`
+
+```silk
+pub fn capacity(self: &Self) -> usize
+```
+
+Returns the number of bytes the storage holds before the next append allocates.
+
 ::Anchor{id="Bytes.impl.clear"}
 
 ### Method `clear`
@@ -209,5 +219,7 @@ Returns an exclusive borrow of all bytes as a slice.
 
 Use the slice to change bytes in place. The slice cannot change the length. The compiler
 rejects other uses of the value, such as [`Bytes.append`](#Bytes.impl.append), while the slice is live.
+
+Category: Collections.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -573,6 +573,11 @@ pub struct DecodeError
 
 A certificate decoding error, with the rule and the position. It does not borrow the input.
 
+### Details
+
+`reason` gives the rule that the input broke. `offset` gives the position, and `offsetSpace`
+tells if `offset` counts in the input or in the decoded DER.
+
 ::Anchor{id="DecodeError.kind"}
 
 ### Field `kind`
@@ -991,8 +996,24 @@ pub struct Certificate
 
 A decoded X.509 certificate that owns its DER bytes.
 
+### When to use
+
+Make one with [`Certificate.decodePem`](#Certificate.impl.decodePem) for a `.pem` or `.crt` file with one `CERTIFICATE`
+block, or with [`Certificate.decodeDer`](#Certificate.impl.decodeDer) for binary DER, such as a certificate from a TLS
+handshake. For a file with more than one certificate, use `silk.certificate_bundle`.
+
+### Details
+
+The accessors return slices of the DER, such as [`Certificate.subjectDer`](#Certificate.impl.subjectDer), and decoded values,
+such as [`Certificate.notAfter`](#Certificate.impl.notAfter). Nothing is normalized: names, algorithms, and extensions keep
+their original bytes.
 The accessors borrow the certificate. Unknown algorithms, duplicate extensions, and other values
 that a validator can reject stay available, so that `silk.certificate_profile` can check them.
+
+### Gotchas
+
+Decoding checks only the structure. It does not verify the signature, the chain, the names, or
+the dates. Use `silk.certificate_path` for that.
 
 ::Anchor{id="Certificate.impl"}
 
@@ -1027,12 +1048,17 @@ pub effect fn decodeDer(input: &[u8], limits: DecodeLimits) -> Result<Certificat
 
 Decodes one DER certificate from `input`, and copies it.
 
-All of `input` must be the certificate. Bytes after it, also whitespace, are an error.
+All of `input` must be the certificate. Bytes after it, also whitespace, are an error. The
+limits in `limits` bound the work for input that you do not control.
 
 #### Errors
 - `Failure` with a [`DecodeError`](#DecodeError) if `input` is not one valid certificate or goes over a
   limit.
 - `OutOfMemoryError` if the `Allocator` fails.
+
+#### Gotchas
+Decoding checks only the structure. It does not verify the signature, the chain, the names,
+or the dates. Use `silk.certificate_path` for that.
 
 ::Anchor{id="Certificate.impl.decodePem"}
 
@@ -1056,6 +1082,9 @@ Spaces, tabs, CR, and LF are allowed around the Base64 lines. The Base64 must be
 #### Gotchas
 Some PEM readers ignore text outside the block. This one does not. Use
 `CertificateBundle.decodeAnnotatedPem` for a CA file with comments.
+
+Decoding checks only the structure. It does not verify the signature, the chain, the names,
+or the dates. Use `silk.certificate_path` for that.
 
 ::Anchor{id="Certificate.impl.tbsDer"}
 
@@ -1260,5 +1289,7 @@ pub fn extension<'a>(self: &'a Self, index: usize) -> Option<ExtensionView<'a>>
 
 Returns the extension at `index` in source order, or `None` if `index` is out of range. The
 value is not decoded.
+
+Category: TLS and certificates.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

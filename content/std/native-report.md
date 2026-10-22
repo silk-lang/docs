@@ -53,6 +53,19 @@ pub struct NativeReport
 
 One report: its descriptor, its remaining byte and frame limits, and whether it is complete.
 
+### When to use
+The native runtime (`silk.native_start` and `silk.native_diagnostics`) uses it to print an
+unhandled error and its call path to standard error. Use it in a custom runtime.
+
+### Details
+Each fragment is written only if it fits in the byte limit. When a limit is reached, the
+report is incomplete, and later calls write nothing. It does not allocate.
+
+### Gotchas
+- The report does not close the descriptor.
+- A write can fail after part of a fragment was written.
+- A report does not stop a trap or run cleanup.
+
 ::Anchor{id="NativeReport.impl"}
 
 ## Implementation `NativeReport`
@@ -140,5 +153,7 @@ pub fn succeeded(self: &Self) -> bool
 ```
 
 Returns whether all fragments were written within the limits.
+
+Category: Native platform.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.
