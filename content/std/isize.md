@@ -725,4 +725,6 @@ not skip spaces and does not accept digit separators.
 - `ParseError` with reason `silk.format.OutOfRange` if the number is outside the range of
   `isize` on the target.
 
+Category: Numbers.
+
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

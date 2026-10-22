@@ -1,20 +1,54 @@
-The native provider of the `Logger` effect: it writes each message to standard output.
+Native providers of the `Logger` effect: [`StderrLogger`](#StderrLogger) writes log lines to standard error,
+and [`StdoutLogger`](#StdoutLogger) writes the bare messages to standard output.
 
 ## When to use
-Provide [`StdoutLogger`](#StdoutLogger) for `Logger` in a native program. Code that logs uses `silk.logger`, so
-a test can provide `InMemoryLogger` instead.
+Provide [`StderrLogger`](#StderrLogger) for `Logger` in a native program. It is the normal choice for
+diagnostics, because it keeps the log out of the program output. Provide [`StdoutLogger`](#StdoutLogger) when
+the messages are the output of the program. Code that logs uses `silk.logger`, so a test can
+provide `InMemoryLogger` instead.
 
 ## Details
-Each message is formatted directly to standard output. The logger adds no level, timestamp, or
-newline, and it does not allocate.
+[`StderrLogger`](#StderrLogger) writes one line for each message: the level, a colon and a space, the formatted
+message, and a newline, such as `warning: disk 91% full`. It holds the standard error lock of
+`silk.os_writer` for the whole line, so lines of different threads do not mix. It formats into a
+buffer of 64 bytes on the stack. Thus a short line is one system call, and the logger does not
+allocate.
+
+[`StderrLogger.make`](#StderrLogger.impl.make) colors the level name when standard error is a terminal, the `NO_COLOR`
+environment variable is not set or is empty, and `TERM` is not `dumb`. It checks once, at the
+first message. [`StderrLogger.withColor`](#StderrLogger.impl.withColor) turns color on or off without a check.
+
+[`StdoutLogger`](#StdoutLogger) formats each message directly to standard output. It adds no level, timestamp,
+or newline, has no lock, and does not allocate.
 
 ## Errors
 `LogError` with code 3 if the write fails. Part of the message can be written already.
 
 ## Gotchas
-The provider exists only on Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
+- The providers exist only on Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
+- A message template for [`StderrLogger`](#StderrLogger) must not end with a newline. The logger adds one.
+- [`StderrLogger.make`](#StderrLogger.impl.make) reads the environment at the first message. A change to `NO_COLOR` after
+  that has no effect on the same logger.
 
 ## Examples
+### Log to standard error
+```silk
+import silk.effect { Effect }
+import silk.logger { LogError, Logger }
+import silk.os_logger { StderrLogger }
+
+pub effect fn main() -> i32
+  ! LogError {
+  let mut logger = StderrLogger.make()
+  let values = .{ name: "silk", count: 3 }
+
+  // Writes "info: silk started 3 workers" and a newline to standard error.
+  run Effect.logInfo("{name} started {count} workers", &values)
+    |> Effect.provideMut<Logger>(&mut logger)
+  return 0
+}
+```
+
 ### Log to standard output
 ```silk
 import silk.effect { Effect }
@@ -35,7 +69,86 @@ pub effect fn main() -> i32
 
 Import as `StdoutLogger` with `import silk.os_logger { StdoutLogger }`.
 
-Public declarations: 1.
+Public declarations: 2.
+
+::Anchor{id="StderrLogger"}
+
+## `StderrLogger`
+
+```silk
+pub struct StderrLogger
+```
+
+A `Logger` provider that writes one line for each message to standard error, with the level.
+
+### Details
+
+Each line is the level name (`trace`, `debug`, `info`, `warning`, or `error`), a colon and a
+space, the formatted message, and a newline. The logger holds the standard error lock of
+`silk.os_writer` for the whole line. Thus lines of different threads do not mix, also with
+`StderrWriter` writes. The logger does not allocate.
+
+With color, the level name has an ANSI color: `error` bold red, `warning` bold yellow, `info`
+green, `debug` blue, and `trace` cyan. The message has no color.
+
+### Gotchas
+
+The template must not end with a newline. The logger adds one.
+
+::Anchor{id="StderrLogger.impl"}
+
+## Implementation `StderrLogger`
+
+```silk
+impl StderrLogger
+```
+
+::Anchor{id="StderrLogger.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> StderrLogger
+```
+
+Returns a logger that colors the level name when the terminal can show it. It does not write
+anything.
+
+#### Details
+
+At the first message, the logger uses color when standard error is a terminal, `NO_COLOR` is
+not set or is empty, and `TERM` is not `dumb`. Later messages use the same answer.
+
+::Anchor{id="StderrLogger.impl.withColor"}
+
+### Associated function `withColor`
+
+```silk
+pub fn withColor(enabled: bool) -> StderrLogger
+```
+
+Returns a logger that colors the level name when `enabled` is true, and never otherwise. It
+does not check the terminal or the environment.
+
+#### When to use
+
+Use it when the program has its own color setting, such as a `--color` flag.
+
+::Anchor{id="StderrLogger.impl.Logger"}
+
+## Implementation `Logger for StderrLogger`
+
+```silk
+impl Logger for StderrLogger
+```
+
+::Anchor{id="StderrLogger.impl.Logger.log"}
+
+### Operation `log`
+
+```silk
+log: StderrLogger.writeStderr
+```
 
 ::Anchor{id="StdoutLogger"}
 
@@ -45,7 +158,18 @@ Public declarations: 1.
 pub struct StdoutLogger
 ```
 
-The native `Logger` provider. It writes only the formatted message, and ignores the level.
+A `Logger` provider that writes only the formatted message to standard output, and ignores the
+level.
+
+### When to use
+
+Use it when the log messages are the output of the program. For diagnostics, use
+[`StderrLogger`](#StderrLogger).
+
+### Gotchas
+
+It adds no newline, so end each template with one. It has no lock, so messages of different
+threads can mix.
 
 ::Anchor{id="StdoutLogger.impl"}
 
@@ -80,5 +204,7 @@ impl Logger for StdoutLogger
 ```silk
 log: StdoutLogger.writeStdout
 ```
+
+Category: Native platform.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

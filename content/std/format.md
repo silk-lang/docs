@@ -67,6 +67,12 @@ impl Writer for CaptureWriter {
     ? &mut Writer {
     return ()
   }
+
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
+  }
 }
 
 fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
@@ -156,6 +162,35 @@ pub struct Format
 The owner type of the formatting and parsing operations. It has no fields and is never
 constructed.
 
+### When to use
+
+Use [`Format.display`](#Format.impl.display) to write one value with default options, [`Format.displayWith`](#Format.impl.displayWith) to set a
+width, fill, sign, or precision, and [`Format.format`](#Format.impl.format) to write a template such as
+`"{name} has {count}"`. Use [`Format.debug`](#Format.impl.debug) to show a value for a programmer. Use
+[`Format.i32Value`](#Format.impl.i32Value), [`Format.f64Value`](#Format.impl.f64Value), and the other `...Value` functions to read decimal
+text back into a number. They accept the default `Display` output of the same type.
+
+### Details
+
+Output goes to the ambient `Writer` effect. No operation allocates, and none makes an
+intermediate `String`. Integers display in decimal, or in another base with a [`Style`](#Style). Finite
+floats display as the shortest decimal that parses back to the same bits, and negative zero
+displays as `-0`. With a precision, a float displays with exactly that many fractional digits,
+rounded half to even, and that output does not always parse back to the same bits. Width counts
+Unicode scalars, not UTF-8 bytes and not terminal columns. Numbers align to the right by
+default. Text, `bool`, and `char` align to the left by default.
+
+### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+- [`ParseError`](#ParseError) from the `...Value` parse functions.
+
+### Gotchas
+
+`NaN` and `Infinity` ignore precision and zero padding. To check that a float is finite before
+you display it, use `f64.isFinite` or `f32.isFinite`.
+
 ::Anchor{id="Format.impl"}
 
 ## Implementation `Format`
@@ -177,8 +212,8 @@ Returns the default [`FormatOptions`](#FormatOptions).
 #### Details
 
 The defaults are: no width, `Alignment.Default`, a space as fill, `Sign.NegativeOnly`, no
-alternate form, no zero padding, no precision, no color, and `Style.Default`. [`Format.display`](#Format.impl.display) uses these
-options.
+alternate form, no zero padding, no precision, no color, and `Style.Default`.
+[`Format.display`](#Format.impl.display) uses these options.
 
 ::Anchor{id="Format.impl.make"}
 
@@ -571,7 +606,13 @@ For integers, the precision is a minimum digit count and turns off zero padding.
 the precision is the exact number of fractional digits, rounded half to even. For text, the
 precision is the maximum number of Unicode scalars, and the rest is cut. Integers use
 `style` for the base and `alternate` for the base prefix. The standard implementations ignore
-`color`.
+`color`. Width counts Unicode scalars. Numbers align to the right by default. Text, `bool`,
+and `char` align to the left by default.
+
+#### Gotchas
+
+`NaN` and `Infinity` ignore precision and zero padding. With a precision, float output does
+not always parse back to the same bits.
 
 #### Errors
 
@@ -702,6 +743,8 @@ Use `format` when the text is known at compile time and each value implements [`
 #### Details
 
 - `{}` takes the next field of a tuple, in order.
+- `{1}` takes the tuple field `1`. The same field can show more than one time. `{}` counts
+  from field `0` and ignores the `{1}` placeholders, as in Rust.
 - `{name}` takes the record field `name`.
 - `{{` writes `{` and `}}` writes `}`.
 
@@ -713,8 +756,8 @@ options are, in this order and each optional:
 - `+` for `Sign.Always`. `-` is the default and changes nothing.
 - `#` for the alternate form.
 - `0` for zero padding.
-- A width in decimal digits.
-- `.` and a precision in decimal digits.
+- A width in decimal digits, or `1$` or `w$` to take it from the `usize` field `1` or `w`.
+- `.` and a precision in decimal digits, or `.1$` or `.p$` to take it from a `usize` field.
 - A type: `x` lowercase hexadecimal, `X` uppercase hexadecimal, `o` octal, `b` binary. These
   need an integer, and `#` adds the prefix `0x`, `0o`, or `0b`. `e` and `E` write a float in
   scientific notation, such as `1.25e3`; these need a float. `?` writes the [`Debug`](#Debug)
@@ -730,11 +773,12 @@ options uses [`Format.defaultOptions`](#Format.impl.defaultOptions). `format` bo
 
 #### Gotchas
 
-One template cannot mix `{}` and `{name}`. A template with `{}` must use each tuple field
-exactly one time. A malformed template, a malformed option, a field that does not exist, or
-a type such as `x` on a value that it does not apply to is a compile error. The width and the precision are fixed in the template; to take them
-from a value, use [`Format.displayWith`](#Format.impl.displayWith). `Sign.Space` and `color` are available only
-through [`FormatOptions`](#FormatOptions).
+One template cannot mix tuple fields and record fields: `{}`, `{1}`, and `1$` need a tuple,
+and `{name}` and `w$` need a record. A template with tuple fields must use each field at
+least one time, as a value, a width, or a precision. A malformed template, a malformed
+option, a field that does not exist, or a type such as `x` on a value that it does not apply
+to is a compile error. A width or precision field that is not a `usize` is a type error.
+`Sign.Space` and `color` are available only through [`FormatOptions`](#FormatOptions).
 
 #### Examples
 
@@ -768,6 +812,12 @@ impl Writer for CaptureWriter {
     ? &mut Writer {
     return ()
   }
+
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
+  }
 }
 
 fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
@@ -796,11 +846,24 @@ effect fn render() -> ()
   return run Format.format("{:#06x} {:b} {:.2e}", &(255, 5, 1234.5))
 }
 
+effect fn reuse() -> ()
+  ! WriterError
+  ? &mut Writer {
+  let width: usize = 5
+  run Format.format("{0}-{1}-{0} ", &("ab", 7))
+  return run Format.format("[{name:>width$}]", &.{ name: "Ada", width: width })
+}
+
 pub effect fn main() -> i32
   ! WriterError {
   let mut writer = CaptureWriter { bytes: [0; 64], length: 0 }
   run render() |> Effect.provideMut<Writer>(&mut writer)
   if !holds(&writer, b"3 + 4 = 7. Ada is 36 {years}. [tea...  2.50] 0x00ff 101 1.23e3") {
+    return 1
+  }
+  let mut second = CaptureWriter { bytes: [0; 64], length: 0 }
+  run reuse() |> Effect.provideMut<Writer>(&mut second)
+  if !holds(&second, b"ab-7-ab [  Ada]") {
     return 1
   }
   return 0
@@ -921,7 +984,8 @@ Reads all of `text` as a decimal `u8`.
 
 #### Details
 
-The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+`text` must contain only the digits `0` to `9`. Signs, spaces, and separators are not
+accepted. Leading zeros are accepted.
 
 #### Errors
 
@@ -942,7 +1006,8 @@ Reads all of `text` as a decimal `u16`.
 
 #### Details
 
-The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+`text` must contain only the digits `0` to `9`. Signs, spaces, and separators are not
+accepted. Leading zeros are accepted.
 
 #### Errors
 
@@ -963,7 +1028,8 @@ Reads all of `text` as a decimal `u32`.
 
 #### Details
 
-The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+`text` must contain only the digits `0` to `9`. Signs, spaces, and separators are not
+accepted. Leading zeros are accepted.
 
 #### Errors
 
@@ -984,7 +1050,8 @@ Reads all of `text` as a decimal `u64`.
 
 #### Details
 
-The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+`text` must contain only the digits `0` to `9`. Signs, spaces, and separators are not
+accepted. Leading zeros are accepted.
 
 #### Errors
 
@@ -1005,7 +1072,8 @@ Reads all of `text` as a decimal `usize`.
 
 #### Details
 
-The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+`text` must contain only the digits `0` to `9`. Signs, spaces, and separators are not
+accepted. Leading zeros are accepted.
 
 #### Errors
 
@@ -1026,7 +1094,8 @@ Reads all of `text` as a decimal `i8`. One leading `-` is accepted.
 
 #### Details
 
-The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+Only the digits `0` to `9` and one leading `-` are accepted. The minimum value reads
+correctly. A leading `+`, spaces, and separators are not accepted.
 
 #### Errors
 
@@ -1047,7 +1116,8 @@ Reads all of `text` as a decimal `i16`. One leading `-` is accepted.
 
 #### Details
 
-The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+Only the digits `0` to `9` and one leading `-` are accepted. The minimum value reads
+correctly. A leading `+`, spaces, and separators are not accepted.
 
 #### Errors
 
@@ -1068,7 +1138,8 @@ Reads all of `text` as a decimal `i32`. One leading `-` is accepted.
 
 #### Details
 
-The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+Only the digits `0` to `9` and one leading `-` are accepted. The minimum value reads
+correctly. A leading `+`, spaces, and separators are not accepted.
 
 #### Errors
 
@@ -1089,7 +1160,8 @@ Reads all of `text` as a decimal `i64`. One leading `-` is accepted.
 
 #### Details
 
-The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+Only the digits `0` to `9` and one leading `-` are accepted. The minimum value reads
+correctly. A leading `+`, spaces, and separators are not accepted.
 
 #### Errors
 
@@ -1110,7 +1182,8 @@ Reads all of `text` as a decimal `isize`. One leading `-` is accepted.
 
 #### Details
 
-The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+Only the digits `0` to `9` and one leading `-` are accepted. The minimum value reads
+correctly. A leading `+`, spaces, and separators are not accepted.
 
 #### Errors
 
@@ -1438,6 +1511,7 @@ The options for one `Display` call.
 ### Details
 
 A `Formatter` holds options only. The output goes to the ambient `Writer`, not to the formatter.
+Width counts Unicode scalars, not UTF-8 bytes and not terminal columns.
 Read the options with [`Format.width`](#Format.impl.width), [`Format.sign`](#Format.impl.sign), and the other accessors.
 
 ::Anchor{id="Display"}
@@ -1492,6 +1566,12 @@ impl Writer for CaptureWriter {
     ! WriterError
     ? &mut Writer {
     return ()
+  }
+
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
   }
 }
 
@@ -1646,10 +1726,17 @@ its fields. For a struct, call [`Format.debugFields`](#Format.impl.debugFields);
 
 ### Details
 
-The standard integers, floats, and `bool` write the same text as `Display`. `string` and
-`char` write quotes and escapes. `Option` and `Result` write the variant and its value, such as
-`Some(3)`. [`Format.alternate`](#Format.impl.alternate) selects the pretty form, which puts each field on its own
+The standard integers and `bool` write the same text as `Display`. Floats also do, but a whole
+number ends in `.0`, as `1.0`. `string` and `char` write quotes and escapes. `Option` and
+`Result` write the variant and its value, such as `Some(3)`. `List` writes its elements, as
+`[1, 2, 3]`. [`Format.alternate`](#Format.impl.alternate) selects the pretty form, which puts each field on its own
 line. Nested values share the formatter, so the pretty form indents at each level.
+
+### Gotchas
+
+Slices, arrays, and anonymous tuples and records have no `Debug` implementation, because only a
+declared type can implement an interface. Write them with [`Format.debugList`](#Format.impl.debugList) and
+[`Format.debugFields`](#Format.impl.debugFields) with an empty name, which writes `(1, 2)` or `{ x: 1 }`.
 
 ::Anchor{id="Debug.debug"}
 
@@ -1748,7 +1835,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="u8.impl.RadixDisplay"}
 
@@ -1789,7 +1877,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="u16.impl.RadixDisplay"}
 
@@ -1830,7 +1919,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="u32.impl.RadixDisplay"}
 
@@ -1871,7 +1961,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="u64.impl.RadixDisplay"}
 
@@ -1912,7 +2003,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="usize.impl.RadixDisplay"}
 
@@ -1953,7 +2045,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="i8.impl.RadixDisplay"}
 
@@ -1994,7 +2087,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="i16.impl.RadixDisplay"}
 
@@ -2035,7 +2129,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="i32.impl.RadixDisplay"}
 
@@ -2076,7 +2171,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="i64.impl.RadixDisplay"}
 
@@ -2117,7 +2213,8 @@ padding, width, fill, and alignment apply.
 
 The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
 digits, trailing fill. Only the alternate form writes a base prefix. A base other than
-decimal writes no sign; see [`Style`](#Style).
+decimal writes no sign: a negative value displays as its two's complement bits at the width
+of its type, as `-1` as `i8` in `LowerHex` is `ff`.
 
 ::Anchor{id="isize.impl.RadixDisplay"}
 
@@ -2244,8 +2341,7 @@ impl<'text> Display for string<'text>
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the string with the width, fill, alignment, and precision of the options. See
-[`Format.padText`](#Format.impl.padText).
+Writes the string with the width, fill, alignment, and precision of the options.
 
 #### Details
 
@@ -2267,7 +2363,8 @@ impl Display for bool
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes `true` or `false` as text, like a string. See [`Format.padText`](#Format.impl.padText).
+Writes `true` or `false` as text, with the width, fill, and alignment of the options. The
+default alignment is left.
 
 ::Anchor{id="char.impl.Display"}
 
@@ -2285,7 +2382,8 @@ impl Display for char
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the character as text, like a one-scalar string. See [`Format.padText`](#Format.impl.padText).
+Writes the character as text, with the width, fill, and alignment of the options. The default
+alignment is left.
 
 ::Anchor{id="string.impl.Debug"}
 
@@ -2363,6 +2461,25 @@ effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &m
 ```
 
 Writes `Success(` or `Failure(`, the `Debug` form of the payload, and `)`.
+
+::Anchor{id="List.impl.Debug"}
+
+## Implementation `Debug for List<T>`
+
+```silk
+impl<T: Debug> Debug for List<T>
+```
+
+::Anchor{id="List.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the `Debug` form of each element between `[` and `]`, separated by `, `, as
+`[1, 2, 3]`. The alternate form puts each element on its own line.
 
 ::Anchor{id="bool.impl.Debug"}
 
@@ -2578,7 +2695,8 @@ impl Debug for f32
 effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the same text as `Display`.
+Writes the same text as `Display`, but a whole number ends in `.0`, as `1.0` and `-0.0`, so
+that it reads as a float. A set precision writes the same text as `Display`.
 
 ::Anchor{id="f64.impl.Debug"}
 
@@ -2596,6 +2714,9 @@ impl Debug for f64
 effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the same text as `Display`.
+Writes the same text as `Display`, but a whole number ends in `.0`, as `1.0` and `-0.0`, so
+that it reads as a float. A set precision writes the same text as `Display`.
+
+Category: Text.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

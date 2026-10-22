@@ -346,6 +346,14 @@ A parsed URI reference that borrows its text.
 It is `Copy` and does not allocate. It cannot live longer than its text. Use
 [`UriReference.copy`](#UriReference.impl.copy) or [`UriReference.parseOwned`](#UriReference.impl.parseOwned) to get an [`OwnedUriReference`](#OwnedUriReference).
 
+The component functions return slices of the input, so nothing is decoded or normalized: the
+case of letters and the spelling of `%XX` escapes do not change. An absent component and an
+empty component are different: `http://a/` has no query, but `http://a/?` has an empty query.
+
+### Gotchas
+The parser checks syntax only. It does not check that a scheme is known, that a host exists, or
+that a port is in range.
+
 ::Anchor{id="UriReference.impl.Copy"}
 
 ## Implementation `Copy for UriReference<'text>`
@@ -593,5 +601,7 @@ pub fn intoString(self: Self) -> String
 ```
 
 Returns the text and consumes the value. It does not copy.
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

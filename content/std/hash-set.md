@@ -94,13 +94,32 @@ An internal part of the storage of [`HashSet`](#HashSet). User code does not use
 pub struct HashSet<T>
 ```
 
-A hash set that owns unique elements.
+A hash set that owns unique elements, with deterministic seeded hashing.
+
+### When to use
+
+Use it to test membership fast, or to keep one copy of each value. The element type must
+implement `silk.hash.HashKey`. Use `silk.list.List` when order or duplicate values matter.
 
 ### Details
+
+[`HashSet.make`](#HashSet.impl.make) does not allocate. The first insert allocates eight buckets. The set doubles
+the number of buckets before more than three quarters of them are in use. A failed growth leaves
+the elements, the length, and the bucket count unchanged.
+
+To visit each element, scan the buckets from 0 to [`HashSet.bucketCount`](#HashSet.impl.bucketCount), test
+[`HashSet.occupiedAt`](#HashSet.impl.occupiedAt), and read [`HashSet.elementAt`](#HashSet.impl.elementAt). This order is the bucket order, not the
+order of insertion. The same seed and the same operations give the same bucket order on each
+target.
 
 Each element is unique under `HashKey.equals`. An insert of an element that is already present
 keeps the old element. The set uses one seed for all of its hashes. Dropping the set drops each
 element and then releases the storage.
+
+### Gotchas
+
+Each lookup consumes its probe value. [`HashSet.elementAt`](#HashSet.impl.elementAt) copies, so the element type must be
+`Copy`. [`HashSet.contains`](#HashSet.impl.contains) and [`HashSet.indexOf`](#HashSet.impl.indexOf) work for elements that are not `Copy`.
 
 ::Anchor{id="HashSet.impl"}
 
@@ -263,5 +282,7 @@ impl<T> Drop for HashSet<T>
 ```silk
 fn drop(self: &mut HashSet<T>) -> ()
 ```
+
+Category: Collections.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

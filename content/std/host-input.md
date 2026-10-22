@@ -103,9 +103,20 @@ The error when a host input provider cannot answer a lookup.
 pub service HostInput
 ```
 
-The effect that reads process arguments, environment variables, and the working directory.
+The effect that reads process arguments, environment variables, and the working directory, as
+bytes.
+
+### When to use
+
+Require `&mut HostInput` in code that reads process arguments or environment variables, so a
+test can provide its own values. Use [`HostInput.text`](#HostInput.impl.text) when you need text. Keep the bytes when
+you only pass a value on, because a host value is not always valid UTF-8.
 
 ### Details
+
+Argument 0 is the program name. The arguments keep the order of the host. This effect only
+reads. It does not change environment variables or the working directory. Each returned value is
+an owned `Bytes`, so the lookups need an `Allocator`.
 
 An absent argument and an unset variable are normal answers, so they give an absent `Option`.
 Only a provider that cannot answer fails with [`HostInputError`](#HostInputError). Each returned value is owned
@@ -257,5 +268,7 @@ To pass a value on, keep the bytes.
 #### Errors
 
 - `InvalidUtf8` if `values` is not valid UTF-8. `values` does not change.
+
+Category: System.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

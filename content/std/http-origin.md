@@ -71,7 +71,9 @@ Public declarations: 2.
 pub enum OriginError
 ```
 
-The reason that an origin is not valid, or that its text does not fit.
+The reason that an origin is not valid, or that its text does not fit: the scheme is not `http`
+or `https`, the URI has user information, the host or port is not valid, or the output is too
+small.
 
 ::Anchor{id="OriginError.InvalidScheme"}
 
@@ -261,5 +263,7 @@ Returns `true` if `text` names this origin.
 #### Details
 `text` is a host with an optional port. The default port can be written or not. Domains are
 compared without case, and equal IP addresses match in any spelling.
+
+Category: HTTP.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

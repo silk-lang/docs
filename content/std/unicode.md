@@ -51,7 +51,22 @@ Public declarations: 1.
 pub struct Unicode
 ```
 
-The owner type of the normalization operations. It has no fields and is never constructed.
+The owner type of the Unicode canonical normalization operations (NFC and NFD). It has no fields
+and is never constructed.
+
+### When to use
+Use normalization where text with different encodings of the same characters must compare
+equal, such as user names or file names from different systems. Use [`Unicode.normalizeNfc`](#Unicode.impl.normalizeNfc)
+for storage and comparison. Use [`Unicode.normalizeNfd`](#Unicode.impl.normalizeNfd) when a consumer needs the decomposed
+form.
+
+### Details
+Normalization is explicit. `string` equality compares the exact UTF-8 bytes and does not
+normalize. The results are the same on each target.
+
+### Gotchas
+Only canonical normalization is implemented. There is no compatibility normalization (NFKC or
+NFKD), locale-sensitive comparison, grapheme segmentation, or case folding.
 
 ::Anchor{id="Unicode.impl"}
 
@@ -156,5 +171,7 @@ The function does not change `value`. Two canonically equivalent inputs give equ
 #### Errors
 
 - `OutOfMemoryError` if the `Allocator` cannot supply the storage for the result.
+
+Category: Text.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

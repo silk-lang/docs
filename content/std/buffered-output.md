@@ -11,8 +11,9 @@ Each operation has two forms. The deadline form, such as `writeAll`, uses a
 
 ## Details
 When a write returns, the buffer owns the accepted bytes. The buffer sends pending bytes to the
-transport only when it is full or when the caller flushes it. A flush sends all pending bytes in
-order, one time each.
+transport only when it is full or when the caller flushes it. Input that is longer than the
+buffer is not copied: once the pending bytes are sent, it goes to the transport directly. A
+flush sends all pending bytes in order, one time each.
 
 A failed transport write or flush makes the buffer terminal. After that, each write and flush
 fails with `BufferError.Terminal`. The error reports exactly how many bytes the transport
@@ -51,6 +52,12 @@ impl Writer for CountingWriter {
     ? &mut Writer {
     return ()
   }
+
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
+  }
 }
 
 pub effect fn main() -> i32
@@ -87,7 +94,22 @@ pub struct BufferedOutput
 
 A fixed-size buffer that holds output bytes until the transport receives them.
 
+### When to use
+
+Use it when a program makes many small writes to a byte transport and each transport write has
+a cost, such as a system call. Make the buffer with [`BufferedOutput.make`](#BufferedOutput.impl.make), write with
+[`BufferedOutput.writeAll`](#BufferedOutput.impl.writeAll), and end with [`BufferedOutput.finish`](#BufferedOutput.impl.finish).
+
+Each operation has two forms. The deadline form, such as `writeAll`, uses a
+`silk.byte_duplex.ByteDuplex` transport and a deadline. The `Writer` form, such as
+`writeAllWriter`, uses a `silk.writer.Writer` provider and has no deadline.
+
 ### Details
+
+The buffer sends pending bytes to the transport only when it is full or when the caller flushes
+it. Input that is longer than the buffer is not copied: once the pending bytes are sent, it goes
+to the transport directly. A failed transport write or flush makes the buffer terminal. After
+that, each write and flush fails with `BufferError.Terminal`.
 
 The buffer has one allocation of [`BufferedOutput.capacity`](#BufferedOutput.impl.capacity) bytes. The size does not change
 after [`BufferedOutput.make`](#BufferedOutput.impl.make). [`BufferedOutput.pending`](#BufferedOutput.impl.pending) gives the number of bytes that the
@@ -188,8 +210,12 @@ does other work. Use [`BufferedOutput.writeAll`](#BufferedOutput.impl.writeAll) 
 #### Details
 
 If the buffer is full, this function first sends all pending bytes to the active `ByteDuplex`
-transport. Then it copies input bytes into the free space. For a non-empty `input`, the result
-is at least 1. For an empty `input`, the result is 0 and the transport is not used.
+transport. Then it copies input bytes into the free space. If `input` is longer than
+[`BufferedOutput.capacity`](#BufferedOutput.impl.capacity), it does not copy: it gives the pending bytes and `input` to
+`ByteDuplex.writeSomeVectored`, or only `input` to `ByteDuplex.writeSome` when nothing is
+pending, until the transport accepts some input bytes, and returns their count. For a
+non-empty `input`, the result is at least 1. For an empty `input`, the result is 0 and the
+transport is not used.
 
 #### Errors
 
@@ -221,9 +247,11 @@ Use `writeAll` for normal output through a `ByteDuplex` transport. Use
 
 #### Details
 
-When this function returns, the buffer owns all of `input`. The transport does not
-necessarily have the bytes yet. Call [`BufferedOutput.flush`](#BufferedOutput.impl.flush) to send them. `deadline` applies
-to each transport write that this call makes.
+When this function returns, the buffer owns all of `input`, or the transport already has
+them. The transport does not necessarily have the buffered bytes yet. Call
+[`BufferedOutput.flush`](#BufferedOutput.impl.flush) to send them. A part of `input` that is longer than the buffer goes
+to the transport directly, without a copy. `deadline` applies to each transport write that
+this call makes.
 
 #### Errors
 
@@ -261,8 +289,8 @@ overflow. `deadline` applies to each transport write that this call makes.
 
 #### Errors
 
-- `BufferError.LengthOverflow` if the sum of the element lengths overflows `usize`. The function
-  writes nothing.
+- `BufferError.LengthOverflow` if the sum of the element lengths overflows `usize`. The
+  function writes nothing.
 - `BufferError.Terminal` if an earlier failure made the buffer terminal.
 - `BufferError.WriteFailed` if the transport fails or `deadline` passes. The buffer becomes
   terminal. `accepted` counts the accepted bytes of all elements together, not only the bytes
@@ -314,13 +342,25 @@ pub effect fn finish(
   ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Sends all pending bytes to the transport and flushes it. This function has the same behavior as
-[`BufferedOutput.flush`](#BufferedOutput.impl.flush).
+Sends all pending bytes to the transport and then flushes the transport.
 
 #### When to use
 
 Use `finish` as the last operation on a buffer. The name shows that the output is complete.
-Dropping a buffer does not flush it.
+Dropping a buffer does not flush it. [`BufferedOutput.flush`](#BufferedOutput.impl.flush) has the same behavior.
+
+#### Details
+
+This function sends pending bytes in order, one time each, and then calls
+`ByteDuplex.flush`. When it returns, [`BufferedOutput.pending`](#BufferedOutput.impl.pending) is 0. `deadline` applies to
+each transport operation that this call makes.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure made the buffer terminal.
+- `BufferError.WriteFailed` if a transport write or the transport flush fails, or if
+  `deadline` passes. The buffer becomes terminal. `drained` gives the number of pending bytes
+  that the transport received.
 
 ::Anchor{id="BufferedOutput.impl.writeSomeWriter"}
 
@@ -332,8 +372,8 @@ pub effect fn writeSomeWriter(self: &mut Self, input: &[u8]) -> usize
   ? &mut Writer
 ```
 
-Copies the longest prefix of `input` that fits into the buffer and returns its length. This
-function uses the active `Writer` provider and has no deadline.
+Accepts `input` into the buffer, or sends it to the active `Writer` together with the
+pending bytes, and returns the number of accepted bytes. This function has no deadline.
 
 #### When to use
 
@@ -343,14 +383,17 @@ of `input`.
 
 #### Details
 
-If the buffer is full, this function first sends all pending bytes in one `Writer.writeAll`
-call. For a non-empty `input`, the result is at least 1.
+If `input` fits in the free part of the buffer, this function copies it. Otherwise it does not
+copy: it sends the pending bytes and then `input` in one `Writer.writeVectored` call, and the
+buffer is empty after it. If no bytes are pending, it sends `input` in one `Writer.writeAll`
+call. Thus the result is the length of `input` in every case. A provider such as
+`silk.os_writer.StdoutWriter` sends a vectored write in one system call.
 
 #### Errors
 
 - `BufferError.Terminal` if an earlier failure made the buffer terminal.
 - `BufferError.UnknownExternalTransfer` if the `Writer` fails. The buffer becomes terminal.
-  The destination can have received some of the pending bytes.
+  The destination can have received some of the pending bytes and of `input`.
 
 ::Anchor{id="BufferedOutput.impl.writeAllWriter"}
 
@@ -362,8 +405,8 @@ pub effect fn writeAllWriter(self: &mut Self, input: &[u8]) -> ()
   ? &mut Writer
 ```
 
-Copies all of `input` into the buffer. This function uses the active `Writer` provider when the
-buffer is full.
+Accepts all of `input`. This function uses the active `Writer` provider when `input` does not
+fit in the buffer.
 
 #### When to use
 
@@ -372,15 +415,18 @@ Use `writeAllWriter` to buffer many small writes to a `Writer`, such as standard
 
 #### Details
 
-When this function returns, the buffer owns all of `input`. The `Writer` does not
-necessarily have the bytes yet. Call [`BufferedOutput.flushWriter`](#BufferedOutput.impl.flushWriter) to send them.
+When this function returns, the buffer owns all of `input`, or the `Writer` already has
+them. The `Writer` does not necessarily have the buffered bytes yet. Call
+[`BufferedOutput.flushWriter`](#BufferedOutput.impl.flushWriter) to send them. An `input` that does not fit in the free part of
+the buffer goes to the `Writer` without a copy, after the pending bytes, in one
+`Writer.writeVectored` call.
 
 #### Errors
 
 - `BufferError.Terminal` if an earlier failure made the buffer terminal.
 - `BufferError.UnknownExternalTransfer` if the `Writer` fails. The buffer becomes terminal.
   `progress` gives the number of `input` bytes that the buffer accepted before the failure.
-  The destination can have received some of the pending bytes.
+  The destination can have received some of the pending bytes and of `input`.
 
 ::Anchor{id="BufferedOutput.impl.flushWriter"}
 
@@ -407,5 +453,7 @@ When this function returns, [`BufferedOutput.pending`](#BufferedOutput.impl.pend
 - `BufferError.UnknownExternalTransfer` if `Writer.writeAll` or `Writer.flush` fails. The
   buffer becomes terminal. A `Writer` does not report partial progress. Thus the destination
   can have received some, all, or none of the pending bytes.
+
+Category: Input and output.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -11,7 +11,10 @@ of one transferable `Execution` package (EXEC-010). Thus one non-generic C entry
 closures of any type.
 
 Threads use `pthread_create` on Darwin and GNU libc targets, and wasi-threads on wasm32 with
-`threading = "multi"`.
+`threading = "multi"`. A native thread gets an 8 MiB stack, the default main-thread stack on
+Darwin and Linux, so work that fits on the main thread fits on a spawned one. The platform's
+own thread default is smaller on Darwin (512 KiB). A wasm32 thread gets the 1 MiB stack its
+runtime gives every thread.
 
 ## Errors
 [`SpawnError`](#SpawnError) if the system cannot make the thread. `OutOfMemoryError` if the start or result
@@ -105,7 +108,8 @@ The owner of one running native thread and the storage for its result.
 
 ### Gotchas
 
-Dropping a handle without calling [`join`](#JoinHandle.impl.join) waits for the thread and drops its result.
+Dropping a handle without calling [`JoinHandle.join`](#JoinHandle.impl.join) waits for the thread and drops its result.
+Thus the result storage that the handle owns lives longer than each write to it.
 
 ::Anchor{id="JoinHandle.impl"}
 
@@ -150,6 +154,21 @@ pub struct NativeThread
 ```
 
 The owner of native thread creation.
+
+### When to use
+Use [`NativeThread.spawn`](#NativeThread.impl.spawn) to run independent work on a new operating-system thread, and
+[`JoinHandle.join`](#JoinHandle.impl.join) to wait for its result. For many small tasks, use `silk.thread_pool`.
+
+### Details
+The closure and its result must be `Transferable`. The closure must be detached: it owns all
+that it captures, and borrows nothing from the caller. Threads use `pthread_create` on Darwin
+and GNU libc targets, and wasi-threads on wasm32 with `threading = "multi"`. A native thread
+gets an 8 MiB stack, the default main-thread stack on Darwin and Linux, so work that fits on the
+main thread fits on a spawned one. A wasm32 thread gets the 1 MiB stack that its runtime gives
+every thread.
+
+### Gotchas
+A fatal trap on any thread ends the whole process.
 
 ::Anchor{id="NativeThread.impl"}
 
@@ -218,5 +237,7 @@ Runs the thread a wasm32 runtime started with `argument`.
 Only the wasm32 runtime calls this, on the new thread, with the argument `spawn` passed to the
 runtime's thread creation. A wasm32 module roots no standard-library export of its own, so the
 runtime's entry module exports the thread entry and forwards here.
+
+Category: Concurrency.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

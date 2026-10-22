@@ -20,7 +20,7 @@ elements.
 
 ## Gotchas
 [`List.get`](#List.impl.get), [`List.set`](#List.impl.set), and [`List.remove`](#List.impl.remove) trap if the index is not less than the length.
-The index of [`List.insert`](#List.impl.insert) must be at most the length. [`List.get`](#List.impl.get) copies the element, so
+[`List.insert`](#List.impl.insert) traps if the index is more than the length. [`List.get`](#List.impl.get) copies the element, so
 it needs `T: Copy`. Use [`List.asSlice`](#List.impl.asSlice) to borrow an element that is not `Copy`.
 
 ## Examples
@@ -113,6 +113,23 @@ A growable list that owns its elements in one contiguous allocation.
 The length is the number of elements in the list. The capacity is the number of elements that
 fit before the next growth. Dropping a list drops each element and then releases the storage. A
 list is affine. Copy it element by element if a second list is necessary.
+
+[`List.make`](#List.impl.make) does not allocate. The first growth allocates space for four elements, and each
+later growth doubles the capacity. Use [`List.reserve`](#List.impl.reserve) or [`List.reserveExact`](#List.impl.reserveExact) to allocate
+before a sequence of appends. Growth copies the elements into new storage before it releases the
+old storage, so a failed [`List.append`](#List.impl.append) or [`List.reserve`](#List.impl.reserve) leaves the list unchanged.
+[`List.remove`](#List.impl.remove), [`List.clear`](#List.impl.clear), and [`List.truncate`](#List.impl.truncate) drop the elements that they remove and
+keep the capacity.
+
+[`List.sort`](#List.impl.sort) is stable, works for elements that are not `Copy`, and allocates temporary
+storage. [`List.binarySearch`](#List.impl.binarySearch) needs a sorted list and returns the lowest index of equal
+elements.
+
+### Gotchas
+
+[`List.get`](#List.impl.get), [`List.set`](#List.impl.set), and [`List.remove`](#List.impl.remove) trap if the index is not less than the length.
+[`List.insert`](#List.impl.insert) traps if the index is more than the length. [`List.get`](#List.impl.get) copies the element, so
+it needs `T: Copy`. Use [`List.asSlice`](#List.impl.asSlice) to borrow an element that is not `Copy`.
 
 ::Anchor{id="List.impl"}
 
@@ -240,9 +257,7 @@ in proportion to their number. `T` does not need to be `Copy`.
 
 #### Gotchas
 
-`index` must be less than or equal to [`List.length`](#List.impl.length). The function checks `index` only
-against the capacity. An `index` more than the length and less than the capacity makes the
-list hold uninitialized elements.
+If `index` is more than [`List.length`](#List.impl.length), the program traps.
 
 ::Anchor{id="List.impl.get"}
 
@@ -389,6 +404,32 @@ length does not change.
 - `OutOfMemoryError` if `length + additional` overflows `usize`, or the `Allocator` cannot
   supply the new storage. The list does not change.
 
+::Anchor{id="List.impl.shrinkToFit"}
+
+### Method `shrinkToFit`
+
+```silk
+pub effect fn shrinkToFit(self: &mut Self) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Releases the capacity beyond the length.
+
+#### When to use
+
+Use `shrinkToFit` on a list that is complete and kept for a long time, so that the spare room
+left by doubling growth does not stay allocated.
+
+#### Details
+
+If the capacity equals the length, or the list is empty, this function does nothing.
+Otherwise, it moves the elements into storage for exactly the length. The length does not
+change.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the new storage. The list does not
+  change.
+
 ::Anchor{id="List.impl.sort"}
 
 ### Method `sort`
@@ -498,5 +539,7 @@ A `count` of 0 does nothing and does not allocate.
 
 - `OutOfMemoryError` if the `Allocator` cannot supply the new storage. The list does not
   change.
+
+Category: Collections.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

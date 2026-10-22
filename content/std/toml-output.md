@@ -57,6 +57,12 @@ impl Writer for CaptureWriter {
     ? &mut Writer {
     return ()
   }
+
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
+  }
 }
 
 fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
@@ -104,6 +110,10 @@ pub struct TomlOutput
 
 Functions that write TOML through the ambient `Writer`.
 
+Use [`TomlOutput.write`](#TomlOutput.impl.write) to write a `silk.toml_value` tree, for example after you change a
+parsed document. Use [`TomlOutput.writeKey`](#TomlOutput.impl.writeKey) and [`TomlOutput.writeString`](#TomlOutput.impl.writeString) with
+`silk.toml_codec` to write a document line by line. The functions do not flush the `Writer`.
+
 ::Anchor{id="TomlOutput.impl"}
 
 ## Implementation `TomlOutput`
@@ -126,12 +136,18 @@ Writes the document `document` as TOML. The root must be a table.
 It checks the full tree first, so a [`TomlError`](/docs/std/toml-scanner#TomlError) occurs before any byte is written.
 
 #### Errors
-- `TomlError` if the tree cannot be written as TOML. See the module docs for the cases.
+- `TomlError` if the tree cannot be written as TOML: the root is not a table, a key occurs two
+  times in one table, a stored number or date is not valid, an array of tables is empty or
+  holds a value that is not a table, or the nesting is deeper than 64. `offset` is 0.
 - `WriterError` if the `Writer` fails. The bytes that it accepted stay written.
 - `OutOfMemoryError` if the `Allocator` cannot supply the table path.
 
 #### Gotchas
-It does not flush the `Writer`.
+It does not flush the `Writer`. In each table, it writes the plain members first, as
+`key = value` lines, and then each nested table as a `[path]` section and each array of
+tables as `[[path]]` sections, so the output order can differ from the source order. A dotted
+or inline table in the source is written as a section. Comments and the original spelling of
+strings are not kept.
 
 ::Anchor{id="TomlOutput.impl.writeString"}
 
@@ -164,5 +180,7 @@ empty key, are written with [`TomlOutput.writeString`](#TomlOutput.impl.writeStr
 
 #### Errors
 - `WriterError` if the `Writer` fails.
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

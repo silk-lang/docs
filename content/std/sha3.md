@@ -52,6 +52,10 @@ Call [`Sha3_224.update`](#Sha3_224.impl.update) for each part of the message, th
 [`Sha3_224.hash`](#Sha3_224.impl.hash) when the full message is in one slice. The state is a fixed-size value and
 does not allocate.
 
+### Gotchas
+It is not Keccak-256 as Ethereum uses it: the padding is different, so the digests are
+different.
+
 ::Anchor{id="Sha3_224.impl"}
 
 ## Implementation `Sha3_224`
@@ -114,6 +118,10 @@ A streaming SHA3-256 state that returns a 32-byte digest.
 Call [`Sha3_256.update`](#Sha3_256.impl.update) for each part of the message, then [`Sha3_256.finish`](#Sha3_256.impl.finish). Use
 [`Sha3_256.hash`](#Sha3_256.impl.hash) when the full message is in one slice. The state is a fixed-size value and
 does not allocate.
+
+### Gotchas
+It is not Keccak-256 as Ethereum uses it: the padding is different, so the digests are
+different.
 
 ::Anchor{id="Sha3_256.impl"}
 
@@ -178,6 +186,10 @@ Call [`Sha3_384.update`](#Sha3_384.impl.update) for each part of the message, th
 [`Sha3_384.hash`](#Sha3_384.impl.hash) when the full message is in one slice. The state is a fixed-size value and
 does not allocate.
 
+### Gotchas
+It is not Keccak-256 as Ethereum uses it: the padding is different, so the digests are
+different.
+
 ::Anchor{id="Sha3_384.impl"}
 
 ## Implementation `Sha3_384`
@@ -241,6 +253,10 @@ Call [`Sha3_512.update`](#Sha3_512.impl.update) for each part of the message, th
 [`Sha3_512.hash`](#Sha3_512.impl.hash) when the full message is in one slice. The state is a fixed-size value and
 does not allocate.
 
+### Gotchas
+It is not Keccak-256 as Ethereum uses it: the padding is different, so the digests are
+different.
+
 ::Anchor{id="Sha3_512.impl"}
 
 ## Implementation `Sha3_512`
@@ -289,5 +305,7 @@ pub fn hash(bytes: &[u8]) -> [u8; 64]
 ```
 
 Returns the 64-byte SHA3-512 digest of `bytes`.
+
+Category: Cryptography.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -114,7 +114,15 @@ The state of a UTF-8 decoder between bytes.
 
 ### Details
 
-The state holds at most one incomplete character. It does not keep a borrow of the input.
+The state holds at most one incomplete character. It does not keep a borrow of the input. Use it
+when bytes arrive in chunks, such as from a socket, and one character can be split between two
+chunks. Use `String.fromUtf8` when all bytes are in one slice.
+
+### Gotchas
+
+If the input ends while [`Utf8Decoder.pending`](#Utf8Decoder.impl.pending) is `true`, the last character is incomplete, and
+the caller must report an error. After an invalid result, make a new decoder before the next
+byte.
 
 ::Anchor{id="Utf8Decoder.impl"}
 
@@ -164,5 +172,7 @@ character, the decoder is ready for the next character.
 
 The decoder rejects overlong encodings, surrogates, and values more than `0x10FFFF`. After an
 invalid result, make a new decoder.
+
+Category: Text.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

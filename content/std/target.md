@@ -365,7 +365,8 @@ Returns the byte order of the target.
 pub static fn cpu() -> string<'static>
 ```
 
-Returns the name of the CPU model that the build selects, as written in the compilation profile.
+Returns the name of the CPU model that the build selects, as written in the compilation
+profile.
 
 ::Anchor{id="Target.impl.deployment"}
 
@@ -391,5 +392,7 @@ Returns `true` if the build enables the CPU feature `value`.
 #### Details
 
 `value` is a canonical feature name of the target, as written in the compilation profile.
+
+Category: Core.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

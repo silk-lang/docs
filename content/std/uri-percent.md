@@ -74,6 +74,10 @@ The URI component that the encoded bytes go into. It selects the bytes that stay
 All components keep ASCII letters, digits, `-`, `.`, `_`, and `~`. The other components also
 keep the sub-delimiters `!$&'()*+,;=`, except where the variant says otherwise.
 
+### Gotchas
+`Query` keeps `&`, `=`, and `+`, so use `Unreserved` to encode one key or value of a query
+string.
+
 ::Anchor{id="PercentComponent.Userinfo"}
 
 ### `Userinfo`
@@ -237,6 +241,16 @@ pub struct UriPercent
 ```
 
 Functions that percent-encode and decode URI components.
+
+### Details
+The [`PercentComponent`](#PercentComponent) selects which bytes stay as they are. All other bytes become `%XX` with
+uppercase hexadecimal digits. A `%` in the input is always encoded, so the input must be raw
+data, not text that is already encoded. Decoding is strict: each `%` must start a valid escape.
+The decoded bytes are not always valid UTF-8.
+
+### Gotchas
+This is generic URI encoding, not HTML form encoding. A `+` is not decoded to a space, and a
+space is encoded as `%20`.
 
 ::Anchor{id="UriPercent.impl"}
 
@@ -408,5 +422,7 @@ Use it when most input has no escapes, to skip the allocation and the copy.
 #### Errors
 - `Failure` with a [`DecodeError`](#DecodeError) if an escape is not valid. Nothing is allocated.
 - `OutOfMemoryError` if the `Allocator` fails.
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

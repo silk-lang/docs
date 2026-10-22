@@ -233,7 +233,11 @@ pub union Value
 An owned TOML value.
 
 Integers, floats, dates, and times hold their source text, which the parser validated. Convert
-them with `silk.toml_codec`, or copy the text to keep the full precision.
+them with `silk.toml_codec`, or copy the text to keep the full precision. Strings are decoded to
+UTF-8 text when the document is parsed. Tables keep the order of the source.
+
+### Gotchas
+A borrowed field or string cannot live longer than the `Value` that owns it.
 
 ::Anchor{id="Value.Integer"}
 
@@ -466,6 +470,16 @@ pub struct Toml
 
 Functions that parse and read TOML documents.
 
+### When to use
+Use [`Toml.parse`](#Toml.impl.parse) to read a configuration file or any other complete TOML document. Read
+members with [`Toml.field`](#Toml.impl.field) and [`Toml.fieldAt`](#Toml.impl.fieldAt), array elements with [`Toml.item`](#Toml.impl.item), and text
+with [`Toml.asString`](#Toml.impl.asString). Use `silk.toml_codec` to convert a value to a number, a boolean, or an
+owned string, and `silk.toml_output` to write a tree back as TOML.
+
+### Gotchas
+The read functions return `None` for a missing key and for a value of a different kind. They do
+not tell you which case occurred.
+
 ::Anchor{id="Toml.impl"}
 
 ## Implementation `Toml`
@@ -543,5 +557,7 @@ Returns the decoded text of an optional string value.
 
 Returns `None` if `self` is `None` or is not a [`Value.String`](#Value.String). The text borrows from the
 value.
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

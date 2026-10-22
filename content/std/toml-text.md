@@ -91,4 +91,6 @@ the scanner reports them in `TomlToken.String`.
 #### Errors
 - `OutOfMemoryError` if the `Allocator` cannot supply the output.
 
+Category: Data formats.
+
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -389,7 +389,9 @@ The rule that failed.
 pub union ProxyError
 ```
 
-The error from proxy settings or from a `CONNECT` response.
+The error from proxy settings or from a `CONNECT` response. For a setting that is not valid, it
+has a [`ProxyAdmissionError`](#ProxyAdmissionError) and holds no credentials. If the proxy rejects `CONNECT`, it has
+the response head.
 
 ::Anchor{id="ProxyError.Admission"}
 
@@ -545,6 +547,21 @@ pub struct ProxyConfig
 
 The settings of a proxy: its host and port, its credentials, and the bypass list.
 
+### When to use
+
+Make one with [`ProxyConfig.fromUri`](#ProxyConfig.impl.fromUri) or [`ProxyConfig.make`](#ProxyConfig.impl.make). Then call [`selectRoute`](#selectRoute) for
+each origin.
+
+### Details
+
+The configuration owns its Basic token. A route writes the `Proxy-Authorization` value only into
+a buffer that you give.
+
+### Gotchas
+
+Only plain `http` proxies are supported. An `https` proxy URI fails with
+`UnsupportedProxyTransport`. Environment variables such as `HTTPS_PROXY` are not read.
+
 ::Anchor{id="RouteMode"}
 
 ## `RouteMode`
@@ -594,6 +611,12 @@ pub union Route<'configuration>
 ```
 
 The route for one origin, from [`selectRoute`](#selectRoute).
+
+### Details
+
+`Direct` connects to the origin. `Tunnel` is for an HTTPS origin: the client sends `CONNECT` to
+the proxy, then does TLS with the origin through the tunnel. `Forward` is for a plain HTTP
+origin: the client sends the request to the proxy with the full URI as target.
 
 ::Anchor{id="Route.Direct"}
 
@@ -1160,5 +1183,7 @@ pub fn equals(self: &Self, other: &Self) -> bool
 ```
 
 Returns `true` if the mode, the origin, the proxy, and the two identities are equal.
+
+Category: HTTP.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

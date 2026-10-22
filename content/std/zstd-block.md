@@ -1,7 +1,8 @@
 Internal bounded zstd compressed-block decoding with retained entropy tables.
 
 ## Details
-Callers supply literal, output, and circular history storage. A failed decode invalidates the state.
+Callers supply literal, output, and circular history storage. A failed decode invalidates the
+state.
 
 Import as `BlockState` with `import silk.support.zstd_block { BlockState }`.
 
@@ -126,7 +127,8 @@ pub effect fn make() -> BlockState ! OutOfMemoryError ? &mut Allocator
 Allocates fresh entropy tables and sets the initial repeat offsets for one frame.
 
 #### Details
-The state owns five exact allocations and releases them when dropped. Decode and reset do not allocate.
+The state owns five exact allocations and releases them when dropped. Decode and reset do not
+allocate.
 
 ::Anchor{id="BlockState.impl.reset"}
 
@@ -146,7 +148,8 @@ Restores fresh entropy tables and repeat offsets before a new frame.
 pub fn workspaceBytes() -> usize
 ```
 
-Returns a conservative byte bound for tables and transient algorithm scratch on supported targets.
+Returns a conservative byte bound for tables and transient algorithm scratch on supported
+targets.
 
 #### Details
 This bound excludes caller-owned compressed, literal, output, and history storage.
@@ -176,5 +179,7 @@ Returns the initialized output length. `historyPosition` is the next circular wr
 
 #### Gotchas
 Failure can change tables and scratch bytes. Discard the frame state after failure.
+
+Category: Compiler support.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

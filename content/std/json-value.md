@@ -168,7 +168,12 @@ One JSON value: null, a boolean, a number, a string, an array, or an object.
 ### Details
 
 A `Value` owns all of its children. Use `match` to get the kind, or the `Json.as...` functions
-to read a field of a known kind.
+to read a field of a known kind. Arrays and objects keep the order of the source. A number keeps
+its source text and is converted only when you call [`Json.asI32`](#Json.impl.asI32) or a similar function.
+
+### Gotchas
+
+A borrowed field or string cannot live longer than the `Value` that owns it.
 
 ::Anchor{id="Value.Null"}
 
@@ -309,6 +314,16 @@ pub effect fn parse(bytes: &[u8]) -> Value ! JsonError | OutOfMemoryError ? &mut
 
 Parses `bytes` as one complete JSON document and returns its tree.
 
+#### When to use
+
+Use it when the shape of a document is not fixed, or when you need only a few fields of a
+larger document. To read a typed value, use [`Json.deserialize`](#Json.impl.deserialize) or [`Json.decode`](#Json.impl.decode).
+
+#### Details
+
+Parsing is strict (RFC 8259): no comments, no trailing commas, and no duplicate keys in an
+object. String escapes are decoded when the document is parsed.
+
 #### Errors
 
 - `JsonError` if `bytes` is not one valid JSON value, if an object has a duplicate key, if the
@@ -403,6 +418,12 @@ impl Writer for CaptureWriter {
     ? &mut Writer {
     return ()
   }
+
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
+  }
 }
 
 fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
@@ -454,7 +475,7 @@ pub effect fn main() -> i32
 pub effect fn write(document: &Value) -> () ! JsonError | WriterError ? &mut Writer
 ```
 
-Writes `document` as compact JSON to the `Writer`.
+Writes `document` as compact JSON to the `Writer`. It does not flush the `Writer`.
 
 #### Errors
 
@@ -471,6 +492,7 @@ pub effect fn writeWith(document: &Value, options: &JsonOptions)
 ```
 
 Writes `document` as JSON to the `Writer`, with the indentation and depth limit of `options`.
+It does not flush the `Writer`.
 
 #### Errors
 
@@ -602,5 +624,7 @@ impl Deserialize for Value
 effect fn deserialize(scanner: &mut JsonScanner)
     -> Self ! JsonError | OutOfMemoryError ? &mut Allocator
 ```
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -161,7 +161,11 @@ A request to run one program, with its arguments, environment, and working direc
 ### Details
 
 Arguments and environment entries are bytes, so a value from the host can go to the child
-without changes. They keep the order in which you add them. The environment starts empty.
+without changes. They keep the order in which you add them. The environment of the child
+starts empty: the child gets only the variables that you set. The child uses the working
+directory of the caller, unless the request comes from [`ChildProcess.requestWithin`](#ChildProcess.impl.requestWithin). This is
+not a shell: spaces, quotes, and other special characters in an argument go to the program as
+they are.
 
 ### Gotchas
 
@@ -280,7 +284,14 @@ The completed outcome.
 pub service ChildProcess
 ```
 
-The effect that runs child processes.
+The effect that runs child processes: run another program, wait for it to end, and get its
+exit code and all of its output.
+
+### When to use
+
+Make a [`ProcessRequest`](#ProcessRequest) with [`ChildProcess.request`](#ChildProcess.impl.request), add arguments and environment
+variables, and run it with [`ChildProcess.submit`](#ChildProcess.impl.submit). This is not a shell. Spaces, quotes, and
+other special characters in an argument are passed to the program as they are.
 
 ### Details
 
@@ -705,5 +716,7 @@ standard error. An exit code other than 0 is a normal outcome.
 - [`ProcessError`](#ProcessError) if the child cannot start, the wait fails, or the output cannot be
   captured.
 - `OutOfMemoryError` if the `Allocator` cannot supply the captured output.
+
+Category: System.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

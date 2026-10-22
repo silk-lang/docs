@@ -128,10 +128,24 @@ pub struct Arc<T>
 
 A thread-safe reference-counted handle to one shared value.
 
+### When to use
+
+Use it to give several native threads ownership of one value. Change the value through a
+[`Mutex`](#Mutex) or atomics.
+
 ### Details
 
-[`get`](#Arc.impl.get) borrows the value for as long as the handle is borrowed. `Arc<T>` is `Transferable` and
-`Concurrent` when `T` is both, since every handle lets its thread read the value.
+It counts its handles atomically, so threads can clone and drop handles at the same time. The
+last handle to drop, on any thread, drops the value. /// [`get`](#Arc.impl.get) borrows the value for as long
+as the handle is borrowed. `Arc<T>` is `Transferable` and `Concurrent` when `T` is both, since
+every handle lets its thread read the value.
+
+### Gotchas
+
+- It gives only shared borrows. Unlike `Shared<T>`, it does not detect reentrant access.
+- A reference cycle of `Arc` handles leaks.
+- These types need the same targets as `Atomic.wait`: Darwin on aarch64, Linux with GNU libc on
+x86_64 or aarch64, and wasm32.
 
 ::Anchor{id="Arc.impl.Transferable"}
 
@@ -231,11 +245,15 @@ A lock that gives one thread at a time exclusive access to a value.
 
 [`lock`](#Mutex.impl.lock) returns a [`MutexGuard`](#MutexGuard), which borrows the value until it is dropped. `Mutex<T>` is
 `Transferable` and `Concurrent` when `T` is `Transferable`: the lock passes the value between
-threads one at a time. Share a mutex by putting it in an [`Arc`](#Arc).
+threads one at a time. Share a mutex by putting it in an [`Arc`](#Arc). It is a futex lock: an
+uncontended lock or unlock is one atomic operation, and a contended lock sleeps in the operating
+system and does not spin.
 
 ### Gotchas
 
-Locking a mutex again on the thread that holds it deadlocks.
+- Locking a mutex again on the thread that holds it deadlocks.
+- These types need the same targets as `Atomic.wait`: Darwin on aarch64, Linux with GNU libc on
+x86_64 or aarch64, and wasm32.
 
 ::Anchor{id="Mutex.impl.Transferable"}
 
@@ -378,7 +396,9 @@ wake it one time. A `Parker` stays with its thread. Its [`Unparker`](#Unparker)s
 wake it.
 
 ### Gotchas
-`park` can also return with no token. Check your own condition again in a loop.
+- `park` can also return with no token. Check your own condition again in a loop.
+- These types need the same targets as `Atomic.wait`: Darwin on aarch64, Linux with GNU libc on
+x86_64 or aarch64, and wasm32.
 
 ::Anchor{id="Unparker"}
 
@@ -452,6 +472,9 @@ pub fn park(self: &Self) -> ()
 
 Consumes a waiting token, or sleeps until one arrives.
 
+#### Gotchas
+It can also return with no token. Check your own condition again in a loop.
+
 ::Anchor{id="Parker.impl.parkTimeout"}
 
 ### Method `parkTimeout`
@@ -460,8 +483,11 @@ Consumes a waiting token, or sleeps until one arrives.
 pub fn parkTimeout(self: &Self, timeout: u64) -> bool
 ```
 
-Like [`park`](#Parker.impl.park), but returns after `timeout` nanoseconds without a token. Returns whether it
-consumed a token.
+Consumes a waiting token, or sleeps until one arrives or `timeout` nanoseconds pass. Returns
+whether it consumed a token.
+
+#### Gotchas
+It can also return `false` early, with no token. Check your own condition again in a loop.
 
 ::Anchor{id="Unparker.impl"}
 
@@ -490,5 +516,7 @@ pub fn clone(self: &Self) -> Unparker
 ```
 
 Adds another unparker for the same parker.
+
+Category: Concurrency.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -65,4 +65,6 @@ operators borrow both operands, so a comparison does not consume a value.
 A conformance must be reflexive, symmetric, and transitive. The compiler does not check these
 rules.
 
+Category: Core.
+
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

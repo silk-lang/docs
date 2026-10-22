@@ -94,7 +94,8 @@ Acquires a fixed-address frame or returns null without retaining a partial reser
 #### Gotchas
 
 The caller must initialize bytes before reading, obey the requested extent, and stop using
-the pointer before release or state destruction. A zero size or invalid alignment returns null.
+the pointer before release or state destruction. A zero size or invalid alignment returns
+null.
 
 ::Anchor{id="ExecutionStorage.impl.release"}
 
@@ -109,5 +110,7 @@ Releases one frame acquired from this state and removes its charge.
 #### Gotchas
 
 The caller must finish semantic cleanup and stop every access before releasing the frame.
+
+Category: Concurrency.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`, `wasm32-unknown-unknown`.

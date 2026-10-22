@@ -406,6 +406,19 @@ pub struct TrustSnapshot
 
 A list of trust anchors that does not change. It owns them and keeps their order and duplicates.
 
+### When to use
+Make one from your CA certificates with [`TrustSnapshot.fromPem`](#TrustSnapshot.impl.fromPem), or from anchors with limits
+with [`TrustSnapshot.fromAnchors`](#TrustSnapshot.impl.fromAnchors). Pass it to path validation or to a TLS client. Use
+[`TrustSnapshot.combine`](#TrustSnapshot.impl.combine) to add your own CAs to another snapshot.
+
+### Details
+[`SnapshotLimits`](#SnapshotLimits) and [`TrustLoadLimits`](#TrustLoadLimits) bound its size. An empty snapshot is valid: it trusts
+no certificate.
+
+### Gotchas
+A snapshot is only a list of authorities. It does not check chains, names, dates, or
+revocation, and it is not the trust store of the operating system.
+
 ::Anchor{id="TrustSnapshot.impl"}
 
 ## Implementation `TrustSnapshot`
@@ -527,5 +540,7 @@ Duplicates are kept. Equal certificates are not merged.
 #### Gotchas
 An anchor in `additional` with fewer limits than the same certificate in `primary` makes the
 trust wider.
+
+Category: TLS and certificates.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

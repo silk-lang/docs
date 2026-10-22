@@ -60,6 +60,11 @@ pub struct OutOfMemoryError
 
 The failure when an allocator cannot supply the requested storage.
 
+### Details
+
+A failed request never returns part of an allocation. Each operation that makes owned storage,
+such as `List.push` or `Box.make`, can fail with this error.
+
 ::Anchor{id="Allocator"}
 
 ## `Allocator`
@@ -69,6 +74,23 @@ pub service Allocator
 ```
 
 A mutable service that supplies owned storage for a `Layout`.
+
+### When to use
+
+Each operation that makes owned storage (such as `Bytes.copy`, `List.push` or `Arc.make`)
+requires `&mut Allocator`. Provide it one time, near the top of the program, with
+[`Allocator.systemAllocatorProvider`](#Allocator.impl.systemAllocatorProvider).
+
+### Details
+
+`Allocator` is a normal service. The requirement stays in the `Effect` until a caller provides
+it. Thus a test or an application can use a different allocator, such as an arena, for one
+part of the code.
+
+### Errors
+
+- [`OutOfMemoryError`](#OutOfMemoryError) when the allocator cannot supply the storage. A failed request never
+  returns part of an allocation.
 
 ::Anchor{id="Allocator.allocate"}
 
@@ -112,6 +134,11 @@ pub fn systemAllocatorProvider() -> SystemAllocator
 
 Returns a provider that uses the process heap. It does not allocate.
 
+#### When to use
+
+Provide it one time, near the top of the program, to satisfy the `&mut Allocator`
+requirement of each operation that makes owned storage.
+
 ::Anchor{id="SystemAllocator"}
 
 ## `SystemAllocator`
@@ -145,5 +172,7 @@ impl Allocator for SystemAllocator
 ```silk
 allocate: SystemAllocator.systemAllocate
 ```
+
+Category: Memory.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

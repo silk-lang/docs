@@ -1,9 +1,11 @@
 Queues that move owned values between native threads, for work-stealing schedulers.
 
 ## When to use
-| Type | Use it for | |---|---| | [`WorkDeque`](#WorkDeque) | The work of one thread, which idle threads can
-steal | | [`Injector`](#Injector) | A queue that all threads push to and take from | | [`Mailbox`](#Mailbox) | Many
-threads that send to one receiver |
+| Type | Use it for |
+|---|---|
+| [`WorkDeque`](#WorkDeque) | The work of one thread, which idle threads can steal |
+| [`Injector`](#Injector) | A queue that all threads push to and take from |
+| [`Mailbox`](#Mailbox) | Many threads that send to one receiver |
 
 ## Details
 [`WorkDeque.make`](#WorkDeque.impl.make) returns the [`Worker`](#Worker) that owns a Chase-Lev deque. The worker pushes and
@@ -143,7 +145,14 @@ Public declarations: 8.
 pub struct WorkDeque
 ```
 
-The constructor of work-stealing deques.
+The constructor of work-stealing deques: the work of one thread, which idle threads can steal.
+
+### Details
+[`WorkDeque.make`](#WorkDeque.impl.make) returns the [`Worker`](#Worker) that owns a Chase-Lev deque. The worker pushes and
+pops at the bottom with no contention. Its [`Stealer`](#Stealer)s take from the top with one
+compare-exchange. The ring grows by doubling. Old rings stay allocated until the deque is
+dropped, because a stealer can still read one. Each push allocates, so it can fail with
+`OutOfMemoryError`.
 
 ::Anchor{id="WorkDeque.impl"}
 
@@ -175,7 +184,7 @@ The owner of a work-stealing deque. It pushes and pops at the bottom.
 
 ### Details
 A worker is `Transferable` when `T` is, so it can move to the thread that runs the work. Push
-and pop take it exclusively. [`pop`](#Worker.impl.pop) returns the newest value.
+and pop take it exclusively. [`Worker.pop`](#Worker.impl.pop) returns the newest value.
 
 ::Anchor{id="Steal"}
 
@@ -377,7 +386,16 @@ Adds another handle to the same queue.
 pub struct Mailbox
 ```
 
-The constructor of multi-producer, single-consumer mailboxes.
+The constructor of multi-producer, single-consumer mailboxes: many threads that send to one
+receiver.
+
+### Details
+It is the Vyukov queue: a send is one swap and one store, with no lock. Each send allocates, so
+it can fail with `OutOfMemoryError`.
+
+### Gotchas
+[`MailboxReceiver.receive`](#MailboxReceiver.impl.receive) can return `None` for a short time while a send is between its two
+steps.
 
 ::Anchor{id="Mailbox.impl"}
 
@@ -483,5 +501,7 @@ pub fn clone(self: &Self) -> MailboxSender<T>
 ```
 
 Adds another sender for the same mailbox.
+
+Category: Concurrency.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

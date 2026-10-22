@@ -2,8 +2,9 @@ Internal strict PEM framing and canonical base64 for owned certificate decoders.
 
 ## Details
 
-The scanner accepts only certificate blocks and ASCII space, tab, CR, and LF separators.
-It checks complete blocks and byte budgets before allocation. Certificate schema checks belong to the caller.
+The scanner accepts only certificate blocks and ASCII space, tab, CR, and LF separators. It
+checks complete blocks and byte budgets before allocation. Certificate schema checks belong to
+the caller.
 
 Import as `Pem` with `import silk.support.certificate_pem { Pem }`.
 
@@ -65,7 +66,8 @@ impl Pem
 pub fn skipAnnotations(input: &[u8], offset: usize) -> usize
 ```
 
-Skips printable annotation lines outside blocks, retaining suspect boundary bytes for rejection.
+Skips printable annotation lines outside blocks, retaining suspect boundary bytes for
+rejection.
 
 #### Details
 
@@ -85,7 +87,8 @@ Returns the first offset without a space, tab, CR, or LF byte.
 
 #### Details
 
-An offset at or beyond the input end returns the input length. This operation allocates nothing.
+An offset at or beyond the input end returns the input length. This operation allocates
+nothing.
 
 ::Anchor{id="Pem.impl.decodeNext"}
 
@@ -106,12 +109,16 @@ Decodes one strict CERTIFICATE block into owned bytes, with exact byte and certi
 #### Details
 
 The caller supplies the BEGIN offset, block index, and previously decoded DER byte total.
-Failures use input offsets and expose no partial bytes. Allocation refusal uses `OutOfMemoryError`.
-Complete lexical validation precedes allocation. The caller validates the returned DER schema.
+Failures use input offsets and expose no partial bytes. Allocation refusal uses
+`OutOfMemoryError`. Complete lexical validation precedes allocation. The caller validates the
+returned DER schema.
 
 #### Gotchas
 
-Other well-formed labels are unsupported. Headers, explanatory text, mismatched markers, and noncanonical base64 fail.
-This operation stops after one END line. The caller must check trailing input or decode further blocks.
+Other well-formed labels are unsupported. Headers, explanatory text, mismatched markers, and
+noncanonical base64 fail. This operation stops after one END line. The caller must check
+trailing input or decode further blocks.
+
+Category: Compiler support.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

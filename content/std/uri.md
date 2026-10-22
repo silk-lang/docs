@@ -95,7 +95,13 @@ pub struct Uri<'text>
 A parsed URI with a scheme. It borrows its text.
 
 It is `Copy` and does not allocate. It cannot live longer than its text. Use [`Uri.copy`](#Uri.impl.copy) or
-[`Uri.parseOwned`](#Uri.impl.parseOwned) to get an [`OwnedUri`](#OwnedUri).
+[`Uri.parseOwned`](#Uri.impl.parseOwned) to get an [`OwnedUri`](#OwnedUri). [`Uri.scheme`](#Uri.impl.scheme) always has a value. The component
+functions return slices of the text, so nothing is decoded or normalized.
+
+[`Uri.resolveOwned`](#Uri.impl.resolveOwned) and [`Uri.resolveInto`](#Uri.impl.resolveInto) follow section 5.2 of RFC 3986: they take
+components from the base or the reference, and remove `.` and `..` path segments. They do not
+change the case of letters or the spelling of `%XX` escapes, and do not apply scheme rules, such
+as a default port.
 
 ::Anchor{id="Uri.impl.Copy"}
 
@@ -372,5 +378,7 @@ pub fn intoString(self: Self) -> String
 ```
 
 Returns the text and consumes the value. It does not copy.
+
+Category: Data formats.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

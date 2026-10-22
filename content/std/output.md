@@ -58,6 +58,14 @@ pub struct Uninitialized<T: Copy>
 
 Owned storage for one `T` that does not hold a valid value yet.
 
+### When to use
+Use it to call a foreign function that returns its result through an output pointer, such as
+`int get(T* out)`. Pass [`Uninitialized.address`](#Uninitialized.impl.address) to the function, and then call
+[`Uninitialized.assumeInitialized`](#Uninitialized.impl.assumeInitialized) and [`Initialized.into`](#Initialized.impl.into).
+
+### Details
+It owns one allocation. Dropping it releases the allocation and does not read the value.
+
 ::Anchor{id="Initialized"}
 
 ## `Initialized`
@@ -149,5 +157,7 @@ pub fn into<T: Copy>(self: Self) -> T
 ```
 
 Returns the value and releases the storage.
+
+Category: Memory.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

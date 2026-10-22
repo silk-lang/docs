@@ -11,10 +11,14 @@ and `finish` hash a message that arrives in parts. [`Sha256.checkpoint`](#Sha256
 [`Sha384.checkpoint`](#Sha384.impl.checkpoint) return the digest so far and keep the state. The states are fixed-size
 values and nothing allocates. Digests use the standard big-endian byte order.
 
-| Type | Digest | Block | |------|--------|-------| | [`Sha224`](#Sha224) | 28 bytes | 64 bytes | |
-[`Sha256`](#Sha256) | 32 bytes | 64 bytes | | [`Sha384`](#Sha384) | 48 bytes | 128 bytes | | [`Sha512`](#Sha512) | 64 bytes
-| 128 bytes | | [`Sha512_224`](#Sha512_224) | 28 bytes | 128 bytes | | [`Sha512_256`](#Sha512_256) | 32 bytes | 128 bytes
-|
+| Type | Digest | Block |
+|------|--------|-------|
+| [`Sha224`](#Sha224) | 28 bytes | 64 bytes |
+| [`Sha256`](#Sha256) | 32 bytes | 64 bytes |
+| [`Sha384`](#Sha384) | 48 bytes | 128 bytes |
+| [`Sha512`](#Sha512) | 64 bytes | 128 bytes |
+| [`Sha512_224`](#Sha512_224) | 28 bytes | 128 bytes |
+| [`Sha512_256`](#Sha512_256) | 32 bytes | 128 bytes |
 
 ## Gotchas
 `finish` consumes the state. To hash two messages that share a prefix, use `checkpoint`, or copy
@@ -503,5 +507,7 @@ Returns the 32-byte SHA-512/256 digest of `bytes`.
 
 #### Gotchas
 The program traps if `bytes` is longer than 2^128 - 1 bits.
+
+Category: Cryptography.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

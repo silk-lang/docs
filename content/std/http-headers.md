@@ -106,7 +106,8 @@ Public declarations: 6.
 pub struct Limits
 ```
 
-Maximum sizes for HTTP values, header lists, and copies.
+Maximum sizes for HTTP values, header lists, and copies. Every `Headers` function checks them
+before it allocates.
 
 ::Anchor{id="Limits.maxMethodBytes"}
 
@@ -196,6 +197,17 @@ pub struct Headers<'value>
 ```
 
 An ordered list of header fields that borrows its fields.
+
+### When to use
+
+Use [`Headers.make`](#Headers.impl.make) to put `Header` values from `silk.http` in a list without a copy. Use
+[`Headers.copy`](#Headers.impl.copy) when the list must live longer than its fields. Look up fields with
+[`Headers.getFirst`](#Headers.impl.getFirst), [`Headers.getUnique`](#Headers.impl.getUnique), or [`Headers.getAll`](#Headers.impl.getAll).
+
+### Details
+
+Names are compared without case. Repeated fields stay separate, in their order, and are never
+joined into one value. Every function checks the [`Limits`](#Limits) before it allocates.
 
 ::Anchor{id="Headers.impl.Copy"}
 
@@ -560,5 +572,7 @@ Returns the next item, or `None` at the end.
 
 #### Errors
 - `ValueError` with the location of the problem, if the field value is not a valid list.
+
+Category: HTTP.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
