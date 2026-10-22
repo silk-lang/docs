@@ -22,10 +22,12 @@ artifact = "static-library"
 - A module not listed is internal. Other packages that import it get MOD0003. With `exports = ["codec.Unit"]`, `app`'s import of `text_utils.lib` fails:
 
 ```
+Checking app (x86_64-unknown-linux-gnu)
+  load     54 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 /home/you/app/src/main.silk:4:8: error[MOD0003] Module lib is not exported by package text-utils@0.1.0
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed app in 0.16s
 ```
 
 - The root module is not exported unless listed. `silk init --lib` lists it: `exports = ["lib"]`.
@@ -52,7 +54,7 @@ Packages that depend on a library compile its source with their own. The artifac
 
 Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`. A profile's `artifact` must name the same form as `[build].artifact`, or the manifest is refused. See **Targets and profiles**.
 
-- A library has no runtime. Its roots are its `export "C"` functions and statics, plus what they reach. A library with no C exports builds an empty archive (`0 symbols`).
+- A library has no runtime. Its roots are its `export "C"` functions and statics, plus what they reach. A library with no C exports builds an empty archive: the build's `codegen` row reads `0 functions`.
 - The archive holds the compiled Silk code, not libc. Link it with a C toolchain that supplies libc.
 - Files land in the output directory like any build. See **Build outputs and native linking**.
 
@@ -102,9 +104,13 @@ silk build
 ```
 
 ```
-Compiled src/lib.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a (llvm, x86_64-unknown-linux-gnu, 2 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/text-utils/build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a
-Build summary: 1 succeeded, 0 failed
+Compiling text-utils (x86_64-unknown-linux-gnu, debug)
+  load     41 modules, 2 in package          0.05s
+  check    2 modules                         0.00s
+  codegen  2 functions                       0.00s
+  borrow   2 bodies                          0.00s
+  link     clang                             0.04s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a in 0.09s
 ```
 
 The symbol map next to the archive shows the C name and the Silk declaration it comes from:

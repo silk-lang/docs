@@ -101,7 +101,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tour (llvm, x86_64-unknown-linux-gnu, 288 symbols)
 total 1150 cents, card declined: over the card limit
 total 1150 cents, voucher paid 0 cents
 total 1150 cents, cash paid 1150 cents
@@ -186,10 +185,12 @@ silk check
 ```
 
 ```
+Checking tour (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.07s
+  check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 /home/you/tour/src/main.silk:76:38: error[OWN0003] Moving tea requires an explicit move
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tour in 0.21s
 ```
 
 After the move, `tea` is gone. Add `let price = tea.cents` on the next line and you get:

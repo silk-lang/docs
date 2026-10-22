@@ -58,7 +58,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 236 symbols)
 2 open, 130 minutes left
 ```
 
@@ -94,10 +93,12 @@ silk check
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:13:15: error[SEM0135] Operator < does not accept (i32, usize)
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 Line 13, column 15 is the `<` in `while index < estimates.length`. The message names the operator and the two operand types it got. In Silk, an operator such as `<` is backed by an interface, and each number type opts in for its own operands. SEM0135 says none of those versions accepts `(i32, usize)`. Where did the `i32` come from? Without an annotation, `index` became an `i32`. `estimates.length` is a `usize`. Silk never converts between number types on its own, so `i32 < usize` has no meaning. Put the `: usize` back.
@@ -115,10 +116,12 @@ Leave the `mut` off `open` and see what the compiler says:
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:15:7: error[SEM0035] Cannot assign through immutable binding open
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 This one has a clear message. Line 15 is `open = open + 1`, the first place you try to change `open`. Making mutation visible at the `let` means a reader can trust that every other binding keeps its value. Put the `mut` back.
@@ -130,10 +133,12 @@ You may be used to writing `open += 1`. Silk has no compound assignment:
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:15:13: error[PAR0001] Expected identifier
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.16s
 ```
 
 PAR codes come from the parser, which reads the shape of your code before any types are checked. It got as far as `+` and then found `=` where it expected a name. The error does not say "no `+=` in Silk", so remember it: write `open = open + 1`.
@@ -198,11 +203,13 @@ fn noun(count: i32) -> string<'static> {
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.06s
+  check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:16:14: error[PAR0001] Expected identifier
 /home/you/tasks/src/main.silk:16:30: error[SEM0087] An expression statement whose result cannot be intentionally ignored
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.18s
 ```
 
 The real message is the first line: the parser did not expect `if` after `=`. In Silk, `if` is a statement. It runs one block or another, but it has no value of its own. The SEM0087 that follows is a knock-on error: once the parser lost its place, it read `{ "task" }` as a statement on its own. That statement produces a value, and Silk does not let a value be thrown away unnoticed.
@@ -305,7 +312,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 248 symbols)
 2 of 3 tasks open, 33% done
 time left: 2h 10m
 ```
@@ -335,7 +341,6 @@ echo $?
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/scratch (llvm, x86_64-unknown-linux-gnu, 182 symbols)
 42
 ```
 
@@ -357,10 +362,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:2:18: error[SEM0135] Operator + does not accept (i32, i64)
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.17s
 ```
 
 It is the same SEM0135 you saw with `index`, this time for `+`: there is no `+` for an `i32` and an `i64`. `drop` in `main` throws away the result of `total`. Silk does not let you ignore a value silently, so a call whose result you do not want is written with `drop`.
@@ -382,11 +389,7 @@ pub fn main() -> i32 {
 }
 ```
 
-```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/scratch (llvm, x86_64-unknown-linux-gnu, 184 symbols)
-```
-
-It compiles, runs, and exits with 0.
+`silk run` prints nothing this time: the program compiles, runs, and exits with 0.
 
 ### Overflow
 
@@ -411,7 +414,6 @@ echo $?
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/scratch (llvm, x86_64-unknown-linux-gnu, 183 symbols)
 fatal trap: arithmetic overflow
   at main.addMinutes (main:2:10)
 132

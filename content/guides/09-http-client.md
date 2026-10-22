@@ -118,7 +118,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/statuscheck (llvm, x86_64-unknown-linux-gnu, 2910 symbols)
 GET /status.json
   open tasks: 2
 GET /missing.json
@@ -335,7 +334,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/statuscheck (llvm, x86_64-unknown-linux-gnu, 742 symbols)
   main::missingIsAStatusError
     PASS  25 us
   main::readsTheOpenCount

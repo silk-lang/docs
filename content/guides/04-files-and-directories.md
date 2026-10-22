@@ -268,10 +268,12 @@ pub effect fn main() -> i32 ! LogError | HostInputError | OutOfMemoryError ? &mu
 `Effect.catchAll` hands every failure of `execute` to `explain`, including `LogError`, so `explain` must accept all six. Leave `LogError` out of its parameter and the check stops at the handler:
 
 ```
+Checking notes (x86_64-unknown-linux-gnu)
+  load     57 modules, 1 in package          0.07s
+  check    failed: 2 modules, 1 error        0.93s
 [x86_64-unknown-linux-gnu]
 /home/you/notes/src/main.silk:190:58: error[SEM0067] An `Effect.catch` handler that does not fit the failures it handles
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed notes in 1.00s
 ```
 
 Column 58 is `explain`. The message does not say which failure is missing when the parameter is a union, so compare the handler's parameter with the effect's `!` row. The two must also agree on the result type: `execute` returns `i32` like `explain`. With `execute` returning `()`, the `run` in `main` fails with SEM0040, "A union conversion whose source has members its target lacks", because the result would be `() | i32`.
@@ -416,7 +418,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/notes (llvm, x86_64-unknown-linux-gnu, 843 symbols)
   main::addRefusesToOverwrite
     PASS  4 ms
 
@@ -427,7 +428,6 @@ Time   4 ms
 Afterwards, `ls /tmp` shows no `notes-test-` directory. Change the expected text to `b"eggs"` and the test fails, and the directory is still removed. The report prints the message of the failing `expect` under the test's name, and the trace names its line:
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/notes (llvm, x86_64-unknown-linux-gnu, 843 symbols)
   main::addRefusesToOverwrite
     assertion failed: the first text was kept
     FAIL  4 ms

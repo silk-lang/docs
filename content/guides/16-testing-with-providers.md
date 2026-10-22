@@ -155,7 +155,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 514 symbols)
 sent 19 bytes as b9a44880 in 0 ms
 ```
 
@@ -596,7 +595,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 733 symbols)
   tests::logFailureComesAfterSending
     PASS  55 us
   tests::missingFileSendsNothing
@@ -619,7 +617,6 @@ The times vary from run to run; the results do not. `--no-cache` is required in 
 Suppose you expect the log line to say `in 0 ms`, as it did when you ran the program for real. Change line 75 of `src/tests.silk` to that and run again:
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 733 symbols)
   tests::logFailureComesAfterSending
     PASS  56 us
   tests::missingFileSendsNothing

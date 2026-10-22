@@ -179,7 +179,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1847 symbols)
   tests::doneRouteCarriesTheId
     PASS  9 us
   tests::duplicatesAreConflicts
@@ -298,8 +297,11 @@ silk check
 ```
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     56 modules, 1 in package          0.07s
+  check    2 modules                         0.17s
+  borrow   108 bodies                        0.00s
+Finished tasks in 0.25s
 ```
 
 The two elements look alike, but their types differ in the lifetime. The first is a `Header<'static>`. The second borrows `length`, so it can only live as long as `length` does. An array has one element type, and the compiler settles on the shorter of the two lifetimes. A `'static` header is fine wherever a shorter-lived one is expected, so both fit, in either order.
@@ -328,21 +330,30 @@ curl exit 52 means "empty reply from server".
 
 `respond` sends the status line and headers, then calls you back to write the body. Your callback receives a `ResponseWriter` borrow that is only valid during that call. In Silk terms the callback is higher-ranked: it must work for whatever lifetime `'call` the caller picks. See **Closures and callable types** in the reference.
 
-The natural first try is a closure that captures `reply.body`:
+The natural first try is a closure, passed as the last argument of `respond`, that captures `reply.body`:
 
 ```silk
     effect fn(writer: &mut ResponseWriter<Connection>) -> u16 ! ServerError ? &mut MonotonicClock {
       drop run ResponseWriter.writeAll(&mut writer.*, Bytes.asSlice(&reply.body), Option<Instant>.none())
+      let none: [Header<'static>; 0] = []
+      let trailers = match move Headers.make(&none, valueLimits()) {
+        Result.Failure { error } => { fail ServerError.Value { error: move error } }
+        Result.Success { value } => value
+      }
+      run ResponseWriter.finish(&mut writer.*, &trailers, Option<Instant>.none())
+      return 0
+    },
 ```
 
 ```
-[x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/Http.silk:323:12: unsupported[EffectFormUnavailable] not supported by the native compiler yet
-check x86_64-unknown-linux-gnu: failed (exit 2)
-Check summary: 0 succeeded, 1 failed
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     95 modules, 8 in package          0.15s
+  check    9 modules                         7.67s
+  borrow   1,329 bodies                      0.14s
+Finished tasks in 7.83s
 ```
 
-This is a compiler gap, not a mistake in your code. An `unsupported` line is not an `error`, and the check fails with exit 2 instead of 1: as far as the compiler can tell the code is valid Silk, but it cannot build it yet. Line 323, column 12 is the `respond` call that receives the closure. A closure works for simpler higher-ranked callbacks, but not for this one yet. The way around it is a named function plus a staged call. Write the body writer as a function whose last parameter is the body:
+That works. The closure borrows `reply.body`, and the borrow is fine because `respond` is done with the callback before it returns. But ten lines of body writing now sit in the middle of the `respond` call. This chapter moves them into a named function plus a staged call. Write the body writer as a function whose last parameter is the body:
 
 ```silk
 // Writes the body once the head is out. The extra `body` argument is bound at the call site:
@@ -491,9 +502,13 @@ silk build
 ```
 
 ```
-Compiled src/main.silk -> ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 2447 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks
-Build summary: 1 succeeded, 0 failed
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     95 modules, 8 in package          0.15s
+  check    8 modules                         5.32s
+  codegen  7,485 functions                   5.72s
+  borrow   1,349 bodies                      0.14s
+  link     clang                             2.80s
+Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 14.36s
 ```
 
 ```sh
@@ -692,7 +707,7 @@ It also speaks plain HTTP. The standard library's TLS support is client-side onl
 - Typed failures map directly to HTTP statuses, and the same `explain` writes the message for both front ends.
 - Keeping routing and answering free of sockets lets you test them with the fakes you already have.
 - `silk/native_socket` and `silk/http_server` give you `listen`, `serveNext`, `withRequest`, `readSome` and `respond`, with explicit limits checked per connection.
-- A staged call such as `writeBody(move reply.body)` builds a callback from a named function, and it works where a closure does not yet.
+- A staged call such as `writeBody(move reply.body)` builds a callback from a named function, which keeps a long callback out of the call that receives it.
 - An array literal takes its element type from its first element, so put the shortest-lived borrow first.
 
 ## Where to go next

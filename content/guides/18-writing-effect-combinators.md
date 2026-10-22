@@ -224,7 +224,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/weather (llvm, x86_64-unknown-linux-gnu, 325 symbols)
 flaky station
   read 1: station down (503)
   read 2: station down (503)
@@ -314,10 +313,12 @@ Each successful attempt now reports its own time. The slow station's reads all t
 `budgetedRead` exists because of the Effect modes. The obvious version, `retrying(withBudget(500, readStation(&mut station.*)), ...)`, does not compile:
 
 ```
+Checking weather (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.16s
 [x86_64-unknown-linux-gnu]
 /home/you/weather/src/main.silk:126:17: error[SEM0052] A generic call whose type arguments its values do not determine
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed weather in 0.23s
 ```
 
 `withBudget` takes its action as `once Effect` and keeps it, so the effect it returns can run only once, and `retrying` needs one that can run again. The message does not say this; at a generic call like this one, an Effect of the wrong mode is reported as SEM0052. `budgetedRead(&mut station.*)` builds a fresh `withBudget` effect each time it runs, and holds only a `&mut` borrow, so it is a `mut Effect`.
@@ -325,11 +326,15 @@ Check summary: 0 succeeded, 1 failed
 An `effect { ... }` block would normally do the same job without a named function. In this release, passing `effect { return run withBudget(500, readStation(&mut station.*)) }` to `retrying` stops with an error inside `retrying`:
 
 ```
+Checking weather (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules                 0.88s
 [x86_64-unknown-linux-gnu]
 /home/you/weather/src/main.silk:66:10: unsupported[signature-form] not supported by the native compiler yet
-check x86_64-unknown-linux-gnu: failed (exit 2)
-Check summary: 0 succeeded, 1 failed
+Failed weather in 0.93s
 ```
+
+The command exits with status 2.
 
 Use a named `effect fn` until that is fixed.
 
@@ -343,11 +348,13 @@ An effect that borrows a local keeps the borrow from the moment it is built unti
 ```
 
 ```
+Checking weather (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.16s
 [x86_64-unknown-linux-gnu]
 /home/you/weather/src/main.silk:120:16: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
   note: /home/you/weather/src/main.silk:119:38: related location
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed weather in 0.23s
 ```
 
 `reading` holds `&mut station`, so even reading the station is refused. Read it before you build the effect, or after you run it. The rule is the same whether or not the effect ever runs: building it is enough.
@@ -355,33 +362,33 @@ Check summary: 0 succeeded, 1 failed
 If `retrying` declared its predicate as a plain `fn(&E) -> bool`, the closure that updates `checked` would not fit, because a closure with a mutable capture is a `mut fn`. Again the generic call reports SEM0052:
 
 ```
+Checking weather (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.16s
 [x86_64-unknown-linux-gnu]
 /home/you/weather/src/main.silk:119:17: error[SEM0052] A generic call whose type arguments its values do not determine
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed weather in 0.23s
 ```
 
 When you write a combinator, accept the weakest mode you can use: `once fn` and `once Effect` if you call it once, `mut fn` and `mut Effect` if you call it repeatedly. Plain `fn` and `Effect` are needed only when something must call or run the value through a shared reference.
 
-## A limit of generic code in this release
+## Logging from a combinator
 
-A function with type parameters cannot use a formatting template in this release. Logging from `withBudget` looks natural:
+A combinator can log like any other effect function, type parameters and all. Add `LogError` and `&mut Logger` to the rows of `withBudget` and log the measurement:
 
 ```silk
   run Effect.log("  took {took} ms\n", &.{ took: took })
 ```
 
-With `LogError` and `&mut Logger` added to its rows, `silk check` stops:
-
 ```
-[x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:78:7: unsupported: this construct is not supported by the native compiler yet
-/home/you/weather/src/main.silk:80:10: error[SEM0129] An explicit return whose value violates the declaration result
-check x86_64-unknown-linux-gnu: failed (exit 2)
-Check summary: 0 succeeded, 1 failed
+Checking weather (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    2 modules                         1.23s
+  borrow   227 bodies                        0.01s
+Finished weather in 1.28s
 ```
 
-The same happens with `Format.format`, and in a generic function with only a type parameter, such as `effect fn noisy<A>(value: A)`. Writing plain bytes, such as `Writer.writeString`, works. In practice, return what you measured, as `Timed` does, and let a non-generic caller format it.
+Every caller of `withBudget` now needs a `Logger` in its row, and every caller gets the line whether it wants it or not. Returning what you measured, as `Timed` does, keeps the combinator free of a `Logger` and lets the caller decide how to report it.
 
 ## API reference
 

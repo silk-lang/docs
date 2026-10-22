@@ -144,7 +144,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/squares (llvm, x86_64-unknown-linux-gnu, 223 symbols)
 sum of squares to 10: 385
 ```
 
@@ -155,8 +154,11 @@ silk check --profile bare
 ```
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking squares (x86_64-unknown-linux-gnu)
+  load     47 modules, 1 in package          0.05s
+  check    2 modules                         0.32s
+  borrow   72 bodies                         0.00s
+Finished squares in 0.38s
 ```
 
 ```sh
@@ -164,8 +166,11 @@ silk check --profile web
 ```
 
 ```
-check wasm32-unknown-unknown: ok
-Check summary: 1 succeeded, 0 failed
+Checking squares (wasm32-unknown-unknown)
+  load     51 modules, 1 in package          0.07s
+  check    2 modules                         0.05s
+  borrow   28 bodies                         0.00s
+Finished squares in 0.12s
 ```
 
 Run these checks in CI. They are the cheapest way to keep a portable library portable.
@@ -179,19 +184,23 @@ silk check --profile web
 ```
 
 ```
+Checking squares (wasm32-unknown-unknown)
+  load     51 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.07s
 [wasm32-unknown-unknown]
 /home/you/squares/src/main.silk:23:27: error[SEM0014] Module silk/os_writer has no member StdoutWriter
-check wasm32-unknown-unknown: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed squares in 0.13s
 ```
 
 `silk/os_writer` exists on wasm32, but its wasm32 page declares nothing. Now try a provider that is declared everywhere but refuses wasm32. Put `let random = OsRandom.make()` in the wasm32 `main`, with `import silk.os_random { OsRandom }`:
 
 ```
+Checking squares (wasm32-unknown-unknown)
+  load     53 modules, 1 in package          0.07s
+  check    failed: 2 modules, 1 error        0.06s
 [wasm32-unknown-unknown]
 /home/you/squares/src/main.silk:26:18: error[SEM0177] OsRandom requires a supported Darwin or GNU libc profile
-check wasm32-unknown-unknown: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed squares in 0.13s
 ```
 
 SEM0177 means library code asked the compiler to stop. The check runs inside `OsRandom.make`, and the error is reported at your call to it. On such a target, write a `Random` provider over whatever entropy the host gives you.
@@ -203,9 +212,13 @@ silk build --profile web
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/wasm32-unknown-unknown/web/squares (llvm, wasm32-unknown-unknown, 31 symbols)
-build llvm/wasm32-unknown-unknown: ok /home/you/squares/build/llvm/wasm32-unknown-unknown/web/squares
-Build summary: 1 succeeded, 0 failed
+Compiling squares (wasm32-unknown-unknown, web)
+  load     51 modules, 1 in package          0.05s
+  check    1 module                          0.02s
+  codegen  31 functions                      0.02s
+  borrow   25 bodies                         0.00s
+  link     clang                             0.70s
+Finished build/llvm/wasm32-unknown-unknown/web/squares in 0.83s
 ```
 
 The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports two things: its `memory` and `main`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
@@ -252,10 +265,15 @@ silk build --profile bare
 ```
 
 ```
+Compiling squares (x86_64-unknown-linux-gnu, bare)
+  load     47 modules, 1 in package          0.05s
+  check    1 module                          0.39s
+  codegen  failed: 77 functions, 1 error     0.02s
 <silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
-build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
+Failed squares in 0.47s
 ```
+
+The command exits with status 2.
 
 The compiler cannot generate the raw runtime's entry point yet. Until it can, use the `bare` profile to check code, and keep the code it checks portable.
 

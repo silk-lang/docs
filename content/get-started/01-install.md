@@ -112,9 +112,14 @@ Run summary: 0 succeeded, 1 failed
 If the chosen Clang cannot start, for example because `SILK_CLANG` names a file that does not exist, the message names the path and where it came from: `from SILK_CLANG`, `from --clang` or `found on PATH`.
 
 ```
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.05s
+  check    1 module                          0.06s
+  codegen  422 functions                     0.21s
+  borrow   137 bodies                        0.00s
 silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable
-build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
+  link     failed:                           0.00s
+Failed hello in 0.36s
 ```
 
 Both failures exit with status 2.

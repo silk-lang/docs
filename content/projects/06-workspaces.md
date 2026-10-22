@@ -72,19 +72,27 @@ silk build
 ```
 
 ```
-Package pricing (/home/you/shop/pricing)
-Compiled src/lib.silk -> ../build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a (llvm, x86_64-unknown-linux-gnu, 0 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/shop/build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a
-Build summary: 1 succeeded, 0 failed
-Package store (/home/you/shop/store)
-Compiled src/main.silk -> ../build/llvm/x86_64-unknown-linux-gnu/debug/store (llvm, x86_64-unknown-linux-gnu, 183 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/shop/build/llvm/x86_64-unknown-linux-gnu/debug/store
-Build summary: 1 succeeded, 0 failed
-Workspace summary: 2 packages succeeded, 0 failed
+Compiling pricing (x86_64-unknown-linux-gnu, debug)
+  load     41 modules, 1 in package          0.05s
+  check    1 module                          0.00s
+  codegen  0 functions                       0.00s
+  borrow   3 bodies                          0.00s
+  link     clang                             0.03s
+Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a in 0.10s
+Compiling store (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.04s
+  check    1 module                          0.00s
+  codegen  364 functions                     0.19s
+  borrow   115 bodies                        0.00s
+  link     clang                             0.19s
+Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s
+Finished 2 packages in 0.59s
 ```
 
-- Each member gets a `Package <name> (<dir>)` heading and its usual report. The last line counts packages.
-- A failing member does not stop the others. The command exits 1 if any member failed: `Workspace summary: 3 packages succeeded, 1 failed`.
+- Each member reports its own phases and ends with its own `Finished` or `Failed` line. The path in a member's `Finished` line is relative to the member's folder, so from the root it starts with `../build` even though the folder is `build/` under the root.
+- The last line counts packages. A failing member does not stop the others; the last line then reads like `Failed 1 of 3 packages in 2.10s`, and the command exits 1.
+- On a terminal, each finished member collapses to one line, and the member in progress is labeled with its position, such as `[2/2] store`. See **Diagnostics and silk check** in Tools for how progress output works.
+- `silk test` still prints a `Package <name> (<dir>)` heading for each member and ends with `Workspace summary: 2 packages succeeded, 0 failed`.
 - `silk format` and `silk format --check` list every member's files.
 - `silk doc` writes one file per member: `build/documentation/<member>.json`.
 - `silk clean` removes the shared output directory: `Removed /home/you/shop/build`.
@@ -102,10 +110,12 @@ silk check -p store
 ```
 
 ```
-Package store (/home/you/shop/store)
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
-Workspace summary: 1 package succeeded, 0 failed
+Checking store (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.06s
+  check    2 modules                         0.12s
+  borrow   99 bodies                         0.00s
+Finished store in 0.18s
+Finished 1 package in 0.18s
 ```
 
 A name that is not a member is refused with the list of members (exit 2):
@@ -120,14 +130,14 @@ silk: its members are: pricing, store
 `silk run` runs one program. At the root it picks the only member that builds an executable, so libraries do not count:
 
 ```sh
-silk run
+silk run; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> ../build/llvm/x86_64-unknown-linux-gnu/debug/store (llvm, x86_64-unknown-linux-gnu, 183 symbols)
+exit 0
 ```
 
-With two programs, name one:
+`store` prints nothing; its `main` returns 0 when the discount is right. With two programs, name one:
 
 ```
 silk: `run` runs one package; pass --package <name> to choose a workspace member

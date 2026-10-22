@@ -35,11 +35,19 @@ build/
 | `object` | `<name>.o` | `-c` |
 | `final` | as above | compiles and, for an executable, links |
 
-`<name>` is `[package].name`, hyphens kept: `libtext-utils.a`. A non-final stage stops before linking, so it works for any target. For a single file, `silk build <source> -o <output> --emit <stage>` does the same.
+`<name>` is `[package].name`, hyphens kept: `libtext-utils.a`. A non-final stage stops before linking, so it works for any target. For a single file, `silk build <source> -o <output> --emit <stage>` does the same. With `stage = "assembly"` in `[build]`, the package from `silk init hello` builds `hello.s`:
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.07s
+  check    1 module                          0.06s
+  codegen  422 functions                     0.22s
+  borrow   137 bodies                        0.00s
+  link     clang                             0.15s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello.s in 0.55s
 ```
+
+The `link` row is the Clang step whatever the stage; for `assembly` it runs `clang -S`.
 
 ## The symbol map
 
@@ -50,7 +58,7 @@ main	export	hello@0.1.0:silk/native_start.silk::_._.enter
 silk_5d3308971cc4722980f0a2011e60fca5	function	hello@0.1.0:silk/native_start.silk::_._.enter
 ```
 
-Kinds are `export` (a C name), `function`, `drop` and `helper`. The count in the `Compiled` line is the number of lines in this file.
+Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled main.silk -> ../hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)`, with both paths relative to the source file's folder. Its symbol count is the number of lines in this file.
 
 ## Finding Clang
 
@@ -158,7 +166,6 @@ silk run; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/cmix (llvm, x86_64-unknown-linux-gnu, 182 symbols)
 exit 42
 ```
 
@@ -233,7 +240,6 @@ silk run -- a b; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/sync (llvm, x86_64-unknown-linux-gnu, 97 symbols)
 exit 3
 ```
 
@@ -272,16 +278,19 @@ silk run; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/bare/bare (llvm, x86_64-unknown-linux-gnu, 2 symbols)
 exit 7
 ```
 
 An executable that exports no C `main` is refused before Clang runs, with exit status 2. Here `main` is a plain `pub fn main() -> i32`, and `silk build` prints:
 
 ```
+Compiling tiny (x86_64-unknown-linux-gnu, bare)
+  load     40 modules, 1 in package          0.06s
+  check    1 module                          0.00s
+  codegen  0 functions                       0.00s
+  borrow   1 body                            0.00s
 silk: an executable built with runtime = { kind = "none" } has no `main`; export one, as `export "C" fn start() -> i32 as "main"` does, or select a runtime
-build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
+Failed tiny in 0.06s
 ```
 
 - `silk check` does not look for the C `main`; only an executable build does.

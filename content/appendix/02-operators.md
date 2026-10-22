@@ -78,7 +78,7 @@ A bound such as `T: Add<T, T>` lets generic code use an operator. In this releas
 Every other bound on a primitive is SEM0121 at the call: `T: Subtract<T, T>` with `i32`, `T: Add<T, T>` with `f64`, `T: Equal` with `i32`, `T: Order` with `char`.
 
 ```
-/home/you/demo/src/main.silk:4:7: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
+/home/you/demo/src/main.silk:6:10: error[SEM0121] `i32: intrinsic/operators.Subtract<i32, i32>` cannot be proved: no implementation of `intrinsic/operators.Subtract<i32, i32>` exists for `i32`
 ```
 
 ## Example

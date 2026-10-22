@@ -15,6 +15,7 @@ Every `silk` command, its options and its exit status. `silk --help` prints the 
 | `silk test` | Build the test runner and run the tests |
 | `silk clean` | Delete the build output directory |
 | `silk format [paths]` | Rewrite source files in the standard layout |
+| `silk lsp` | Run the language server for an editor |
 | `silk doc` | Write the package's documentation as JSON |
 | `silk doctest` | Type-check the Silk examples in documentation comments |
 | `silk doc-reference` | Generate the Markdown std lib reference |
@@ -23,7 +24,7 @@ Every `silk` command, its options and its exit status. `silk --help` prints the 
 | `silk <command> --help`, `-h` | Print that command's usage lines and exit 0 |
 | `silk --version`, `-v` | Print `silk v0.1.0` and exit 0 |
 
-There is no `silk lsp` yet. An unknown command prints `` silk: unknown command `frobnicate`  `` and the synopsis, and exits 2.
+An unknown command prints `` silk: unknown command `frobnicate`  `` and the synopsis, and exits 2.
 
 ## Finding the project
 
@@ -108,30 +109,52 @@ See **Dependencies** in Projects and packages.
 ## check
 
 ```
-silk check [project options] [--json]
+silk check [project options] [--progress <mode>] [--quiet] [--timings] [--json] [--replay <script> [--differential]]
 ```
 
-Analyzes every planned target without generating code. Diagnostics go to standard error; the per-target result lines and `Check summary` go to standard output. `--json` writes each diagnostic as one JSON object per line instead. See **Diagnostics and silk check**.
+Analyzes every planned target without generating code. Each target prints a heading, a row per phase and a final line, on standard error. See **Diagnostics and silk check**.
 
 ```
-check x86_64-unknown-linux-gnu: ok
-check wasm32-unknown-unknown: ok
-Check summary: 2 succeeded, 0 failed
+Checking hello (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.06s
+  check    2 modules                         0.13s
+  borrow   99 bodies                         0.00s
+Finished hello in 0.20s
+Checking hello (wasm32-unknown-unknown)
+  load     47 modules, 1 in package          0.06s
+  check    2 modules                         0.04s
+  borrow   27 bodies                         0.00s
+Finished hello in 0.11s
 ```
+
+| Option | Meaning |
+| --- | --- |
+| `--progress <auto\|live\|plain\|never>` | How progress rows are shown. `auto`, the default, redraws them in place in a terminal and prints each finished row once otherwise. `never` prints none |
+| `--quiet`, `-q` | Print only the final line and the diagnostics |
+| `--timings` | List the five slowest modules and function bodies before the final line |
+| `--json` | Write each diagnostic as one JSON object per line, with no progress output |
+| `--replay <script>` | Apply the edits in a TOML script in memory and print the incremental checker's counters for each step, on standard output |
+| `--differential` | With `--replay`, also check each step from scratch and exit 1 if the results differ |
 
 ## build
 
 ```
-silk build [project options]
+silk build [project options] [--progress <mode>] [--quiet] [--timings]
 ```
 
-Builds every planned target and prints one line per artifact:
+Builds every planned target. The rows add `codegen` and `link`, and the final line names the program, relative to the package directory:
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 182 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/hello/build/llvm/x86_64-unknown-linux-gnu/debug/hello
-Build summary: 1 succeeded, 0 failed
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     51 modules, 1 in package          0.07s
+  check    1 module                          0.00s
+  codegen  364 functions                     0.25s
+  borrow   115 bodies                        0.01s
+  link     clang                             0.17s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.55s
 ```
+
+`--progress`, `--quiet` and `--timings` work as for `check`. `--timings` also lists the slowest functions to emit.
 
 ## run
 
@@ -178,6 +201,14 @@ silk format [paths] [--check] [--manifest-path <path>]
 ```
 
 Formats every `.silk` file under the package's source root, or only the given files and directories. `--check` reports files that need formatting and changes nothing. Put `--` before a path that starts with `-`. See **Formatting**.
+
+## lsp
+
+```
+silk lsp [--stdlib <directory>]
+```
+
+Runs a language server that speaks the Language Server Protocol over standard input and output. An editor starts it; you do not run it by hand. It reports diagnostics as you type, lists the declarations in a file, folds blocks, and formats the file the way `silk format` does. Hover, go to definition and signature help work for functions declared in your package, but not yet for std lib names or local variables, and in some function bodies they return nothing. See **Editor setup** in Get started.
 
 ## doc, doctest and doc-reference
 
@@ -237,6 +268,10 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_CLANG` | The Clang executable, when `--clang` is not given |
 | `SILK_LLVM_AR` | The archiver for static libraries; default is `llvm-ar` beside Clang |
 | `SDKROOT`, `DEVELOPER_DIR` | macOS SDK selection; an invalid `SDKROOT` is an error |
+| `SILK_PROGRESS` | The progress style for `check` and `build` when `--progress` is not given: `auto`, `live`, `plain` or `never`. An invalid value is ignored |
+| `NO_COLOR` | Set to a non-empty value, turns off colors in live progress output |
+| `COLUMNS` | The width of live progress output; default 80 |
+| `TERM` | `dumb` turns live progress output into plain rows |
 | `SSL_CERT_FILE` | The certificate bundle for `silk changes since` when it fetches releases over HTTPS |
 | `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE` | Passed through to Clang; no other variable is |
 
@@ -244,4 +279,4 @@ The installer reads `SILK_INSTALL`, `SILK_RELEASE` and `SILK_CHANNEL`; see **Ins
 
 ## Output streams
 
-Result lines and summaries (`Compiled`, `check ...: ok`, `Build summary`, test results, `formatted`, `unchanged`) go to standard output. Diagnostics, refusals, warnings, `needs formatting`, and `SILK_GAP` notices go to standard error. A program started by `silk run` writes to both as it chooses.
+Test results, `--replay` lines, the `run ...: failed` lines of `silk run`, `formatted` and `unchanged` go to standard output. Progress rows, diagnostics, refusals, warnings, `needs formatting`, and `SILK_GAP` notices go to standard error. `silk run` and `silk test` print no progress rows. A program started by `silk run` writes to both as it chooses.

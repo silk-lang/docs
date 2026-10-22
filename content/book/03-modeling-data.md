@@ -49,10 +49,12 @@ Unlike `if`, `match` is an expression: it has a value, so you can `return` it di
 The compiler checks that the arms cover every member. Delete the `Priority.High` arm and check:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:26:10: error[SEM0158] Match over Priority does not cover High
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 Line 26 is the `match`. The message names the enum and the member that has no arm: `Priority.High`. This check is what makes adding a fourth priority safe later: every `match` that forgot it becomes an error. Put the arm back.
@@ -122,10 +124,12 @@ Build a task with a struct literal. Here, unlike in the declaration, fields are 
 Every field must be given. The new `TaskId` type earns its keep at once. Write `id: 1` by habit, and check:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:51:9: error[SEM0025] Field id expects main.TaskId but received i32
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 A clear message: the field wants a `TaskId`, and you gave it a number. `main.TaskId` is the full name of the type, `TaskId` in the module `main`. Write `TaskId(1)`.
@@ -154,10 +158,12 @@ The parameter type `&Status` is a reference to a status. `statusMark` only needs
 Why all this, when `priorityLabel` could just write `match priority`? Because a `Priority` is copied freely and a `Status` is not. A union might hold large data, so Silk does not copy it behind your back. A plain `match` would need its own copy. Try it, writing `match status.*` without the `&`:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:34:10: error[OWN0003] A non-Copy value consumed without the explicit `move` its position requires
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 OWN codes come from the ownership checker. `Copy` is the name for types that copy freely, like numbers and enums, and `Status` is not one of them. So a plain `match` would use up the status itself, and Silk wants you to write `move` when you mean that. But `statusMark` only borrowed the status, and it has no business using it up. For a `match`, the answer is almost always `&`: look at the value where it is. Chapter 4 is all about ownership and explains the other options.
@@ -209,7 +215,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 241 symbols)
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
 ```
@@ -250,8 +255,11 @@ Two new things appear in the `Add` arms.
 The `'static` on the title says where its text lives. Leave it off, writing `Add { title: string, priority: Priority }`, and check:
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    2 modules                         0.12s
+  borrow   174 bodies                        0.01s
+Finished tasks in 0.18s
 ```
 
 It passes, but the meaning changed. `string` takes one argument, the lifetime in angle brackets. A field that leaves it out gives `Command` a hidden lifetime parameter: a command now borrows its title from *some* text, and the type carries that borrow wherever it goes. Chapter 5 is all about such borrows. For now every title is a literal, so say so: write `string<'static>` again.
@@ -259,10 +267,12 @@ It passes, but the meaning changed. `string` takes one argument, the lifetime in
 Guards are useful, but the compiler cannot see inside them. A guarded arm does not count when the compiler checks that every case is covered. Delete the `Command.Done` arm and check:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:47:10: error[SEM0044] Match does not cover Done
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 SEM0044 is the union version of SEM0158: the `match` on line 47 does not cover every variant, and the message names the one that has no arm, `Done`. Put it back. This is the check that will keep the command handling honest as new commands arrive in later chapters.
@@ -279,7 +289,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 250 symbols)
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
 next command: add an urgent task

@@ -35,6 +35,9 @@ Two modules both export a type called `Format`: `silk/format` (text templates) a
 If you import both as `Format`, `silk check` stops at every use of the name:
 
 ```
+Checking unpack (x86_64-unknown-linux-gnu)
+  load     60 modules, 1 in package          0.07s
+  check    failed: 2 modules, 6 errors       0.20s
 [x86_64-unknown-linux-gnu]
 /home/you/unpack/src/main.silk:5:22: error[SEM0016] Two bindings in one scope claiming the same spelling
 /home/you/unpack/src/main.silk:54:7: error[SEM0016] Two bindings in one scope claiming the same spelling
@@ -42,8 +45,7 @@ If you import both as `Format`, `silk check` stops at every use of the name:
 /home/you/unpack/src/main.silk:111:38: error[SEM0016] Two bindings in one scope claiming the same spelling
 /home/you/unpack/src/main.silk:127:7: error[SEM0016] Two bindings in one scope claiming the same spelling
 /home/you/unpack/src/main.silk:148:7: error[SEM0016] Two bindings in one scope claiming the same spelling
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed unpack in 0.27s
 ```
 
 The message does not name `Format`, so look for a name that two imports share. Writing `inflate.Format.Gzip` through the module name does not work either: this release reports it as `unsupported: this construct is not supported by the native compiler yet`. Rename on import instead.
@@ -251,7 +253,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/unpack (llvm, x86_64-unknown-linux-gnu, 541 symbols)
 base64: aGVsbG8sIHNpbGs=
 decoded: hello, silk
 aGVsbG8 rejected: not a whole 4-byte group

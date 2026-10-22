@@ -392,7 +392,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/numbered (llvm, x86_64-unknown-linux-gnu, 782 symbols)
   main::aSilentPeerTimesOut
     PASS  61 us
   main::copiesEveryByte

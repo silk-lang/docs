@@ -245,7 +245,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/stock (llvm, x86_64-unknown-linux-gnu, 682 symbols)
 config: Spring stock (owner Julia, limit 3)
 order 1042 ships to Porto
 3 lines, 8 items

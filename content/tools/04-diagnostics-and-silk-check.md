@@ -8,12 +8,17 @@ When the compiler rejects your code, it prints one line per problem: where it is
 silk check
 ```
 
-With no errors, you get one line per target and a summary:
+With no errors, you get a heading, one row per compiler phase, and a final line:
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking hello (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.08s
+  check    2 modules                         0.16s
+  borrow   99 bodies                         0.00s
+Finished hello in 0.24s
 ```
+
+The heading names the package and the target. `load` reads and parses the modules your package needs: 51 here, the std lib modules included, and 1 of them in your package. `check` analyzes the modules that matter to the program, and `borrow` checks ownership and borrowing in each function body. The times are wall-clock times and vary from run to run. **Progress output** below explains how these lines change in a terminal and how to turn them off.
 
 `silk build`, `silk run` and `silk test` report the same diagnostics, in the same form, before they stop. `silk check` is the quick way to see them. It exits 0 when every target checks, and 1 when any target has an error.
 
@@ -33,10 +38,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking hello (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.04s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/hello/src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed hello in 0.15s
 ```
 
 Read it piece by piece:
@@ -66,12 +73,14 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking hello (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.04s
+  check    failed: 2 modules, 2 errors       0.09s
 [x86_64-unknown-linux-gnu]
 /home/you/hello/src/main.silk:5:4: error[SEM0003] Duplicate declaration name half
   note: /home/you/hello/src/main.silk:1:4: related location
 /home/you/hello/src/main.silk:10:10: error[SEM0016] Two bindings in one scope claiming the same spelling
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed hello in 0.14s
 ```
 
 The second error follows from the first: fix the duplicate and it goes away.
@@ -90,11 +99,13 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking hello (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    failed: 2 modules, 2 errors       0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/hello/src/main.silk:1:20: error[PAR0001] Expected `)`
 /home/you/hello/src/main.silk:6:20: error[SEM0037] Assignment expected i32 but received string<'static>
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed hello in 0.17s
 ```
 
 The missing `)` gets one diagnostic, not one for each token the parser had to skip, and the type error in `main` is still found. When a declaration is damaged beyond repair, the parser skips to the next line that starts a declaration.
@@ -106,16 +117,21 @@ silk check --target host --target wasm32-unknown-unknown
 ```
 
 ```
+Checking hello (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 /home/you/hello/src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
+Failed hello in 0.16s
+Checking hello (wasm32-unknown-unknown)
+  load     47 modules, 1 in package          0.03s
+  check    failed: 2 modules, 1 error        0.02s
 [wasm32-unknown-unknown]
 /home/you/hello/src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
-check x86_64-unknown-linux-gnu: failed (exit 1)
-check wasm32-unknown-unknown: failed (exit 1)
-Check summary: 0 succeeded, 2 failed
+Failed hello in 0.06s
 ```
 
-Diagnostics go to standard error and the result lines to standard output, so in a terminal the two can interleave.
+The targets are checked one after the other, and each one prints its own heading, rows and final line. A failed phase says `failed:` and counts the errors it reported. The diagnostics follow the rows, and the `borrow` phase does not run once `check` has failed.
 
 ## When the location is not your file
 
@@ -159,9 +175,115 @@ A few other lines can appear around diagnostics:
 | `silk: ...` | The command itself failed: no manifest, an unknown package, an invalid option |
 | `ARTIFACT-001` and similar | The build setup was refused, for example a target with no runtime or a missing native tool. The line names the subject and how to fix it |
 
+## Progress output
+
+The heading, the phase rows and the final line are progress output. `silk check` and `silk build` print them on standard error, so standard output stays free for a program's own output. `silk run` and `silk test` print no progress rows.
+
+| Row | Meaning |
+| --- | --- |
+| `load` | Modules read and parsed, and how many of them are in your package |
+| `check` | Modules analyzed |
+| `borrow` | Function bodies checked for ownership and borrowing |
+| `codegen` | Functions turned into machine code (`silk build` only) |
+| `link` | The native linker run (`silk build` only) |
+
+`silk build` ends with `Finished` and the path of the program it wrote, relative to the package directory. A command that stops on an error ends with `Failed <package> in <time>`.
+
+How the rows look depends on where standard error goes:
+
+- **Plain**, when standard error is a file, a pipe or a CI log: each row is printed once, when its phase ends. All the examples in these docs are plain output.
+- **Live**, when standard error is a terminal: each running phase is redrawn in place with a spinner, a bar, a count and the elapsed time, and a finished phase gets a check mark or a cross. Colors are used unless the `NO_COLOR` environment variable is set to a non-empty value. The width follows `COLUMNS` and defaults to 80. A terminal with `TERM=dumb` gets plain output.
+
+When one command covers several targets or workspace packages, live output keeps one line per finished package, and the running one is labeled like `[1/2] pricing`. A command that selects workspace packages ends with a total, such as `Finished 2 packages in 1.92s` or `Failed 1 of 2 packages in 0.84s`.
+
+Choose the style with `--progress`, or with the `SILK_PROGRESS` environment variable when you cannot change the command line:
+
+| Value | Effect |
+| --- | --- |
+| `auto` | Live in a terminal, plain otherwise. The default |
+| `live` | Always live |
+| `plain` | Always plain |
+| `never` | No progress output at all. Diagnostics still print |
+
+The option wins over the variable, and an invalid `SILK_PROGRESS` value is ignored. `--quiet` (or `-q`) keeps only the final line and the diagnostics:
+
+```sh
+silk check --quiet
+```
+
+```
+Finished hello in 0.20s
+```
+
+`--json` and `--replay` print no progress output at all.
+
+## Find slow modules
+
+`silk check --timings` and `silk build --timings` add the five slowest items of each phase before the final line:
+
+```sh
+silk check --timings
+```
+
+```
+Checking hello (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    2 modules                         0.10s
+  borrow   99 bodies                         0.00s
+  Slowest modules to check
+       74.9ms  silk/native_start.silk
+       26.1ms  main.silk
+  Slowest bodies to borrow-check
+       0.20ms  silk/native_diagnostics.makePool
+       0.18ms  silk/native_start. for .code
+       0.17ms  silk/execution_storage.acquire
+       0.17ms  silk/native_start.start
+       0.16ms  silk/list..appendBytes
+Finished hello in 0.15s
+```
+
+`silk build --timings` also lists the slowest functions to emit. Std lib modules appear in the lists because they are checked with your program. Some body names are internal, such as `silk/native_start. for .code` for a loop body. `--quiet` turns the lists off.
+
+## Replay edits
+
+`silk check --replay <script>` measures the incremental checker, the part of the compiler that rechecks only what an edit affects. It is a tool for working on the compiler and for reporting slow rechecks, not for checking your code: it prints counters, not diagnostics. The script is a TOML file of `[[edit]]` tables, applied in memory one after the other. Your files are not changed.
+
+```toml
+[[edit]]
+kind = "trivia"
+module = "main.silk"
+find = "pub effect fn main"
+replace = "// entry point\npub effect fn main"
+
+[[edit]]
+kind = "body"
+module = "main.silk"
+find = "Hello, world!"
+replace = "Hello, Silk!"
+```
+
+| Key | Meaning |
+| --- | --- |
+| `kind` | What the edit changes: `trivia`, `body`, `header-same-type`, `header-new-type`, `add`, `delete` or `rename` |
+| `module` | The file, relative to the package's source folder |
+| `find`, `replace` | The text to replace. `find` must occur exactly once in the file |
+| `to` | The new path, for a `rename` |
+
+```sh
+silk check --replay edits.toml
+```
+
+```
+silk-replay step=0 kind=initial module=- demands=19659 hits=17540 units-run=2119 marked-outdated=0 fingerprinted=1402 unchanged=0 verified=0 graph-units=2119 graph-bytes=1114368 rejections=0 update-us=0 check-us=216831
+silk-replay step=1 kind=trivia module=main.silk demands=1162 hits=1160 units-run=2 marked-outdated=2 fingerprinted=0 unchanged=0 verified=0 graph-units=2119 graph-bytes=1114368 rejections=0 update-us=57 check-us=8088
+silk-replay step=2 kind=body module=main.silk demands=3102 hits=3068 units-run=34 marked-outdated=2 fingerprinted=0 unchanged=0 verified=0 graph-units=2151 graph-bytes=1769728 rejections=0 update-us=38 check-us=22087
+```
+
+Step 0 is the first full check. Each later step is one edit: `units-run` counts the pieces of work the checker redid, `hits` the ones it reused, and `check-us` the time in microseconds. The lines go to standard output. Add `--differential` to also check each step from scratch and compare: each step gets a `silk-replay-differential step=N rejections=0 differences=0` line, and the command exits 1 when the two disagree. A bad script exits 2 with a `silk:` line, such as `silk: replay edit 2 (main.silk): its find text does not occur exactly once`.
+
 ## Diagnostics as JSON
 
-`silk check --json` writes each diagnostic as one JSON object on its own line, on standard error, in place of the human line. The result lines and summary stay the same on standard output, and so does the exit status.
+`silk check --json` writes each diagnostic as one JSON object on its own line, on standard error, in place of the human line. The heading, phase rows and final line are left out, so standard error holds only JSON. The exit status is the same.
 
 ```sh
 silk check --json
@@ -169,8 +291,6 @@ silk check --json
 
 ```
 {"target":"x86_64-unknown-linux-gnu","code":"SEM0012","severity":"error","path":"/home/you/hello/src/main.silk","line":7,"column":15,"start":109,"end":114,"message":"Expected i32 but received i64","notes":[],"related":[]}
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
 ```
 
 | Field | Type | Meaning |
@@ -200,5 +320,6 @@ For CI, `silk check` on its own is enough: it exits 1 on any error. Use `--json`
 - A diagnostic reads `path:line:column: error[CODE] message`, under a `[target]` header, followed by an indented `note:` line for each related location.
 - The code family tells you the phase: `LEX`, `PAR`, `MOD`, `SEM` or `OWN`.
 - A std lib check that rejects your arguments is reported at your call. A location inside the std lib is rare and usually an `unsupported` line.
+- Progress rows go to standard error. `--progress`, `SILK_PROGRESS` and `--quiet` control them, and `--timings` lists the slowest modules.
 - `silk check --json` writes one JSON object per diagnostic on standard error, with byte offsets and related locations.
 - Fix the first diagnostic first; later ones are often consequences.

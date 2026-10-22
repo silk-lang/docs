@@ -473,9 +473,13 @@ silk build
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/greeter (llvm, x86_64-unknown-linux-gnu, 1273 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/greeter/build/llvm/x86_64-unknown-linux-gnu/debug/greeter
-Build summary: 1 succeeded, 0 failed
+Compiling greeter (x86_64-unknown-linux-gnu, debug)
+  load     75 modules, 1 in package          0.13s
+  check    1 module                          2.24s
+  codegen  2,654 functions                   1.34s
+  borrow   813 bodies                        0.10s
+  link     clang                             1.29s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/greeter in 5.23s
 ```
 
 The plain routes, with curl:

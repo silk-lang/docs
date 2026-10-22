@@ -32,10 +32,16 @@ silk build --target aarch64-unknown-linux-gnu
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/aarch64-unknown-linux-gnu/debug/tiny.o (llvm, aarch64-unknown-linux-gnu, 182 symbols)
-build llvm/aarch64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/aarch64-unknown-linux-gnu/debug/tiny.o
-Build summary: 1 succeeded, 0 failed
+Compiling tiny (aarch64-unknown-linux-gnu, debug)
+  load     51 modules, 1 in package          0.06s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.20s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.18s
+Finished build/llvm/aarch64-unknown-linux-gnu/debug/tiny.o in 0.50s
 ```
+
+With an object stage, the `link` row is Clang compiling the object; nothing is linked.
 
 ## Choosing targets
 
@@ -48,11 +54,24 @@ silk check --target aarch64-apple-darwin --target aarch64-unknown-linux-gnu --ta
 ```
 
 ```
-check aarch64-apple-darwin: ok
-check aarch64-unknown-linux-gnu: ok
-check wasm32-unknown-unknown: ok
-Check summary: 3 succeeded, 0 failed
+Checking tiny (aarch64-apple-darwin)
+  load     51 modules, 1 in package          0.06s
+  check    2 modules                         0.12s
+  borrow   98 bodies                         0.00s
+Finished tiny in 0.18s
+Checking tiny (aarch64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.04s
+  check    2 modules                         0.10s
+  borrow   98 bodies                         0.00s
+Finished tiny in 0.14s
+Checking tiny (wasm32-unknown-unknown)
+  load     47 modules, 1 in package          0.05s
+  check    2 modules                         0.04s
+  borrow   26 bodies                         0.00s
+Finished tiny in 0.10s
 ```
+
+Each target is a separate unit with its own rows and its own last line. On a terminal, each finished target collapses to one line.
 
 Code can ask which target and profile it is built for at compile time: `silk/target` (`Target`) and `silk/compilation` (`Compilation`). See **Static control flow and reflection** in the reference.
 
@@ -71,10 +90,16 @@ silk build --release
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/release/tiny (llvm, x86_64-unknown-linux-gnu, 182 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/x86_64-unknown-linux-gnu/release/tiny
-Build summary: 1 succeeded, 0 failed
+Compiling tiny (x86_64-unknown-linux-gnu, release)
+  load     51 modules, 1 in package          0.06s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.20s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.45s
+Finished build/llvm/x86_64-unknown-linux-gnu/release/tiny in 0.76s
 ```
+
+The heading names the profile in parentheses after the target.
 
 ## Named profiles
 
@@ -92,9 +117,13 @@ silk build --profile fast
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/fast/tiny (llvm, x86_64-unknown-linux-gnu, 182 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/x86_64-unknown-linux-gnu/fast/tiny
-Build summary: 1 succeeded, 0 failed
+Compiling tiny (x86_64-unknown-linux-gnu, fast)
+  load     51 modules, 1 in package          0.05s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.22s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.45s
+Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.79s
 ```
 
 - A named profile builds into a directory with its own name, beside `debug` and `release`.
@@ -153,10 +182,14 @@ file build/llvm/x86_64-unknown-linux-gnu/fast/tiny
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/fast/tiny (llvm, x86_64-unknown-linux-gnu, 182 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/x86_64-unknown-linux-gnu/fast/tiny
-Build summary: 1 succeeded, 0 failed
-build/llvm/x86_64-unknown-linux-gnu/fast/tiny: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=cdea8134f07c4bd5d436d11d6e872dbe1703a0cd, for GNU/Linux 3.2.0, not stripped
+Compiling tiny (x86_64-unknown-linux-gnu, fast)
+  load     51 modules, 1 in package          0.05s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.21s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.39s
+Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.72s
+build/llvm/x86_64-unknown-linux-gnu/fast/tiny: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=800f30f73d46b54cc9ec80f7f6bbea4225a993b1, for GNU/Linux 3.2.0, not stripped
 ```
 
 The other fields are valid values that the native compiler cannot build yet. Rather than ignore them, it refuses a profile that changes them from the default:
@@ -230,10 +263,15 @@ relocation = "static"
 `silk check` accepts this package. `silk build` stops in the runtime's entry point, which this compiler cannot generate yet:
 
 ```
+Compiling bare (x86_64-unknown-linux-gnu, bare)
+  load     44 modules, 1 in package          0.05s
+  check    1 module                          0.00s
+  codegen  failed: 12 functions, 1 error     0.00s
 <silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
-build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
+Failed bare in 0.10s
 ```
+
+The command exits with status 2.
 
 Without the composition, `libc = "none"` finds no runtime in the std lib catalog: `silk: the build selects no single runtime (ARTIFACT-001)`.
 
@@ -256,9 +294,13 @@ silk build --target wasm32-unknown-unknown
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/wasm32-unknown-unknown/debug/web (llvm, wasm32-unknown-unknown, 32 symbols)
-build llvm/wasm32-unknown-unknown: ok /home/you/web/build/llvm/wasm32-unknown-unknown/debug/web
-Build summary: 1 succeeded, 0 failed
+Compiling web (wasm32-unknown-unknown, debug)
+  load     47 modules, 1 in package          0.07s
+  check    1 module                          0.00s
+  codegen  32 functions                      0.02s
+  borrow   24 bodies                         0.00s
+  link     clang                             0.10s
+Finished build/llvm/wasm32-unknown-unknown/debug/web in 0.23s
 ```
 
 A host instantiates it with an empty import object and calls `main()` (42) or `add(2, 3)` (5). `node <silk>/lib/silk/stdlib/host/wasm-runner.mjs <module>` runs `main` and exits with its result. On wasm32, a C function takes and returns scalars and pointers only; C statics, variadic functions and callbacks are refused. `artifact = "object"` and `"static-library"` build too.

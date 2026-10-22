@@ -279,7 +279,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/sealnote (llvm, x86_64-unknown-linux-gnu, 481 symbols)
 sha256   ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 sha3-256 3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532
 hmac     7eaf83970d7ec8ac8821fb679caa6197a556926ca35aaee7893bc5f4461a6bba
@@ -300,10 +299,12 @@ silk check
 ```
 
 ```
+Checking sealnote (x86_64-unknown-linux-gnu)
+  load     65 modules, 1 in package          0.09s
+  check    failed: 2 modules, 1 error        0.22s
 [x86_64-unknown-linux-gnu]
 /home/you/sealnote/src/main.silk:169:3: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed sealnote in 0.31s
 ```
 
 `sealNote` still needs `&mut Random`, and `main` neither provides it nor can declare it, so the program does not compile. A program cannot use secure randomness without choosing a source. See **Services and providers** in the reference.

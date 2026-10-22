@@ -166,7 +166,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 269 symbols)
 finished #1
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
@@ -211,10 +210,12 @@ silk check
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:135:24: error[OWN0003] Moving draft requires an explicit move
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 This is a rule, not a guess about what you meant. In many languages, `f(x)` might copy `x` or might give it away, and you only find out by reading `f`. In Silk, when a named value leaves its owner, the code says `move` right there. Someone reading `report` can see that `draft` is gone after line 135 without opening `add`.
@@ -235,11 +236,13 @@ Put the `move` back. Now try using the draft after it has moved. Add a log line 
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:136:48: error[OWN0001] draft.title was moved and cannot be used again
   note: /home/you/tasks/src/main.silk:135:24: related location
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 The indented `note:` line is a related location: here, the `move draft` on line 135 that gave the draft away.
@@ -263,11 +266,13 @@ Some types are so small and simple that duplicating them is harmless. Reading su
 Structs, unions and tuples are not `Copy` unless you say so. Delete the `impl Copy for TaskId {}` line and check:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:65:41: error[OWN0003] Moving id requires an explicit move
 /home/you/tasks/src/main.silk:137:21: error[OWN0003] Moving milk requires an explicit move
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 The line numbers are two lower than before because you removed two lines. Without `Copy`, `TaskId` moves like any struct. The first use of `id` in the task literal would move it, and `return id` would then be a use after move. The same goes for `milk`, which is needed by both `complete` and the log line.
@@ -310,13 +315,15 @@ When a method has to change the value, it takes an exclusive reference, `&mut`:
 An exclusive borrow needs something that is allowed to change. Change the first line of `report` to `let board = Board.make()`, without `mut`, and check:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 4 errors       0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:135:20: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
 /home/you/tasks/src/main.silk:136:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
 /home/you/tasks/src/main.silk:137:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
 /home/you/tasks/src/main.silk:139:12: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 Each line points at a call to `add` or `complete`, the methods that take `&mut self`. The message says what went wrong: an exclusive borrow needs a binding declared `mut`. You declared `board` immutable, and then asked to lend it out for writing four times. Put the `mut` back.
@@ -324,10 +331,12 @@ Each line points at a call to `add` or `complete`, the methods that take `&mut s
 The same rule applies inside methods. Change `complete` to take `self: &Self`, and `&mut self.tasks[index]` fails:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:76:18: error[SEM0058] A shared view cannot be reborrowed exclusively
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 A shared reference is a promise to every other reader that the value won't change under them. You can't turn it into a writable one halfway through. Change it back to `&mut Self`.
@@ -349,13 +358,15 @@ To see it, keep a reference to the first task while adding more. Change the top 
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:137:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
   note: /home/you/tasks/src/main.silk:136:15: related location
 /home/you/tasks/src/main.silk:138:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
   note: /home/you/tasks/src/main.silk:136:15: related location
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 Both notes point at `&board.tasks[0]` on line 136, where the shared loan began.
@@ -375,7 +386,6 @@ A loan lasts until the last use of the reference, not until the end of the block
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 269 symbols)
 [ ] #1 Buy milk (normal)
 finished #1
 [x] #1 Buy milk (normal)
