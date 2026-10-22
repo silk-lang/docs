@@ -109,7 +109,7 @@ const plainHeadingText = (heading: string): string =>
   heading.replace(/`/g, '').replace(/\\(.)/g, '$1').trim()
 
 // The module table on the stdlib index lists every profile per row. The site
-// only needs the module, its namespace and its summary.
+// only needs the module, its category, its namespace and its summary.
 const condenseModuleTable = (line: string): string | undefined => {
   if (!line.startsWith('|')) {
     return line
@@ -118,13 +118,13 @@ const condenseModuleTable = (line: string): string | undefined => {
     .slice(1, -1)
     .split(/(?<!\\)\|/)
     .map(cell => cell.trim())
-  if (cells.length !== 5) {
+  if (cells.length !== 6) {
     return line
   }
   if (/\.profile-\d+\.md/.test(cells[0] ?? '')) {
     return undefined
   }
-  return `| ${cells[0]} | ${cells[1]} | ${cells[4]} |`
+  return `| ${cells[0]} | ${cells[1]} | ${cells[2]} | ${cells[5]} |`
 }
 
 const decodeEntities = (text: string): string =>
@@ -200,8 +200,8 @@ const transform = (
     title: page.slug === 'overview' ? 'Overview' : (title ?? page.slug),
     markdown: isStdIndex
       ? markdown.replace(
-          /^\| Module \| Import namespace \| Summary \|\n\| [^\n]+/m,
-          '| Module | Import namespace | Summary |\n| --- | --- | --- |',
+          /^\| Module \| Category \| Import namespace \| Summary \|\n\| [^\n]+/m,
+          '| Module | Category | Import namespace | Summary |\n| --- | --- | --- | --- |',
         )
       : markdown,
   }
