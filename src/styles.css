@@ -109,3 +109,12 @@
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
+
+/* Scrolls without showing a scrollbar, for the docs sidebar and table of contents. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
