@@ -79,18 +79,15 @@ Every page is a markdown file in `content/<section>/` and is served at
   pnpm catalog   # rewrites src/docs/written.ts
   ```
 
-- Synced from silk-lang/silk, not edited here: `content/spec/` (the prescriptive
-  language specification, from the silk repository's `reference/`) and `content/std/`
-  (the standard library API, from `reference/stdlib/`). Change the source in
-  silk-lang/silk and sync again:
+- Synced from silk-lang/silk, not edited here: `content/std/`, the standard library API
+  that `silk doc-reference` generates into the silk repository's `reference/stdlib/`.
+  Change the source in silk-lang/silk and sync again:
 
   ```sh
   pnpm sync-docs ../silk   # path to a silk-lang/silk checkout
   ```
 
-  The script also rewrites `src/docs/generated.ts`, the sidebar groups for those pages.
-  The group order for the specification lives at the top of `scripts/sync-silk-docs.ts`;
-  a new file that is not listed there lands in a "Spec: more" group, with a warning.
+  The script also rewrites `src/docs/generated.ts`, the sidebar group for those pages.
 
 The site's markdown renderer does not accept raw HTML, frontmatter, task lists or text
 directives, so write `00\:00` for a colon followed by letters or digits in prose, or put

@@ -23,8 +23,8 @@ const docsRoot = resolve(import.meta.dirname, '..')
 
 // SECTIONS
 
-// The sidebar order of the hand-written sections. The synced specification and
-// standard library groups follow them.
+// The sidebar order of the hand-written sections. The synced standard library
+// group follows them.
 const sections: ReadonlyArray<Readonly<{ directory: string; title: string }>> =
   [
     { directory: 'get-started', title: 'Get started' },

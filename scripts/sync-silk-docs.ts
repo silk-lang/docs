@@ -1,13 +1,13 @@
-// Copies the language reference and the standard library API reference from a
-// silk-lang/silk checkout into content/spec and content/std, and writes the sidebar groups for
-// them to src/docs/generated.ts.
+// Copies the standard library API reference from a silk-lang/silk checkout into
+// content/std, and writes its sidebar group to src/docs/generated.ts.
 //
 //   pnpm sync-docs ../silk
 //
 // The source markdown is written for GitHub, so a few constructs are rewritten
 // into the vocabulary @foldkit/markdown accepts: frontmatter and the H1 move
 // into the catalog, HTML comments are dropped, `<a id>` anchors become Anchor
-// islands, and links between reference files become site routes.
+// islands, and links between stdlib files become site routes. Links to other
+// files in the silk repository point at GitHub.
 
 import { execFileSync } from 'node:child_process'
 import {
@@ -28,117 +28,10 @@ const SOURCE_REPOSITORY = 'https://github.com/silk-lang/silk'
 
 const docsRoot = resolve(import.meta.dirname, '..')
 
-// GROUPS
-
-// The order of the language reference follows reference/index.md, regrouped
-// so the sidebar reads from the language core outward. On the site it is the
-// specification (/docs/spec), next to the hand-written reference in
-// content/reference. Files that are not listed here still sync, into a
-// trailing group, with a warning.
-
-type GroupSpec = Readonly<{
-  key: string
-  title: string
-  slugs: ReadonlyArray<string>
-}>
-
-const referenceGroups: ReadonlyArray<GroupSpec> = [
-  {
-    key: 'language',
-    title: 'Spec: language',
-    slugs: [
-      'overview',
-      'lexical-form',
-      'values-and-types',
-      'expressions-and-operators',
-      'statements-and-discarding',
-      'functions-callables-and-control-flow',
-      'patterns-and-destructuring',
-      'modules-names-and-visibility',
-      'module-static-selection',
-      'generics-interfaces-and-specialization',
-      'static-evaluation',
-      'ownership-and-borrowing',
-      'lifetimes',
-      'local-shared-ownership',
-      'thread-properties',
-      'program-entry',
-      'program-termination-and-reporting',
-      'testing',
-    ],
-  },
-  {
-    key: 'effects',
-    title: 'Spec: effects and services',
-    slugs: [
-      'effects-and-execution',
-      'effect-contracts',
-      'typed-failures',
-      'requirements-and-services',
-      'effect-suspension',
-      'independent-execution',
-      'single-threaded-fibers',
-    ],
-  },
-  {
-    key: 'platform',
-    title: 'Spec: platform and tooling',
-    slugs: [
-      'compilation-profiles',
-      'selected-source-tooling',
-      'artifact-roots-and-requirements',
-      'platform-supplies',
-      'runtime-and-standard-library',
-      'unsafe-intrinsics-and-targets',
-      'native-pointer-boundary',
-      'atomic-memory-operations',
-      'foreign-call-contracts',
-      'integer-c-variadics',
-      'synchronous-native-callbacks',
-      'native-assembly',
-      'llvm-helper-capabilities',
-      'raw-linux',
-      'native-standard-streams',
-      'native-clocks',
-      'native-entropy',
-      'native-filesystem',
-    ],
-  },
-  {
-    key: 'library-contracts',
-    title: 'Spec: library contracts',
-    slugs: [
-      'base64',
-      'buffered-byte-io',
-      'network-address-resolution',
-      'native-socket-connections',
-      'native-socket-listeners',
-      'http-head-parsing',
-      'http-body-framing',
-      'http-content-decoding',
-      'http-server',
-      'http-exchange',
-      'http-fetch',
-      'http-proxy-routing',
-      'http-redirects',
-      'http-connection-pooling',
-      'websocket-upgrade',
-      'websocket-server',
-      'p256-key-agreement',
-      'ecdsa-p256-verification',
-    ],
-  },
-  {
-    key: 'style',
-    title: 'Spec: style guides',
-    slugs: ['style-guide', 'documentation-style-guide'],
-  },
-]
-
 // SOURCE PAGES
 
 type SourcePage = Readonly<{
-  directory: 'spec' | 'std'
+  directory: 'std'
   slug: string
   sourcePath: string
 }>
@@ -155,11 +48,6 @@ const markdownFiles = (directory: string): ReadonlyArray<string> =>
     .sort()
 
 const sourcePages = (silkRoot: string): ReadonlyArray<SourcePage> => [
-  ...markdownFiles(join(silkRoot, 'reference')).map(fileName => ({
-    directory: 'spec' as const,
-    slug: fileName === 'index.md' ? 'overview' : basename(fileName, '.md'),
-    sourcePath: `reference/${fileName}`,
-  })),
   ...markdownFiles(join(silkRoot, 'reference/stdlib')).map(fileName => ({
     directory: 'std' as const,
     slug: fileName === 'index.md' ? 'overview' : basename(fileName, '.md'),
@@ -177,12 +65,6 @@ const routeForSourcePath = (sourcePath: string): string | undefined => {
     return stdlib[1] === 'index'
       ? '/docs/std/overview'
       : `/docs/std/${stdlib[1]}`
-  }
-  const reference = sourcePath.match(/^reference\/([^/]+)\.md$/)
-  if (reference) {
-    return reference[1] === 'index'
-      ? '/docs/spec/overview'
-      : `/docs/spec/${reference[1]}`
   }
   return undefined
 }
@@ -299,7 +181,7 @@ const transform = (
       continue
     }
 
-    const rewritten = rewriteLinks(line, page.sourcePath)
+    const rewritten = qualifyModuleNames(rewriteLinks(line, page.sourcePath))
       .replace(/<code>([^<]*)<\/code>/g, (_, code: string) => inlineCode(code))
       .replace(/^(\s*[-*+]) \[[ xX]\] /, '$1 ')
     const condensed = isStdIndex ? condenseModuleTable(rewritten) : rewritten
@@ -325,8 +207,18 @@ const transform = (
   }
 }
 
+// The generator names modules by path (`silk/http_server`); the site uses the
+// name code imports, `silk.http_server`.
+const moduleName = (path: string): string => path.replace(/\//g, '.')
+
 const stdTitle = (title: string): string =>
-  title.startsWith('silk/') ? title.slice('silk/'.length) : title
+  title.startsWith('silk/') ? moduleName(title) : title
+
+const qualifyModuleNames = (line: string): string =>
+  line.replace(
+    /`(silk\/[a-z0-9_/]+)`/g,
+    (_, path: string) => `\`${moduleName(path)}\``,
+  )
 
 // OUTPUT
 
@@ -411,18 +303,20 @@ const main = (): void => {
     }
     return {
       ...page,
-      title: page.directory === 'std' ? stdTitle(title) : title,
+      title: stdTitle(title),
       markdown,
     }
   })
 
+  // content/spec held the language specification, which the site no longer
+  // shows; removing it keeps an old checkout from carrying it forward.
   for (const directory of ['spec', 'std']) {
     rmSync(join(docsRoot, 'content', directory), {
       recursive: true,
       force: true,
     })
-    mkdirSync(join(docsRoot, 'content', directory), { recursive: true })
   }
+  mkdirSync(join(docsRoot, 'content/std'), { recursive: true })
   for (const page of synced) {
     writeFileSync(
       join(docsRoot, 'content', page.directory, `${page.slug}.md`),
@@ -430,45 +324,10 @@ const main = (): void => {
     )
   }
 
-  const referencePages = new Map(
-    synced
-      .filter(page => page.directory === 'spec')
-      .map(page => [page.slug, page]),
-  )
-  const listed = new Set(referenceGroups.flatMap(group => group.slugs))
-  const unlisted = [...referencePages.values()].filter(
-    page => !listed.has(page.slug),
-  )
-  for (const page of unlisted) {
-    console.warn(
-      `warning: ${page.sourcePath} is not in a sidebar group, adding it to "Spec: more"`,
-    )
-  }
-  for (const slug of listed) {
-    if (!referencePages.has(slug)) {
-      console.warn(`warning: reference/${slug}.md no longer exists`)
-    }
-  }
-
-  const presentPages = (
-    slugs: ReadonlyArray<string>,
-  ): ReadonlyArray<SyncedPage> =>
-    slugs.flatMap(slug => {
-      const page = referencePages.get(slug)
-      return page === undefined ? [] : [page]
-    })
-
-  const stdPages = synced.filter(page => page.directory === 'std')
-  const stdOverview = stdPages.filter(page => page.slug === 'overview')
-  const stdModules = stdPages.filter(page => page.slug !== 'overview')
+  const stdOverview = synced.filter(page => page.slug === 'overview')
+  const stdModules = synced.filter(page => page.slug !== 'overview')
 
   const groupEntries = [
-    ...referenceGroups.map(group =>
-      groupEntry(group.key, group.title, true, presentPages(group.slugs)),
-    ),
-    ...(unlisted.length > 0
-      ? [groupEntry('more-spec', 'Spec: more', true, unlisted)]
-      : []),
     groupEntry('std', 'Standard library', true, [
       ...stdOverview,
       ...stdModules,
@@ -482,9 +341,7 @@ const main = (): void => {
     stdio: 'inherit',
   })
 
-  console.log(
-    `synced ${referencePages.size} reference pages and ${stdPages.length} standard library pages from ${revision}`,
-  )
+  console.log(`synced ${synced.length} standard library pages from ${revision}`)
 }
 
 main()
