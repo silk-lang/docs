@@ -43,7 +43,7 @@ export const siteNav = <Message>(
         [
           h.AriaLabel('Main'),
           h.Class(
-            'mx-auto flex max-w-[1440px] items-center justify-between gap-6 px-5 py-6 md:px-20 md:py-8',
+            'mx-auto flex max-w-[90rem] items-center justify-between gap-6 px-5 py-6 md:px-20 md:py-8',
           ),
         ],
         [
@@ -85,7 +85,7 @@ export const siteFooter = <Message>(h: HtmlBuilder<Message>): Html =>
       h.div(
         [
           h.Class(
-            'mx-auto flex max-w-[1440px] flex-col gap-6 px-5 py-8 md:flex-row md:items-center md:justify-between md:px-20',
+            'mx-auto flex max-w-[90rem] flex-col gap-6 px-5 py-8 md:flex-row md:items-center md:justify-between md:px-20',
           ),
         ],
         [
