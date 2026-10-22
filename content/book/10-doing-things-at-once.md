@@ -330,7 +330,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     67 modules, 1 in package          0.07s
   check    failed: 2 modules, 1 error        4.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:573:63: error[OWN0003] Moving state requires an explicit move
+/home/you/tasks/src/main.silk:576:63: error[OWN0003] Moving state requires an explicit move
 Failed tasks in 4.19s
 ```
 
@@ -500,7 +500,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     67 modules, 1 in package          0.09s
   check    failed: 2 modules, 1 error        4.36s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:467:33: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
+/home/you/tasks/src/main.silk:470:33: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
 Failed tasks in 4.46s
 ```
 

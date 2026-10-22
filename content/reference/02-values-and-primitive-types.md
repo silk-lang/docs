@@ -178,6 +178,24 @@ Vectors of every admitted shape compile on every target, whatever its preferred 
 
 The features come from the profile's `cpu` table; see Targets and profiles. With the default x86-64 model, `preferredBytes()` is `16`. `cpu.model = "x86-64-v3"` or `features = ["avx2"]` makes it `32`, and `cpu.model = "x86-64-v4"` or `features = ["avx512bw"]` makes it `64`. A wasm32 profile turns on hardware vectors with `features = ["simd128"]`.
 
+### Architecture instructions
+
+Some instructions do in one step what takes several portable operations: byte table lookups, multiply-add steps, saturating packs and sums of absolute differences. The `silk/arch` modules give them as ordinary functions, named after what they compute:
+
+| Module | Functions, with the instruction and the CPU feature it needs |
+| --- | --- |
+| `silk.arch.x86` | `shuffleBytes` (`pshufb`, ssse3), `shuffleBytes256` (avx2), `multiplyAddBytes` (`pmaddubsw`, ssse3), `multiplyAddBytes256` (avx2), `multiplyAddWords` (`pmaddwd`, sse2), `multiplyAddWords256` (avx2), `packUnsigned16` (`packuswb`, sse2), `packUnsigned16x256` (avx2), `packUnsigned32` (`packusdw`, sse4.1), `packSigned16` (`packsswb`, sse2), `packSigned32` (`packssdw`, sse2), `sumAbsoluteDifferences` (`psadbw`, sse2), `sumAbsoluteDifferences256` (avx2) |
+| `silk.arch.aarch64` | `tableLookup` (`tbl`, neon), `dotProduct` (`udot`, dotprod), `dotProductSigned` (`sdot`, dotprod), `pairwiseAdd8`, `pairwiseAdd16`, `pairwiseAdd32` (`addp`, neon) |
+| `silk.arch.wasm` | `swizzle` (`i8x16.swizzle`, simd128), `relaxedSwizzle` (`i8x16.relaxed_swizzle`, relaxed-simd), `dot` (`i32x4.dot_i16x8_s`, simd128), `narrowUnsigned`, `narrowSigned` (`i8x16.narrow_i16x8_u` and `_s`, simd128) |
+
+- Every function compiles on every target. Where the build targets the module's architecture with the feature enabled, it is the one instruction. Elsewhere it computes the same lanes with portable code, which is correct but slower.
+- The choice is made at compile time from the profile, like `simd.preferredBytes()`. With the default x86-64 profile, `x86.shuffleBytes` takes the portable path; with `cpu.model = "x86-64-v2"` (SSSE3 and SSE4.1) it is `pshufb`, and `x86-64-v3` adds the AVX2 forms.
+- Code that only pays off with the instruction tests `Target.hasCpuFeature` from `silk/target` in a `static if` and keeps a plain loop otherwise.
+- The 256-bit x86 forms work on each 16-byte half separately: a `shuffleBytes256` index picks only within its own half, and `packUnsigned16x256` interleaves the halves of its operands.
+- Index rules differ. `x86.shuffleBytes` uses the low four bits of an index and gives `0` when bit 7 is set; `aarch64.tableLookup` and `wasm.swizzle` give `0` for any index of 16 or more. `wasm.relaxedSwizzle` leaves those lanes unspecified, and they may differ between engines.
+
+To run a faster path on machines that have a feature the build does not select, see Targets and profiles, under CPU features at run time. The underlying members are in Intrinsics, under Architecture members.
+
 ## Examples
 
 ```silk
@@ -323,6 +341,29 @@ pub fn main() -> i32 {
 }
 ```
 
+Sixteen nibbles to hex digits with one table lookup. It exits with 0 under the default profile, which runs the portable path, and under `cpu.model = "x86-64-v2"`, which compiles `shuffleBytes` to `pshufb`:
+
+```silk
+import silk.arch.x86
+import silk.simd.u8x16
+
+// Sixteen nibbles to sixteen lowercase hex digits with one table lookup.
+fn hexDigits(nibbles: simd<u8, 16>) -> simd<u8, 16> {
+  let digits = u8x16.fromArray([48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 97, 98, 99, 100, 101, 102])
+  return x86.shuffleBytes(digits, nibbles)
+}
+
+pub fn main() -> i32 {
+  let nibbles = u8x16.fromArray([12, 10, 15, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13])
+  let hex = hexDigits(nibbles)
+  if u8x16.extract(hex, 0) != 99 || u8x16.extract(hex, 4) != 48 || u8x16.extract(hex, 15) != 100 { return 1 }
+  // A set bit 7 gives a zero lane, as pshufb does.
+  let cleared = x86.shuffleBytes(nibbles, u8x16.splat(128))
+  if cleared != u8x16.splat(0) { return 2 }
+  return 0
+}
+```
+
 Vector `+` traps per lane like scalar `+`. Use the wrapping or saturating form when overflow is expected:
 
 ```silk
@@ -363,7 +404,7 @@ fatal trap: arithmetic overflow
 
 ## See also
 
-Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · `silk/i8`, `silk/i16`, `silk/i32`, `silk/i64`, `silk/isize`, `silk/u8`, `silk/u16`, `silk/u32`, `silk/u64`, `silk/usize`, `silk/f32`, `silk/f64`, `silk/numeric`, `silk/bool`, `silk/char`, `silk/string`, `silk/layout`, `silk/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...)
+Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · `silk/i8`, `silk/i16`, `silk/i32`, `silk/i64`, `silk/isize`, `silk/u8`, `silk/u16`, `silk/u32`, `silk/u64`, `silk/usize`, `silk/f32`, `silk/f64`, `silk/numeric`, `silk/bool`, `silk/char`, `silk/string`, `silk/layout`, `silk/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...), `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`
 
 ## Open questions
 

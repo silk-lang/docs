@@ -226,7 +226,7 @@ Checking taskcore (x86_64-unknown-linux-gnu)
   check    failed: 5 modules, 2 errors       0.19s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks-workspace/taskcore/src/Board.silk:52:23: error[SEM0021] Constructing a struct at a site where its raw constructor is not available
-/home/you/tasks-workspace/taskcore/src/Store.silk:116:21: error[SEM0028] A field projection naming a private field of another module's struct
+/home/you/tasks-workspace/taskcore/src/Store.silk:119:21: error[SEM0028] A field projection naming a private field of another module's struct
 Failed taskcore in 0.25s
 Failed 1 of 1 package in 0.26s
 ```
@@ -286,7 +286,7 @@ Checking taskcore (x86_64-unknown-linux-gnu)
   load     47 modules, 5 in package          0.05s
   check    failed: 5 modules, 1 error        0.77s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/taskcore/src/Store.silk:184:10: error[SEM0129] Return expected i32 but received bool
+/home/you/tasks-workspace/taskcore/src/Store.silk:187:10: error[SEM0129] Return expected i32 but received bool
 Failed taskcore in 0.83s
 Failed 1 of 1 package in 0.84s
 ```

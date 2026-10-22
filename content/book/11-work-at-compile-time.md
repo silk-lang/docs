@@ -143,7 +143,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     68 modules, 1 in package          0.10s
   check    failed: 2 modules, 1 error        5.10s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:563:10: error[PAR0001] Expected `{`
+/home/you/tasks/src/main.silk:566:10: error[PAR0001] Expected `{`
 Failed tasks in 5.21s
 ```
 
@@ -421,12 +421,12 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     68 modules, 1 in package          0.08s
   check    failed: 2 modules, 1 error        5.10s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:558:5: error[SEM0177] a progress bar is 1 to 40 cells wide
-  note: /home/you/tasks/src/main.silk:551:7: related location
+/home/you/tasks/src/main.silk:561:5: error[SEM0177] a progress bar is 1 to 40 cells wide
+  note: /home/you/tasks/src/main.silk:554:7: related location
 Failed tasks in 5.18s
 ```
 
-Line 558 is the `compileError` itself, and the message is your own text. The `note:` line is the call that selected the branch: line 551, the `bar(0, done, total)` in `showBoard`. With many call sites, that is the one to fix. Put the width back to 20.
+Line 561 is the `compileError` itself, and the message is your own text. The `note:` line is the call that selected the branch: line 554, the `bar(0, done, total)` in `showBoard`. With many call sites, that is the one to fix. Put the width back to 20.
 
 What if `width` were an ordinary parameter? Try a smaller case in the scratch project:
 

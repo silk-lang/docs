@@ -166,7 +166,7 @@ The manifest page lists every field and its values. The native build applies the
 | arm64 | `aes`, `crc`, `crypto`, `dotprod`, `fp-armv8`, `fullfp16`, `i8mm`, `lse`, `neon`, `rdm`, `sha2`, `sha3` |
 | wasm32 | `atomics`, `bulk-memory`, `mutable-globals`, `relaxed-simd`, `sign-ext`, `simd128` |
 
-A feature also turns on the features it implies, so `avx2` brings `avx` and the SSE levels below it. A level model brings its features: `x86-64-v3` includes `avx2`, `fma` and `bmi2`, and `x86-64-v4` the AVX-512 set. SSE2 on x86-64 and NEON on arm64 are always on. Code can test any of them with `Target.hasCpuFeature`, and `silk/simd` uses them to pick a vector width (see SIMD vectors and masks in Values and primitive types). With this profile, `Target.hasCpuFeature("avx2")` is `true`:
+A feature also turns on the features it implies, so `avx2` brings `avx` and the SSE levels below it. A level model brings its features: `x86-64-v3` includes `avx2`, `fma` and `bmi2`, and `x86-64-v4` the AVX-512 set. SSE2 on x86-64 and NEON on arm64 are always on. Code can test any of them with `Target.hasCpuFeature`, `silk/simd` uses them to pick a vector width, and `silk/arch` to pick an instruction (see SIMD vectors and masks in Values and primitive types). To test the running machine instead, see CPU features at run time below. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
 
 ```toml
 [profiles.fast]
@@ -240,6 +240,69 @@ These combinations are refused when the manifest is read:
 | `artifact` different from `[build].artifact` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [build].artifact = "executable"; set [build].artifact to choose the artifact, and omit the profile's artifact or write it as "executable"` |
 
 The profile names in these messages are the ones used to produce them; yours shows its own. LINE is the line of the field, or of the `[profiles.<name>]` header when the field is missing, as for the thread sanitizer without `threading`. A field inside an inline table written over several lines, such as `features` in `cpu = { model = "x86-64",` followed by `features = ["avx512"] }` on the next line, is reported at the line that writes it.
+
+## CPU features at run time
+
+A profile's `cpu` features apply to the whole program, and the program needs a machine that has them. To ship one binary that runs everywhere and goes faster where it can, keep the profile at the baseline, compile the hot function for more features, and call it only after the machine reports them.
+
+- `silk/cpu`, `CpuFeatures`: `CpuFeatures.detect()` asks the running machine; `CpuFeatures.selected()` is the set the profile selects. `has(&features, "avx2")` tests one name, spelled as in `cpu.features`; `containsAll(&features, &other)` tests a whole set.
+- `detect()` reads `cpuid` on x86-64 Linux, with or without libc, counting AVX and AVX-512 only when the operating system saves their registers. It reads `getauxval` on arm64 Linux with GNU libc and `sysctlbyname` on arm64 macOS. Elsewhere, such as in a wasm32 module, which cannot ask the engine, it reports the selected set. The result always includes the selected set.
+- Detection is not cached. Call `detect()` once at start and keep the value.
+- `with Intrinsic.machine(features: ("avx2",))` on an `unsafe fn` compiles that function with the listed features, the features they imply and the profile's own. Each call is `unsafe`: the caller has checked the machine. The rules are in Intrinsics, under Functions compiled for CPU features.
+- A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `features` list. The `silk/arch` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
+
+The same portable loop, compiled twice. In a release build the optimizer inlines `total` into `totalAvx2` and vectorizes it with 32-byte AVX2 registers; the rest of the program stays at the default x86-64 level:
+
+```silk
+import silk.cpu { CpuFeatures }
+import silk.effect { Effect }
+import silk.logger { LogError }
+import silk.os_logger { StdoutLogger }
+import silk.u32
+import silk.usize
+
+// The portable kernel: every machine can run it.
+fn total(values: &[u32]) -> u32 {
+  let mut sum: u32 = 0
+  let mut at: usize = 0
+  while at < values.length {
+    sum = u32.wrappingAdd(sum, values[at])
+    at = at + 1
+  }
+  return sum
+}
+
+// The same kernel compiled for AVX2. A caller must know the machine has it.
+unsafe fn totalAvx2(values: &[u32]) -> u32 with Intrinsic.machine(features: ("avx2",)) {
+  return total(values)
+}
+
+pub effect fn main() -> () ! LogError {
+  let mut logger = StdoutLogger.make()
+  let mut values: [u32; 1000] = [0; 1000]
+  let mut at: usize = 0
+  while at < 1000 {
+    values[at] = usize.toU32(at)
+    at = at + 1
+  }
+  let machine = CpuFeatures.detect()
+  if CpuFeatures.has(&machine, "avx2") {
+    let sum = unsafe totalAvx2(&values)
+    run Effect.log("avx2 kernel: {sum}\n", &.{ sum: sum }) |> Effect.provideMut(&mut logger)
+  } else {
+    let sum = total(&values)
+    run Effect.log("portable kernel: {sum}\n", &.{ sum: sum }) |> Effect.provideMut(&mut logger)
+  }
+}
+```
+
+`silk run --release` prints, after the build lines, on a machine with AVX2:
+
+```
+avx2 kernel: 499500
+```
+
+On a machine without it, the program prints `portable kernel: 499500`. The `features` list names x86-64 features, so a program that also builds for other targets puts `totalAvx2` and its call under `static if Target.arch() == Arch.X86_64`; a name the target lacks is SEM0242.
 
 ## Linux without libc
 
@@ -329,4 +392,4 @@ The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32
 
 ## See also
 
-The manifest, The standard library, Build outputs and native linking; **Package parameters** and **Static control flow and reflection** in the reference; chapter 11 of the book.
+The manifest, The standard library, Build outputs and native linking; **Package parameters**, **Static control flow and reflection** and **Intrinsics** in the reference; chapter 11 of the book; `silk/cpu`, `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`.

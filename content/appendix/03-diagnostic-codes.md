@@ -16,7 +16,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | PAR | Parsing | PAR0001-PAR0007 |
 | MOD | Module and package resolution | MOD0001-MOD0004 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0240 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0243 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
 
@@ -4085,7 +4085,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0237)
+## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0243)
 
 ### SEM0185
 
@@ -4854,7 +4854,9 @@ pub fn main() -> i32 { return naked() }
 /home/you/demo/src/main.silk:1:19: error[SEM0236] This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` only to other runtime functions
 ```
 
-Fix: Put `Intrinsic.machine` and `Intrinsic.foreign` only on `extern "C"` or `export "C"` functions. See Unsafe code and C interop, Intrinsics.
+The same code covers `Intrinsic.machine(features:)` on an `extern "C"`, `export "C"` or `static` function, a `features:` clause with another field beside it, and either property on an interface or service operation.
+
+Fix: Put `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` only on `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` alone on an ordinary `unsafe fn`. See Unsafe code and C interop, Intrinsics.
 
 ### SEM0237
 
@@ -4929,6 +4931,8 @@ An `Intrinsic.simd*` member whose type arguments break one of its rules gets the
 - ``Intrinsic.simdShuffle needs simd<u32, 4> and simd<i32, 4> to have the same lane type, but they have u32 and i32``.
 - ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices. A `shuffle` from a `silk/simd` module prints this too, at your call to it.
 
+An architecture member, such as `Intrinsic.x86ShuffleBytes<simd<u16, 8>>`, given a shape it does not take prints the code's meaning instead: ``A SIMD vector or mask shape, or SIMD operation type arguments or shuffle indices, that are not admitted``. Intrinsics lists the shapes each one takes.
+
 Fix: For a shape, use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. For a member, give it the lanes it names, or vectors that agree in the measure it names. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
 
 ### SEM0240
@@ -4960,6 +4964,76 @@ pub fn main() -> i32 {
 The column is the `Option` in the requirement row. The error is reported at the requirement, so a function that declares it is refused even before anything provides it.
 
 Fix: Require `? &mut Counter` when the code needs exclusive access, or `? &Option<&Counter>` for an optional service with shared operations. See Services and providers.
+
+### SEM0241
+
+An architecture intrinsic whose target or CPU feature is not enabled for the function that calls it.
+
+```silk
+pub fn main() -> i32 {
+  let bytes = Intrinsic.simdSplat<simd<u8, 16>>(1)
+  let picked = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(bytes, bytes)
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:3:16: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`
+```
+
+The default x86-64 profile has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
+
+Fix: Call the `silk/arch` wrapper, here `x86.shuffleBytes` from `silk.arch.x86`, which falls back to portable code. Or select the feature in the profile (`cpu.model = "x86-64-v2"`) and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` with `with Intrinsic.machine(features: ("ssse3",))`. See Intrinsics and Targets and profiles.
+
+### SEM0242
+
+A `features` entry that is not a text literal naming a CPU feature of the target.
+
+```silk
+unsafe fn fast(value: u32) -> u32 with Intrinsic.machine(features: ("neon",)) {
+  return value
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:69: error[SEM0242] neon is not a CPU feature of x86_64-unknown-linux-gnu; `features` lists text literals from the target's catalog
+```
+
+The column is the entry. A constant, an empty tuple `()` or another non-literal entry prints "a non-literal entry" in place of the name. Level names such as `"x86-64-v3"` are refused too: they are CPU models, not features.
+
+Fix: List features from the target's catalog in Targets and profiles, as text literals. Put a function for another architecture under `static if Intrinsic.targetArchitecture() == "aarch64"` or the like, so other targets never check it.
+
+### SEM0243
+
+A function that lists CPU `features` but is not declared `unsafe`.
+
+```silk
+fn fast(value: u32) -> u32 with Intrinsic.machine(features: ("avx2",)) {
+  return value
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:1: error[SEM0243] fast enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them
+```
+
+Running AVX2 code on a machine without AVX2 is undefined, so each call must be `unsafe`.
+
+Fix: Declare it `unsafe fn fast(...)`, and call it inside `unsafe` after `CpuFeatures.detect()` from `silk/cpu` reports the features. See Intrinsics.
 
 ## Codes this compiler does not report
 
