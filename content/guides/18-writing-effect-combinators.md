@@ -354,14 +354,29 @@ effect fn scaled(static factor: i32) -> i32 {
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.04s
-  check    failed: 2 modules                 0.12s
+  load     51 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:2:10: unsupported[static-residualization] not supported by the native compiler yet
-Failed weather in 0.16s
+/home/you/weather/src/main.silk:12:23: error[SEM0245] An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled`
+Failed weather in 0.21s
 ```
 
-The command exits with status 2. Line 2 is `run action` inside `again`. Passing `again(one())` instead of the block works, and so does the block once `factor` is an ordinary parameter. Inside a `static for` body the same block is refused at the block itself, with "unsupported: this construct is not supported by the native compiler yet".
+Column 23 is the `effect { ... }` block. Do what the message says: move the code that builds and runs the block into a function of its own, and call that from `scaled`:
+
+```silk
+effect fn oneAgain() -> i32 {
+  return run again(effect { return run one() })
+}
+
+effect fn scaled(static factor: i32) -> i32 {
+  let got = run oneAgain()
+  return got * factor
+}
+```
+
+This checks and runs; with `main` returning `run scaled(3)`, the program exits with status 3. Passing `again(one())` instead of the block also works, and so does the block once `factor` is an ordinary parameter. An anonymous function `fn(x: i32) -> i32 { ... }` in the same place gets the same SEM0245.
+
+Inside a `static for` body, a block or an anonymous function is refused with the other form of SEM0245, at the block: "An `effect {}` block inside a `static for` body is not supported by the native compiler yet: every unrolled iteration would share its one declaration; move the code that builds and runs it into a named function and call that from the loop body". The fix is the same: a named function, called from the loop body.
 
 ## Borrowing while an effect is alive
 

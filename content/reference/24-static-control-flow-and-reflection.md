@@ -52,6 +52,7 @@ ExactType           = 'typeof' '(' Path ')'
 - Each repetition is checked separately with that element's types. A body that suits one field's type but not another's fails for that field (SEM0012).
 - `return` and `fail` inside the body leave the enclosing function.
 - `break` and `continue` directly inside a `static for` body are not supported. `silk check` stops with "unsupported: this construct is not supported by the native compiler yet".
+- An anonymous function or `effect { ... }` block directly in the body is not supported yet, since every repetition would share its one declaration. It is SEM0245 at the literal: ``An anonymous function inside a `static for` body is not supported by the native compiler yet: every unrolled iteration would share its one declaration; move the code that builds and runs it into a named function and call that from the loop body``. Move that code into a named function and call it from the body.
 - `static for` is a statement only. There is no module-level form.
 
 ## `compileError`
@@ -272,6 +273,7 @@ Calling `scaled(0, 21)` instead, on line 32, fails the build with SEM0177. The n
 | SEM0130 | A non-unit function falls through after branch selection |
 | SEM0176 | Static evaluation needs runtime work: a runtime condition, a non-sequence in `static for`, or a reflection call in runtime code |
 | SEM0177 | A selected `compileError`, with a note at the selecting call |
+| SEM0245 | An anonymous function or `effect {}` block in a `static for` body, or in a function with `static` parameters |
 
 ## See also
 

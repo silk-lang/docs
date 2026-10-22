@@ -16,7 +16,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | PAR | Parsing | PAR0001-PAR0007 |
 | MOD | Module and package resolution | MOD0001-MOD0004 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0244 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0245 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
 
@@ -2567,7 +2567,8 @@ The column is the start of the `impl` for a missing operation, and the member's 
 - A member the interface does not have: ``Invalid conformance: `other` is not an operation of `Info` ``.
 - A member in `impl Copy`: ``Invalid conformance: `impl Copy` declares no members; the compiler copies the value``.
 
-Other invalid conformances, such as a second identical `impl` or a member defined twice, print the code's meaning: ``An invalid source-declared capability implementation``.
+- A second identical `impl`, at the second one: ``Invalid conformance: `Square` implements `Shape` twice; keep one implementation``.
+- A member defined twice, at the second definition: ``Invalid conformance: `area` is defined twice in the implementation of `Shape` for `Square` ``.
 
 Fix: Implement every interface member, with the interface's signature, and nothing else. `Copy` needs every field to be `Copy`. See Interfaces and impls.
 
@@ -4092,7 +4093,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0244)
+## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0245)
 
 ### SEM0185
 
@@ -4145,7 +4146,7 @@ pub fn main() -> i32 { unsafe { if flag(1.0) { return 0 } } return 1 }
 /home/you/demo/src/main.silk:2:36: error[SEM0187] A foreign parameter or result type outside the C-compatible scalar subset
 ```
 
-Message template, not filled by this compiler: `{type} is not admitted by the {abi} ABI`.
+A vector with no C vector type fills the template `{type} is not admitted by the {abi} ABI`: `mask<N>`, `simd<isize, N>` and `simd<usize, N>` print, for example, `mask<4> is not admitted by the C ABI`. For an imported function it is reported at each call, at the callee's name, and a declaration that is never called is not checked. For an `export "C"` function it is reported at the parameter or result type.
 
 Fix: Use C scalar types (integers, `f32`, `f64`, raw pointers) in foreign signatures. `bool` is not one of them. See Unsafe code and C interop.
 
@@ -5062,9 +5063,44 @@ pub fn main() -> i32 {
 /home/you/demo/src/main.silk:4:20: error[SEM0244] simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`
 ```
 
-The column is the callee's name; each call is reported, and a declaration that is never called is not. On x86-64, 128-bit vectors need nothing, 256-bit ones `avx` and 512-bit ones `avx512f`. A width the target's C ABI has no register for prints the other form, as for `simd<u8, 8>` on x86-64: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width". A function's own `features` list does not count.
+For an imported function the column is the callee's name; each call is reported, and a declaration that is never called is not. An `export "C"` function is checked at its declaration, by `silk check` as well as `silk build`, at the vector type. On x86-64, 128-bit vectors need nothing, 256-bit ones `avx` and 512-bit ones `avx512f`. A width the target's C ABI has no register for prints the other form, as for `simd<u8, 8>` on x86-64: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width". A function's own `features` list does not count.
 
 Fix: Select the feature in the profile, as in `[profiles.fast.cpu] features = ["avx"]` or `model = "x86-64-v3"`, and build with `--profile fast`. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and profiles.
+
+### SEM0245
+
+An anonymous function or `effect {}` block that the native compiler cannot specialize yet: one run from a function with `static` parameters, or one in a `static for` body.
+
+```silk
+import silk.effect { Effect }
+
+effect fn again<'env, A, E, ?R>(mut action: mut Effect<'env; A ! E ? R>) -> A ! E ? R {
+  return run action
+}
+
+effect fn one() -> i32 {
+  return 1
+}
+
+effect fn scaled(static factor: i32) -> i32 {
+  let got = run again(effect { return run one() })
+  return got * factor
+}
+
+pub fn main() -> i32 {
+  return run scaled(3)
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:12:23: error[SEM0245] An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled`
+```
+
+The column is the block. An anonymous function prints "An anonymous function" in place of "An `effect {}` block". Inside a `static for` body the message is the other template: ``An `effect {}` block inside a `static for` body is not supported by the native compiler yet: every unrolled iteration would share its one declaration; move the code that builds and runs it into a named function and call that from the loop body``.
+
+Fix: Move the code that builds and runs the block into a named function without `static` parameters, such as `effect fn oneAgain() -> i32 { return run again(effect { return run one() }) }`, and call it from `scaled` or from the loop body. See Writing effect combinators and Static control flow and reflection.
 
 ## Codes this compiler does not report
 

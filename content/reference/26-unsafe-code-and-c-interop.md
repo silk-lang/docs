@@ -133,7 +133,7 @@ A foreign declaration may carry `with Intrinsic.foreign(...)`. It holds either o
 A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function passes by value in one vector register, the way C compilers pass a vector type of the same size. On the C side, declare a vector with the same lane type and count, such as `float __attribute__((vector_size(16)))` for `simd<f32, 4>`.
 
 - Lane types are the fixed-width numbers: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`, `f32`, `f64`.
-- `simd<isize, N>`, `simd<usize, N>` and `mask<N>` do not cross. A call with one is `unsupported[ForeignAggregate]`.
+- `simd<isize, N>`, `simd<usize, N>` and `mask<N>` do not cross: C has no vector type for them. They are SEM0187, "mask<4> is not admitted by the C ABI", at each call of a foreign function and at the parameter or result type of an `export "C"` function.
 - The vector's total width must be one the target's C ABI passes in a vector register, and the profile must select that register's CPU feature:
 
 | Target | Width | Needs |
@@ -146,9 +146,8 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 
 - Any other width, such as `simd<u8, 8>` on x86-64, is SEM0244: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width".
 - A width whose feature the profile does not select is also SEM0244: "simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`".
-- For a foreign function, SEM0244 is reported at each call, at the callee's name. A declaration that is never called is not checked.
+- For a foreign function, SEM0244 is reported at each call, at the callee's name. A declaration that is never called is not checked. For an `export "C"` function, it is reported at the vector type in the declaration, by `silk check` as well as `silk build`.
 - Only the profile's `cpu` counts. A `features` list from `Intrinsic.machine(...)` on the calling function does not satisfy SEM0244. See Targets and profiles for `cpu`.
-- For an `export "C"` function, `silk check` accepts a vector it cannot pass; `silk build` stops with `unsupported[c-abi-vector] not supported by the native compiler yet` at the declaration and exits 2.
 - A C function-pointer type cannot carry a vector: `extern "C" fn(simd<f32, 4>) -> f32` is SEM0187.
 
 ## Native symbols
@@ -326,7 +325,7 @@ The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` wo
 | SEM0137 | `unsafe` does not acknowledge a complete unsafe invocation |
 | SEM0185 | Foreign function ABI string is not `"C"` |
 | SEM0186 | Foreign function declared without `unsafe` |
-| SEM0187 | Foreign parameter or result type is not a C-compatible scalar |
+| SEM0187 | Foreign parameter or result type is not a C-compatible scalar, including `mask<N>` and pointer-sized vector lanes |
 | SEM0188 | Silk-only contract syntax on a foreign declaration |
 | SEM0189 | Foreign function used as a value instead of called |
 | SEM0190 | Native symbol is not an ASCII identifier |
@@ -341,7 +340,7 @@ The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` wo
 | SEM0215 | Invalid pointer alignment, address space or qualifier conversion |
 | SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause |
 | SEM0236 | `Intrinsic.foreign` or `Intrinsic.machine` on a function without linkage, or on an interface or service operation |
-| SEM0244 | SIMD vector in a foreign call that the target's C ABI cannot pass in a vector register the profile selects |
+| SEM0244 | SIMD vector in a foreign call or `export "C"` signature that the target's C ABI cannot pass in a vector register the profile selects |
 
 ## See also
 
