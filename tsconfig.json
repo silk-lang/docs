@@ -11,7 +11,8 @@
     "exactOptionalPropertyTypes": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["vite/client", "@foldkit/markdown/content"]
+    "types": ["vite/client", "@foldkit/markdown/content", "node"],
+    "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "scripts/**/*"]
 }

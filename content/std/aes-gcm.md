@@ -1,0 +1,169 @@
+Detached AES-128-GCM and AES-256-GCM authenticated encryption.
+
+## When to use
+Use [`AesGcm`](#AesGcm) to encrypt with an explicit nonce and associated data. Use [`open`](#AesGcm.impl.open) to verify and decrypt.
+
+## Details
+Operations borrow inputs and write separate caller-owned destinations. They allocate no memory and require no provider.
+Keys contain 16 or 32 bytes, nonces contain 12 bytes, and detached tags contain 16 bytes.
+Every failure leaves all destinations unchanged. Successful operations preserve an unused output suffix.
+
+## Gotchas
+The caller must ensure nonce uniqueness for each key and enforce per-key usage limits.
+These operations do not implement TLS. Functional vectors do not prove side-channel resistance or production security.
+Secret copies are not guaranteed to be erased.
+
+Import as `AesGcm` with `import silk.aes_gcm { AesGcm }`.
+
+Public declarations: 2.
+
+::Anchor{id="AesGcmError"}
+
+## `AesGcmError`
+
+```silk
+pub union AesGcmError
+```
+
+A rejected AES-GCM operation that leaves all caller-owned destinations unchanged.
+
+::Anchor{id="AesGcmError.InvalidKeyLength"}
+
+### `InvalidKeyLength`
+
+```silk
+InvalidKeyLength
+```
+
+A key whose length is neither 16 nor 32 bytes.
+
+::Anchor{id="AesGcmError.InvalidNonceLength"}
+
+### `InvalidNonceLength`
+
+```silk
+InvalidNonceLength
+```
+
+A nonce whose length is not 12 bytes.
+
+::Anchor{id="AesGcmError.InvalidTagLength"}
+
+### `InvalidTagLength`
+
+```silk
+InvalidTagLength
+```
+
+A tag input or destination whose length is not 16 bytes.
+
+::Anchor{id="AesGcmError.OutputTooSmall"}
+
+### `OutputTooSmall`
+
+```silk
+OutputTooSmall
+```
+
+A destination shorter than the plaintext or ciphertext input.
+
+::Anchor{id="AesGcmError.LimitExceeded"}
+
+### `LimitExceeded`
+
+```silk
+LimitExceeded
+```
+
+A message or associated-data length beyond the GCM domain.
+
+::Anchor{id="AesGcmError.AuthenticationFailed"}
+
+### `AuthenticationFailed`
+
+```silk
+AuthenticationFailed
+```
+
+A tag that does not authenticate the key, nonce, associated data and ciphertext.
+
+::Anchor{id="AesGcm"}
+
+## `AesGcm`
+
+```silk
+pub struct AesGcm
+```
+
+The owner of allocation-free AES-128/256-GCM seal and open operations.
+
+::Anchor{id="AesGcm.impl"}
+
+## Implementation `AesGcm`
+
+```silk
+impl AesGcm
+```
+
+::Anchor{id="AesGcm.impl.seal"}
+
+### Associated function `seal`
+
+```silk
+pub fn seal(
+    key: &[u8],
+    nonce: &[u8],
+    aad: &[u8],
+    plaintext: &[u8],
+    ciphertext: &mut [u8],
+    tag: &mut [u8],
+  ) -> Result<(), AesGcmError>
+```
+
+Encrypts plaintext and writes its detached authentication tag, or leaves both destinations unchanged.
+
+#### Details
+
+Keys contain 16 or 32 bytes, nonces contain 12 bytes, and the tag destination contains exactly 16 bytes.
+The ciphertext destination must hold the plaintext. An unused suffix remains unchanged.
+Plaintext is limited to 2^36−32 bytes and AAD to 2^61−1 bytes, also bounded by target addressability.
+Invalid widths, short output and excess lengths return distinct `AesGcmError` variants before any write.
+Inputs and exclusive destinations must not alias. No input is retained and no allocator or provider is required.
+
+#### Gotchas
+
+The caller must use a unique nonce for each encryption under one key and enforce per-key usage limits.
+The operation does not generate a nonce or guarantee physical erasure of secret copies.
+
+::Anchor{id="AesGcm.impl.open"}
+
+### Associated function `open`
+
+```silk
+pub fn open(
+    key: &[u8],
+    nonce: &[u8],
+    aad: &[u8],
+    ciphertext: &[u8],
+    tag: &[u8],
+    plaintext: &mut [u8],
+  ) -> Result<(), AesGcmError>
+```
+
+Verifies a detached tag before writing plaintext, or leaves the whole destination unchanged.
+
+#### Details
+
+Keys contain 16 or 32 bytes, nonces contain 12 bytes, and tags contain exactly 16 bytes.
+The plaintext destination must hold the ciphertext. An unused suffix remains unchanged.
+Ciphertext is limited to 2^36−32 bytes and AAD to 2^61−1 bytes, also bounded by target addressability.
+Invalid widths, short output and excess lengths return distinct `AesGcmError` variants before any write.
+A wrong tag returns `AuthenticationFailed` without publishing plaintext. All 16 tag bytes participate in comparison.
+Inputs and the exclusive destination must not alias. No input is retained and no allocator or provider is required.
+
+#### Gotchas
+
+Authentication does not detect replay or establish peer identity. The caller owns nonce and per-key usage policy.
+Secret copies are not guaranteed to be erased.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

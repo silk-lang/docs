@@ -1,0 +1,203 @@
+Owned arbitrary bytes for file contents, process output, and other encoding-neutral data.
+
+## When to use
+Use [`Bytes`](#Bytes) when every octet must round-trip unchanged. Use `silk.string.String` instead when
+the value is known to be valid UTF-8 and callers need text operations.
+
+## Details
+[`make`](#Bytes.impl.make) creates an empty value without allocating, while [`zeroed`](#Bytes.impl.zeroed), [`copy`](#Bytes.impl.copy), and [`append`](#Bytes.impl.append)
+may require an [`Allocator`](/docs/std/allocator#Allocator). Shared and exclusive views borrow only the initialized prefix;
+later appends can reallocate, so do not retain a view across a mutation.
+
+## Examples
+### Copy, append, and update bytes
+```silk
+import silk.bytes { Bytes }
+
+import silk.allocator { Allocator, OutOfMemoryError }
+
+import silk.effect { Effect }
+
+import silk.u8
+
+effect fn build() -> i32
+! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let source = b"AB"
+  let mut copying = Bytes.copy(&source)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut bytes = run copying
+  let suffix = b"C"
+  let mut appending = Bytes.append(&mut bytes, &suffix)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let appended = run appending
+  let mut writable = Bytes.asMutSlice(&mut bytes)
+  writable[1] = u8.toU8(48)
+  let readable = Bytes.asSlice(&bytes)
+  return u8.toI32(readable[0]) - u8.toI32(readable[1]) + u8.toI32(readable[2]) - 42
+}
+
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(build(), recover)
+}
+```
+
+Import as `Bytes` with `import silk.bytes { Bytes }`.
+
+Public declarations: 1.
+
+::Anchor{id="Bytes"}
+
+## `Bytes`
+
+```silk
+pub struct Bytes
+```
+
+An owned encoding-neutral sequence of arbitrary octets.
+
+### Details
+
+A value owns its initialized bytes and releases their storage on drop. Its length can grow with
+[`append`](#Bytes.impl.append), and its capacity is not part of the public contract.
+
+::Anchor{id="Bytes.impl"}
+
+## Implementation `Bytes`
+
+```silk
+impl Bytes
+```
+
+::Anchor{id="Bytes.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Bytes
+```
+
+Creates an empty `Bytes` value without allocating storage.
+
+::Anchor{id="Bytes.impl.zeroed"}
+
+### Associated function `zeroed`
+
+```silk
+pub effect fn zeroed(length: usize) -> Bytes ! OutOfMemoryError ? &mut Allocator
+```
+
+Allocates an owned initialized byte buffer of exactly `length` zero octets.
+
+#### Details
+
+A zero length returns an empty value without an allocation.
+
+::Anchor{id="Bytes.impl.length"}
+
+### Method `length`
+
+```silk
+pub fn length(self: &Self) -> usize
+```
+
+Returns the initialized byte count.
+
+::Anchor{id="Bytes.impl.copy"}
+
+### Associated function `copy`
+
+```silk
+pub effect fn copy(values: &[u8]) -> Bytes ! OutOfMemoryError ? &mut Allocator
+```
+
+Copies a complete borrowed byte sequence into independently owned storage.
+
+#### Details
+
+Empty input does not allocate. Nonempty input uses one allocation sized to its byte length.
+
+::Anchor{id="Bytes.impl.reserveExact"}
+
+### Method `reserveExact`
+
+```silk
+pub effect fn reserveExact(self: &mut Self, additional: usize) -> ()
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Reserves storage for `additional` bytes without changing the initialized length.
+
+#### Details
+
+Sufficient capacity is reused. Otherwise, one allocation provides the current length plus
+`additional` bytes of capacity. Size overflow or allocation failure leaves the value unchanged.
+
+::Anchor{id="Bytes.impl.clear"}
+
+### Method `clear`
+
+```silk
+pub fn clear(self: &mut Self) -> ()
+```
+
+Removes all initialized bytes and keeps the allocation for reuse.
+
+::Anchor{id="Bytes.impl.truncate"}
+
+### Method `truncate`
+
+```silk
+pub fn truncate(self: &mut Self, length: usize) -> ()
+```
+
+Removes bytes after `length` and keeps the allocation for reuse.
+
+#### Details
+
+A length greater than or equal to the current length leaves the value unchanged.
+
+::Anchor{id="Bytes.impl.append"}
+
+### Method `append`
+
+```silk
+pub effect fn append(self: &mut Self, values: &[u8]) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Appends a complete borrowed byte sequence in source order.
+
+#### Details
+
+If growth fails, the original bytes and their length remain unchanged.
+
+::Anchor{id="Bytes.impl.asSlice"}
+
+### Method `asSlice`
+
+```silk
+pub fn asSlice(self: &Self) -> &[u8]
+```
+
+Borrows all initialized octets as one shared lexical slice.
+
+::Anchor{id="Bytes.impl.asMutSlice"}
+
+### Method `asMutSlice`
+
+```silk
+pub fn asMutSlice(self: &mut Self) -> &mut [u8]
+```
+
+Borrows all initialized octets as one exclusive lexical slice.
+
+#### Gotchas
+
+Do not retain this slice across [`append`](#Bytes.impl.append), because an append can replace the allocation.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

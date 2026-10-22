@@ -1,0 +1,90 @@
+Immutable homogeneous sequences available only during static evaluation.
+
+## Details
+
+Every operation returns a complete canonical value. Sequences expose no allocator, capacity,
+address, mutable alias, destructor, or runtime layout.
+
+Import as `StaticSequence` with `import silk.static_sequence { StaticSequence }`.
+
+Public declarations: 1.
+
+::Anchor{id="StaticSequence"}
+
+## `StaticSequence`
+
+```silk
+pub struct StaticSequence
+```
+
+The scope for StaticSequence operations.
+
+### Details
+
+This owner carries no data. Select it with `import silk.static_sequence { StaticSequence }`
+to access its inherent operations.
+
+::Anchor{id="StaticSequence.impl"}
+
+## Implementation `StaticSequence`
+
+```silk
+impl StaticSequence
+```
+
+::Anchor{id="StaticSequence.impl.empty"}
+
+### Associated function `empty`
+
+```silk
+pub static fn empty<Element>() -> Intrinsic.StaticSequence<Element>
+```
+
+Returns the empty sequence for `Element`.
+
+::Anchor{id="StaticSequence.impl.append"}
+
+### Method `append`
+
+```silk
+pub static fn append<Element>(self: Intrinsic.StaticSequence<Element>, value: Element) -> Intrinsic.StaticSequence<
+    Element,
+  >
+```
+
+Returns `self` followed by `value` without changing `self`.
+
+::Anchor{id="StaticSequence.impl.concat"}
+
+### Associated function `concat`
+
+```silk
+pub static fn concat<Element>(
+    left: Intrinsic.StaticSequence<Element>,
+    right: Intrinsic.StaticSequence<Element>,
+  ) -> Intrinsic.StaticSequence<Element>
+```
+
+Returns every element of `left` followed by every element of `right`.
+
+::Anchor{id="StaticSequence.impl.length"}
+
+### Method `length`
+
+```silk
+pub static fn length<Element>(self: Intrinsic.StaticSequence<Element>) -> usize
+```
+
+Returns the finite sequence length.
+
+::Anchor{id="StaticSequence.impl.at"}
+
+### Method `at`
+
+```silk
+pub static fn at<Element>(self: Intrinsic.StaticSequence<Element>, index: usize) -> Element
+```
+
+Returns the element at `index`, or reports a static phase violation when out of bounds.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

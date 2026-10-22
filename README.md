@@ -31,4 +31,20 @@ pnpm preview    # serves dist/client
 - `public/` holds the Space Mono fonts (SIL Open Font License, see `public/fonts/OFL.txt`)
   and the brand avatars.
 
+## Documentation content
+
+- `content/start/` holds the Get started pages, written here.
+- `content/reference/` and `content/std/` are synced from the silk repository's
+  `reference/` directory. Do not edit them here; change the source in silk-lang/silk and
+  sync again:
+
+  ```sh
+  pnpm sync-docs ../silk   # path to a silk-lang/silk checkout
+  ```
+
+  The script also rewrites `src/docs/generated.ts`, the sidebar groups for those pages.
+  The group order for the language reference lives at the top of
+  `scripts/sync-silk-docs.ts`; a new reference file that is not listed there lands in a
+  "More reference" group, with a warning.
+
 See `AGENTS.md` for project conventions and `FOLDKIT.md` for Foldkit's.
