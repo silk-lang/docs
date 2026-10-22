@@ -1,0 +1,376 @@
+Parse an absolute URI (RFC 3986), and resolve relative references against it.
+
+## When to use
+Use [`Uri.parse`](#Uri.impl.parse) when the text must have a scheme, such as a URL that a user gives you or the
+base URL of a page. Use [`Uri.resolveOwned`](#Uri.impl.resolveOwned) or [`Uri.resolveInto`](#Uri.impl.resolveInto) to turn a relative link,
+such as `../img/logo.png`, into a full URI. For text that can be relative, use
+`silk.uri_reference`.
+
+## Details
+[`Uri`](#Uri) borrows its text and does not allocate. Its component functions are the same as those of
+`UriReference`, but [`Uri.scheme`](#Uri.impl.scheme) always has a value. Resolution follows section 5.2 of RFC
+3986: it takes components from the base or the reference, and removes `.` and `..` path
+segments. It does not change the case of letters or the spelling of `%XX` escapes. It does not
+apply scheme rules, such as a default port.
+
+## Errors
+- `ParseError` if the text is not a valid URI. A text without a scheme gives `MissingScheme` at
+  offset 0.
+- `OutOfMemoryError` from the functions that allocate.
+
+## Examples
+### Read the parts of a URL
+```silk
+import silk.option { Option }
+import silk.result { Result }
+import silk.uri { Uri }
+import silk.uri_reference { ParseError }
+
+pub fn main() -> i32 {
+  let uri = match Uri.parse("https://ada@example.com:8443/docs?page=2#intro") {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let host = Uri.host(&uri) |> Option<string>.unwrapOr("")
+  let port = Uri.port(&uri) |> Option<string>.unwrapOr("")
+  if Uri.scheme(&uri) != "https" || host != "example.com" || port != "8443"
+    || Uri.path(&uri) != "/docs" {
+    return 1
+  }
+  return 0
+}
+```
+
+### Resolve a relative link
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.result { Result }
+import silk.uri { OwnedUri, Uri }
+import silk.uri_reference { ParseError, UriReference }
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let base = match Uri.parse("https://example.com/docs/guide/intro.html") {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let link = match UriReference.parse("../img/logo.png") {
+    Result<UriReference, ParseError>.Success { value } => value
+    Result<UriReference, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let resolved = run Uri.resolveOwned(&base, &link) |> Effect.provideMut<Allocator>(&mut allocator)
+  return match move resolved {
+    Result<OwnedUri, ParseError>.Success { value } => {
+      let view = OwnedUri.view(&value)
+      if Uri.format(&view) != "https://example.com/docs/img/logo.png" {
+        return 1
+      }
+      return 0
+    }
+    Result<OwnedUri, ParseError>.Failure { error: _ } => 1
+  }
+}
+```
+
+Import as `Uri` with `import silk.uri { Uri }`.
+
+Public declarations: 2.
+
+::Anchor{id="Uri"}
+
+## `Uri`
+
+```silk
+pub struct Uri<'text>
+```
+
+A parsed URI with a scheme. It borrows its text.
+
+It is `Copy` and does not allocate. It cannot live longer than its text. Use [`Uri.copy`](#Uri.impl.copy) or
+[`Uri.parseOwned`](#Uri.impl.parseOwned) to get an [`OwnedUri`](#OwnedUri).
+
+::Anchor{id="Uri.impl.Copy"}
+
+## Implementation `Copy for Uri<'text>`
+
+```silk
+impl<'text> Copy for Uri<'text>
+```
+
+::Anchor{id="Uri.impl"}
+
+## Implementation `Uri<'text>`
+
+```silk
+impl<'text> Uri<'text>
+```
+
+::Anchor{id="Uri.impl.parse"}
+
+### Associated function `parse`
+
+```silk
+pub fn parse(text: string<'text>) -> Result<Uri<'text>, ParseError>
+```
+
+Parses `text` as a URI that has a scheme. It does not allocate, decode, or normalize.
+
+#### Errors
+- `ParseError` with `MissingScheme` at offset 0 if `text` has no scheme, such as `/path` or
+  `example.com`.
+- `ParseError` for other syntax problems, with the component and byte position.
+
+::Anchor{id="Uri.impl.copy"}
+
+### Method `copy`
+
+```silk
+pub effect fn copy(self: &Self) -> OwnedUri ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns an [`OwnedUri`](#OwnedUri) with a copy of the text. It does not parse again.
+
+#### Errors
+- `OutOfMemoryError` if the `Allocator` fails.
+
+::Anchor{id="Uri.impl.parseOwned"}
+
+### Associated function `parseOwned`
+
+```silk
+pub effect fn parseOwned(text: string<'text>) -> Result<OwnedUri, ParseError>
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Parses `text` and returns an [`OwnedUri`](#OwnedUri) with a copy of it.
+
+#### Errors
+- `Failure` with a `ParseError` if `text` is not valid. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
+
+::Anchor{id="Uri.impl.format"}
+
+### Method `format`
+
+```silk
+pub fn format(self: &Self) -> string<'text>
+```
+
+Returns the full text of the URI, as it was parsed.
+
+::Anchor{id="Uri.impl.asReference"}
+
+### Method `asReference`
+
+```silk
+pub fn asReference(self: &Self) -> UriReference<'text>
+```
+
+Returns the URI as a `UriReference`, for functions that accept any reference. It does not
+parse again.
+
+::Anchor{id="Uri.impl.scheme"}
+
+### Method `scheme`
+
+```silk
+pub fn scheme(self: &Self) -> string<'text>
+```
+
+Returns the scheme without the `:`. The case of the letters does not change.
+
+::Anchor{id="Uri.impl.authority"}
+
+### Method `authority`
+
+```silk
+pub fn authority(self: &Self) -> Option<string<'text>>
+```
+
+Returns the authority without the `//`. Returns `None` if the component is absent. A component
+that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
+
+::Anchor{id="Uri.impl.userinfo"}
+
+### Method `userinfo`
+
+```silk
+pub fn userinfo(self: &Self) -> Option<string<'text>>
+```
+
+Returns the user information without the `@`. Returns `None` if the component is absent. A
+component that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
+
+::Anchor{id="Uri.impl.host"}
+
+### Method `host`
+
+```silk
+pub fn host(self: &Self) -> Option<string<'text>>
+```
+
+Returns the host, with the brackets of an IP literal. Returns `None` if there is no authority.
+The host of `file:///x` is present and empty.
+
+::Anchor{id="Uri.impl.hostKind"}
+
+### Method `hostKind`
+
+```silk
+pub fn hostKind(self: &Self) -> Option<HostKind>
+```
+
+Returns the `HostKind` of the host, or `None` if there is no authority.
+
+::Anchor{id="Uri.impl.port"}
+
+### Method `port`
+
+```silk
+pub fn port(self: &Self) -> Option<string<'text>>
+```
+
+Returns the port digits without the `:`. Returns `None` if the component is absent. A
+component that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
+
+::Anchor{id="Uri.impl.path"}
+
+### Method `path`
+
+```silk
+pub fn path(self: &Self) -> string<'text>
+```
+
+Returns the path. It can be empty.
+
+::Anchor{id="Uri.impl.query"}
+
+### Method `query`
+
+```silk
+pub fn query(self: &Self) -> Option<string<'text>>
+```
+
+Returns the query without the `?`. Returns `None` if the component is absent. A component that
+is present but empty, such as the query of `http://a/?`, returns `Some("")`.
+
+::Anchor{id="Uri.impl.fragment"}
+
+### Method `fragment`
+
+```silk
+pub fn fragment(self: &Self) -> Option<string<'text>>
+```
+
+Returns the fragment without the `#`. Returns `None` if the component is absent. A component
+that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
+
+::Anchor{id="Uri.impl.resolveInto"}
+
+### Associated function `resolveInto`
+
+```silk
+pub effect fn resolveInto(output: &mut Bytes, base: &Uri, reference: &UriReference) -> Result<
+    (),
+    ParseError,
+  > ! OutOfMemoryError ? &mut Allocator
+```
+
+Resolves `reference` against `base` (RFC 3986, section 5.2) and writes the result to `output`.
+
+It replaces the contents of `output`. If `output` has enough capacity, it does not allocate.
+To read the result, call [`Uri.parse`](#Uri.impl.parse) on the bytes of `output`.
+
+#### Errors
+- `Failure` with a `ParseError` if the result is not a valid URI. This can occur when dot
+  segment removal makes the path start with `//`. Then `output` holds the text that failed.
+- `OutOfMemoryError` if the `Allocator` fails. `output` does not change.
+
+#### Gotchas
+`output` must not share storage with the text of `base` or `reference`.
+
+::Anchor{id="Uri.impl.resolveOwned"}
+
+### Associated function `resolveOwned`
+
+```silk
+pub effect fn resolveOwned(base: &Uri, reference: &UriReference) -> Result<OwnedUri, ParseError>
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Resolves `reference` against `base` (RFC 3986, section 5.2) and returns a new [`OwnedUri`](#OwnedUri).
+
+It allocates one buffer. Use [`Uri.resolveInto`](#Uri.impl.resolveInto) to reuse a buffer that you already have.
+
+#### Errors
+- `Failure` with a `ParseError` if the result is not a valid URI.
+- `OutOfMemoryError` if the `Allocator` fails.
+
+::Anchor{id="OwnedUri"}
+
+## `OwnedUri`
+
+```silk
+pub struct OwnedUri
+```
+
+A URI that owns its text and its parsed ranges.
+
+[`OwnedUri.view`](#OwnedUri.impl.view) returns a [`Uri`](#Uri) that borrows it, and the view cannot live longer than the
+`OwnedUri`.
+
+::Anchor{id="OwnedUri.impl"}
+
+## Implementation `OwnedUri`
+
+```silk
+impl OwnedUri
+```
+
+::Anchor{id="OwnedUri.impl.fromString"}
+
+### Associated function `fromString`
+
+```silk
+pub fn fromString(text: String) -> Result<OwnedUri, ParseError>
+```
+
+Parses `text` as a URI with a scheme and keeps it, without a copy or an allocation.
+
+#### Errors
+- `Failure` with a `ParseError` if `text` is not valid or has no scheme.
+
+#### Gotchas
+It consumes `text` also when it fails.
+
+::Anchor{id="OwnedUri.impl.view"}
+
+### Method `view`
+
+```silk
+pub fn view(self: &Self) -> Uri
+```
+
+Returns a [`Uri`](#Uri) that borrows this value. It does not parse again or allocate.
+
+::Anchor{id="OwnedUri.impl.intoString"}
+
+### Method `intoString`
+
+```silk
+pub fn intoString(self: Self) -> String
+```
+
+Returns the text and consumes the value. It does not copy.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

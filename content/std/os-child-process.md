@@ -1,0 +1,116 @@
+The native provider of the `ChildProcess` effect: it runs real programs.
+
+## When to use
+Provide [`OsChildProcess`](#OsChildProcess) for `ChildProcess` in a native program. Code that runs programs uses
+`silk.child_process`, so a test can provide a fake instead.
+
+## Details
+Each call starts the program, waits for it to end, and captures all of its standard output and
+standard error. Each call owns its own pipes and buffers. An exit code that is not 0, and an end
+by a signal, are normal outcomes. If a call fails, it releases its resources and waits for the
+child, so no zombie process stays.
+
+## Errors
+`ProcessError` and `OutOfMemoryError`, as described in `silk.child_process`.
+
+## Gotchas
+- A call blocks the thread until the child ends.
+- Do not wait for a child of this provider in other code.
+- A trap in the parent can leave resources open.
+- On GNU/Linux, if the child cannot start and also cannot report why, the outcome looks like an
+  exit with code 127.
+- The provider exists only on Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
+
+## Examples
+### Run echo
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.child_process { ChildProcess, ProcessError }
+import silk.effect { Effect }
+import silk.filesystem { FileError, Path }
+import silk.option { Option }
+import silk.os_child_process { OsChildProcess }
+
+effect fn program() -> i32
+  ! FileError | ProcessError | OutOfMemoryError
+  ? &mut Allocator {
+  let path = run Path.make("/bin/echo")
+  let mut request = run ChildProcess.request(&path)
+  run ChildProcess.addArgument(&mut request, b"hi")
+  let mut provider = OsChildProcess.make()
+  let outcome = run ChildProcess.submit(&request) |> Effect.provideMut<ChildProcess>(&mut provider)
+  let code = match ChildProcess.exitCode(&outcome) {
+    Option<i32>.Some { value } => value
+    Option<i32>.None => {
+      return 1
+    }
+  }
+
+  // echo writes its argument and a newline.
+  let output = ChildProcess.outputBytes(&outcome)
+  if code != 0 || output.length != 3 || output[0] != 104 {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
+
+Import as `OsChildProcess` with `import silk.os_child_process { OsChildProcess }`.
+
+Public declarations: 1.
+
+::Anchor{id="OsChildProcess"}
+
+## `OsChildProcess`
+
+```silk
+pub struct OsChildProcess
+```
+
+The native `ChildProcess` provider. It has no state. Each call owns its resources.
+
+::Anchor{id="OsChildProcess.impl"}
+
+## Implementation `OsChildProcess`
+
+```silk
+impl OsChildProcess
+```
+
+::Anchor{id="OsChildProcess.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> OsChildProcess
+```
+
+Returns a provider. It does not allocate or start a process.
+
+::Anchor{id="OsChildProcess.impl.ChildProcess"}
+
+## Implementation `ChildProcess for OsChildProcess`
+
+```silk
+impl ChildProcess for OsChildProcess
+```
+
+::Anchor{id="OsChildProcess.impl.ChildProcess.execute"}
+
+### Operation `execute`
+
+```silk
+execute: OsChildProcess.execute
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

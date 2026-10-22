@@ -1,0 +1,155 @@
+A deterministic, single-threaded scheduler for structured Fibers.
+
+## When to use
+Use [`LocalScheduler.execute`](#LocalScheduler.impl.execute) at the application entry to run one lazy program that uses the
+`Scheduler` and `MonotonicClock` services. For parallel work on several threads, use
+`silk.thread_pool`.
+
+## Details
+Each call makes new task storage, a FIFO ready queue, and a private timer source. The root is
+task zero, and uses the same `Execution<()>` storage as each child.
+
+A clock wait in a task parks only that task. When no task is ready, the driver waits on the
+parent `MonotonicClock` for the earliest timer. [`LocalScheduler.execute`](#LocalScheduler.impl.execute) returns only after
+the root finishes, and it cancels each unfinished descendant first.
+
+## Errors
+- The typed failure of the root program.
+- `OutOfMemoryError` if task storage cannot be allocated.
+- [`StalledError`](#StalledError) if no task is ready, no timer is waiting, and the root is not finished.
+
+## Examples
+### Run a root program
+```silk
+import silk.allocator { OutOfMemoryError }
+import silk.effect { Effect }
+import silk.fiber { Cancelled, Fiber }
+import silk.local_scheduler { LocalScheduler, StalledError }
+import silk.monotonic_clock { MonotonicClock }
+import silk.os_monotonic_clock { OsMonotonicClock }
+import silk.scheduler { Scheduler, TaskIdExhaustedError }
+
+effect fn square(value: i32) -> i32 {
+  // Lets the other ready task run first.
+  run Fiber.yieldNow()
+  return value * value
+}
+
+effect fn root() -> i32
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
+  let three = run Fiber<i32, never>.forkChild(square(3))
+  let four = run Fiber<i32, never>.forkChild(square(4))
+
+  // join parks the root until the child finishes.
+  let first = run three.join()
+  let second = run four.join()
+  if first + second != 25 {
+    return 1
+  }
+  return 0
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  let mut clock = OsMonotonicClock.make()
+  let mut scheduler = LocalScheduler.make()
+  return run scheduler.execute<i32, OutOfMemoryError | TaskIdExhaustedError | Cancelled>(root())
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
+```
+
+Import as `LocalScheduler` with `import silk.local_scheduler { LocalScheduler }`.
+
+Public declarations: 2.
+
+::Anchor{id="LocalScheduler"}
+
+## `LocalScheduler`
+
+```silk
+pub struct LocalScheduler
+```
+
+A reusable deterministic single-threaded Scheduler provider.
+
+### Details
+
+Each call to [`execute`](#LocalScheduler.impl.execute) creates fresh task storage and readiness state.
+
+::Anchor{id="LocalScheduler.impl"}
+
+## Implementation `LocalScheduler`
+
+```silk
+impl LocalScheduler
+```
+
+::Anchor{id="LocalScheduler.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> LocalScheduler
+```
+
+Constructs a reusable local Scheduler value.
+
+::Anchor{id="LocalScheduler.impl.execute"}
+
+### Method `execute`
+
+```silk
+pub effect fn execute<A: 'static, E: 'static>(
+    self: &mut Self,
+    program: once Effect<'static;
+      A
+      ! E
+      ? &mut Scheduler | &mut MonotonicClock
+    >,
+  ) -> A
+  ! E | OutOfMemoryError | StalledError
+  ? &mut MonotonicClock
+```
+
+Runs one lazy root program under this scheduler and returns its result.
+
+#### Details
+The root becomes task zero. This call owns all task and timer storage of the run. It gives
+each task its own `Scheduler` and `MonotonicClock` clients, and runs ready tasks in FIFO
+order.
+
+A clock read in a task uses one cached mark per driver turn. A wait suspends its task. Tasks
+resume in deadline order, then in registration order. When the ready queue is empty, the
+driver waits on the parent `MonotonicClock` for the earliest timer.
+
+Before it returns or fails, it cancels each unfinished descendant and releases the run state.
+
+#### Errors
+The failure of the root, `OutOfMemoryError`, or [`StalledError`](#StalledError) when no task is ready and no
+timer is waiting.
+
+::Anchor{id="StalledError"}
+
+## `StalledError`
+
+```silk
+pub struct StalledError
+```
+
+Reports that no task is ready and no event registration remains while the root is incomplete.
+
+### Details
+
+[`execute`](#LocalScheduler.impl.execute) cancels and releases the incomplete task tree before it raises this error.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

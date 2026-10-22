@@ -1,0 +1,564 @@
+An ordered list of HTTP header fields, with lookup by name, copies, and formatting.
+
+## When to use
+Use [`Headers.make`](#Headers.impl.make) to put `Header` values from `silk.http` in a list without a copy. Use
+[`Headers.copy`](#Headers.impl.copy) when the list must live longer than its fields. Look up fields with
+[`Headers.getFirst`](#Headers.impl.getFirst), [`Headers.getUnique`](#Headers.impl.getUnique), or [`Headers.getAll`](#Headers.impl.getAll).
+
+## Details
+Names are compared without case. Repeated fields stay separate, in their order, and are never
+joined into one value. [`Limits`](#Limits) sets the maximum sizes, and every function checks them before
+it allocates. [`Headers.formatInto`](#Headers.impl.formatInto) writes `name: value\r\n` for each field.
+
+## Errors
+- `ValueError` with `LimitExceeded` if a list exceeds its [`Limits`](#Limits).
+- `ValueError` with `OutputTooSmall` if the output buffer is too small. Nothing is written.
+
+## Examples
+### Look up repeated fields
+```silk
+import silk.http { Header, ValueError }
+import silk.http_headers { HeaderIterator, Headers, Limits }
+import silk.option { Option }
+import silk.result { Result }
+
+fn limits() -> Limits {
+  return Limits {
+    maxMethodBytes: 64,
+    maxTargetBytes: 8192,
+    maxNameBytes: 256,
+    maxValueBytes: 8192,
+    maxFields: 16,
+    maxFieldBytes: 4096,
+    maxOwnedBytes: 8192,
+  }
+}
+
+fn field(name: string<'static>, bytes: &'static [u8]) -> Header<'static> {
+  return match Header.make(name, bytes, limits()) {
+    Result<Header, ValueError>.Success { value } => value
+    Result<Header, ValueError>.Failure { error: _ } => {
+      let invalid = 1 / 0
+      return field(name, bytes)
+    }
+  }
+}
+
+pub fn main() -> i32 {
+  let entries = [field("Accept", b"text/html"), field("Vary", b"Accept"), field("ACCEPT", b"*/*")]
+  let headers = match Headers.make(&entries, limits()) {
+    Result<Headers, ValueError>.Success { value } => value
+    Result<Headers, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // Both Accept fields match, in their order.
+  let mut accept = Headers.getAll(&headers, "accept")
+  let mut count = 0
+  while true {
+    match HeaderIterator.next(&mut accept) {
+      Option<Header>.Some { value: _ } => {
+        count = count + 1
+      }
+      Option<Header>.None => {
+        break
+      }
+    }
+  }
+  if count != 2 {
+    return 1
+  }
+
+  // getUnique fails, because Accept occurs two times.
+  let unique = match Headers.getUnique(&headers, "Accept") {
+    Result<Option<Header>, ValueError>.Success { value: _ } => true
+    Result<Option<Header>, ValueError>.Failure { error: _ } => false
+  }
+  if unique {
+    return 1
+  }
+  let mut output: [u8; 64] = [0; 64]
+  let length = match Headers.formatInto(&headers, &mut output) {
+    Result<usize, ValueError>.Success { value } => value
+    Result<usize, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // "Accept: text/html\r\nVary: Accept\r\nACCEPT: */*\r\n"
+  if length != 46 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `Headers` with `import silk.http_headers { Headers }`.
+
+Public declarations: 6.
+
+::Anchor{id="Limits"}
+
+## `Limits`
+
+```silk
+pub struct Limits
+```
+
+Maximum sizes for HTTP values, header lists, and copies.
+
+::Anchor{id="Limits.maxMethodBytes"}
+
+### Field `maxMethodBytes`
+
+```silk
+pub maxMethodBytes: usize
+```
+
+The maximum length of a method, in bytes.
+
+::Anchor{id="Limits.maxTargetBytes"}
+
+### Field `maxTargetBytes`
+
+```silk
+pub maxTargetBytes: usize
+```
+
+The maximum length of a request target, in bytes.
+
+::Anchor{id="Limits.maxNameBytes"}
+
+### Field `maxNameBytes`
+
+```silk
+pub maxNameBytes: usize
+```
+
+The maximum length of a field name, in bytes.
+
+::Anchor{id="Limits.maxValueBytes"}
+
+### Field `maxValueBytes`
+
+```silk
+pub maxValueBytes: usize
+```
+
+The maximum length of a field value or a reason phrase, in bytes.
+
+::Anchor{id="Limits.maxFields"}
+
+### Field `maxFields`
+
+```silk
+pub maxFields: usize
+```
+
+The maximum number of fields in a list.
+
+::Anchor{id="Limits.maxFieldBytes"}
+
+### Field `maxFieldBytes`
+
+```silk
+pub maxFieldBytes: usize
+```
+
+The maximum total length of all names and values in a list, in bytes.
+
+::Anchor{id="Limits.maxOwnedBytes"}
+
+### Field `maxOwnedBytes`
+
+```silk
+pub maxOwnedBytes: usize
+```
+
+The maximum memory for a copy, in bytes, including its index. See
+[`Headers.requiredOwnedBytes`](#Headers.impl.requiredOwnedBytes).
+
+::Anchor{id="Limits.impl.Copy"}
+
+## Implementation `Copy for Limits`
+
+```silk
+impl Copy for Limits
+```
+
+::Anchor{id="Headers"}
+
+## `Headers`
+
+```silk
+pub struct Headers<'value>
+```
+
+An ordered list of header fields that borrows its fields.
+
+::Anchor{id="Headers.impl.Copy"}
+
+## Implementation `Copy for Headers<'value>`
+
+```silk
+impl<'value> Copy for Headers<'value>
+```
+
+::Anchor{id="Headers.impl"}
+
+## Implementation `Headers<'value>`
+
+```silk
+impl<'value> Headers<'value>
+```
+
+::Anchor{id="Headers.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make(
+    entries: &'value [Header<'value>],
+    limits: Limits,
+  ) -> Result<Headers<'value>, ValueError>
+```
+
+Checks `entries` against `limits` and returns a list that borrows them. It does not allocate.
+
+::Anchor{id="Headers.impl.count"}
+
+### Method `count`
+
+```silk
+pub fn count(self: &Self) -> usize
+```
+
+Returns the number of fields, including repeated fields.
+
+::Anchor{id="Headers.impl.fieldBytes"}
+
+### Method `fieldBytes`
+
+```silk
+pub fn fieldBytes(self: &Self) -> usize
+```
+
+Returns the total length of all names and values, in bytes.
+
+::Anchor{id="Headers.impl.iter"}
+
+### Method `iter`
+
+```silk
+pub fn iter(self: &Self) -> HeaderIterator<'value>
+```
+
+Returns an iterator over all fields, in order.
+
+::Anchor{id="Headers.impl.getAll"}
+
+### Method `getAll`
+
+```silk
+pub fn getAll(self: &Self, name: string<'value>) -> HeaderIterator<'value>
+```
+
+Returns an iterator over the fields named `name`, compared without case, in order.
+
+::Anchor{id="Headers.impl.getFirst"}
+
+### Method `getFirst`
+
+```silk
+pub fn getFirst(self: &Self, name: string) -> Option<Header<'value>>
+```
+
+Returns the first field named `name`, compared without case, or `None`.
+
+::Anchor{id="Headers.impl.getUnique"}
+
+### Method `getUnique`
+
+```silk
+pub fn getUnique(self: &Self, name: string) -> Result<Option<Header<'value>>, ValueError>
+```
+
+Returns the field named `name`, or `None` if there is no such field.
+
+#### Errors
+- `LimitExceeded` with `UniqueField` if there is more than one such field.
+
+::Anchor{id="Headers.impl.copy"}
+
+### Method `copy`
+
+```silk
+pub effect fn copy(
+    self: &Self,
+    limits: Limits,
+  ) -> Result<OwnedHeaders, ValueError> ! OutOfMemoryError ? &mut Allocator
+```
+
+Copies all fields into new memory, so that the copy does not borrow them.
+
+#### Errors
+- `LimitExceeded` if the list exceeds `limits`. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
+
+::Anchor{id="Headers.impl.copyMatching"}
+
+### Method `copyMatching`
+
+```silk
+pub effect fn copyMatching(
+    self: &Self,
+    name: string<'value>,
+    limits: Limits,
+  ) -> Result<OwnedHeaders, ValueError> ! OutOfMemoryError ? &mut Allocator
+```
+
+Copies only the fields named `name`, compared without case, into new memory.
+
+#### Details
+Repeated fields stay separate, in their order. `limits` applies to the copied fields only, and
+is checked before allocation.
+
+::Anchor{id="Headers.impl.requiredOwnedBytes"}
+
+### Method `requiredOwnedBytes`
+
+```silk
+pub fn requiredOwnedBytes(self: &Self) -> Result<usize, ValueError>
+```
+
+Returns the memory that [`Headers.copy`](#Headers.impl.copy) needs, to compare with `maxOwnedBytes`. It does not
+allocate.
+
+::Anchor{id="Headers.impl.formatInto"}
+
+### Method `formatInto`
+
+```silk
+pub fn formatInto(self: &Self, output: &mut [u8]) -> Result<usize, ValueError>
+```
+
+Writes `name: value\r\n` for each field to the start of `output`, and returns the length. It
+writes no start line and no empty line at the end.
+
+::Anchor{id="Headers.impl.connectionTokens"}
+
+### Method `connectionTokens`
+
+```silk
+pub fn connectionTokens(self: &Self) -> MetadataIterator<'value>
+```
+
+Returns an iterator over the options in all `Connection` fields, such as `close` or
+`keep-alive`.
+
+::Anchor{id="Headers.impl.contentCodings"}
+
+### Method `contentCodings`
+
+```silk
+pub fn contentCodings(self: &Self) -> MetadataIterator<'value>
+```
+
+Returns an iterator over the codings in all `Content-Encoding` fields, such as `gzip`.
+
+::Anchor{id="Headers.impl.transferCodings"}
+
+### Method `transferCodings`
+
+```silk
+pub fn transferCodings(self: &Self) -> MetadataIterator<'value>
+```
+
+Returns an iterator over the codings in all `Transfer-Encoding` fields, such as `chunked`. It
+also checks the parameters of each coding.
+
+::Anchor{id="OwnedHeaders"}
+
+## `OwnedHeaders`
+
+```silk
+pub struct OwnedHeaders
+```
+
+A header list that owns its memory. Get a [`Headers`](#Headers) from it with [`OwnedHeaders.view`](#OwnedHeaders.impl.view).
+
+::Anchor{id="OwnedHeaders.impl"}
+
+## Implementation `OwnedHeaders`
+
+```silk
+impl OwnedHeaders
+```
+
+::Anchor{id="OwnedHeaders.impl.view"}
+
+### Method `view`
+
+```silk
+pub fn view<'value>(self: &'value Self) -> Headers<'value>
+```
+
+Returns the fields as a [`Headers`](#Headers) that borrows this value.
+
+::Anchor{id="OwnedHeaders.impl.ownedBytes"}
+
+### Method `ownedBytes`
+
+```silk
+pub fn ownedBytes(self: &Self) -> usize
+```
+
+Returns the memory that this copy uses, in bytes, as counted against `maxOwnedBytes`.
+
+::Anchor{id="HeaderIterator"}
+
+## `HeaderIterator`
+
+```silk
+pub struct HeaderIterator<'value>
+```
+
+An iterator over header fields, in order. Get it from [`Headers.iter`](#Headers.impl.iter) or [`Headers.getAll`](#Headers.impl.getAll).
+
+::Anchor{id="HeaderIterator.impl"}
+
+## Implementation `HeaderIterator<'value>`
+
+```silk
+impl<'value> HeaderIterator<'value>
+```
+
+::Anchor{id="HeaderIterator.impl.next"}
+
+### Method `next`
+
+```silk
+pub fn next(self: &mut Self) -> Option<Header<'value>>
+```
+
+Returns the next field, or `None` at the end.
+
+::Anchor{id="HeaderIterator.impl.fieldIndex"}
+
+### Method `fieldIndex`
+
+```silk
+pub fn fieldIndex(self: &Self) -> usize
+```
+
+Returns the position in the list of the last field from [`HeaderIterator.next`](#HeaderIterator.impl.next), from 0.
+
+::Anchor{id="MetadataToken"}
+
+## `MetadataToken`
+
+```silk
+pub struct MetadataToken<'value>
+```
+
+One item of a list field, such as `gzip` in `Content-Encoding: gzip, br`.
+
+::Anchor{id="MetadataToken.impl.Copy"}
+
+## Implementation `Copy for MetadataToken<'value>`
+
+```silk
+impl<'value> Copy for MetadataToken<'value>
+```
+
+::Anchor{id="MetadataToken.impl"}
+
+## Implementation `MetadataToken<'value>`
+
+```silk
+impl<'value> MetadataToken<'value>
+```
+
+::Anchor{id="MetadataToken.impl.token"}
+
+### Method `token`
+
+```silk
+pub fn token(self: &Self) -> &'value [u8]
+```
+
+Returns the name of the item, without parameters.
+
+::Anchor{id="MetadataToken.impl.raw"}
+
+### Method `raw`
+
+```silk
+pub fn raw(self: &Self) -> &'value [u8]
+```
+
+Returns the whole item, with its parameters.
+
+::Anchor{id="MetadataToken.impl.fieldIndex"}
+
+### Method `fieldIndex`
+
+```silk
+pub fn fieldIndex(self: &Self) -> usize
+```
+
+Returns the position in the list of the field that holds this item, from 0.
+
+::Anchor{id="MetadataToken.impl.offset"}
+
+### Method `offset`
+
+```silk
+pub fn offset(self: &Self) -> usize
+```
+
+Returns the byte offset of the item in the field value.
+
+::Anchor{id="MetadataToken.impl.matches"}
+
+### Method `matches`
+
+```silk
+pub fn matches(self: &Self, known: string) -> bool
+```
+
+Returns `true` if the name of the item equals `known`, compared without case.
+
+::Anchor{id="MetadataIterator"}
+
+## `MetadataIterator`
+
+```silk
+pub struct MetadataIterator<'value>
+```
+
+An iterator over the items of list fields, such as `Connection` or `Content-Encoding`.
+
+::Anchor{id="MetadataIterator.impl"}
+
+## Implementation `MetadataIterator<'value>`
+
+```silk
+impl<'value> MetadataIterator<'value>
+```
+
+::Anchor{id="MetadataIterator.impl.next"}
+
+### Method `next`
+
+```silk
+pub fn next(self: &mut Self) -> Result<Option<MetadataToken<'value>>, ValueError>
+```
+
+Returns the next item, or `None` at the end.
+
+#### Errors
+- `ValueError` with the location of the problem, if the field value is not a valid list.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

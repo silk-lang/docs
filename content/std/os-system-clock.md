@@ -1,0 +1,92 @@
+The native provider of the `SystemClock` effect: the time of day, as seconds since 1970.
+
+## When to use
+Provide [`OsSystemClock`](#OsSystemClock) for `SystemClock` in a native program, for timestamps. In a test,
+provide a fake that returns a fixed time.
+
+## Details
+Each call reads the real-time clock of the system. A failure of the clock is a trap.
+
+## Gotchas
+- This clock can go back when the system time is set. Use `silk.os_monotonic_clock` to measure
+  durations.
+- On Linux, it needs glibc 2.17 or later.
+- The provider exists only on Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
+
+## Examples
+### Read the time
+```silk
+import silk.effect { Effect }
+import silk.os_system_clock { OsSystemClock }
+import silk.system_clock { Instant, SystemClock }
+
+pub fn main() -> i32 {
+  let mut clock = OsSystemClock.make()
+  let now = run SystemClock.now() |> Effect.provideMut<SystemClock>(&mut clock)
+
+  // Seconds since 1970. 1600000000 is in September 2020.
+  let nanoseconds = SystemClock.nanoseconds(&now)
+  if SystemClock.seconds(&now) < 1600000000 || nanoseconds < 0 || nanoseconds >= 1000000000 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `OsSystemClock` with `import silk.os_system_clock { OsSystemClock }`.
+
+Public declarations: 1.
+
+::Anchor{id="OsSystemClock"}
+
+## `OsSystemClock`
+
+```silk
+pub struct OsSystemClock
+```
+
+The native `SystemClock` provider. It has no state. A failure is a trap.
+
+::Anchor{id="OsSystemClock.impl"}
+
+## Implementation `OsSystemClock`
+
+```silk
+impl OsSystemClock
+```
+
+::Anchor{id="OsSystemClock.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> OsSystemClock
+```
+
+Returns a clock. It does not read the time.
+
+::Anchor{id="OsSystemClock.impl.SystemClock"}
+
+## Implementation `SystemClock for OsSystemClock`
+
+```silk
+impl SystemClock for OsSystemClock
+```
+
+::Anchor{id="OsSystemClock.impl.SystemClock.now"}
+
+### Operation `now`
+
+```silk
+effect fn now(self: &mut Self) -> Instant
+```
+
+::Anchor{id="OsSystemClock.impl.SystemClock.getResolution"}
+
+### Operation `getResolution`
+
+```silk
+effect fn getResolution(self: &mut Self) -> u64
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

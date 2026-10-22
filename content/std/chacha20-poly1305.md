@@ -1,0 +1,195 @@
+Encrypt and authenticate data with ChaCha20-Poly1305 (RFC 8439).
+
+## When to use
+Use [`ChaCha20Poly1305.seal`](#ChaCha20Poly1305.impl.seal) to encrypt a message so that only holders of the key can read it
+and any change is detected. Use [`ChaCha20Poly1305.open`](#ChaCha20Poly1305.impl.open) to check and decrypt it. It is fast
+without AES hardware, and it is a cipher suite of TLS 1.3 and WireGuard.
+
+## Details
+The key is 32 bytes, the nonce is 12 bytes, and the tag is 16 bytes. The tag is separate from
+the ciphertext ("detached"), so store or send both. The associated data (`aad`) is authenticated
+but not encrypted. The ciphertext has the same length as the plaintext. Nothing allocates.
+
+## Errors
+The functions return an [`AeadError`](#AeadError). All checks come before the first write, and on any error
+the output buffers do not change. [`ChaCha20Poly1305.open`](#ChaCha20Poly1305.impl.open) writes no plaintext unless the tag
+is correct.
+
+## Gotchas
+The same key and nonce must never encrypt two messages. If they do, an attacker can recover the
+XOR of the two plaintexts and forge tags. Use a counter, or 12 random bytes from `silk.random`
+for a small number of messages per key.
+
+Authentication does not stop replay. The source code avoids branches on secret data, but the
+module cannot promise constant time on every compiler and target, or that secrets are erased.
+
+## Examples
+### Encrypt, decrypt, and detect a change
+```silk
+import silk.chacha20_poly1305 { AeadError, ChaCha20Poly1305 }
+import silk.result { Result }
+
+pub fn main() -> i32 {
+  let key: [u8; 32] = [42; 32]
+  let nonce: [u8; 12] = [0; 12]
+  let mut ciphertext: [u8; 5] = [0; 5]
+  let mut tag: [u8; 16] = [0; 16]
+  match ChaCha20Poly1305.seal(&key, &nonce, b"v1", b"hello", &mut ciphertext, &mut tag) {
+    Result<(), AeadError>.Success { value: _ } => {}
+    Result<(), AeadError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let mut plaintext: [u8; 5] = [0; 5]
+  match ChaCha20Poly1305.open(&key, &nonce, b"v1", &ciphertext, &tag, &mut plaintext) {
+    Result<(), AeadError>.Success { value: _ } => {}
+    Result<(), AeadError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if plaintext[0] != 104 || plaintext[4] != 111 {
+    return 1
+  }
+
+  // Other associated data gives a different tag, so open fails.
+  return match ChaCha20Poly1305.open(&key, &nonce, b"v2", &ciphertext, &tag, &mut plaintext) {
+    Result<(), AeadError>.Failure { error: AeadError.AuthenticationFailed } => 0
+    _ => 1
+  }
+}
+```
+
+Import as `ChaCha20Poly1305` with `import silk.chacha20_poly1305 { ChaCha20Poly1305 }`.
+
+Public declarations: 2.
+
+::Anchor{id="AeadError"}
+
+## `AeadError`
+
+```silk
+pub enum AeadError
+```
+
+The reason that [`ChaCha20Poly1305.seal`](#ChaCha20Poly1305.impl.seal) or [`ChaCha20Poly1305.open`](#ChaCha20Poly1305.impl.open) rejected a call. The
+checks run in the order of the variants, and the first failure is returned.
+
+::Anchor{id="AeadError.InvalidKey"}
+
+### `InvalidKey`
+
+```silk
+InvalidKey
+```
+
+The key is not 32 bytes.
+
+::Anchor{id="AeadError.InvalidNonce"}
+
+### `InvalidNonce`
+
+```silk
+InvalidNonce
+```
+
+The nonce is not 12 bytes.
+
+::Anchor{id="AeadError.InvalidTag"}
+
+### `InvalidTag`
+
+```silk
+InvalidTag
+```
+
+The tag, or the tag output, is not 16 bytes.
+
+::Anchor{id="AeadError.OutputTooSmall"}
+
+### `OutputTooSmall`
+
+```silk
+OutputTooSmall
+```
+
+The output is shorter than the input message.
+
+::Anchor{id="AeadError.LimitExceeded"}
+
+### `LimitExceeded`
+
+```silk
+LimitExceeded
+```
+
+The message is longer than 274877906880 bytes (2^32 blocks of 64 bytes).
+
+::Anchor{id="AeadError.AuthenticationFailed"}
+
+### `AuthenticationFailed`
+
+```silk
+AuthenticationFailed
+```
+
+The tag is not correct for the key, nonce, associated data, and ciphertext.
+
+::Anchor{id="ChaCha20Poly1305"}
+
+## `ChaCha20Poly1305`
+
+```silk
+pub struct ChaCha20Poly1305
+```
+
+Functions that encrypt and decrypt with ChaCha20-Poly1305.
+
+::Anchor{id="ChaCha20Poly1305.impl"}
+
+## Implementation `ChaCha20Poly1305`
+
+```silk
+impl ChaCha20Poly1305
+```
+
+::Anchor{id="ChaCha20Poly1305.impl.seal"}
+
+### Associated function `seal`
+
+```silk
+pub fn seal(key: &[u8], nonce: &[u8], aad: &[u8], plaintext: &[u8], ciphertext: &mut [u8], tag: &mut [u8]) -> Result<(), AeadError>
+```
+
+Encrypts `plaintext` into `ciphertext` and writes the 16-byte authentication tag to `tag`.
+
+`aad` is authenticated but not encrypted. `ciphertext` can be longer than `plaintext`. The
+bytes after the written prefix do not change.
+
+#### Errors
+- `InvalidKey`, `InvalidNonce`, or `InvalidTag` for a wrong length.
+- `OutputTooSmall` if `ciphertext` is shorter than `plaintext`.
+- `LimitExceeded` if `plaintext` is too long.
+
+#### Gotchas
+Use a new nonce for each message under the same key. The function does not make one.
+
+::Anchor{id="ChaCha20Poly1305.impl.open"}
+
+### Associated function `open`
+
+```silk
+pub fn open(key: &[u8], nonce: &[u8], aad: &[u8], ciphertext: &[u8], tag: &[u8], plaintext: &mut [u8]) -> Result<(), AeadError>
+```
+
+Checks `tag`, and if it is correct, decrypts `ciphertext` into `plaintext`.
+
+`aad` must be the same bytes that were given to [`ChaCha20Poly1305.seal`](#ChaCha20Poly1305.impl.seal). The function checks
+all 16 tag bytes before it writes `plaintext`. The bytes after the written prefix do not
+change.
+
+#### Errors
+- `AuthenticationFailed` if the tag is not correct. `plaintext` does not change.
+- `InvalidKey`, `InvalidNonce`, `InvalidTag`, `OutputTooSmall`, or `LimitExceeded` as for
+  [`ChaCha20Poly1305.seal`](#ChaCha20Poly1305.impl.seal).
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

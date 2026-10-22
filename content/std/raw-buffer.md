@@ -1,0 +1,201 @@
+Typed raw storage made from an allocation, for code that implements containers.
+
+## When to use
+Application code uses `silk.list.List`, `silk.bytes.Bytes`, or `silk.box.Box`. Use `RawBuffer`
+only when you implement a container that keeps its own record of capacity and of which slots are
+initialized.
+
+## Details
+A `RawBuffer<T>` holds one allocation and a count of `T` slots. It does not record which slots
+are initialized. Use [`RawBuffer.slot`](#RawBuffer.impl.slot) with the `silk.slot` operations to change one slot, and
+[`RawBuffer.copy`](#RawBuffer.impl.copy), [`RawBuffer.view`](#RawBuffer.impl.view), and [`RawBuffer.viewMut`](#RawBuffer.impl.viewMut) to work on ranges.
+
+[`RawBuffer.slot`](#RawBuffer.impl.slot) and [`RawBuffer.fill`](#RawBuffer.impl.fill) check the count and trap outside it. The `unsafe`
+operations do not check.
+
+## Gotchas
+When a raw buffer is dropped, it releases its allocation but does not drop the values in it. A
+container must drop or take each initialized slot before it drops the buffer, or those values
+leak.
+
+## Examples
+### Fill a byte buffer and read it back
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.layout { Layout }
+import silk.raw_buffer { RawBuffer }
+import silk.u8
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let allocation = run Allocator.allocate(Layout.of<[u8; 3]>())
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  unsafe {
+    let mut buffer = RawBuffer.from<u8>(move allocation, 3)
+    RawBuffer.fill(&mut buffer, 0, 3, 14)
+    let values = RawBuffer.view<u8>(&buffer, 0, 3)
+    if u8.toI32(values[0] + values[1] + values[2]) != 42 {
+      return 1
+    }
+  }
+  return 0
+}
+```
+
+Import as `RawBuffer` with `import silk.raw_buffer { RawBuffer }`.
+
+Public declarations: 1.
+
+::Anchor{id="RawBuffer"}
+
+## `RawBuffer`
+
+```silk
+pub struct RawBuffer
+```
+
+The owner type of the raw buffer operations. It has no fields and is never constructed.
+
+### Details
+
+This struct is not the builtin `RawBuffer<T>` storage type that [`RawBuffer.from`](#RawBuffer.impl.from) returns.
+
+::Anchor{id="RawBuffer.impl"}
+
+## Implementation `RawBuffer`
+
+```silk
+impl RawBuffer
+```
+
+::Anchor{id="RawBuffer.impl.from"}
+
+### Associated function `from`
+
+```silk
+pub unsafe fn from<T>(allocation: Intrinsic.Allocation, count: usize) -> Intrinsic.RawBuffer<T>
+```
+
+Returns a raw buffer of `count` slots of `T` that owns `allocation`. All slots are
+uninitialized.
+
+#### Gotchas
+
+The caller must prove that the allocation is large enough for `count` values of `T` and is
+aligned for `T`. `Layout.repeat(Layout.of<T>(), count)` gives a layout that fits.
+
+::Anchor{id="RawBuffer.impl.slot"}
+
+### Associated function `slot`
+
+```silk
+pub fn slot<'storage, T>(buffer: &'storage mut Intrinsic.RawBuffer<T>, index: usize) -> Intrinsic.Slot<'storage, T>
+```
+
+Selects the slot at `index` for one `silk.slot` operation.
+
+#### Details
+
+The selection borrows the buffer exclusively until a slot operation consumes it. Lifetimes
+inside `T` are not part of that borrow.
+
+#### Gotchas
+
+An `index` that is not less than [`RawBuffer.count`](#RawBuffer.impl.count) traps. The slot does not know if it is
+initialized. The caller must track that.
+
+::Anchor{id="RawBuffer.impl.count"}
+
+### Associated function `count`
+
+```silk
+pub fn count<T>(buffer: &Intrinsic.RawBuffer<T>) -> usize
+```
+
+Returns the number of slots in the buffer. This is the capacity, not the number of initialized
+slots.
+
+::Anchor{id="RawBuffer.impl.read"}
+
+### Associated function `read`
+
+```silk
+pub unsafe fn read<T: Copy>(buffer: &Intrinsic.RawBuffer<T>, index: usize) -> T
+```
+
+Returns a copy of the value in the slot at `index`. The slot stays initialized.
+
+#### Gotchas
+
+The caller must prove that `index` is less than [`RawBuffer.count`](#RawBuffer.impl.count) and that the slot is
+initialized. If `T` is a reference, the copy keeps its own lifetime, also after the buffer is
+released.
+
+::Anchor{id="RawBuffer.impl.copy"}
+
+### Associated function `copy`
+
+```silk
+pub unsafe fn copy<T>(destination: &mut Intrinsic.RawBuffer<T>, destinationOffset: usize, source: &[T], length: usize) -> ()
+```
+
+Moves `length` initialized values from `source` into the buffer, starting at slot
+`destinationOffset`.
+
+#### Details
+
+The source and the destination can overlap. The result is the same as a copy through a
+temporary buffer. After the call, the destination slots are initialized.
+
+#### Gotchas
+
+The caller must prove that both ranges are in bounds and that the source values are
+initialized. The values move, so the caller must not use or drop them at the source again. The
+destination slots must be uninitialized, or their old values leak.
+
+::Anchor{id="RawBuffer.impl.fill"}
+
+### Associated function `fill`
+
+```silk
+pub fn fill(buffer: &mut Intrinsic.RawBuffer<u8>, offset: usize, length: usize, value: u8) -> ()
+```
+
+Sets `length` bytes, starting at slot `offset`, to `value`. After the call, those slots are
+initialized.
+
+#### Gotchas
+
+A range that goes past [`RawBuffer.count`](#RawBuffer.impl.count) traps.
+
+::Anchor{id="RawBuffer.impl.view"}
+
+### Associated function `view`
+
+```silk
+pub unsafe fn view<T>(buffer: &Intrinsic.RawBuffer<T>, offset: usize, length: usize) -> &[T]
+```
+
+Returns a shared slice of `length` slots, starting at slot `offset`.
+
+#### Gotchas
+
+The caller must prove that the range is in bounds and that each slot in it is initialized.
+
+::Anchor{id="RawBuffer.impl.viewMut"}
+
+### Associated function `viewMut`
+
+```silk
+pub unsafe fn viewMut<T>(buffer: &mut Intrinsic.RawBuffer<T>, offset: usize, length: usize) -> &mut [T]
+```
+
+Returns an exclusive slice of `length` slots, starting at slot `offset`.
+
+#### Gotchas
+
+The caller must prove that the range is in bounds and that each slot in it is initialized.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

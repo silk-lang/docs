@@ -1,0 +1,79 @@
+Borrowed subranges of slices, with no copy and no allocation.
+
+## When to use
+Use [`Slice.view`](#Slice.impl.view) to give a part of a slice to a function that takes `&[T]`, such as the
+remaining input of a parser.
+
+## Details
+A view borrows the input. It has the same lifetime as the input and does not copy elements.
+The range rules are the same as for indexing: a range outside the input traps. An empty range at
+the end of the input is valid, also for an empty input.
+
+## Examples
+### Sum the second half of an array
+```silk
+import silk.slice { Slice }
+
+fn sum(values: &[i32]) -> i32 {
+  let mut total = 0
+  let mut index: usize = 0
+  while index < values.length {
+    total = total + values[index]
+    index = index + 1
+  }
+  return total
+}
+
+pub fn main() -> i32 {
+  let values = [1, 2, 3, 4]
+  let tail = Slice.view<i32>(&values, 2, 2)
+  if sum(tail) != 7 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `Slice` with `import silk.slice { Slice }`.
+
+Public declarations: 1.
+
+::Anchor{id="Slice"}
+
+## `Slice`
+
+```silk
+pub struct Slice
+```
+
+The owner type of the slice operations. It has no fields and is never constructed.
+
+::Anchor{id="Slice.impl"}
+
+## Implementation `Slice`
+
+```silk
+impl Slice
+```
+
+::Anchor{id="Slice.impl.view"}
+
+### Associated function `view`
+
+```silk
+pub fn view<T>(values: &[T], offset: usize, length: usize) -> &[T]
+```
+
+Returns a shared borrow of the `length` elements of `values` that start at index `offset`.
+
+#### Details
+
+The view does not copy elements and does not allocate. It cannot live longer than `values`.
+`view(values, values.length, 0)` is a valid empty view.
+
+#### Gotchas
+
+If `offset` is more than `values.length`, or `offset + length` is more than `values.length`,
+the program traps.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

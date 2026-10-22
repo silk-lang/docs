@@ -1,0 +1,238 @@
+Compile-time descriptions of the fields of a struct or tuple type, for generic code that visits
+each field.
+
+## When to use
+Use [`Reflect`](#Reflect) to write one generic function that works on the fields of many types, such as a
+serializer or a formatter. Use [`Reflect.fields`](#Reflect.impl.fields) with `static for` to visit each field, and
+[`Reflect.borrowField`](#Reflect.impl.borrowField) to read the value of a field at runtime.
+
+## Details
+Descriptors exist only during static evaluation. They have no runtime value, so reflection adds
+no runtime cost. The compiler expands a `static for` over [`Reflect.fields`](#Reflect.impl.fields) into one copy of
+the loop body for each field, in declaration order. In each copy, the field has its own type.
+
+A descriptor shows only the fields that are visible from the module that calls the reflection
+operation. Private fields of a type from another module are not in the list.
+
+## Examples
+### Add all fields of a struct
+```silk
+import silk.reflect { Reflect }
+
+struct Pair {
+  pub first: i32
+  pub second: i32
+}
+
+fn sum(owner: &Pair) -> i32 {
+  let mut total = 0
+  static for field in Reflect.fields<Pair>() {
+    total = total + Reflect.borrowField<Pair, i32>(owner, field).*
+  }
+  return total
+}
+
+pub fn main() -> i32 {
+  let pair = Pair { first: 20, second: 22 }
+  if sum(&pair) != 42 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `Reflect` with `import silk.reflect { Reflect }`.
+
+Public declarations: 7.
+
+::Anchor{id="namedKind"}
+
+## `namedKind`
+
+```silk
+pub const namedKind: u8
+```
+
+The [`Reflect.typeKind`](#Reflect.impl.typeKind) result for a declared struct with named fields.
+
+::Anchor{id="positionalKind"}
+
+## `positionalKind`
+
+```silk
+pub const positionalKind: u8
+```
+
+The [`Reflect.typeKind`](#Reflect.impl.typeKind) result for a declared tuple type with positional fields.
+
+::Anchor{id="anonymousNamedKind"}
+
+## `anonymousNamedKind`
+
+```silk
+pub const anonymousNamedKind: u8
+```
+
+The [`Reflect.typeKind`](#Reflect.impl.typeKind) result for an anonymous record with named fields.
+
+::Anchor{id="anonymousPositionalKind"}
+
+## `anonymousPositionalKind`
+
+```silk
+pub const anonymousPositionalKind: u8
+```
+
+The [`Reflect.typeKind`](#Reflect.impl.typeKind) result for an anonymous tuple with positional fields.
+
+::Anchor{id="labeledFieldKind"}
+
+## `labeledFieldKind`
+
+```silk
+pub const labeledFieldKind: u8
+```
+
+The [`Reflect.fieldKind`](#Reflect.impl.fieldKind) result for a field with a name. Read the name with
+[`Reflect.fieldLabel`](#Reflect.impl.fieldLabel).
+
+::Anchor{id="positionalFieldKind"}
+
+## `positionalFieldKind`
+
+```silk
+pub const positionalFieldKind: u8
+```
+
+The [`Reflect.fieldKind`](#Reflect.impl.fieldKind) result for a field with a position. Read the position with
+[`Reflect.fieldOrdinal`](#Reflect.impl.fieldOrdinal).
+
+::Anchor{id="Reflect"}
+
+## `Reflect`
+
+```silk
+pub struct Reflect
+```
+
+The owner type of the reflection operations. It has no fields and is never constructed.
+
+### Details
+
+Each operation except [`Reflect.borrowField`](#Reflect.impl.borrowField) is `static`. It runs only during static
+evaluation, such as in a `static for`, a `static if`, or a `static fn`.
+
+::Anchor{id="Reflect.impl"}
+
+## Implementation `Reflect`
+
+```silk
+impl Reflect
+```
+
+::Anchor{id="Reflect.impl.typeOf"}
+
+### Associated function `typeOf`
+
+```silk
+pub static fn typeOf<Owner>() -> Intrinsic.Type<Owner>
+```
+
+Returns the compile-time descriptor of the struct or tuple type `Owner`.
+
+#### Details
+
+Give the descriptor to [`Reflect.typeKind`](#Reflect.impl.typeKind) to find the kind of type.
+
+::Anchor{id="Reflect.impl.fields"}
+
+### Associated function `fields`
+
+```silk
+pub static fn fields<Owner>() -> Intrinsic.Fields<Owner>
+```
+
+Returns the compile-time descriptors of the fields of `Owner`, in declaration order.
+
+#### Details
+
+Use the result as the sequence of a `static for`. Each element has the type
+`Intrinsic.Field<Owner, Value>`, where `Value` is the type of that field.
+
+#### Gotchas
+
+The list contains only the fields that are visible from the calling module. A private field of
+a type from another module is not in the list.
+
+::Anchor{id="Reflect.impl.typeKind"}
+
+### Associated function `typeKind`
+
+```silk
+pub static fn typeKind<Owner>(descriptor: Intrinsic.Type<Owner>) -> u8
+```
+
+Returns the kind of type that `descriptor` describes: [`namedKind`](#namedKind), [`positionalKind`](#positionalKind),
+[`anonymousNamedKind`](#anonymousNamedKind), or [`anonymousPositionalKind`](#anonymousPositionalKind).
+
+::Anchor{id="Reflect.impl.fieldKind"}
+
+### Associated function `fieldKind`
+
+```silk
+pub static fn fieldKind<Owner, Value>(field: Intrinsic.Field<Owner, Value>) -> u8
+```
+
+Returns [`labeledFieldKind`](#labeledFieldKind) for a named field, or [`positionalFieldKind`](#positionalFieldKind) for a positional
+field.
+
+::Anchor{id="Reflect.impl.fieldLabel"}
+
+### Associated function `fieldLabel`
+
+```silk
+pub static fn fieldLabel<Owner, Value>(field: Intrinsic.Field<Owner, Value>) -> string<'static>
+```
+
+Returns the name of a named field, as written in the type declaration.
+
+#### Gotchas
+
+Use this function only for a field where [`Reflect.fieldKind`](#Reflect.impl.fieldKind) is [`labeledFieldKind`](#labeledFieldKind).
+
+::Anchor{id="Reflect.impl.fieldOrdinal"}
+
+### Associated function `fieldOrdinal`
+
+```silk
+pub static fn fieldOrdinal<Owner, Value>(field: Intrinsic.Field<Owner, Value>) -> usize
+```
+
+Returns the zero-based position of a positional field.
+
+#### Gotchas
+
+Use this function only for a field where [`Reflect.fieldKind`](#Reflect.impl.fieldKind) is [`positionalFieldKind`](#positionalFieldKind).
+
+::Anchor{id="Reflect.impl.borrowField"}
+
+### Associated function `borrowField`
+
+```silk
+pub fn borrowField<Owner, Value>(owner: &Owner, static field: Intrinsic.Field<Owner, Value>) -> &Value
+```
+
+Returns a shared borrow of the field of `owner` that `field` describes.
+
+#### Details
+
+`field` is a static argument, so the compiler selects the field during specialization. At
+runtime this function is a plain field access. The borrow lives as long as the borrow of
+`owner`.
+
+#### Gotchas
+
+`field` must come from [`Reflect.fields`](#Reflect.impl.fields) for the same `Owner` type. This function cannot move
+a field out of an owned value.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

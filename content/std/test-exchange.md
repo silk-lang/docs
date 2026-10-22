@@ -1,0 +1,255 @@
+The binary plan and receipt formats that let `silk test` control the test runner.
+
+## When to use
+`silk.test_runner` uses this module. The host (the `silk test` driver) writes a plan file, and
+the runner writes a receipt file. You do not call it from normal code.
+
+## Details
+A plan starts with the magic `SLKTPLN1`, a version (`1`), a mode, and a 32-byte nonce. All
+integers are little-endian. There are two modes:
+
+- Per-test mode (`1`). The plan has the count of discovered tests, then one catalog entry per
+  test: ordinal, declaration name, execution identity, and action (`0` run, `1` cached). The
+  receipt has one result per selected test. Its disposition is `0` cached, `1` passed, or `2`
+  failed.
+- Uncached mode (`2`). The plan is exactly 256 bytes. It holds a SHA-256 digest of the catalog
+  (see [`updateCatalogDigest`](#updateCatalogDigest)) and the test count, then zero padding. The receipt is also
+  padded to 256 bytes.
+
+A receipt starts with the magic `SLKTRCP1`, the version, the mode, the nonce of the plan, and
+the SHA-256 of the complete plan. It ends with the counts and the status.
+
+## Gotchas
+- A [`Plan`](#Plan) does not stop at the first error. After a failure it reads as empty, and [`failed`](#failed)
+  stays true. Check [`failed`](#failed) or the `bool` results before a test body runs.
+- Test output goes to the inherited stdout and stderr. Only the receipt decides the result.
+
+Import as `TestExchange` with `import silk.test_exchange as TestExchange`.
+
+Public declarations: 18.
+
+::Anchor{id="Plan"}
+
+## `Plan`
+
+```silk
+pub struct Plan<'a>
+```
+
+A cursor over one borrowed plan.
+
+::Anchor{id="Entry"}
+
+## `Entry`
+
+```silk
+pub struct Entry<'a>
+```
+
+One borrowed per-test catalog entry.
+
+::Anchor{id="Receipt"}
+
+## `Receipt`
+
+```silk
+pub struct Receipt
+```
+
+An owned receipt under construction. Start it with [`beginReceipt`](#beginReceipt).
+
+::Anchor{id="openPlan"}
+
+## `openPlan`
+
+```silk
+pub fn openPlan<'a>(bytes: &'a [u8]) -> Plan<'a>
+```
+
+Opens a plan and checks its magic, version, mode and nonce framing.
+
+If a check fails, the returned plan is already rejected. See [`failed`](#failed).
+
+::Anchor{id="isPerTest"}
+
+## `isPerTest`
+
+```silk
+pub fn isPerTest(plan: &Plan) -> bool
+```
+
+Returns true for a per-test plan (mode `1`).
+
+::Anchor{id="isUncached"}
+
+## `isUncached`
+
+```silk
+pub fn isUncached(plan: &Plan) -> bool
+```
+
+Returns true for an uncached plan of 256 bytes (mode `2`).
+
+::Anchor{id="failed"}
+
+## `failed`
+
+```silk
+pub fn failed(plan: &Plan) -> bool
+```
+
+Returns true after a check on the plan fails. It does not become false again.
+
+::Anchor{id="beginPerTest"}
+
+## `beginPerTest`
+
+```silk
+pub fn beginPerTest(plan: &mut Plan, expectedDiscovered: u64) -> bool
+```
+
+Reads the test count of a per-test plan, and checks it and the size bound of the file.
+
+The count must equal `expectedDiscovered`. Call it before any test body runs.
+
+::Anchor{id="readEntry"}
+
+## `readEntry`
+
+```silk
+pub fn readEntry<'a>(
+  plan: &mut Plan<'a>,
+  expectedOrdinal: u64,
+  expectedDeclaration: &[u8],
+) -> Entry<'a>
+```
+
+Reads and checks the next catalog entry.
+
+The ordinal and declaration name must match the expected values, and a cached entry must have an
+execution identity. For an uncached plan, it returns [`uncachedEntry`](#uncachedEntry) and reads nothing.
+
+::Anchor{id="cached"}
+
+## `cached`
+
+```silk
+pub fn cached(entry: &Entry) -> bool
+```
+
+Returns true for a valid entry that the host marked as a cache hit.
+
+::Anchor{id="executionIdentity"}
+
+## `executionIdentity`
+
+```silk
+pub fn executionIdentity<'a>(entry: &Entry<'a>) -> &'a [u8]
+```
+
+Borrows the opaque execution identity of an entry.
+
+::Anchor{id="uncachedEntry"}
+
+## `uncachedEntry`
+
+```silk
+pub fn uncachedEntry<'a>(bytes: &'a [u8]) -> Entry<'a>
+```
+
+Returns the empty entry that is not cached, for uncached mode.
+
+::Anchor{id="finishPerTest"}
+
+## `finishPerTest`
+
+```silk
+pub fn finishPerTest(plan: &mut Plan) -> bool
+```
+
+Checks that a per-test plan ends exactly after the catalog.
+
+::Anchor{id="validateUncached"}
+
+## `validateUncached`
+
+```silk
+pub fn validateUncached(
+  plan: &mut Plan,
+  expectedCatalogDigest: &[u8],
+  expectedDiscovered: u64,
+) -> bool
+```
+
+Checks an uncached plan: exactly 256 bytes, the catalog digest, the test count, and zero
+padding.
+
+::Anchor{id="updateCatalogDigest"}
+
+## `updateCatalogDigest`
+
+```silk
+pub fn updateCatalogDigest(state: &mut Sha256, ordinal: u64, identity: &[u8]) -> ()
+```
+
+Adds one catalog identity to the digest of an uncached plan.
+
+It hashes the ordinal and the identity length as 8-byte little-endian values, then the identity.
+
+::Anchor{id="beginReceipt"}
+
+## `beginReceipt`
+
+```silk
+pub effect fn beginReceipt(
+  plan: &[u8],
+  perTest: bool,
+  selected: u64,
+) -> Receipt ! OutOfMemoryError ? &mut Allocator
+```
+
+Starts a receipt for `plan`. It copies the nonce and hashes the complete plan.
+
+`selected` is the number of results that follow in per-test mode.
+
+::Anchor{id="appendResult"}
+
+## `appendResult`
+
+```silk
+pub effect fn appendResult(
+  receipt: &mut Receipt,
+  ordinal: u64,
+  declaration: &[u8],
+  execution: &[u8],
+  disposition: u8,
+) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Appends one per-test result. Append results in ordinal order.
+
+### Gotchas
+It traps if the receipt is not per-test, or if `disposition` is more than `2`.
+
+::Anchor{id="finishReceipt"}
+
+## `finishReceipt`
+
+```silk
+pub effect fn finishReceipt(
+  receipt: Receipt,
+  discovered: u64,
+  selected: u64,
+  cachedCount: u64,
+  executed: u64,
+  passed: u64,
+  failedCount: u64,
+  status: u32,
+) -> Bytes ! OutOfMemoryError ? &mut Allocator
+```
+
+Appends the counts and the status, and returns the receipt bytes.
+
+In uncached mode the receipt is padded to exactly 256 bytes.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

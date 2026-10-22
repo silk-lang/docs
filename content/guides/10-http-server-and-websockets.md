@@ -1,6 +1,6 @@
 # HTTP server and WebSockets
 
-A Silk HTTP server is a loop you write yourself: listen on a socket, accept one connection, read one request, write one response. The standard library supplies each step with explicit limits and no background threads. This guide builds `greeter`, a server on 127.0.0.1:8080 with two plain routes and one WebSocket route. Chapter 13 of the book builds a larger service the same way; here the focus is on the server API itself.
+A Silk HTTP server is a loop you write yourself: listen on a socket, accept one connection, read one request, write one response. The standard library supplies each step with explicit limits and no background threads. This guide builds `greeter`, a server on `127.0.0.1:8080` with two plain routes and one WebSocket route. Chapter 13 of the book builds a larger service the same way; here the focus is on the server API itself.
 
 | Request | Answer |
 | --- | --- |

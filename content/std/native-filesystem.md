@@ -1,0 +1,254 @@
+The system calls for files and directories, for the native `FileSystem` provider.
+
+## When to use
+`silk.os_filesystem` uses [`NativeFileSystem`](#NativeFileSystem). Application code uses the `FileSystem` effect
+from `silk.filesystem` instead.
+
+## Details
+Each operation starts at the root directory and opens each part of the path relative to its
+parent, without following symbolic links. So a path cannot leave the root.
+
+[`FileHandle`](#FileHandle) and [`DirectoryHandle`](#DirectoryHandle) each own one open descriptor. Close them with
+[`NativeFileSystem.closeFile`](#NativeFileSystem.impl.closeFile) or [`NativeFileSystem.closeDirectory`](#NativeFileSystem.impl.closeDirectory) to get a close error. A
+drop also closes them, and keeps an earlier error.
+
+An atomic write makes a new file in the same directory with a unique name, then makes it visible
+at the path. A replace uses `renameat`, which replaces a final symbolic link itself, not its
+target. A create uses `linkat`, which fails if any entry exists. New files get mode 0666,
+filtered by the umask. A replace keeps no permissions, owner, extended attributes, or hard links
+of the old file. A synchronized write calls `fsync` on the new file before it is visible, and on
+the directory after. This is not `F_FULLFSYNC`, and it does not promise that data survives a
+power loss.
+
+## Errors
+Each operation fails with `FileError`, with a portable reason and the native error code.
+`writeFileAtomic` fails with `AtomicWriteError`.
+
+## Gotchas
+- A call that a signal interrupts is made again, except `close`, which is never repeated.
+- Other processes must not change the temporary files of an atomic write.
+- The functions exist only on Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
+
+Import as `NativeFileSystem` with `import silk.native_filesystem { NativeFileSystem }`.
+
+Public declarations: 3.
+
+::Anchor{id="FileHandle"}
+
+## `FileHandle`
+
+```silk
+pub struct FileHandle
+```
+
+An open file. It owns its descriptor, and closes it one time.
+
+::Anchor{id="DirectoryHandle"}
+
+## `DirectoryHandle`
+
+```silk
+pub struct DirectoryHandle
+```
+
+An open directory stream. It keeps a name that did not fit in the output, for the next call.
+
+::Anchor{id="DirectoryHandle.impl.Drop"}
+
+## Implementation `Drop for DirectoryHandle`
+
+```silk
+impl Drop for DirectoryHandle
+```
+
+::Anchor{id="DirectoryHandle.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut DirectoryHandle) -> ()
+```
+
+::Anchor{id="NativeFileSystem"}
+
+## `NativeFileSystem`
+
+```silk
+pub struct NativeFileSystem
+```
+
+The file system functions. Each takes the root directory and a normalized path below it.
+
+::Anchor{id="NativeFileSystem.impl"}
+
+## Implementation `NativeFileSystem`
+
+```silk
+impl NativeFileSystem
+```
+
+::Anchor{id="NativeFileSystem.impl.openFile"}
+
+### Associated function `openFile`
+
+```silk
+pub effect fn openFile(root: &[u8], path: &[u8], writing: bool, operation: i32) -> FileHandle ! FileError
+```
+
+Opens a regular file to read, or to write when `writing` is true. A file to write is truncated
+only after it is found to be a regular file.
+
+::Anchor{id="NativeFileSystem.impl.createFile"}
+
+### Associated function `createFile`
+
+```silk
+pub effect fn createFile(root: &[u8], path: &[u8], bytes: &[u8]) -> () ! FileError
+```
+
+Creates a file at `path` and writes `bytes`, only if no entry exists.
+
+#### Details
+An existing file, directory, or symbolic link fails with `AlreadyExists`. The new file gets
+mode 0666, filtered by the umask. A reader can see a part of the file during the write. If a
+later write or close fails, the new partial file stays. It does not call `fsync`.
+
+::Anchor{id="NativeFileSystem.impl.writeFileAtomic"}
+
+### Associated function `writeFileAtomic`
+
+```silk
+pub effect fn writeFileAtomic(root: &[u8], path: &[u8], bytes: &[u8], policy: i32, durability: i32, counter: &mut u64) -> () ! AtomicWriteError
+```
+
+Writes `bytes` to a temporary file in the same directory, then makes it visible at `path` in
+one step.
+
+#### Details
+`policy` 0 replaces with `renameat`. The path can be absent, a regular file, or a symbolic
+link, which is replaced itself. A directory or another kind fails with `WrongType`. `policy` 1
+creates with `linkat`, and fails with `AlreadyExists` if any entry exists.
+
+The temporary name is created with `O_EXCL`. At most 128 names are tried. The temporary entry
+is removed through the open directory, not by its path again.
+
+`durability` 0 does not sync. `durability` 1 calls `fsync` on the file before it is visible,
+then on the directory after. An unsupported policy or sync fails.
+
+#### Errors
+`AtomicWriteError` has the first error and whether the new contents are visible. A failed sync
+or close of the directory reports that they are visible. A temporary entry that cannot be
+removed is reported separately with its name.
+
+::Anchor{id="NativeFileSystem.impl.syncDirectory"}
+
+### Associated function `syncDirectory`
+
+```silk
+pub effect fn syncDirectory(root: &[u8], path: &[u8]) -> () ! FileError
+```
+
+Calls `fsync` on the directory at `path`, then closes it.
+
+If the file system does not support it (`EINVAL`, `ENOTSUP`, or `ENOSYS`), it fails with
+`Unsupported` and the native code.
+
+::Anchor{id="NativeFileSystem.impl.openDirectory"}
+
+### Associated function `openDirectory`
+
+```silk
+pub effect fn openDirectory(root: &[u8], path: &[u8], operation: i32) -> DirectoryHandle ! FileError
+```
+
+Opens the directory at `path` as a stream.
+
+::Anchor{id="NativeFileSystem.impl.inspect"}
+
+### Associated function `inspect`
+
+```silk
+pub effect fn inspect(root: &[u8], path: &[u8], outputKind: &mut i32, length: &mut usize, operation: i32) -> () ! FileError
+```
+
+Writes the kind (0 for a file, 1 for a directory) and the length of the entry at `path`. It
+does not follow a symbolic link.
+
+::Anchor{id="NativeFileSystem.impl.command"}
+
+### Associated function `command`
+
+```silk
+pub effect fn command(root: &[u8], path: &[u8], command: i32, operation: i32) -> () ! FileError
+```
+
+Creates a directory (`command` 0), removes a file (1), or removes an empty directory (2) at
+`path`. It does not follow a symbolic link.
+
+::Anchor{id="NativeFileSystem.impl.readFile"}
+
+### Associated function `readFile`
+
+```silk
+pub effect fn readFile(handle: &mut FileHandle, output: &mut [u8], operation: i32) -> usize ! FileError
+```
+
+Reads at most `output.length` bytes into the start of `output`, and returns the count. Zero
+means the end of the file.
+
+::Anchor{id="NativeFileSystem.impl.writeFile"}
+
+### Associated function `writeFile`
+
+```silk
+pub effect fn writeFile(handle: &mut FileHandle, input: &[u8], operation: i32) -> () ! FileError
+```
+
+Writes all of `input`. If it fails, part of `input` can be written already.
+
+::Anchor{id="NativeFileSystem.impl.next"}
+
+### Associated function `next`
+
+```silk
+pub effect fn next(handle: &mut DirectoryHandle, output: &mut [u8], count: &mut usize, required: &mut usize, outputKind: &mut i32, operation: i32) -> bool ! FileError
+```
+
+Copies the name of the next directory entry to `output`, and returns true.
+
+If the name does not fit, it returns false, writes the needed size to `required`, and keeps
+the name for the next call. A true result with a `count` of 0 is the end of the directory.
+
+::Anchor{id="NativeFileSystem.impl.createUnique"}
+
+### Associated function `createUnique`
+
+```silk
+pub effect fn createUnique(root: &[u8], path: &[u8], prefix: &[u8], counter: &mut u64, output: &mut [u8], count: &mut usize, required: &mut usize, operation: i32) -> bool ! FileError
+```
+
+Creates a directory in `path` named `prefix`, `-`, and 16 hex digits of `counter`, and returns
+true. It tries at most 128 names. If the name does not fit in `output`, it returns false and
+writes the needed size to `required`.
+
+::Anchor{id="NativeFileSystem.impl.closeFile"}
+
+### Associated function `closeFile`
+
+```silk
+pub effect fn closeFile(value: FileHandle, operation: FileOperation) -> () ! FileError
+```
+
+Closes the file one time. It does not try again after an interrupt.
+
+::Anchor{id="NativeFileSystem.impl.closeDirectory"}
+
+### Associated function `closeDirectory`
+
+```silk
+pub effect fn closeDirectory(value: DirectoryHandle, operation: FileOperation) -> () ! FileError
+```
+
+Closes the directory stream one time.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

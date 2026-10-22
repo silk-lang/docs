@@ -1,0 +1,90 @@
+The native provider of the `Random` effect: secure random bytes from the operating system.
+
+## When to use
+Provide [`OsRandom`](#OsRandom) for `Random` in a native program, for keys, nonces, and other secrets. In a
+test, provide a fake that returns fixed bytes.
+
+## Details
+Each fill gets bytes from the secure random source of the system: `getrandom` on Linux and
+`arc4random_buf` on macOS. An empty buffer does nothing.
+
+## Gotchas
+- A failure of the source is a trap, because weak bytes are not safe. Part of the buffer can be
+  changed before the trap.
+- On Linux, it needs glibc 2.25 and Linux 3.17 or later.
+- [`OsRandom.make`](#OsRandom.impl.make) fails to compile on targets other than Darwin on aarch64, and Linux with GNU
+  libc on x86_64 or aarch64.
+
+## Examples
+### Make a random key
+```silk
+import silk.effect { Effect }
+import silk.os_random { OsRandom }
+import silk.random { Random }
+
+pub fn main() -> i32 {
+  let mut random = OsRandom.make()
+  let mut key: [u8; 32] = [0; 32]
+  run Random.fillBytes(&mut key) |> Effect.provideMut<Random>(&mut random)
+
+  // 32 zero bytes from a secure source are practically impossible.
+  let mut index: usize = 0
+  while index < 32 {
+    if key[index] != 0 {
+      return 0
+    }
+    index = index + 1
+  }
+  return 1
+}
+```
+
+Import as `OsRandom` with `import silk.os_random { OsRandom }`.
+
+Public declarations: 1.
+
+::Anchor{id="OsRandom"}
+
+## `OsRandom`
+
+```silk
+pub struct OsRandom
+```
+
+The native `Random` provider. It has no state. A failure is a trap.
+
+::Anchor{id="OsRandom.impl"}
+
+## Implementation `OsRandom`
+
+```silk
+impl OsRandom
+```
+
+::Anchor{id="OsRandom.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> OsRandom
+```
+
+Returns a provider. It does not read random bytes.
+
+::Anchor{id="OsRandom.impl.Random"}
+
+## Implementation `Random for OsRandom`
+
+```silk
+impl Random for OsRandom
+```
+
+::Anchor{id="OsRandom.impl.Random.fillBytes"}
+
+### Operation `fillBytes`
+
+```silk
+effect fn fillBytes(self: &mut Self, output: &mut [u8]) -> ()
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

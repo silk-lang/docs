@@ -1,0 +1,71 @@
+Decode the text of a JSON string token, including its escapes, into owned bytes.
+
+## When to use
+Use [`JsonText.decode`](#JsonText.impl.decode) in a `Deserialize` implementation, after `JsonScanner` returned a
+`JsonToken.String`. Pass the raw bytes of the token, its offset, and its `escaped` flag. The
+result is valid UTF-8, so `String.fromBytesUnchecked` can take it without a check.
+
+Import as `JsonText` with `import silk.json_text { JsonText }`.
+
+Public declarations: 1.
+
+::Anchor{id="JsonText"}
+
+## `JsonText`
+
+```silk
+pub struct JsonText
+```
+
+The owner type of the string decoding operations. It has no fields and is never constructed.
+
+::Anchor{id="JsonText.impl"}
+
+## Implementation `JsonText`
+
+```silk
+impl JsonText
+```
+
+::Anchor{id="JsonText.impl.copy"}
+
+### Associated function `copy`
+
+```silk
+pub effect fn copy(raw: &[u8]) -> Bytes ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns an owned copy of `raw`.
+
+#### Gotchas
+
+`raw` must be bytes that the scanner already checked as valid UTF-8 text with no escapes.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the copy.
+
+::Anchor{id="JsonText.impl.decode"}
+
+### Associated function `decode`
+
+```silk
+pub effect fn decode(raw: &[u8], offset: usize, escaped: bool)
+    -> Bytes ! JsonError | OutOfMemoryError ? &mut Allocator
+```
+
+Returns the text of the quoted string token `raw`, with escapes such as `\n` and `\u00e9`
+decoded.
+
+#### Details
+
+`raw` includes the quotes. `offset` is the position of the token in the document, for errors.
+If `escaped` is `false`, the text is copied without a scan for escapes.
+
+#### Errors
+
+- `JsonError` with reason `UnterminatedString` if `raw` is shorter than two bytes, or
+  `InvalidEscape` for an escape that is not valid.
+- `OutOfMemoryError` if the `Allocator` cannot supply the text.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

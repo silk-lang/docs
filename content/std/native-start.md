@@ -1,0 +1,27 @@
+The default start code of a native program: it calls your `main` and returns its status.
+
+## When to use
+The compiler uses this runtime for native programs on Darwin on aarch64, and Linux with GNU libc
+on x86_64 or aarch64. You do not call it.
+
+## Details
+`main` can return one of these:
+- `i32`, the exit status.
+- `()`, for status 0.
+- An effect that returns `i32` or `()`, and that can require `&mut HostInput`. The runtime gives
+  an `OsHostInput` with the arguments and the environment of the process.
+
+Other requirements, such as `&mut Allocator`, must be provided by your code. An unhandled error
+prints a report to standard error and returns status 1. The report has at most 4096 bytes and 32
+frames.
+
+## Gotchas
+- There is no scheduler or event loop. If `main` parks, the program fails with status 1. Make
+  your own execution for code that parks.
+- A trap does not unwind, so cleanup code does not run.
+
+Public declarations: 0.
+
+This module declares no public items.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -1,0 +1,168 @@
+Write a TOML document or a single TOML string or key through the ambient `Writer`.
+
+## When to use
+Use [`TomlOutput.write`](#TomlOutput.impl.write) to write a `silk.toml_value` tree, for example after you change a
+parsed document. Use [`TomlOutput.writeKey`](#TomlOutput.impl.writeKey) and [`TomlOutput.writeString`](#TomlOutput.impl.writeString) with
+`silk.toml_codec` to write a document line by line.
+
+## Details
+[`TomlOutput.write`](#TomlOutput.impl.write) checks the full tree before it writes the first byte. In each table, it
+writes the plain members first, as `key = value` lines, and then each nested table as a `[path]`
+section and each array of tables as `[[path]]` sections. A table inside an array is written
+inline as `{ ... }`. The table kind is not used, so a dotted or inline table in the source is
+written as a section. Integers, floats, dates, and times are written with their stored text.
+
+## Errors
+- `TomlError` if the tree cannot be written as TOML: the root is not a table, a key occurs two
+  times in one table, a stored number or date is not valid, an array of tables is empty or holds
+  a value that is not a table, or the nesting is deeper than 64. `offset` is 0.
+- `WriterError` if the `Writer` fails. The bytes that it accepted stay written.
+- `OutOfMemoryError` if the `Allocator` cannot supply the table path.
+
+## Gotchas
+The output order can differ from the source order, because the plain members of a table come
+before its nested tables. Comments and the original spelling of strings are not kept. The
+functions do not flush the `Writer`.
+
+## Examples
+### Write a parsed document
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.toml_output { TomlOutput }
+import silk.toml_scanner { TomlError }
+import silk.toml_value { Toml }
+import silk.writer { Writer, WriterError }
+
+struct CaptureWriter {
+  bytes: [u8; 64]
+  length: usize
+}
+
+impl Writer for CaptureWriter {
+  effect fn writeAll(self: &mut Self, value: &[u8]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    let mut index: usize = 0
+    while index < value.length {
+      self.bytes[self.length] = value[index]
+      self.length = self.length + 1
+      index = index + 1
+    }
+    return ()
+  }
+
+  effect fn flush(self: &mut Self) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return ()
+  }
+}
+
+fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
+  if writer.length != expected.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < expected.length {
+    if writer.bytes[index] != expected[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
+}
+
+pub effect fn main() -> i32
+  ! TomlError | OutOfMemoryError | WriterError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let document = run Toml.parse(b"owner = { name = \"Ada\" }\nport = 80\n")
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut output = CaptureWriter { bytes: [0; 64], length: 0 }
+  run TomlOutput.write(&document) |> Effect.provideMut<Allocator>(&mut allocator)
+    |> Effect.provideMut<Writer>(&mut output)
+
+  // The plain member `port` comes first, and the inline table becomes a section.
+  if !holds(&output, b"port = 80\n[owner]\nname = \"Ada\"\n") {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `TomlOutput` with `import silk.toml_output { TomlOutput }`.
+
+Public declarations: 1.
+
+::Anchor{id="TomlOutput"}
+
+## `TomlOutput`
+
+```silk
+pub struct TomlOutput
+```
+
+Functions that write TOML through the ambient `Writer`.
+
+::Anchor{id="TomlOutput.impl"}
+
+## Implementation `TomlOutput`
+
+```silk
+impl TomlOutput
+```
+
+::Anchor{id="TomlOutput.impl.write"}
+
+### Associated function `write`
+
+```silk
+pub effect fn write(document: &Value)
+    -> () ! TomlError | OutOfMemoryError | WriterError ? &mut Allocator | &mut Writer
+```
+
+Writes the document `document` as TOML. The root must be a table.
+
+It checks the full tree first, so a [`TomlError`](/docs/std/toml-scanner#TomlError) occurs before any byte is written.
+
+#### Errors
+- `TomlError` if the tree cannot be written as TOML. See the module docs for the cases.
+- `WriterError` if the `Writer` fails. The bytes that it accepted stay written.
+- `OutOfMemoryError` if the `Allocator` cannot supply the table path.
+
+#### Gotchas
+It does not flush the `Writer`.
+
+::Anchor{id="TomlOutput.impl.writeString"}
+
+### Associated function `writeString`
+
+```silk
+pub effect fn writeString(value: string) -> () ! WriterError ? &mut Writer
+```
+
+Writes `value` as a TOML basic string in `"` quotes.
+
+It escapes `"` and `\`, writes the common control characters as `\b`, `\t`, `\n`, `\f`, and
+`\r`, and writes the other control characters as `\u00XX`. Other text is written as it is.
+
+#### Errors
+- `WriterError` if the `Writer` fails.
+
+::Anchor{id="TomlOutput.impl.writeKey"}
+
+### Associated function `writeKey`
+
+```silk
+pub effect fn writeKey(value: string) -> () ! WriterError ? &mut Writer
+```
+
+Writes `value` as a TOML key.
+
+A key that has only ASCII letters, digits, `-`, and `_` is written bare. Other keys, and the
+empty key, are written with [`TomlOutput.writeString`](#TomlOutput.impl.writeString).
+
+#### Errors
+- `WriterError` if the `Writer` fails.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

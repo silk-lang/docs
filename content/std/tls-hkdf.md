@@ -1,0 +1,355 @@
+The TLS 1.3 key schedule functions `HKDF-Expand-Label` and `Derive-Secret` (RFC 8446, section
+7.1).
+
+## When to use
+Use [`TlsHkdfSha256`](#TlsHkdfSha256) or [`TlsHkdfSha384`](#TlsHkdfSha384) to derive TLS 1.3 secrets, keys, and IVs, or keys for
+a protocol that reuses the TLS key schedule, such as QUIC. For other uses, use `silk.hkdf`.
+
+## Details
+[`TlsHkdfSha256.expandLabel`](#TlsHkdfSha256.impl.expandLabel) adds the prefix `tls13 ` to the label and fills the output.
+[`TlsHkdfSha256.deriveSecret`](#TlsHkdfSha256.impl.deriveSecret) hashes the handshake messages and expands with that hash.
+[`TlsHkdfSha256.deriveSecretFromHash`](#TlsHkdfSha256.impl.deriveSecretFromHash) takes a transcript hash that you already have. Nothing
+allocates.
+
+## Errors
+- [`LabelError`](#LabelError) if the label is not 1 to 249 bytes, the context is longer than 255 bytes, the
+  output is too long, or the messages are too long. The output does not change.
+
+## Gotchas
+Give the label without `tls13 `, because it is always added. You choose the labels and build the
+transcript. Secrets are not erased.
+
+## Examples
+### Derive a secret from messages or from their hash
+```silk
+import silk.result { Result }
+import silk.sha2 { Sha256 }
+import silk.tls_hkdf { LabelError, TlsHkdfSha256 }
+
+pub fn main() -> i32 {
+  let secret: [u8; 32] = [7; 32]
+  let fromMessages = match TlsHkdfSha256.deriveSecret(&secret, b"derived", b"") {
+    Result<[u8; 32], LabelError>.Success { value } => value
+    Result<[u8; 32], LabelError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // An empty transcript is the hash of no bytes, not 32 zero bytes.
+  let emptyHash = Sha256.hash(b"")
+  let fromHash = match TlsHkdfSha256.deriveSecretFromHash(&secret, b"derived", &emptyHash) {
+    Result<[u8; 32], LabelError>.Success { value } => value
+    Result<[u8; 32], LabelError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let mut index: usize = 0
+  while index < 32 {
+    if fromMessages[index] != fromHash[index] {
+      return 1
+    }
+    index = index + 1
+  }
+  return 0
+}
+```
+
+Import as `TlsHkdfSha256` with `import silk.tls_hkdf { TlsHkdfSha256 }`.
+
+Public declarations: 3.
+
+::Anchor{id="LabelError"}
+
+## `LabelError`
+
+```silk
+pub union LabelError
+```
+
+A length that the key schedule does not accept. It holds no secret bytes.
+
+::Anchor{id="LabelError.LabelLength"}
+
+### `LabelLength`
+
+```silk
+LabelLength
+```
+
+The label is empty or longer than 249 bytes.
+
+::Anchor{id="LabelError.LabelLength.requested"}
+
+#### Field `requested`
+
+```silk
+pub requested: usize
+```
+
+The requested length in bytes.
+
+::Anchor{id="LabelError.LabelLength.maximum"}
+
+#### Field `maximum`
+
+```silk
+pub maximum: usize
+```
+
+The largest accepted length in bytes.
+
+::Anchor{id="LabelError.ContextLength"}
+
+### `ContextLength`
+
+```silk
+ContextLength
+```
+
+The context is longer than 255 bytes.
+
+::Anchor{id="LabelError.ContextLength.requested"}
+
+#### Field `requested`
+
+```silk
+pub requested: usize
+```
+
+The requested length in bytes.
+
+::Anchor{id="LabelError.ContextLength.maximum"}
+
+#### Field `maximum`
+
+```silk
+pub maximum: usize
+```
+
+The largest accepted length in bytes.
+
+::Anchor{id="LabelError.OutputLength"}
+
+### `OutputLength`
+
+```silk
+OutputLength
+```
+
+The output is longer than 255 hash blocks.
+
+::Anchor{id="LabelError.OutputLength.requested"}
+
+#### Field `requested`
+
+```silk
+pub requested: usize
+```
+
+The requested length in bytes.
+
+::Anchor{id="LabelError.OutputLength.maximum"}
+
+#### Field `maximum`
+
+```silk
+pub maximum: usize
+```
+
+The largest accepted length in bytes.
+
+::Anchor{id="LabelError.MessageTooLong"}
+
+### `MessageTooLong`
+
+```silk
+MessageTooLong
+```
+
+The messages are longer than SHA-256 allows.
+
+::Anchor{id="LabelError.MessageTooLong.requested"}
+
+#### Field `requested`
+
+```silk
+pub requested: u64
+```
+
+The requested length in bytes.
+
+::Anchor{id="LabelError.MessageTooLong.maximum"}
+
+#### Field `maximum`
+
+```silk
+pub maximum: u64
+```
+
+The largest accepted length in bytes.
+
+::Anchor{id="TlsHkdfSha256"}
+
+## `TlsHkdfSha256`
+
+```silk
+pub struct TlsHkdfSha256
+```
+
+The TLS 1.3 key schedule with SHA-256. Secrets and transcript hashes are 32 bytes.
+
+::Anchor{id="TlsHkdfSha256.impl"}
+
+## Implementation `TlsHkdfSha256`
+
+```silk
+impl TlsHkdfSha256
+```
+
+::Anchor{id="TlsHkdfSha256.impl.expandLabel"}
+
+### Associated function `expandLabel`
+
+```silk
+pub fn expandLabel(secret: &([u8; 32]), label: &[u8], context: &[u8], output: &mut [u8]) -> Result<
+    (),
+    LabelError,
+  >
+```
+
+Fills `output` with `HKDF-Expand-Label(secret, label, context, output.length)`.
+
+The prefix `tls13 ` is added to `label`. All lengths are checked before the first write.
+
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `ContextLength` if `context` is longer than 255 bytes.
+- `OutputLength` if `output` is longer than 8160 bytes.
+
+::Anchor{id="TlsHkdfSha256.impl.deriveSecret"}
+
+### Associated function `deriveSecret`
+
+```silk
+pub fn deriveSecret(secret: &([u8; 32]), label: &[u8], messages: &[u8]) -> Result<
+    [u8; 32],
+    LabelError,
+  >
+```
+
+Returns `Derive-Secret(secret, label, messages)`: the 32-byte expansion with the SHA-256 hash
+of `messages` as the context.
+
+Give the handshake messages as they are on the wire, in order.
+
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `MessageTooLong` if `messages` is too long.
+
+#### Gotchas
+If you already have the transcript hash, use [`TlsHkdfSha256.deriveSecretFromHash`](#TlsHkdfSha256.impl.deriveSecretFromHash). This
+function hashes its input again.
+
+::Anchor{id="TlsHkdfSha256.impl.deriveSecretFromHash"}
+
+### Associated function `deriveSecretFromHash`
+
+```silk
+pub fn deriveSecretFromHash(secret: &([u8; 32]), label: &[u8], transcriptHash: &([u8; 32])) -> Result<
+    [u8; 32],
+    LabelError,
+  >
+```
+
+Returns `Derive-Secret` with a SHA-256 transcript hash that you already computed.
+
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+
+#### Gotchas
+For an empty transcript, give the hash of no bytes. A hash of all zeros gives a different
+secret.
+
+::Anchor{id="TlsHkdfSha384"}
+
+## `TlsHkdfSha384`
+
+```silk
+pub struct TlsHkdfSha384
+```
+
+The TLS 1.3 key schedule with SHA-384. Secrets and transcript hashes are 48 bytes.
+
+::Anchor{id="TlsHkdfSha384.impl"}
+
+## Implementation `TlsHkdfSha384`
+
+```silk
+impl TlsHkdfSha384
+```
+
+::Anchor{id="TlsHkdfSha384.impl.expandLabel"}
+
+### Associated function `expandLabel`
+
+```silk
+pub fn expandLabel(secret: &([u8; 48]), label: &[u8], context: &[u8], output: &mut [u8]) -> Result<
+    (),
+    LabelError,
+  >
+```
+
+Fills `output` with `HKDF-Expand-Label(secret, label, context, output.length)`.
+
+The prefix `tls13 ` is added to `label`. All lengths are checked before the first write.
+
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `ContextLength` if `context` is longer than 255 bytes.
+- `OutputLength` if `output` is longer than 12240 bytes.
+
+::Anchor{id="TlsHkdfSha384.impl.deriveSecret"}
+
+### Associated function `deriveSecret`
+
+```silk
+pub fn deriveSecret(secret: &([u8; 48]), label: &[u8], messages: &[u8]) -> Result<
+    [u8; 48],
+    LabelError,
+  >
+```
+
+Returns `Derive-Secret(secret, label, messages)`: the 48-byte expansion with the SHA-384 hash
+of `messages` as the context.
+
+Give the handshake messages as they are on the wire, in order.
+
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `MessageTooLong` if `messages` is too long.
+
+#### Gotchas
+If you already have the transcript hash, use [`TlsHkdfSha384.deriveSecretFromHash`](#TlsHkdfSha384.impl.deriveSecretFromHash). This
+function hashes its input again.
+
+::Anchor{id="TlsHkdfSha384.impl.deriveSecretFromHash"}
+
+### Associated function `deriveSecretFromHash`
+
+```silk
+pub fn deriveSecretFromHash(secret: &([u8; 48]), label: &[u8], transcriptHash: &([u8; 48])) -> Result<
+    [u8; 48],
+    LabelError,
+  >
+```
+
+Returns `Derive-Secret` with a SHA-384 transcript hash that you already computed.
+
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+
+#### Gotchas
+For an empty transcript, give the hash of no bytes. A hash of all zeros gives a different
+secret.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

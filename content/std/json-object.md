@@ -1,0 +1,202 @@
+Write a JSON object, one member at a time, to the `Writer`.
+
+## When to use
+Use [`JsonObject`](#JsonObject) in a `Serialize` implementation to write a struct as a JSON object. Start
+with [`JsonObject.begin`](#JsonObject.impl.begin), add members with [`JsonObject.field`](#JsonObject.impl.field) or [`JsonObject.fieldIfSome`](#JsonObject.impl.fieldIfSome),
+and finish with [`JsonObject.end`](#JsonObject.impl.end), in one `|>` chain.
+
+## Details
+Each step returns an effect that the next step runs, so the chain writes the members in order.
+The object keeps track of commas and of the depth. It does not allocate.
+
+## Errors
+- `JsonError` if the nesting is deeper than the limit in the options, or a value fails.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+## Examples
+### Write a struct as an object
+```silk
+import silk.effect { Effect }
+import silk.json_codec { Serialize }
+import silk.json_object { JsonObject }
+import silk.json_output { JsonOptions }
+import silk.json_scanner { JsonError }
+import silk.json_value { Json }
+import silk.writer { Writer, WriterError }
+
+struct CaptureWriter {
+  bytes: [u8; 64]
+  length: usize
+}
+
+impl Writer for CaptureWriter {
+  effect fn writeAll(self: &mut Self, value: &[u8]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    let mut index: usize = 0
+    while index < value.length {
+      self.bytes[self.length] = value[index]
+      self.length = self.length + 1
+      index = index + 1
+    }
+    return ()
+  }
+
+  effect fn flush(self: &mut Self) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return ()
+  }
+}
+
+fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
+  if writer.length != expected.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < expected.length {
+    if writer.bytes[index] != expected[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
+}
+
+struct Point {
+  x: i32
+  y: i32
+}
+
+impl Serialize for Point {
+  effect fn serialize(self: &Self, options: &JsonOptions) -> ()
+    ! JsonError | WriterError
+    ? &mut Writer {
+    return run JsonObject.begin(options) |> JsonObject.field("x", &self.x)
+      |> JsonObject.field("y", &self.y)
+      |> JsonObject.end
+  }
+}
+
+pub effect fn main() -> i32
+  ! JsonError | WriterError {
+  let mut writer = CaptureWriter { bytes: [0; 64], length: 0 }
+  let point = Point { x: 3, y: -4 }
+  run Json.serialize(&point, &JsonOptions.compact()) |> Effect.provideMut<Writer>(&mut writer)
+  if !holds(&writer, b"{\"x\":3,\"y\":-4}") {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `JsonObject` with `import silk.json_object { JsonObject }`.
+
+Public declarations: 1.
+
+::Anchor{id="JsonObject"}
+
+## `JsonObject`
+
+```silk
+pub struct JsonObject
+```
+
+The state of one open JSON object: its options and if a member was written.
+
+::Anchor{id="JsonObject.impl"}
+
+## Implementation `JsonObject`
+
+```silk
+impl JsonObject
+```
+
+::Anchor{id="JsonObject.impl.begin"}
+
+### Associated function `begin`
+
+```silk
+pub effect fn begin(options: &JsonOptions)
+    -> JsonObject ! JsonError | WriterError ? &mut Writer
+```
+
+Writes `{` and returns the state of the open object.
+
+#### Errors
+
+- `JsonError` with reason `DepthExceeded` if the object would be deeper than the limit in
+  `options`. Nothing is written.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+::Anchor{id="JsonObject.impl.field"}
+
+### Method `field`
+
+```silk
+pub effect fn field<'env, T: Serialize, E, ?R>(
+    self: once Effect<'env; JsonObject ! E ? R>,
+    key: string<'env>,
+    value: &'env T
+  ) -> JsonObject ! E | JsonError | WriterError ? R | &mut Writer
+```
+
+Writes the member `name` with `value`, after a comma if needed.
+
+#### Details
+
+The object operations form a chain with `|>`: `JsonObject.begin(options) |>
+JsonObject.field(...) |> JsonObject.end`. Each step takes the effect of the step before it and
+runs it one time. If an earlier step fails, this step writes nothing.
+
+#### Errors
+
+- `JsonError` from `value`.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+::Anchor{id="JsonObject.impl.fieldIfSome"}
+
+### Method `fieldIfSome`
+
+```silk
+pub effect fn fieldIfSome<'env, T: Serialize, E, ?R>(
+    self: once Effect<'env; JsonObject ! E ? R>,
+    key: string<'env>,
+    value: &'env Option<T>
+  ) -> JsonObject ! E | JsonError | WriterError ? R | &mut Writer
+```
+
+Writes the member `name` if `value` is present. Writes nothing for an absent value: no key and
+no comma.
+
+#### When to use
+
+Use it for optional fields that the JSON leaves out when they are absent. `JsonObject.field`
+with an `Option` writes `null` instead.
+
+#### Details
+
+The object operations form a chain with `|>`: `JsonObject.begin(options) |>
+JsonObject.field(...) |> JsonObject.end`. Each step takes the effect of the step before it and
+runs it one time. If an earlier step fails, this step writes nothing.
+
+::Anchor{id="JsonObject.impl.end"}
+
+### Method `end`
+
+```silk
+pub effect fn end<'env, E, ?R>(
+    self: once Effect<'env; JsonObject ! E ? R>
+  ) -> () ! E | JsonError | WriterError ? R | &mut Writer
+```
+
+Writes `}` and completes the object. If the object has members and indentation is on, it
+writes a newline first.
+
+#### Details
+
+The object operations form a chain with `|>`: `JsonObject.begin(options) |>
+JsonObject.field(...) |> JsonObject.end`. Each step takes the effect of the step before it and
+runs it one time. If an earlier step fails, this step writes nothing.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

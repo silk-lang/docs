@@ -1,0 +1,112 @@
+A `TrustSource` provider that holds a trust snapshot in memory.
+
+## When to use
+Use [`MemoryTrustSource`](#MemoryTrustSource) when the program already has its trust anchors, for example from an
+embedded CA file, and in tests. Call [`MemoryTrustSource.replace`](#MemoryTrustSource.impl.replace) to change the trust for later
+loads, for example after a configuration reload.
+
+## Details
+Each load returns a copy of the current snapshot. Snapshots that were loaded before a
+replacement do not change.
+
+## Gotchas
+It does not read files, refresh, or remove duplicates.
+
+## Examples
+### Provide trust from memory
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.list { List }
+import silk.memory_trust_source { MemoryTrustSource }
+import silk.result { Result }
+import silk.trust_anchor { TrustAnchor }
+import silk.trust_snapshot { SnapshotLimits, TrustLoadLimits, TrustSnapshot, TrustSourceError }
+import silk.trust_source { TrustSource }
+
+pub effect fn main() -> i32
+  ! TrustSourceError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let snapshot = match TrustSnapshot.fromAnchors(
+    List<TrustAnchor>.make(),
+    SnapshotLimits.defaults()
+  ) {
+    Result<TrustSnapshot, TrustSourceError>.Success { value } => move value
+    Result<TrustSnapshot, TrustSourceError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let mut source = MemoryTrustSource.make(move snapshot)
+  let loaded = run TrustSource.load(TrustLoadLimits.defaults())
+    |> Effect.provideMut<TrustSource>(&mut source)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  if TrustSnapshot.anchors(&loaded).length != 0 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `MemoryTrustSource` with `import silk.memory_trust_source { MemoryTrustSource }`.
+
+Public declarations: 1.
+
+::Anchor{id="MemoryTrustSource"}
+
+## `MemoryTrustSource`
+
+```silk
+pub struct MemoryTrustSource
+```
+
+A `TrustSource` provider that owns the current trust snapshot.
+
+::Anchor{id="MemoryTrustSource.impl"}
+
+## Implementation `MemoryTrustSource`
+
+```silk
+impl MemoryTrustSource
+```
+
+::Anchor{id="MemoryTrustSource.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make(snapshot: TrustSnapshot) -> MemoryTrustSource
+```
+
+Returns a provider with `snapshot` as the current trust. It does not allocate or check the
+snapshot.
+
+::Anchor{id="MemoryTrustSource.impl.replace"}
+
+### Method `replace`
+
+```silk
+pub fn replace(self: &mut Self, next: TrustSnapshot) -> TrustSnapshot
+```
+
+Makes `next` the current trust, and returns the old snapshot.
+
+Only later loads see `next`. Snapshots that were loaded before do not change. It does not
+allocate or fail.
+
+::Anchor{id="MemoryTrustSource.impl.TrustSource"}
+
+## Implementation `TrustSource for MemoryTrustSource`
+
+```silk
+impl TrustSource for MemoryTrustSource
+```
+
+::Anchor{id="MemoryTrustSource.impl.TrustSource.load"}
+
+### Operation `load`
+
+```silk
+load: MemoryTrustSource.loadCurrent
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

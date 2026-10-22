@@ -1,0 +1,606 @@
+Parse JSON into a tree of values, read fields from it, and write it back.
+
+## When to use
+Use [`Json.parse`](#Json.impl.parse) when the shape of a document is not fixed, or when you need only a few fields
+of a larger document. Read the fields with [`Json.field`](#Json.impl.field), [`Json.fieldAt`](#Json.impl.fieldAt), and the `as...`
+functions. Use [`Json.deserialize`](#Json.impl.deserialize) or [`Json.decode`](#Json.impl.decode) to read a document straight into a typed
+value, and [`Json.serialize`](#Json.impl.serialize) to write a typed value. To read tokens without building a tree,
+use `silk.json_scanner`.
+
+## Details
+Parsing is strict (RFC 8259): no comments, no trailing commas, and no duplicate keys in an
+object. Arrays and objects keep the order of the source. A number keeps its source text and is
+converted only when you call [`Json.asI32`](#Json.impl.asI32) or a similar function. String escapes are decoded
+when the document is parsed. If parsing fails, everything that was built is released.
+
+## Errors
+- `JsonError` if the input is not valid JSON, has a duplicate key, nests deeper than `MAX_DEPTH`
+  (64), or has content after the value. `offset` gives the position.
+- `OutOfMemoryError` if the `Allocator` cannot supply the tree.
+- `WriterError` from the write functions if the `Writer` fails.
+
+## Gotchas
+A borrowed field or string cannot live longer than the [`Value`](#Value) that owns it. The write
+functions do not flush the `Writer`.
+
+## Examples
+### Read fields from a document
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.json_scanner { JsonError }
+import silk.json_value { Json }
+import silk.option { Option }
+
+pub effect fn main() -> i32
+  ! JsonError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let document = run Json.parse(b"{\"id\":42,\"user\":{\"name\":\"Ada\"}}")
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let id = Json.field(&document, "id") |> Json.asI32 |> Option<i32>.unwrapOr(0)
+  let name = Json.field(&document, "user") |> Json.fieldAt("name") |> Json.asString
+    |> Option<string>.unwrapOr("")
+  if id != 42 || name != "Ada" {
+    return 1
+  }
+  return 0
+}
+```
+
+### Read a typed value directly
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.json_scanner { JsonError }
+import silk.json_value { Json }
+import silk.list { List }
+
+pub effect fn main() -> i32
+  ! JsonError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let values = run Json.deserialize<List<i64>>(b"[1, 2, 39]")
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  if List<i64>.length(&values) != 3 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `Json` with `import silk.json_value { Json }`.
+
+Public declarations: 4.
+
+::Anchor{id="JsonEntry"}
+
+## `JsonEntry`
+
+```silk
+pub struct JsonEntry
+```
+
+One key and value of a JSON object.
+
+::Anchor{id="JsonEntry.key"}
+
+### Field `key`
+
+```silk
+pub key: String
+```
+
+The key, with escapes decoded.
+
+::Anchor{id="JsonEntry.value"}
+
+### Field `value`
+
+```silk
+pub value: Value
+```
+
+The value.
+
+::Anchor{id="JsonChild"}
+
+## `JsonChild`
+
+```silk
+pub union JsonChild
+```
+
+One element of an array or one member of an object.
+
+### Details
+
+Arrays and objects use the same storage type, so nested arrays and objects drop in the same way.
+
+::Anchor{id="JsonChild.Item"}
+
+### `Item`
+
+```silk
+Item
+```
+
+An array element.
+
+::Anchor{id="JsonChild.Item.value"}
+
+#### Field `value`
+
+```silk
+pub value: Value
+```
+
+The element.
+
+::Anchor{id="JsonChild.Member"}
+
+### `Member`
+
+```silk
+Member
+```
+
+An object member.
+
+::Anchor{id="JsonChild.Member.entry"}
+
+#### Field `entry`
+
+```silk
+pub entry: JsonEntry
+```
+
+The key and the value.
+
+::Anchor{id="Value"}
+
+## `Value`
+
+```silk
+pub union Value
+```
+
+One JSON value: null, a boolean, a number, a string, an array, or an object.
+
+### Details
+
+A `Value` owns all of its children. Use `match` to get the kind, or the `Json.as...` functions
+to read a field of a known kind.
+
+::Anchor{id="Value.Null"}
+
+### `Null`
+
+```silk
+Null
+```
+
+JSON `null`.
+
+::Anchor{id="Value.Bool"}
+
+### `Bool`
+
+```silk
+Bool
+```
+
+JSON `true` or `false`.
+
+::Anchor{id="Value.Bool.value"}
+
+#### Field `value`
+
+```silk
+pub value: bool
+```
+
+The boolean value.
+
+::Anchor{id="Value.Number"}
+
+### `Number`
+
+```silk
+Number
+```
+
+A JSON number, kept as its source text.
+
+::Anchor{id="Value.Number.text"}
+
+#### Field `text`
+
+```silk
+pub text: String
+```
+
+The number as it was written in the source, such as `"-1.5e3"`.
+
+::Anchor{id="Value.String"}
+
+### `String`
+
+```silk
+String
+```
+
+A JSON string.
+
+::Anchor{id="Value.String.text"}
+
+#### Field `text`
+
+```silk
+pub text: String
+```
+
+The text, with escapes decoded.
+
+::Anchor{id="Value.Array"}
+
+### `Array`
+
+```silk
+Array
+```
+
+A JSON array.
+
+::Anchor{id="Value.Array.values"}
+
+#### Field `values`
+
+```silk
+pub values: Box<List<JsonChild>>
+```
+
+The elements in source order. Each is a `JsonChild.Item`.
+
+::Anchor{id="Value.Object"}
+
+### `Object`
+
+```silk
+Object
+```
+
+A JSON object.
+
+::Anchor{id="Value.Object.entries"}
+
+#### Field `entries`
+
+```silk
+pub entries: Box<List<JsonChild>>
+```
+
+The members in source order. Each is a `JsonChild.Member`.
+
+::Anchor{id="Json"}
+
+## `Json`
+
+```silk
+pub struct Json
+```
+
+The owner type of the JSON parse, write, and read operations. It has no fields and is never
+constructed.
+
+::Anchor{id="Json.impl"}
+
+## Implementation `Json`
+
+```silk
+impl Json
+```
+
+::Anchor{id="Json.impl.parse"}
+
+### Associated function `parse`
+
+```silk
+pub effect fn parse(bytes: &[u8]) -> Value ! JsonError | OutOfMemoryError ? &mut Allocator
+```
+
+Parses `bytes` as one complete JSON document and returns its tree.
+
+#### Errors
+
+- `JsonError` if `bytes` is not one valid JSON value, if an object has a duplicate key, if the
+  nesting is deeper than 64, or if content follows the value. The partial tree is dropped.
+- `OutOfMemoryError` if the `Allocator` cannot supply the tree.
+
+::Anchor{id="Json.impl.decode"}
+
+### Associated function `decode`
+
+```silk
+pub fn decode<T: Decode>(bytes: &[u8]) -> Result<T, JsonError>
+```
+
+Reads `bytes` as one complete JSON document of type `T`. It does not allocate.
+
+#### When to use
+
+Use it for types that implement `Decode`, such as numbers and `bool`. Use [`Json.deserialize`](#Json.impl.deserialize)
+for types that need memory, such as `String` and `List<T>`.
+
+#### Errors
+
+- `JsonError` if the JSON is not valid, the value does not have type `T` (`TypeMismatch`), a
+  number does not fit (`NumberOutOfRange`), or content follows the value (`TrailingContent`).
+
+::Anchor{id="Json.impl.deserialize"}
+
+### Associated function `deserialize`
+
+```silk
+pub effect fn deserialize<T: Deserialize>(bytes: &[u8])
+    -> T ! JsonError | OutOfMemoryError ? &mut Allocator
+```
+
+Reads `bytes` as one complete JSON document of type `T`.
+
+#### Errors
+
+- `JsonError` if the JSON is not valid, the value does not have type `T`, or content follows
+  the value.
+- `OutOfMemoryError` if the `Allocator` cannot supply the value.
+
+::Anchor{id="Json.impl.serialize"}
+
+### Associated function `serialize`
+
+```silk
+pub effect fn serialize<T: Serialize>(value: &T, options: &JsonOptions)
+    -> () ! JsonError | WriterError ? &mut Writer
+```
+
+Writes `value` as JSON to the `Writer`, with `options`.
+
+#### Errors
+
+- `JsonError` if the nesting is deeper than the limit in `options`, or a float is not finite.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+#### Examples
+
+##### Write a struct
+```silk
+import silk.effect { Effect }
+import silk.json_codec { Serialize }
+import silk.json_object { JsonObject }
+import silk.json_output { JsonOptions }
+import silk.json_scanner { JsonError }
+import silk.json_value { Json }
+import silk.writer { Writer, WriterError }
+
+struct CaptureWriter {
+  bytes: [u8; 64]
+  length: usize
+}
+
+impl Writer for CaptureWriter {
+  effect fn writeAll(self: &mut Self, value: &[u8]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    let mut index: usize = 0
+    while index < value.length {
+      self.bytes[self.length] = value[index]
+      self.length = self.length + 1
+      index = index + 1
+    }
+    return ()
+  }
+
+  effect fn flush(self: &mut Self) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return ()
+  }
+}
+
+fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
+  if writer.length != expected.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < expected.length {
+    if writer.bytes[index] != expected[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
+}
+
+struct Point {
+  x: i32
+  y: i32
+}
+
+impl Serialize for Point {
+  effect fn serialize(self: &Self, options: &JsonOptions) -> ()
+    ! JsonError | WriterError
+    ? &mut Writer {
+    return run JsonObject.begin(options) |> JsonObject.field("x", &self.x)
+      |> JsonObject.field("y", &self.y)
+      |> JsonObject.end
+  }
+}
+
+pub effect fn main() -> i32
+  ! JsonError | WriterError {
+  let mut writer = CaptureWriter { bytes: [0; 64], length: 0 }
+  let point = Point { x: 3, y: -4 }
+  run Json.serialize(&point, &JsonOptions.compact()) |> Effect.provideMut<Writer>(&mut writer)
+  if !holds(&writer, b"{\"x\":3,\"y\":-4}") {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="Json.impl.write"}
+
+### Associated function `write`
+
+```silk
+pub effect fn write(document: &Value) -> () ! JsonError | WriterError ? &mut Writer
+```
+
+Writes `document` as compact JSON to the `Writer`.
+
+#### Errors
+
+- `JsonError` if the nesting is deeper than 64.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+::Anchor{id="Json.impl.writeWith"}
+
+### Associated function `writeWith`
+
+```silk
+pub effect fn writeWith(document: &Value, options: &JsonOptions)
+    -> () ! JsonError | WriterError ? &mut Writer
+```
+
+Writes `document` as JSON to the `Writer`, with the indentation and depth limit of `options`.
+
+#### Errors
+
+- `JsonError` if the nesting is deeper than the limit in `options`.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+::Anchor{id="Json.impl.field"}
+
+### Method `field`
+
+```silk
+pub fn field<'a>(self: &'a Value, key: string) -> Option<&'a Value>
+```
+
+Returns the value of member `key` of an object. Returns an absent option if `self` is not an
+object or has no such key.
+
+::Anchor{id="Json.impl.fieldAt"}
+
+### Method `fieldAt`
+
+```silk
+pub fn fieldAt<'a>(self: Option<&'a Value>, key: string) -> Option<&'a Value>
+```
+
+Returns the value of member `key` if `self` is a present object. Returns an absent option in
+other cases.
+
+#### When to use
+
+Use it to read nested fields in a chain: `Json.field(&doc, "user") |> Json.fieldAt("name")`.
+
+::Anchor{id="Json.impl.asI32"}
+
+### Method `asI32`
+
+```silk
+pub fn asI32(self: Option<&Value>) -> Option<i32>
+```
+
+Returns the number as `i32`. Returns an absent option if the value is absent, is not a number,
+is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in `i32`.
+
+::Anchor{id="Json.impl.asI64"}
+
+### Method `asI64`
+
+```silk
+pub fn asI64(self: Option<&Value>) -> Option<i64>
+```
+
+Returns the number as `i64`. Returns an absent option if the value is absent, is not a number,
+is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in `i64`.
+
+::Anchor{id="Json.impl.asU64"}
+
+### Method `asU64`
+
+```silk
+pub fn asU64(self: Option<&Value>) -> Option<u64>
+```
+
+Returns the number as `u64`. Returns an absent option if the value is absent, is not a number,
+is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in `u64`.
+
+::Anchor{id="Json.impl.asF64"}
+
+### Method `asF64`
+
+```silk
+pub fn asF64(self: Option<&Value>) -> Option<f64>
+```
+
+Returns the number as `f64`, rounded to the nearest value. Returns an absent option if the
+value is absent, is not a number, or is too large for a finite `f64`.
+
+::Anchor{id="Json.impl.asF32"}
+
+### Method `asF32`
+
+```silk
+pub fn asF32(self: Option<&Value>) -> Option<f32>
+```
+
+Returns the number as `f32`, rounded to the nearest value. Returns an absent option if the
+value is absent, is not a number, or is too large for a finite `f32`.
+
+::Anchor{id="Json.impl.asString"}
+
+### Method `asString`
+
+```silk
+pub fn asString<'a>(self: Option<&'a Value>) -> Option<string<'a>>
+```
+
+Returns the text of a string. Returns an absent option if the value is absent or is not a
+string. The text is borrowed from the tree.
+
+::Anchor{id="Value.impl.Serialize"}
+
+## Implementation `Serialize for Value`
+
+```silk
+impl Serialize for Value
+```
+
+::Anchor{id="Value.impl.Serialize.serialize"}
+
+### Operation `serialize`
+
+```silk
+effect fn serialize(self: &Self, options: &JsonOptions)
+    -> () ! JsonError | WriterError ? &mut Writer
+```
+
+::Anchor{id="Value.impl.Deserialize"}
+
+## Implementation `Deserialize for Value`
+
+```silk
+impl Deserialize for Value
+```
+
+::Anchor{id="Value.impl.Deserialize.deserialize"}
+
+### Operation `deserialize`
+
+```silk
+effect fn deserialize(scanner: &mut JsonScanner)
+    -> Self ! JsonError | OutOfMemoryError ? &mut Allocator
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

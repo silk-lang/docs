@@ -1,0 +1,222 @@
+Operating-system threads that each run one `Transferable` closure and return its result.
+
+## When to use
+Use [`NativeThread.spawn`](#NativeThread.impl.spawn) to run independent work on a new native thread, and
+[`JoinHandle.join`](#JoinHandle.impl.join) to wait for its result. For many small tasks, use `silk.thread_pool`.
+
+## Details
+The closure and its result must be `Transferable`. The closure must be detached: it owns all
+that it captures, and borrows nothing from the caller. Each thread runs its closure as the body
+of one transferable `Execution` package (EXEC-010). Thus one non-generic C entry point starts
+closures of any type.
+
+Threads use `pthread_create` on Darwin and GNU libc targets, and wasi-threads on wasm32 with
+`threading = "multi"`.
+
+## Errors
+[`SpawnError`](#SpawnError) if the system cannot make the thread. `OutOfMemoryError` if the start or result
+storage cannot be allocated.
+
+## Gotchas
+- Dropping a [`JoinHandle`](#JoinHandle) without a join waits for the thread. Thus the result storage that
+  the handle owns lives longer than each write to it.
+- A fatal trap on any thread ends the whole process.
+
+## Examples
+### Compute on another thread
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.native_thread { NativeThread, SpawnError }
+
+fn sum(limit: i32) -> i32 {
+  let mut total = 0
+  let mut index = 1
+  while index <= limit {
+    total = total + index
+    index = index + 1
+  }
+  return total
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError | SpawnError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+
+  // The closure owns what it captures, so it can run on the new thread.
+  let limit = 100
+  let handle = run NativeThread.spawn(
+    fn() -> i32 {
+      return sum(limit)
+    }
+  )
+    |> Effect.provideMut<Allocator>(&mut allocator)
+
+  // Other work runs here while the thread computes.
+  if handle.join() != 5050 {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
+```
+
+Import as `NativeThread` with `import silk.native_thread { NativeThread }`.
+
+Public declarations: 3.
+
+::Anchor{id="SpawnError"}
+
+## `SpawnError`
+
+```silk
+pub struct SpawnError
+```
+
+The thread could not be created, for example because a resource limit was reached.
+
+::Anchor{id="SpawnError.code"}
+
+### Field `code`
+
+```silk
+pub code: i32
+```
+
+The error number `pthread_create` returned.
+
+::Anchor{id="JoinHandle"}
+
+## `JoinHandle`
+
+```silk
+pub struct JoinHandle<T>
+```
+
+The owner of one running native thread and the storage for its result.
+
+### Gotchas
+
+Dropping a handle without calling [`join`](#JoinHandle.impl.join) waits for the thread and drops its result.
+
+::Anchor{id="JoinHandle.impl"}
+
+## Implementation `JoinHandle<T>`
+
+```silk
+impl<T> JoinHandle<T>
+```
+
+::Anchor{id="JoinHandle.impl.join"}
+
+### Method `join`
+
+```silk
+pub fn join(self: Self) -> T
+```
+
+Waits for the thread to finish and returns the value its closure produced.
+
+::Anchor{id="JoinHandle.impl.Drop"}
+
+## Implementation `Drop for JoinHandle<T>`
+
+```silk
+impl<T> Drop for JoinHandle<T>
+```
+
+::Anchor{id="JoinHandle.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut JoinHandle<T>) -> ()
+```
+
+::Anchor{id="NativeThread"}
+
+## `NativeThread`
+
+```silk
+pub struct NativeThread
+```
+
+The owner of native thread creation.
+
+::Anchor{id="NativeThread.impl"}
+
+## Implementation `NativeThread`
+
+```silk
+impl NativeThread
+```
+
+::Anchor{id="NativeThread.impl.processorCount"}
+
+### Associated function `processorCount`
+
+```silk
+pub fn processorCount() -> usize
+```
+
+Returns the number of processors online, at least one.
+
+#### Details
+Use it to size a worker pool. The operating system can still run other work on those
+processors.
+
+::Anchor{id="NativeThread.impl.yieldNow"}
+
+### Associated function `yieldNow`
+
+```silk
+pub fn yieldNow() -> ()
+```
+
+Offers the rest of the current thread's time slice to other runnable threads.
+
+::Anchor{id="NativeThread.impl.spawn"}
+
+### Associated function `spawn`
+
+```silk
+pub effect<'static> fn spawn<
+    T: 'static + Transferable,
+    F: 'static + once fn() -> T + Intrinsic.Detached + Transferable
+  >(work: F) -> JoinHandle<T>
+  ! OutOfMemoryError | SpawnError
+  ? &mut Allocator
+```
+
+Starts `work` on a new native thread and returns the handle that joins it.
+
+#### Details
+
+The thread's start storage and result storage come from the selected `Allocator`. Creation
+failure reports [`SpawnError`](#SpawnError) and drops `work` without running it.
+
+::Anchor{id="NativeThread.impl.runStarted"}
+
+### Associated function `runStarted`
+
+```silk
+pub unsafe fn runStarted(argument: ?*mut u8) -> ()
+```
+
+Runs the thread a wasm32 runtime started with `argument`.
+
+#### Details
+
+Only the wasm32 runtime calls this, on the new thread, with the argument `spawn` passed to the
+runtime's thread creation. A wasm32 module roots no standard-library export of its own, so the
+runtime's entry module exports the thread entry and forwards here.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

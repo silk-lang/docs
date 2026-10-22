@@ -1,0 +1,1507 @@
+The server side of one HTTP/1.0 or HTTP/1.1 connection, with streaming bodies and fixed limits.
+
+## When to use
+Use this module to serve HTTP over a byte duplex: a socket from `silk.native_socket`, or a
+`MemoryByteDuplex` in tests. `silk.http_server_native` accepts sockets and calls
+[`withConnection`](#withConnection) for you.
+
+1. Call [`withConnection`](#withConnection) with the transport, [`Limits`](#Limits), and a [`ConnectionHandler`](#ConnectionHandler).
+2. In the handler, call [`withRequest`](#withRequest) for each request. It returns `None` when the peer closes
+   between requests.
+3. In the request callback, read the body with [`readSome`](#readSome), then answer with [`respond`](#respond),
+   [`reject`](#reject), [`withUpgrade`](#withUpgrade), or [`withTunnel`](#withTunnel).
+4. In the [`respond`](#respond) callback, write the body with [`ResponseWriter.writeAll`](#ResponseWriter.impl.writeAll), then call
+   [`ResponseWriter.finish`](#ResponseWriter.impl.finish).
+
+## Details
+The connection serves one request at a time. The request, the body decoder, the response writer,
+and an upgraded channel are lent to callbacks, and cannot escape them. [`Connection.phase`](#Connection.impl.phase)
+tells what the connection can do next.
+
+The server adds the `Connection` field. It closes the connection after a response if:
+- The [`ReusePolicy`](#ReusePolicy) or the peer asks for it.
+- The request body was not read to its end.
+- The response body ends at close.
+- The request count reached `maxRequestsPerConnection`.
+- The request is HTTP/1.0, and it is not a keep-alive request with `Http10KeepAlive`.
+
+For `Expect: 100-continue`, the first [`readSome`](#readSome) or [`discardRemaining`](#discardRemaining) sends `100 Continue`
+first. Another expectation makes [`Request.expectationRejected`](#Request.impl.expectationRejected) true.
+
+## Errors
+[`ServerError`](#ServerError) keeps the cause from the lower layer: the head parser, the body framing, the
+buffer, or the header values. Most errors set the phase to `Failed`.
+
+## Gotchas
+- When the scope ends, the connection closes at once. It does not flush or drain. Call
+  [`finishConnection`](#finishConnection) for a graceful close.
+- If a [`respond`](#respond) callback returns without [`ResponseWriter.finish`](#ResponseWriter.impl.finish), or fails, the connection
+  is closed after the request.
+- A request callback that returns without a response closes the connection.
+
+## Examples
+### Answer one request
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.buffered_input { BufferError }
+import silk.byte_duplex { ByteDuplex }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.http { Header, ResponseHead, Status, ValueError, Version }
+import silk.http_body { Limits as BodyLimits, TrailerPolicy }
+import silk.http_head { Limits as HeadLimits }
+import silk.http_headers { Headers, Limits as ValueLimits }
+import silk.http_server {
+  BodyMode,
+  Connection,
+  ConnectionHandler,
+  Limits,
+  Request,
+  ResponseWriter,
+  ReusePolicy,
+  ServerError,
+  respond,
+  withConnection,
+  withRequest,
+}
+import silk.list { List }
+import silk.memory_byte_duplex {
+  MemoryByteDuplex,
+  MemoryReadEvent,
+  MemoryWriteAction,
+  MemoryWriteEvent
+}
+import silk.monotonic_clock { MonotonicClock }
+import silk.option { Option }
+import silk.result { Result }
+import silk.system_clock { Instant, SystemClock }
+import silk.u64
+import silk.usize
+
+struct FixedClock {}
+
+impl MonotonicClock for FixedClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return u64.toU64(1)
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    drop when
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, duration: u64) -> () {
+    drop duration
+    return ()
+  }
+}
+
+fn valueLimits() -> ValueLimits {
+  return ValueLimits {
+    maxMethodBytes: 32,
+    maxTargetBytes: 128,
+    maxNameBytes: 64,
+    maxValueBytes: 256,
+    maxFields: 12,
+    maxFieldBytes: 512,
+    maxOwnedBytes: 2048,
+  }
+}
+
+fn limits() -> Limits {
+  return Limits {
+    head: HeadLimits {
+      maxHeadBytes: 1024,
+      maxStartLineBytes: 256,
+      maxFieldLineBytes: 256,
+      maxOwnedBytes: 2048,
+      values: valueLimits(),
+    },
+    body: BodyLimits {
+      maxWireBytes: 1024,
+      maxPayloadBytes: 512,
+      maxChunkBytes: 64,
+      maxChunks: 8,
+      maxChunkLineBytes: 64,
+      maxExtensionBytes: 128,
+      maxTrailerBytes: 256,
+      maxTrailerFields: 4,
+      maxOwnedBytes: 2048,
+      trailerValues: valueLimits(),
+    },
+    values: valueLimits(),
+    readCapacity: 256,
+    writeCapacity: 256,
+    maxRequestsPerConnection: 1,
+    maxInformationalResponses: 2,
+    maxDiscardWireBytes: u64.toU64(256),
+    shutdownDrainBytes: 16,
+  }
+}
+
+// Writes the body and ends the response with no trailers.
+effect<'call> fn writeHello<
+  'call,
+  'writerView: 'call,
+  'requestView: 'writerView,
+  'connectionView: 'requestView,
+  'transportView: 'connectionView,
+>(
+  writer: &'call mut ResponseWriter<
+    'writerView,
+    'requestView,
+    'connectionView,
+    'transportView,
+    MemoryByteDuplex
+  >,
+) -> i32
+  ! ServerError
+  ? &mut MonotonicClock {
+  let progress = run ResponseWriter.writeAll(&mut writer.*, b"Hello", Option<Instant>.none())
+  if progress.consumed != 5 {
+    return 1
+  }
+  let entries: [Header<'static>; 0] = []
+  let trailers = match move Headers.make(&entries, valueLimits()) {
+    Result.Success { value } => value
+    Result.Failure { error } => {
+      fail ServerError.Value { error: move error }
+    }
+  }
+  run ResponseWriter.finish(&mut writer.*, &trailers, Option<Instant>.none())
+  return 0
+}
+
+// Answers one request with 200 and a five-byte body.
+effect<'call> fn handleRequest<
+  'call,
+  'requestView: 'call,
+  'connectionView: 'requestView,
+  'transportView: 'connectionView,
+>(
+  request: &'call mut Request<'requestView, 'connectionView, 'transportView, MemoryByteDuplex>,
+) -> i32
+  ! ServerError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock {
+  let length = match move Header.make("Content-Length", b"5", valueLimits()) {
+    Result.Success { value } => value
+    Result.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let entries: [Header<'static>; 1] = [length]
+  let headers = match move Headers.make(&entries, valueLimits()) {
+    Result.Success { value } => value
+    Result.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let status = match move Status.fromCode(200) {
+    Result.Success { value } => value
+    Result.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let response = match move ResponseHead.make(
+    Version.Http11,
+    status,
+    Option<&'static [u8]>.some(b"OK"),
+    headers,
+    valueLimits(),
+  ) {
+    Result.Success { value } => move value
+    Result.Failure { error: _ } => {
+      return 1
+    }
+  }
+  return run respond(
+    move request,
+    &response,
+    BodyMode.ContentLength { length: u64.toU64(5) },
+    ReusePolicy.CloseAfterResponse,
+    TrailerPolicy.defaultPolicy(),
+    Option<Instant>.none(),
+    writeHello,
+  )
+}
+
+struct HelloHandler {}
+
+impl ConnectionHandler<
+  MemoryByteDuplex,
+  i32,
+  ServerError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock
+> for HelloHandler {
+  effect<'call> fn handle<'call, 'connection: 'call, 'transport: 'connection>(
+    handler: Self,
+    connection: &'call mut Connection<'connection, 'transport, MemoryByteDuplex>,
+  ) -> i32
+    ! ServerError | OutOfMemoryError
+    ? &mut Allocator | &mut MonotonicClock where
+    &'transport mut MemoryByteDuplex provides &ByteDuplex from &mut ByteDuplex
+      | &mut MonotonicClock {
+    drop handler
+
+    // `None` means that the peer closed before a request.
+    return match run withRequest(&mut connection.*, Option<Instant>.none(), handleRequest) {
+      Option.Some { value } => value
+      Option.None => 1
+    }
+  }
+}
+
+fn equal(left: &[u8], right: &[u8]) -> bool {
+  if left.length != right.length {
+    return false
+  }
+  let mut index = usize.ZERO
+  while index < left.length {
+    if left[index] != right[index] {
+      return false
+    }
+    index = index + usize.ONE
+  }
+  return true
+}
+
+effect fn program() -> i32
+  ! ServerError | BufferError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock {
+  // A peer that sends one GET request, then ends.
+  let input = run Bytes.copy(b"GET / HTTP/1.1\r\nHost: example.test\r\n\r\n")
+  let mut reads = List<MemoryReadEvent>.make()
+  run List.append(
+    &mut reads,
+    MemoryReadEvent.Data { readyAt: SystemClock.make(0, 0), bytes: move input }
+  )
+  run List.append(&mut reads, MemoryReadEvent.End { readyAt: SystemClock.make(0, 0) })
+  let mut writes = List<MemoryWriteEvent>.make()
+  run List.append(
+    &mut writes,
+    MemoryWriteEvent {
+      readyAt: SystemClock.make(0, 0),
+      action: MemoryWriteAction.Accept { count: 256 }
+    },
+  )
+  let mut transport = run MemoryByteDuplex.make(
+    move reads,
+    move writes,
+    256,
+    64,
+    Option<i32>.none()
+  )
+  let code = run withConnection(&mut transport, limits(), HelloHandler {})
+  if code != 0 {
+    return code
+  }
+  let expected = b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nHello"
+  if !equal(transport.outbound(), expected) {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed(error: ServerError | BufferError | OutOfMemoryError) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut clock = FixedClock {}
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<MonotonicClock>(&mut clock)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
+
+Import as `Connection` with `import silk.http_server { Connection }`.
+
+Public declarations: 22.
+
+::Anchor{id="ConnectionPhase"}
+
+## `ConnectionPhase`
+
+```silk
+pub enum ConnectionPhase
+```
+
+The state of a server connection. Each operation is allowed only in some phases.
+
+::Anchor{id="ConnectionPhase.Ready"}
+
+### `Ready`
+
+```silk
+Ready
+```
+
+[`withRequest`](#withRequest) can read the next request.
+
+::Anchor{id="ConnectionPhase.RequestActive"}
+
+### `RequestActive`
+
+```silk
+RequestActive
+```
+
+A request is active. Read its body and select a response.
+
+::Anchor{id="ConnectionPhase.Responding"}
+
+### `Responding`
+
+```silk
+Responding
+```
+
+A [`ResponseWriter`](#ResponseWriter) is writing the response.
+
+::Anchor{id="ConnectionPhase.Closing"}
+
+### `Closing`
+
+```silk
+Closing
+```
+
+The connection closes after this response. No more requests are read.
+
+::Anchor{id="ConnectionPhase.Upgraded"}
+
+### `Upgraded`
+
+```silk
+Upgraded
+```
+
+The connection was given to another protocol, after an upgrade or a tunnel. HTTP operations
+fail.
+
+::Anchor{id="ConnectionPhase.Closed"}
+
+### `Closed`
+
+```silk
+Closed
+```
+
+The connection is done. No more I/O is allowed.
+
+::Anchor{id="ConnectionPhase.Failed"}
+
+### `Failed`
+
+```silk
+Failed
+```
+
+A protocol or transport error occurred. No more I/O is allowed.
+
+::Anchor{id="BodyMode"}
+
+## `BodyMode`
+
+```silk
+pub union BodyMode
+```
+
+How the response body is framed.
+
+::Anchor{id="BodyMode.NoBody"}
+
+### `NoBody`
+
+```silk
+NoBody
+```
+
+No body. Use it for HEAD, 204, and 304 responses too.
+
+::Anchor{id="BodyMode.ContentLength"}
+
+### `ContentLength`
+
+```silk
+ContentLength
+```
+
+A body of exactly `length` bytes. The head must have the same `Content-Length`.
+
+::Anchor{id="BodyMode.ContentLength.length"}
+
+#### Field `length`
+
+```silk
+pub length: u64
+```
+
+The number of body bytes. [`ResponseWriter.finish`](#ResponseWriter.impl.finish) fails if fewer were written.
+
+::Anchor{id="BodyMode.Chunked"}
+
+### `Chunked`
+
+```silk
+Chunked
+```
+
+HTTP/1.1 chunked framing. Trailers are allowed.
+
+::Anchor{id="BodyMode.CloseDelimited"}
+
+### `CloseDelimited`
+
+```silk
+CloseDelimited
+```
+
+The body ends when the connection closes. The connection is not reused.
+
+::Anchor{id="BodyMode.impl.Copy"}
+
+## Implementation `Copy for BodyMode`
+
+```silk
+impl Copy for BodyMode
+```
+
+::Anchor{id="ReusePolicy"}
+
+## `ReusePolicy`
+
+```silk
+pub enum ReusePolicy
+```
+
+Whether to keep the connection open after the response. A policy never keeps a connection whose
+request was not read to the end.
+
+::Anchor{id="ReusePolicy.Automatic"}
+
+### `Automatic`
+
+```silk
+Automatic
+```
+
+Keeps an HTTP/1.1 connection open if both messages are complete and the peer did not ask to
+close.
+
+::Anchor{id="ReusePolicy.CloseAfterResponse"}
+
+### `CloseAfterResponse`
+
+```silk
+CloseAfterResponse
+```
+
+Closes the connection after this response.
+
+::Anchor{id="ReusePolicy.Http10KeepAlive"}
+
+### `Http10KeepAlive`
+
+```silk
+Http10KeepAlive
+```
+
+Like `Automatic`, and also keeps an HTTP/1.0 connection open if the peer sent `Connection:
+keep-alive`.
+
+::Anchor{id="Limits"}
+
+## `Limits`
+
+```silk
+pub struct Limits
+```
+
+The limits of a server connection. [`withConnection`](#withConnection) checks them with [`validateLimits`](#validateLimits).
+
+::Anchor{id="Limits.head"}
+
+### Field `head`
+
+```silk
+pub head: HeadLimits
+```
+
+The limits for parsing request heads and checking response heads.
+
+::Anchor{id="Limits.body"}
+
+### Field `body`
+
+```silk
+pub body: BodyLimits
+```
+
+The limits for body framing, size, trailers, and decoder memory.
+
+::Anchor{id="Limits.values"}
+
+### Field `values`
+
+```silk
+pub values: HeaderLimits
+```
+
+The limits for response values, including the `Connection` field that the server adds.
+
+::Anchor{id="Limits.readCapacity"}
+
+### Field `readCapacity`
+
+```silk
+pub readCapacity: usize
+```
+
+The size of the input buffer. It is 1 through `MAX_CAPACITY` of `silk.buffered_input`.
+
+::Anchor{id="Limits.writeCapacity"}
+
+### Field `writeCapacity`
+
+```silk
+pub writeCapacity: usize
+```
+
+The size of the output buffer. It is 1 through `MAX_CAPACITY` of `silk.buffered_input`.
+
+::Anchor{id="Limits.maxRequestsPerConnection"}
+
+### Field `maxRequestsPerConnection`
+
+```silk
+pub maxRequestsPerConnection: usize
+```
+
+The maximum number of requests on one connection. With zero, no request is read.
+
+::Anchor{id="Limits.maxInformationalResponses"}
+
+### Field `maxInformationalResponses`
+
+```silk
+pub maxInformationalResponses: usize
+```
+
+The maximum number of 1xx responses for one request, including an automatic `100 Continue`.
+
+::Anchor{id="Limits.maxDiscardWireBytes"}
+
+### Field `maxDiscardWireBytes`
+
+```silk
+pub maxDiscardWireBytes: u64
+```
+
+The maximum number of bytes that one [`discardRemaining`](#discardRemaining) call reads and drops.
+
+::Anchor{id="Limits.shutdownDrainBytes"}
+
+### Field `shutdownDrainBytes`
+
+```silk
+pub shutdownDrainBytes: usize
+```
+
+The maximum number of input bytes that [`finishConnection`](#finishConnection) reads and drops.
+
+::Anchor{id="Limits.impl.Copy"}
+
+## Implementation `Copy for Limits`
+
+```silk
+impl Copy for Limits
+```
+
+::Anchor{id="ServerLimitKind"}
+
+## `ServerLimitKind`
+
+```silk
+pub enum ServerLimitKind
+```
+
+A limit of the server, separate from the parser and framing limits.
+
+::Anchor{id="ServerLimitKind.InformationalResponses"}
+
+### `InformationalResponses`
+
+```silk
+InformationalResponses
+```
+
+The number of 1xx responses for one request.
+
+::Anchor{id="ServerError"}
+
+## `ServerError`
+
+```silk
+pub union ServerError
+```
+
+The error of a server operation, with its lower-level cause.
+
+::Anchor{id="ServerError.Head"}
+
+### `Head`
+
+```silk
+Head
+```
+
+A request head or a response head is not valid.
+
+::Anchor{id="ServerError.Head.error"}
+
+#### Field `error`
+
+```silk
+pub error: ParseError
+```
+
+The parser error.
+
+::Anchor{id="ServerError.Body"}
+
+### `Body`
+
+```silk
+Body
+```
+
+A request body or a response body broke its framing.
+
+::Anchor{id="ServerError.Body.error"}
+
+#### Field `error`
+
+```silk
+pub error: BodyError
+```
+
+The framing error, with the progress before it.
+
+::Anchor{id="ServerError.Buffer"}
+
+### `Buffer`
+
+```silk
+Buffer
+```
+
+A buffer or transport operation failed.
+
+::Anchor{id="ServerError.Buffer.error"}
+
+#### Field `error`
+
+```silk
+pub error: BufferError
+```
+
+The buffer error, with the transport progress.
+
+::Anchor{id="ServerError.Output"}
+
+### `Output`
+
+```silk
+Output
+```
+
+Output failed while a response body was written. Some bytes were sent.
+
+::Anchor{id="ServerError.Output.error"}
+
+#### Field `error`
+
+```silk
+pub error: BufferError
+```
+
+The buffer error.
+
+::Anchor{id="ServerError.Output.progress"}
+
+#### Field `progress`
+
+```silk
+pub progress: WriteProgress
+```
+
+The bytes that were accepted before the error.
+
+::Anchor{id="ServerError.Value"}
+
+### `Value`
+
+```silk
+Value
+```
+
+A response value or header is not valid.
+
+::Anchor{id="ServerError.Value.error"}
+
+#### Field `error`
+
+```silk
+pub error: ValueError
+```
+
+The value error.
+
+::Anchor{id="ServerError.LimitExceeded"}
+
+### `LimitExceeded`
+
+```silk
+LimitExceeded
+```
+
+An operation went over a server limit.
+
+::Anchor{id="ServerError.LimitExceeded.limit"}
+
+#### Field `limit`
+
+```silk
+pub limit: ServerLimitKind
+```
+
+The limit.
+
+::Anchor{id="ServerError.LimitExceeded.allowed"}
+
+#### Field `allowed`
+
+```silk
+pub allowed: u64
+```
+
+The value of the limit.
+
+::Anchor{id="ServerError.LimitExceeded.attempted"}
+
+#### Field `attempted`
+
+```silk
+pub attempted: u64
+```
+
+The count that the operation tried to reach.
+
+::Anchor{id="ServerError.SizeOverflow"}
+
+### `SizeOverflow`
+
+```silk
+SizeOverflow
+```
+
+A count or size does not fit in its type.
+
+::Anchor{id="ServerError.UnsupportedExpectation"}
+
+### `UnsupportedExpectation`
+
+```silk
+UnsupportedExpectation
+```
+
+The request has an `Expect` value other than `100-continue`, so its body cannot be read.
+
+::Anchor{id="ServerError.InvalidBodyMode"}
+
+### `InvalidBodyMode`
+
+```silk
+InvalidBodyMode
+```
+
+The body mode or the response head does not fit the request or the status.
+
+::Anchor{id="ServerError.InvalidState"}
+
+### `InvalidState`
+
+```silk
+InvalidState
+```
+
+The operation is not allowed in the current phase.
+
+::Anchor{id="ServerError.InvalidState.phase"}
+
+#### Field `phase`
+
+```silk
+pub phase: ConnectionPhase
+```
+
+The current phase.
+
+::Anchor{id="ServerError.UpgradeRejected"}
+
+### `UpgradeRejected`
+
+```silk
+UpgradeRejected
+```
+
+The request or the response does not allow this upgrade. See [`withUpgrade`](#withUpgrade).
+
+::Anchor{id="ServerError.TunnelRejected"}
+
+### `TunnelRejected`
+
+```silk
+TunnelRejected
+```
+
+The request or the response does not allow a tunnel. See [`withTunnel`](#withTunnel).
+
+::Anchor{id="ServerError.TruncatedHead"}
+
+### `TruncatedHead`
+
+```silk
+TruncatedHead
+```
+
+The input ended in the middle of a request head.
+
+::Anchor{id="WriteProgress"}
+
+## `WriteProgress`
+
+```silk
+pub struct WriteProgress
+```
+
+The progress of one [`ResponseWriter`](#ResponseWriter) call.
+
+::Anchor{id="WriteProgress.consumed"}
+
+### Field `consumed`
+
+```silk
+pub consumed: usize
+```
+
+The number of body bytes from `input` that this call accepted.
+
+::Anchor{id="WriteProgress.buffered"}
+
+### Field `buffered`
+
+```silk
+pub buffered: usize
+```
+
+The number of framed bytes that this call put in the output buffer.
+
+::Anchor{id="WriteProgress.totalPayload"}
+
+### Field `totalPayload`
+
+```silk
+pub totalPayload: u64
+```
+
+The total body bytes of the response so far.
+
+::Anchor{id="WriteProgress.totalWire"}
+
+### Field `totalWire`
+
+```silk
+pub totalWire: u64
+```
+
+The total framed body bytes of the response so far, with chunk framing.
+
+::Anchor{id="WriteProgress.impl.Copy"}
+
+## Implementation `Copy for WriteProgress`
+
+```silk
+impl Copy for WriteProgress
+```
+
+::Anchor{id="Connection"}
+
+## `Connection`
+
+```silk
+pub struct Connection<'connection, 'transport, P>
+```
+
+A server connection. [`withConnection`](#withConnection) lends it to a [`ConnectionHandler`](#ConnectionHandler).
+
+::Anchor{id="Connection.impl"}
+
+## Implementation `Connection<'connection, 'transport, P>`
+
+```silk
+impl<'connection, 'transport, P> Connection<'connection, 'transport, P>
+```
+
+::Anchor{id="Connection.impl.phase"}
+
+### Method `phase`
+
+```silk
+pub fn phase(self: &Self) -> ConnectionPhase
+```
+
+Returns the current phase.
+
+::Anchor{id="Connection.impl.requests"}
+
+### Method `requests`
+
+```silk
+pub fn requests(self: &Self) -> usize
+```
+
+Returns the number of requests that were read on this connection.
+
+::Anchor{id="Connection.impl.unread"}
+
+### Method `unread`
+
+```silk
+pub fn unread(self: &Self) -> usize
+```
+
+Returns the number of bytes in the input buffer that were not read yet.
+
+::Anchor{id="Request"}
+
+## `Request`
+
+```silk
+pub struct Request<'request, 'connection, 'transport, P>
+```
+
+The active request. [`withRequest`](#withRequest) lends it to a callback.
+
+::Anchor{id="Request.impl"}
+
+## Implementation `Request<'request, 'connection, 'transport, P>`
+
+```silk
+impl<'request, 'connection, 'transport, P> Request<'request, 'connection, 'transport, P>
+```
+
+::Anchor{id="Request.impl.head"}
+
+### Method `head`
+
+```silk
+pub effect fn head<'head>(self: &'head Self) -> RequestHead<'head> ! ServerError
+```
+
+Returns the parsed head of the request.
+
+#### Errors
+`InvalidState` if the request is no longer active.
+
+::Anchor{id="Request.impl.bodyComplete"}
+
+### Method `bodyComplete`
+
+```silk
+pub effect fn bodyComplete(self: &Self) -> bool ! ServerError
+```
+
+Returns whether the request body was read to its end.
+
+#### Errors
+`InvalidState` if the request is no longer active.
+
+::Anchor{id="Request.impl.expectationRejected"}
+
+### Method `expectationRejected`
+
+```silk
+pub effect fn expectationRejected(self: &Self) -> bool ! ServerError
+```
+
+Returns whether the request has an `Expect` value other than `100-continue`.
+
+If it is true, the body cannot be read. Answer with [`reject`](#reject), for example with 417.
+
+#### Errors
+`InvalidState` if the request is no longer active.
+
+::Anchor{id="ResponseWriter"}
+
+## `ResponseWriter`
+
+```silk
+pub struct ResponseWriter<'writer, 'request, 'connection, 'transport, P>
+```
+
+Writes the body of a final response. [`respond`](#respond) lends it to a callback.
+
+::Anchor{id="ConnectionHandler"}
+
+## `ConnectionHandler`
+
+```silk
+pub interface ConnectionHandler<P, A, E, ?R>
+```
+
+The code that serves one connection. See [`withConnection`](#withConnection).
+
+::Anchor{id="ConnectionHandler.handle"}
+
+### Operation `handle`
+
+```silk
+effect<'call> fn handle<'call, 'connection: 'call, 'transport: 'connection>(
+    handler: Self,
+    connection: &'call mut Connection<'connection, 'transport, P>,
+  ) -> A ! E ? R
+  where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Serves `connection`. The connection cannot escape this call.
+
+::Anchor{id="validateLimits"}
+
+## `validateLimits`
+
+```silk
+pub fn validateLimits(limits: &Limits) -> Result<(), ServerError>
+```
+
+Checks the buffer sizes of `limits`. It does not allocate or do I/O.
+
+### Errors
+`Buffer` with `InvalidCapacity` if `readCapacity` or `writeCapacity` is zero or too large.
+
+::Anchor{id="withConnection"}
+
+## `withConnection`
+
+```silk
+pub effect<'env> fn withConnection<
+  'env,
+  A,
+  E,
+  ?CallbackRequirements,
+  P,
+  H: ConnectionHandler<P, A, E ? CallbackRequirements> + 'env,
+>(
+  transport: &'env mut P,
+  limits: Limits,
+  handler: H,
+) -> A
+! E | ServerError | BufferError | OutOfMemoryError
+? CallbackRequirements | &mut Allocator
+where &'env mut P provides &ByteDuplex from &mut ByteDuplex,
+  &'env mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock,
+  CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
+```
+
+Serves one connection over `transport` with `handler`, and closes it after.
+
+### Details
+It allocates the parsers and the buffers, then calls the handler. When the handler returns or
+fails, the transport is closed at once.
+
+### Errors
+- `ServerError` if `limits` is not valid.
+- `OutOfMemoryError` if the parsers or buffers cannot be allocated.
+- The error of the handler.
+
+::Anchor{id="withRequest"}
+
+## `withRequest`
+
+```silk
+pub effect fn withRequest<
+  'request,
+  'connection: 'request,
+  'transport: 'connection,
+  'callback,
+  A,
+  E,
+  ?CallbackRequirements,
+  P,
+>(
+  connection: &'request mut Connection<'connection, 'transport, P>,
+  deadline: Option<Instant>,
+  callback: for<'call, 'requestView: 'call, 'connectionView: 'requestView, 'transportView: 'connectionView> once fn<'callback>(
+    &'call mut Request<'requestView, 'connectionView, 'transportView, P>,
+  ) -> once Effect<'call; A ! E ? CallbackRequirements>,
+) -> Option<A>
+! E | ServerError | OutOfMemoryError
+? CallbackRequirements | &mut Allocator | &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Reads the next request head, and lends the request to `callback`.
+
+### Details
+It returns `None`, and calls nothing, when the peer closes before a new request, or when
+`maxRequestsPerConnection` is reached. If the callback returns without a complete response, the
+connection is set to close.
+
+### Errors
+- `InvalidState` if the phase is not `Ready`.
+- `Head` if the head is not valid, and `TruncatedHead` if the input ends in the head.
+- `Body` if the body framing of the request is not valid.
+- The error of the callback.
+
+::Anchor{id="readSome"}
+
+## `readSome`
+
+```silk
+pub effect fn readSome<'request, 'connection, 'transport, P>(
+  request: &mut Request<'request, 'connection, 'transport, P>,
+  output: &mut [u8],
+  deadline: Option<Instant>,
+) -> usize
+! ServerError
+? &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Reads the next bytes of the request body into the start of `output`.
+
+### Details
+It returns at least one byte, or zero at the end of the body. If the request has `Expect:
+100-continue`, the first call sends `100 Continue`.
+
+### Errors
+- `UnsupportedExpectation` if [`Request.expectationRejected`](#Request.impl.expectationRejected) is true.
+- `Body` if the body breaks its framing.
+- `InvalidState` if the request is no longer active.
+
+::Anchor{id="discardRemaining"}
+
+## `discardRemaining`
+
+```silk
+pub effect fn discardRemaining<'request, 'connection, 'transport, P>(
+  request: &mut Request<'request, 'connection, 'transport, P>,
+  maxWireBytes: u64,
+  deadline: Option<Instant>,
+) -> ()
+! ServerError
+? &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Reads and drops the rest of the request body, so that the connection can be reused.
+
+### Details
+It reads at most the smaller of `maxWireBytes` and `limits.maxDiscardWireBytes`. If the body
+needs `Expect: 100-continue`, it sends `100 Continue` first.
+
+### Errors
+- `Body` with `DiscardLimit` if the body is longer than the limit. The phase becomes `Failed`.
+- `UnsupportedExpectation` if [`Request.expectationRejected`](#Request.impl.expectationRejected) is true.
+
+::Anchor{id="finishConnection"}
+
+## `finishConnection`
+
+```silk
+pub effect fn finishConnection<'connection, 'transport, P>(
+  connection: &mut Connection<'connection, 'transport, P>,
+  maxDrainBytes: usize,
+  deadline: Instant,
+) -> ()
+! ServerError
+? &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Closes the connection gracefully.
+
+### Details
+It flushes the output and shuts down writes. Then it reads and drops at most the smaller of
+`maxDrainBytes` and `limits.shutdownDrainBytes`, so that the peer gets the response before the
+close. The phase becomes `Closed`.
+
+### Errors
+- `InvalidState` if the phase is not `Ready`, `Closing`, or `Upgraded`.
+- `Buffer` if the flush, the shutdown, or the drain fails.
+
+::Anchor{id="sendInformational"}
+
+## `sendInformational`
+
+```silk
+pub effect fn sendInformational<'request, 'connection, 'transport, 'value, P>(
+  request: &mut Request<'request, 'connection, 'transport, P>,
+  head: &ValueResponseHead<'value>,
+  deadline: Option<Instant>,
+) -> ()
+! ServerError
+? &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Sends a 1xx response, such as 103 Early Hints, and flushes it.
+
+### Errors
+- `InvalidState` if the status is not 1xx, is 101, has another version than the request, or is a
+  second 100.
+- `InvalidBodyMode` if the head has `Content-Length`, `Transfer-Encoding`, `Trailer`, or
+  `Connection`.
+- `LimitExceeded` if `maxInformationalResponses` is reached.
+
+::Anchor{id="respond"}
+
+## `respond`
+
+```silk
+pub effect fn respond<
+  'writer,
+  'request: 'writer,
+  'connection: 'request,
+  'transport: 'connection,
+  'value: 'writer,
+  'names: 'request,
+  'callback,
+  A,
+  E,
+  ?CallbackRequirements,
+  P,
+>(
+  request: &'writer mut Request<'request, 'connection, 'transport, P>,
+  head: &ValueResponseHead<'value>,
+  mode: BodyMode,
+  reuse: ReusePolicy,
+  trailerPolicy: TrailerPolicy<'names>,
+  deadline: Option<Instant>,
+  callback: for<'call, 'writerView: 'call, 'requestView: 'writerView, 'connectionView: 'requestView, 'transportView: 'connectionView> once fn<'callback>(
+    &'call mut ResponseWriter<'writerView, 'requestView, 'connectionView, 'transportView, P>,
+  ) -> once Effect<'call; A ! E ? CallbackRequirements>,
+) -> A
+! E | ServerError | OutOfMemoryError
+? CallbackRequirements | &mut Allocator | &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Sends the head of the final response, and lends a [`ResponseWriter`](#ResponseWriter) to `callback` for the body.
+
+### Details
+The server adds `Connection: close` or `keep-alive` as needed. The callback writes the body and
+calls [`ResponseWriter.finish`](#ResponseWriter.impl.finish). If it does not, or fails, the connection closes after the
+request.
+
+### Errors
+- `InvalidBodyMode` if the status is less than 200, the version is not the version of the
+  request, or `mode` does not fit the head and the status.
+- `InvalidState` if the request is not active.
+- The error of the callback.
+
+::Anchor{id="reject"}
+
+## `reject`
+
+```silk
+pub effect fn reject<
+  'loan,
+  'request: 'loan,
+  'connection: 'request,
+  'transport: 'connection,
+  'value,
+  P,
+>(
+  request: &'loan mut Request<'request, 'connection, 'transport, P>,
+  head: &ValueResponseHead<'value>,
+  deadline: Option<Instant>,
+) -> ()
+! ServerError | OutOfMemoryError
+? &mut Allocator | &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Sends a final response with no body, and closes the connection after it.
+
+It does not read the rest of the request body. Use it for errors such as 400, 413, or 417.
+
+### Errors
+`InvalidBodyMode` if the status is less than 200, or the version is not the version of the
+request.
+
+::Anchor{id="withUpgrade"}
+
+## `withUpgrade`
+
+```silk
+pub effect fn withUpgrade<
+  'loan,
+  'request: 'loan,
+  'connection: 'request,
+  'transport: 'connection,
+  'value: 'loan,
+  'callback,
+  A,
+  E,
+  ?CallbackRequirements,
+  P,
+>(
+  request: &'loan mut Request<'request, 'connection, 'transport, P>,
+  selectedProtocol: string,
+  response: &ValueResponseHead<'value>,
+  deadline: Option<Instant>,
+  callback: for<'call, 'transportView: 'call> once fn<'callback>(
+    &'call mut BufferedDuplex<'transportView, P>,
+  ) -> once Effect<'call; A ! E ? CallbackRequirements>,
+) -> A
+! E | ServerError | OutOfMemoryError
+? CallbackRequirements | &mut Allocator | &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Sends a 101 response, and lends the buffered channel to `callback` for the new protocol.
+
+### Details
+The channel keeps any bytes that the peer sent after the request head. After this call, the
+phase is `Upgraded`, and HTTP operations fail.
+
+### Errors
+`UpgradeRejected` if one of these is false:
+- The request has no body, `Connection: upgrade`, and `selectedProtocol` in `Upgrade`.
+- The response is 101, has the same version, has `selectedProtocol` in `Upgrade`, and has no
+  body fields.
+
+::Anchor{id="withTunnel"}
+
+## `withTunnel`
+
+```silk
+pub effect fn withTunnel<
+  'loan,
+  'request: 'loan,
+  'connection: 'request,
+  'transport: 'connection,
+  'value: 'loan,
+  'callback,
+  A,
+  E,
+  ?CallbackRequirements,
+  P,
+>(
+  request: &'loan mut Request<'request, 'connection, 'transport, P>,
+  response: &ValueResponseHead<'value>,
+  deadline: Option<Instant>,
+  callback: for<'call, 'transportView: 'call> once fn<'callback>(
+    &'call mut BufferedDuplex<'transportView, P>,
+  ) -> once Effect<'call; A ! E ? CallbackRequirements>,
+) -> A
+! E | ServerError | OutOfMemoryError
+? CallbackRequirements | &mut Allocator | &mut MonotonicClock
+where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Sends a 2xx response to `CONNECT`, and lends the buffered channel to `callback` for the tunnel.
+
+### Details
+The channel keeps any bytes that the peer sent after the request head. After this call, the
+phase is `Upgraded`.
+
+### Errors
+`TunnelRejected` if the method is not `CONNECT`, the request has a body, the status is not 2xx,
+the version is not the same, or the response has body fields.
+
+::Anchor{id="ResponseWriter.impl"}
+
+## Implementation `ResponseWriter<'writer, 'request, 'connection, 'transport, P>`
+
+```silk
+impl<'writer, 'request, 'connection, 'transport, P>
+  ResponseWriter<'writer, 'request, 'connection, 'transport, P>
+```
+
+::Anchor{id="ResponseWriter.impl.writeSome"}
+
+### Method `writeSome`
+
+```silk
+pub effect fn writeSome(
+    self: &mut Self,
+    input: &[u8],
+    deadline: Option<Instant>,
+  ) -> WriteProgress
+  ! ServerError
+  ? &mut MonotonicClock
+  where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Writes a prefix of `input` to the body, and returns the progress.
+
+It accepts at least one byte unless `input` is empty.
+
+#### Errors
+- `Body` if the bytes go over the declared `ContentLength`.
+- `Output` if the transport fails. The progress tells what was sent.
+- `InvalidState` if the response is finished.
+
+::Anchor{id="ResponseWriter.impl.writeAll"}
+
+### Method `writeAll`
+
+```silk
+pub effect fn writeAll(
+    self: &mut Self,
+    input: &[u8],
+    deadline: Option<Instant>,
+  ) -> WriteProgress
+  ! ServerError
+  ? &mut MonotonicClock
+  where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Writes all of `input` to the body, and returns the progress.
+
+#### Errors
+As [`ResponseWriter.writeSome`](#ResponseWriter.impl.writeSome). `Output` includes the bytes of earlier steps of this call.
+
+::Anchor{id="ResponseWriter.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub effect fn finish<'value>(
+    self: &mut Self,
+    trailers: &Headers<'value>,
+    deadline: Option<Instant>,
+  ) -> ()
+  ! ServerError
+  ? &mut MonotonicClock
+  where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
+```
+
+Ends the body, writes `trailers`, and flushes the response.
+
+Call it one time. Trailers are sent only with `Chunked`. For other modes, give empty headers.
+
+#### Errors
+- `Body` if a `ContentLength` body is short, or the trailers are not allowed.
+- `Output` or `Buffer` if the transport fails.
+- `InvalidState` if the response is already finished.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

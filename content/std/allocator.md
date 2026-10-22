@@ -1,0 +1,149 @@
+The `Allocator` service: the source of owned heap storage in the standard library.
+
+## When to use
+Each operation that makes owned storage (such as `Bytes.copy`, `List.push` or `Arc.make`)
+requires `&mut Allocator`. Provide it one time, near the top of the program, with
+[`Allocator.systemAllocatorProvider`](#Allocator.impl.systemAllocatorProvider).
+
+## Details
+[`Allocator`](#Allocator) is a normal service. The requirement stays in the `Effect` until a caller provides
+it. Thus a test or an application can use a different allocator for one part of the code.
+
+## Errors
+[`OutOfMemoryError`](#OutOfMemoryError) when the allocator cannot supply the storage. A failed request never
+returns part of an allocation.
+
+## Examples
+### Provide the system allocator
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+
+// The requirement `? &mut Allocator` stays open until a caller provides it.
+effect fn greeting() -> Bytes
+  ! OutOfMemoryError
+  ? &mut Allocator {
+  return run Bytes.copy(b"Silk")
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let bytes = run greeting() |> Effect.provideMut<Allocator>(&mut allocator)
+  if Bytes.length(&bytes) != 4 {
+    return 1
+  }
+  return 0
+}
+
+effect fn outOfMemory(error: OutOfMemoryError) -> i32 {
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), outOfMemory)
+}
+```
+
+Import as `Allocator` with `import silk.allocator { Allocator }`.
+
+Public declarations: 3.
+
+::Anchor{id="OutOfMemoryError"}
+
+## `OutOfMemoryError`
+
+```silk
+pub struct OutOfMemoryError
+```
+
+The failure when an allocator cannot supply the requested storage.
+
+::Anchor{id="Allocator"}
+
+## `Allocator`
+
+```silk
+pub service Allocator
+```
+
+A mutable service that supplies owned storage for a `Layout`.
+
+::Anchor{id="Allocator.allocate"}
+
+### Operation `allocate`
+
+```silk
+effect fn allocate(layout: Layout) -> Intrinsic.Allocation ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns one allocation for `layout`, or fails with no partial storage.
+
+::Anchor{id="Allocator.impl"}
+
+## Implementation `Allocator`
+
+```silk
+impl Allocator
+```
+
+::Anchor{id="Allocator.impl.outOfMemory"}
+
+### Associated function `outOfMemory`
+
+```silk
+pub effect fn outOfMemory() -> never ! OutOfMemoryError
+```
+
+Fails at once with `OutOfMemoryError`.
+
+#### When to use
+Use it when a size calculation overflows, so that the caller sees the normal allocation
+failure.
+
+::Anchor{id="Allocator.impl.systemAllocatorProvider"}
+
+### Associated function `systemAllocatorProvider`
+
+```silk
+pub fn systemAllocatorProvider() -> SystemAllocator
+```
+
+Returns a provider that uses the process heap. It does not allocate.
+
+::Anchor{id="SystemAllocator"}
+
+## `SystemAllocator`
+
+```silk
+pub struct SystemAllocator
+```
+
+The process-heap provider for [`Allocator`](#Allocator). It has no state.
+
+::Anchor{id="SystemAllocator.impl"}
+
+## Implementation `SystemAllocator`
+
+```silk
+impl SystemAllocator
+```
+
+::Anchor{id="SystemAllocator.impl.Allocator"}
+
+## Implementation `Allocator for SystemAllocator`
+
+```silk
+impl Allocator for SystemAllocator
+```
+
+::Anchor{id="SystemAllocator.impl.Allocator.allocate"}
+
+### Operation `allocate`
+
+```silk
+allocate: SystemAllocator.systemAllocate
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

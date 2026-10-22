@@ -1,0 +1,161 @@
+Reads and writes on file descriptors that the caller owns, for native providers.
+
+## When to use
+Use [`NativeDescriptor`](#NativeDescriptor) to build a native provider, such as `silk.os_writer` or
+`silk.os_standard_input`. Application code uses the `Writer` and `StandardInput` effects
+instead.
+
+## Details
+One system call transfers at most 0x7ffff000 bytes. A call that a signal interrupts is made
+again. An empty buffer makes no system call. The functions never close the descriptor.
+
+## Errors
+Each function returns `false` on failure and writes the native error code to `error`, or 0 when
+the system returned a count that is not valid.
+
+## Gotchas
+- The caller keeps the descriptor open and controls access from other threads.
+- [`NativeDescriptor.writeAll`](#NativeDescriptor.impl.writeAll) can fail after part of the bytes were written.
+- The module is empty on targets other than Darwin on aarch64, and Linux with GNU libc on x86_64
+  or aarch64.
+
+## Examples
+### Make empty transfers
+```silk
+import silk.native_descriptor { NativeDescriptor }
+
+pub fn main() -> i32 {
+  let mut nativeError = 0
+
+  // Descriptor 1 is standard output. An empty write makes no system call.
+  let written = run NativeDescriptor.writeAll(1, b"", &mut nativeError)
+  if !written || nativeError != 0 {
+    return 1
+  }
+
+  // A read of zero bytes also makes no system call.
+  let mut empty: [u8; 0] = []
+  let mut count: usize = 7
+  let read = run NativeDescriptor.read(0, &mut empty, &mut count, &mut nativeError)
+  if !read || count != 0 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `NativeDescriptor` with `import silk.native_descriptor { NativeDescriptor }`.
+
+Public declarations: 5.
+
+::Anchor{id="read"}
+
+## `read`
+
+```silk
+pub unsafe extern "C" fn read(fd: i32, buffer: ?[*]mut u8, count: usize) -> isize with Intrinsic.foreign(noCapture: ("buffer",))
+```
+
+The C `read` function: reads at most `count` bytes from `fd` into `buffer`.
+
+### Gotchas
+`buffer` must have `count` writable bytes during the call. After a negative result, read the
+error code at once.
+
+::Anchor{id="write"}
+
+## `write`
+
+```silk
+pub unsafe extern "C" fn write(fd: i32, buffer: ?[*]const u8, count: usize) -> isize with Intrinsic.foreign(noCapture: ("buffer",))
+```
+
+The C `write` function: writes at most `count` bytes from `buffer` to `fd`.
+
+### Gotchas
+`buffer` must have `count` readable bytes during the call. A positive result can be less than
+`count`. After a negative result, read the error code at once.
+
+::Anchor{id="isatty"}
+
+## `isatty`
+
+```silk
+pub unsafe extern "C" fn isatty(fd: i32) -> i32
+```
+
+The C `isatty` function: returns 1 when `fd` is a terminal, else 0.
+
+::Anchor{id="__error"}
+
+## `__error`
+
+```silk
+pub unsafe extern "C" fn __error() -> *mut i32
+```
+
+Returns the error code slot of the thread on Darwin. Read it at once after a failed call.
+
+::Anchor{id="NativeDescriptor"}
+
+## `NativeDescriptor`
+
+```silk
+pub struct NativeDescriptor
+```
+
+Safe reads and writes on a descriptor that the caller owns.
+
+::Anchor{id="NativeDescriptor.impl"}
+
+## Implementation `NativeDescriptor`
+
+```silk
+impl NativeDescriptor
+```
+
+::Anchor{id="NativeDescriptor.impl.read"}
+
+### Associated function `read`
+
+```silk
+pub effect fn read(fd: i32, buffer: &mut [u8], count: &mut usize, error: &mut i32) -> bool
+```
+
+Reads one time from `fd` into the start of `buffer`, and returns whether it succeeded.
+
+#### Details
+On success, `count` is the number of bytes read. Zero means the end of input, or an empty
+`buffer`. On failure, `count` is zero and `error` is the native error code, or zero for a
+count that is not valid. Bytes after the count are not changed.
+
+::Anchor{id="NativeDescriptor.impl.isTerminal"}
+
+### Associated function `isTerminal`
+
+```silk
+pub effect fn isTerminal(fd: i32) -> bool
+```
+
+Returns whether `fd`, such as 2 for standard error, is a terminal. A closed descriptor, a
+pipe, a file, or a failed query answers false.
+
+::Anchor{id="NativeDescriptor.impl.writeAll"}
+
+### Associated function `writeAll`
+
+```silk
+pub effect fn writeAll(fd: i32, buffer: &[u8], error: &mut i32) -> bool
+```
+
+Writes all of `buffer` to `fd`, and returns whether it succeeded.
+
+#### Details
+It calls `write` until all bytes are written. On failure, `error` is the native error code, or
+zero if the system wrote nothing or returned a count that is not valid.
+
+#### Gotchas
+Part of `buffer` can be written before a failure. Do not write all of it again without a
+check.
+
+Profiles: `aarch64-apple-darwin`.

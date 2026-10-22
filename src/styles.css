@@ -1,0 +1,108 @@
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/SpaceMono-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/SpaceMono-Bold.ttf') format('truetype');
+}
+
+/* Design tokens from the Elyx design (tokens/colors.elyx and colors-dark.elyx). */
+:root {
+  color-scheme: light dark;
+
+  --silk-paper: #e3e1dc;
+  --silk-ink: #3b3a39;
+  --silk-muted: #6b6a67;
+  --silk-rule: #c9c6bf;
+  --silk-signal: #d51c21;
+  --silk-signal-soft: #e2cdc9;
+
+  --syntax-surface: #3b3a39;
+  --syntax-plain: #e3e1dc;
+  --syntax-label: #e3e1dc73;
+  --syntax-gutter: #e3e1dc40;
+  --syntax-divider: #e3e1dc1f;
+  --syntax-comment: #8a8884;
+  --syntax-keyword: #f0726a;
+  --syntax-type: #e3b98b;
+  --syntax-function: #e3e1dc;
+  --syntax-operator: #a9a6a0;
+  --syntax-string: #bcc79f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --silk-paper: #1e1d1c;
+    --silk-ink: #e3e1dc;
+    --silk-muted: #9c9993;
+    --silk-rule: #42403d;
+    --silk-signal: #e8443f;
+    --silk-signal-soft: #3c2321;
+
+    --syntax-surface: #2a2927;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--silk-paper);
+  --color-ink: var(--silk-ink);
+  --color-muted: var(--silk-muted);
+  --color-rule: var(--silk-rule);
+  --color-signal: var(--silk-signal);
+  --color-signal-soft: var(--silk-signal-soft);
+
+  --color-code: var(--syntax-surface);
+  --color-code-plain: var(--syntax-plain);
+  --color-code-label: var(--syntax-label);
+  --color-code-gutter: var(--syntax-gutter);
+  --color-code-divider: var(--syntax-divider);
+  --color-code-comment: var(--syntax-comment);
+  --color-code-keyword: var(--syntax-keyword);
+  --color-code-type: var(--syntax-type);
+  --color-code-function: var(--syntax-function);
+  --color-code-operator: var(--syntax-operator);
+  --color-code-string: var(--syntax-string);
+}
+
+@theme {
+  --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-mono);
+
+  --tracking-label: 0.1em;
+  --tracking-tight: -0.025em;
+  --tracking-tighter: -0.05em;
+
+  --leading-prose: 1.62;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-signal-soft);
+  }
+}
+
+/* The small bold uppercase caption used for section labels, badges and table headers. */
+@utility label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}

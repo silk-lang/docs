@@ -1,0 +1,94 @@
+Decode TOML string tokens into owned UTF-8 text.
+
+## When to use
+Use [`TomlText.decode`](#TomlText.impl.decode) when you read tokens with `silk.toml_scanner` and need the text of a
+quoted string or key. `silk.toml_value` uses it to build its tree.
+
+## Details
+[`TomlText.decode`](#TomlText.impl.decode) removes the quotes, removes a newline right after the opening quotes of a
+multiline string, handles line-ending backslashes, and decodes escapes such as `\n` and `é`. A
+literal string has no escapes, so only the quotes are removed.
+
+## Errors
+- `OutOfMemoryError` if the `Allocator` cannot supply the output.
+
+## Gotchas
+The input must be a complete string token that `silk.toml_scanner` validated. Other input gives
+wrong text or an index failure.
+
+## Examples
+### Decode a string token
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.toml_text { TomlText }
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let text = run TomlText.decode(b"\"tab\\there\"", false, false)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+
+  // The decoded text is `tab`, a tab character (9), and `here`.
+  let bytes = Bytes.asSlice(&text)
+  if bytes.length != 8 || bytes[3] != 9 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `TomlText` with `import silk.toml_text { TomlText }`.
+
+Public declarations: 1.
+
+::Anchor{id="TomlText"}
+
+## `TomlText`
+
+```silk
+pub struct TomlText
+```
+
+Functions that turn validated TOML string bytes into owned bytes.
+
+::Anchor{id="TomlText.impl"}
+
+## Implementation `TomlText`
+
+```silk
+impl TomlText
+```
+
+::Anchor{id="TomlText.impl.copy"}
+
+### Associated function `copy`
+
+```silk
+pub effect fn copy(raw: &[u8]) -> Bytes ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns an owned copy of `raw`. It does not decode anything.
+
+#### Errors
+- `OutOfMemoryError` if the `Allocator` cannot supply the copy.
+
+::Anchor{id="TomlText.impl.decode"}
+
+### Associated function `decode`
+
+```silk
+pub effect fn decode(raw: &[u8], literal: bool, multiline: bool)
+    -> Bytes ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns the decoded text of the quoted token `raw`.
+
+Set `literal` for a string in `'` quotes and `multiline` for a string with three quotes, as
+the scanner reports them in `TomlToken.String`.
+
+#### Errors
+- `OutOfMemoryError` if the `Allocator` cannot supply the output.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

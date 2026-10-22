@@ -1,0 +1,123 @@
+Read JSON tokens from a `BufferedInput`, for documents that do not fit in one slice.
+
+## When to use
+Use [`JsonReader`](#JsonReader) to read a large or streamed JSON document from a `ByteDuplex` transport, such
+as an HTTP body. When the whole document is in memory, use `silk.json_scanner.JsonScanner`.
+
+## Details
+Each call to [`JsonReader.next`](#JsonReader.impl.next) returns one checked token. The raw bytes of a string, number,
+or literal are copied into a scratch buffer that the caller gives. The reader does not keep a
+reference to the input or the scratch buffer between calls. It does not allocate.
+
+## Errors
+- `JsonError` if the input is not valid JSON, or with reason `TokenTooLarge` if a token does not
+  fit in the scratch buffer.
+- `BufferError` if the input fails.
+
+## Gotchas
+After an error, the reader cannot continue. Drop each token before the next call, because the
+token borrows the scratch buffer.
+
+Import as `JsonReader` with `import silk.json_reader { JsonReader }`.
+
+Public declarations: 2.
+
+::Anchor{id="JsonReadToken"}
+
+## `JsonReadToken`
+
+```silk
+pub struct JsonReadToken<'scratch>
+```
+
+One token and its raw bytes in the scratch buffer.
+
+### Details
+
+For a string, `raw` includes the quotes and the escapes. For punctuation and the end of input,
+`raw` is empty.
+
+::Anchor{id="JsonReadToken.token"}
+
+### Field `token`
+
+```silk
+pub token: JsonToken
+```
+
+The token. Its offsets are from the start of the document.
+
+::Anchor{id="JsonReadToken.raw"}
+
+### Field `raw`
+
+```silk
+pub raw: &'scratch [u8]
+```
+
+The source bytes of a string, number, or literal token.
+
+::Anchor{id="JsonReader"}
+
+## `JsonReader`
+
+```silk
+pub struct JsonReader
+```
+
+The state of one JSON document read from a `BufferedInput`.
+
+### Details
+
+It keeps the position in the document between calls. After the document ends, each call returns
+`EndOfInput`.
+
+::Anchor{id="JsonReader.impl"}
+
+## Implementation `JsonReader`
+
+```silk
+impl JsonReader
+```
+
+::Anchor{id="JsonReader.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> JsonReader
+```
+
+Returns a reader at the start of a document. It does not allocate.
+
+::Anchor{id="JsonReader.impl.next"}
+
+### Method `next`
+
+```silk
+pub effect fn next<'scratch>(
+    self: &mut JsonReader,
+    input: &mut BufferedInput,
+    scratch: &'scratch mut [u8],
+    deadline: Option<Instant>,
+  ) -> JsonReadToken<'scratch>
+  ! JsonError | BufferError
+  ? &mut ByteDuplex | &mut MonotonicClock
+```
+
+Reads the next token from `input` and copies its raw bytes into `scratch`.
+
+#### Details
+
+The token borrows only `scratch`. A number at the end of the buffered bytes waits for the next
+byte, which stays in `input`. Whitespace does not use scratch space. `deadline` applies to
+each read.
+
+#### Errors
+
+- `JsonError` if the input is not valid JSON.
+- `JsonError` with reason `TokenTooLarge` if the token does not fit in `scratch`. `offset` is
+  the first byte of the token and `available` is the scratch size.
+- `BufferError` if the input fails, or `BufferError.Terminal` after an earlier error.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

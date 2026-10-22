@@ -1,0 +1,317 @@
+Connection pools that open native TCP, HTTPS, and Unix socket connections.
+
+## When to use
+Use [`withDirectPool`](#withDirectPool) to reuse connections to network origins, then call [`withConnection`](#withConnection) for
+each request. Use [`withUnixPool`](#withUnixPool) and [`withUnixConnection`](#withUnixConnection) when all requests go through one
+Unix socket, for example to a local daemon. `silk.http_fetch_native` can send requests through a
+pool from this module.
+
+## Details
+Each pool has one [`Context`](#Context) with the native options, the HTTP limits, and an optional trust
+snapshot. The pool copies the trust snapshot when it starts, and each new HTTPS connection gets
+its own copy. The pool rules, such as limits, reuse, and expiry, are in
+`silk.http_connection_pool`.
+
+The context removes `options.deadline`. Each checkout gives its own deadline, and a pooled
+connection keeps no deadline.
+
+## Errors
+- `PoolError` from `silk.http_connection_pool`.
+- The native errors of a new connection: resolver, socket, TLS, identity, and trust errors.
+- The error of the handler.
+
+## Gotchas
+- A direct pool accepts only direct keys. A Unix pool accepts only keys for its own path. Other
+  keys fail with `PoolError.ContextMismatch`, before any network contact.
+- Proxy keys always fail with `PoolError.ContextMismatch`. These contexts do not open proxy
+  connections.
+- An HTTPS origin also fails with `PoolError.ContextMismatch` if the pool has no trust snapshot.
+  Give `preparedTrust` to use HTTPS.
+
+Import as `PoolNative` with `import silk.http_connection_pool_native as PoolNative`.
+
+Public declarations: 8.
+
+::Anchor{id="Context"}
+
+## `Context`
+
+```silk
+pub struct Context
+```
+
+The settings that a native pool uses to open connections.
+
+### Details
+Only [`withDirectPool`](#withDirectPool) and [`withUnixPool`](#withUnixPool) make a context. It holds the route (direct or one
+Unix path), the native options without a deadline, the HTTP limits, and a copy of the trust
+snapshot. It does not change after the pool starts.
+
+::Anchor{id="limitsEqual"}
+
+## `limitsEqual`
+
+```silk
+pub fn limitsEqual(left: &Limits, right: &Limits) -> bool
+```
+
+Returns whether all the fields of two HTTP connection limits are equal.
+
+::Anchor{id="Context.impl"}
+
+## Implementation `Context`
+
+```silk
+impl Context
+```
+
+::Anchor{id="Context.impl.PoolContextCopy"}
+
+## Implementation `PoolContextCopy<TrustSourceError | OutOfMemoryError ? &mut Allocator> for Context`
+
+```silk
+impl PoolContextCopy<
+  TrustSourceError | OutOfMemoryError ? &mut Allocator
+> for Context
+```
+
+::Anchor{id="Context.impl.PoolContextCopy.copy"}
+
+### Operation `copy`
+
+```silk
+copy: Context.copyContext
+```
+
+::Anchor{id="Context.impl.PoolContext"}
+
+## Implementation `PoolContext<ConnectionKey, NativeTransport, NativeExchangeError | ExchangeError | ResolverError | NativeSocketError | ConnectionError | IdentityError | TrustSourceError | OutOfMemoryError ? &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random> for Context`
+
+```silk
+impl PoolContext<
+  ConnectionKey,
+  NativeTransport,
+  NativeExchangeError
+    | ExchangeError
+    | ResolverError
+    | NativeSocketError
+    | ConnectionError
+    | IdentityError
+    | TrustSourceError
+    | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random
+> for Context
+```
+
+::Anchor{id="Context.impl.PoolContext.accepts"}
+
+### Operation `accepts`
+
+```silk
+accepts: Context.acceptsKey
+```
+
+::Anchor{id="Context.impl.PoolContext.acquire"}
+
+### Operation `acquire`
+
+```silk
+acquire: Context.acquire
+```
+
+::Anchor{id="withDirectPool"}
+
+## `withDirectPool`
+
+```silk
+pub effect<'env> fn withDirectPool<
+  A,
+  E,
+  ?R,
+  H: PoolHandler<ConnectionKey, NativeTransport, Context, A, E ? R> + 'env,
+  'env,
+>(
+  config: Config,
+  options: Options,
+  limits: Limits,
+  preparedTrust: Option<&TrustSnapshot>,
+  handler: H,
+) -> A
+! E | PoolError | TrustSourceError | OutOfMemoryError
+? R | &mut Allocator
+where &mut NativeTransport provides &HttpTransport from &mut HttpTransport
+```
+
+Makes a pool for direct TCP and HTTPS connections, lends it to `handler`, and closes it after.
+
+### Details
+The pool copies `preparedTrust` with the `options.trust.snapshot` limits before the handler
+starts. `options.deadline` is not used. Give a deadline to each [`withConnection`](#withConnection) instead.
+
+### Errors
+- `PoolError.InvalidConfig` if `config` is not valid.
+- `TrustSourceError` or `OutOfMemoryError` if the trust snapshot cannot be copied.
+- The error of the handler.
+
+::Anchor{id="withUnixPool"}
+
+## `withUnixPool`
+
+```silk
+pub effect<'env> fn withUnixPool<
+  A,
+  E,
+  ?R,
+  H: PoolHandler<ConnectionKey, NativeTransport, Context, A, E ? R> + 'env,
+  'env,
+>(
+  config: Config,
+  path: &[u8],
+  options: Options,
+  limits: Limits,
+  preparedTrust: Option<&TrustSnapshot>,
+  handler: H,
+) -> A
+! E | PoolError | NativeExchangeError | NativeSocketError | TrustSourceError | OutOfMemoryError
+? R | &mut Allocator
+where &mut NativeTransport provides &HttpTransport from &mut HttpTransport
+```
+
+Makes a pool for the Unix socket at `path`, lends it to `handler`, and closes it after.
+
+### Details
+All connections go to `path`. The origin of each request can be HTTP or HTTPS. For HTTPS, TLS
+checks the certificate against the origin, not the path. The pool copies `path` and
+`preparedTrust` before the handler starts. `options.deadline` is not used.
+
+### Errors
+- `PoolError.InvalidConfig` if `config` is not valid.
+- `NativeSocketError` if `path` is not a valid socket path, or Unix sockets are not supported on
+  the target.
+- `TrustSourceError` or `OutOfMemoryError` if a copy fails.
+- The error of the handler.
+
+::Anchor{id="copyHandle"}
+
+## `copyHandle`
+
+```silk
+pub effect fn copyHandle(
+  handle: &Handle<ConnectionKey, NativeTransport, Context>,
+) -> Handle<ConnectionKey, NativeTransport, Context>
+! TrustSourceError | OutOfMemoryError
+? &mut Allocator
+```
+
+Returns another handle for the same pool. If the copy of the context fails, the first handle
+stays valid and no new handle is made.
+
+::Anchor{id="acceptsLimits"}
+
+## `acceptsLimits`
+
+```silk
+pub fn acceptsLimits(
+  handle: &Handle<ConnectionKey, NativeTransport, Context>,
+  limits: Limits,
+) -> bool
+```
+
+Returns whether the HTTP limits of the pool are equal to `limits`, in all fields.
+
+`silk.http_fetch_native` calls it before a checkout, so that a request never uses a connection
+with other limits.
+
+::Anchor{id="withConnection"}
+
+## `withConnection`
+
+```silk
+pub effect<'env> fn withConnection<
+  A,
+  E,
+  ?R,
+  H: ConnectionHandler<NativeTransport, A, E ? R> + 'env,
+  'env,
+>(
+  handle: &Handle<ConnectionKey, NativeTransport, Context>,
+  origin: Origin,
+  requestDeadline: Option<Instant>,
+  acquisitionDeadline: Option<Instant>,
+  handler: H,
+) -> CheckoutResult<A>
+! E
+  | PoolError
+  | NativeExchangeError
+  | ExchangeError
+  | ResolverError
+  | NativeSocketError
+  | ConnectionError
+  | IdentityError
+  | TrustSourceError
+  | OutOfMemoryError
+? R | &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random
+where
+  &mut NativeTransport provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random,
+  &mut NativeTransport provides &HttpTransport from &mut HttpTransport
+```
+
+Checks out one connection to `origin` from a direct pool, and lends it to `handler`.
+
+### Details
+To open a new connection, the pool uses the earlier of `requestDeadline` and
+`acquisitionDeadline`. The handler uses `requestDeadline` for its exchanges. The connection goes
+back to the pool only if it is eligible for reuse.
+
+### Errors
+- `PoolError.ContextMismatch` if the pool is a Unix pool. Nothing is sent.
+- `PoolError` for a full or closed pool, or an expired deadline.
+- The native errors of a new connection, and the error of the handler.
+
+::Anchor{id="withUnixConnection"}
+
+## `withUnixConnection`
+
+```silk
+pub effect<'env> fn withUnixConnection<
+  A,
+  E,
+  ?R,
+  H: ConnectionHandler<NativeTransport, A, E ? R> + 'env,
+  'env,
+>(
+  handle: &Handle<ConnectionKey, NativeTransport, Context>,
+  path: &[u8],
+  origin: Origin,
+  requestDeadline: Option<Instant>,
+  acquisitionDeadline: Option<Instant>,
+  handler: H,
+) -> CheckoutResult<A>
+! E
+  | PoolError
+  | NativeExchangeError
+  | ExchangeError
+  | ResolverError
+  | NativeSocketError
+  | ConnectionError
+  | IdentityError
+  | TrustSourceError
+  | OutOfMemoryError
+? R | &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random
+where
+  &mut NativeTransport provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random,
+  &mut NativeTransport provides &HttpTransport from &mut HttpTransport
+```
+
+Checks out one connection to `origin` from a Unix pool, and lends it to `handler`.
+
+### Details
+`path` and `origin` make the key. The deadlines work as in [`withConnection`](#withConnection).
+
+### Errors
+- `PoolError.ContextMismatch` if `path` is not the path of the pool, or if the pool is a direct
+  pool. Nothing is sent.
+- `PoolError` for a full or closed pool, or an expired deadline.
+- The native errors of a new connection, and the error of the handler.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

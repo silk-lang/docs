@@ -1,0 +1,471 @@
+UTF-8 text: owned strings, validation of bytes, and traversal one Unicode scalar at a time.
+
+## When to use
+Use the built-in `string` type for borrowed text, such as a literal or a view into a buffer. Use
+[`String`](#String) when the text must own its storage, for example to build text at runtime. Use
+`silk.bytes.Bytes` for bytes that are not necessarily UTF-8.
+
+## Details
+A `string` and a [`String`](#String) always hold valid UTF-8.
+
+- [`String.fromUtf8`](#String.impl.fromUtf8) checks bytes and borrows them as a `string`. It does not allocate.
+- [`String.copyUtf8`](#String.impl.copyUtf8) checks bytes and copies them into a new [`String`](#String).
+- [`String.fromBytes`](#String.impl.fromBytes) checks an owned `Bytes` value and keeps its storage, with no copy.
+  [`String.intoBytes`](#String.impl.intoBytes) gives the storage back as `Bytes`.
+
+A failed [`String.append`](#String.impl.append) or [`String.appendOwned`](#String.impl.appendOwned) leaves the string unchanged. Traversal with
+[`String.nextScalar`](#String.impl.nextScalar) gives Unicode scalar values and byte offsets. It does not give grapheme
+clusters, so one visible character can be more than one scalar.
+
+## Gotchas
+A [`ScalarCursor`](#ScalarCursor) is valid only for the string where the traversal started, and only while that
+string does not change. Start with [`String.scalarCursor`](#String.impl.scalarCursor) and advance only with
+[`String.nextCursor`](#String.impl.nextCursor).
+
+## Examples
+### Check bytes as UTF-8
+```silk
+import silk.result { Result }
+import silk.string { String, InvalidUtf8 }
+
+pub fn main() -> i32 {
+  let valid = String.fromUtf8(b"Silk") |> Result<string, InvalidUtf8>.unwrapOr("")
+  let rejected = String.fromUtf8(b"a\x80") |> Result<string, InvalidUtf8>.unwrapOr("")
+  if String.byteLength(valid) != 4 || String.byteLength(rejected) != 0 {
+    return 1
+  }
+  return 0
+}
+```
+
+### Count the scalars of a string
+```silk
+import silk.option { Option }
+import silk.string { String, ScalarStep }
+
+pub fn main() -> i32 {
+  // "né" has 2 scalars in 3 bytes.
+  let text = "né"
+  let mut count = 0
+  let mut step = String.nextScalar(text, String.scalarCursor())
+  while true {
+    match move step {
+      Option<ScalarStep>.Some { value } => {
+        count = count + 1
+        step = String.nextScalar(text, String.nextCursor(move value))
+      }
+      Option<ScalarStep>.None => {
+        break
+      }
+    }
+  }
+  if count != 2 || String.byteLength(text) != 3 {
+    return 1
+  }
+  return 0
+}
+```
+
+### Build an owned string
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.string { String }
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut text = run String.copy("hello") |> Effect.provideMut<Allocator>(&mut allocator)
+  run String.append(&mut text, ", world") |> Effect.provideMut<Allocator>(&mut allocator)
+  if String.view(&text) != "hello, world" {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `String` with `import silk.string { String }`.
+
+Public declarations: 4.
+
+::Anchor{id="String"}
+
+## `String`
+
+```silk
+pub struct String
+```
+
+Owned UTF-8 text. Dropping a `String` releases its storage.
+
+### Details
+
+Get a borrowed `string` view with [`String.view`](#String.impl.view). A `String` is affine. Use [`String.copy`](#String.impl.copy) to
+make an independent copy of a view.
+
+::Anchor{id="String.impl"}
+
+## Implementation `String`
+
+```silk
+impl String
+```
+
+::Anchor{id="String.impl.fromUtf8Unchecked"}
+
+### Associated function `fromUtf8Unchecked`
+
+```silk
+pub unsafe fn fromUtf8Unchecked(values: &[u8]) -> string
+```
+
+Returns `values` as a `string` view, with no UTF-8 check.
+
+#### When to use
+
+Use this function only when earlier code proves that all of `values` is valid UTF-8, such as a
+buffer that this module made. Use [`String.fromUtf8`](#String.impl.fromUtf8) in other cases.
+
+#### Gotchas
+
+This function is `unsafe`. If `values` is not valid UTF-8, the behavior of later text
+operations is not defined.
+
+::Anchor{id="String.impl.fromUtf8"}
+
+### Associated function `fromUtf8`
+
+```silk
+pub fn fromUtf8(values: &[u8]) -> Result<string, InvalidUtf8>
+```
+
+Checks that `values` is valid UTF-8 and returns it as a `string` view. This function does not
+allocate.
+
+#### Details
+
+The view borrows `values` and has the same lifetime.
+
+#### Errors
+
+- [`InvalidUtf8`](#InvalidUtf8) if `values` is not valid UTF-8. `offset` gives the position of the first
+  invalid byte.
+
+::Anchor{id="String.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> String
+```
+
+Returns an empty `String`. This function does not allocate.
+
+::Anchor{id="String.impl.fromBytes"}
+
+### Associated function `fromBytes`
+
+```silk
+pub fn fromBytes(values: Bytes) -> Result<String, InvalidUtf8>
+```
+
+Checks that `values` is valid UTF-8 and returns it as a `String` that keeps the same storage.
+
+#### When to use
+
+Use `fromBytes` to turn an owned byte buffer, such as file contents, into owned text without a
+copy. Use [`String.fromUtf8`](#String.impl.fromUtf8) to borrow bytes without taking ownership.
+
+#### Details
+
+This function consumes `values`. On success, the `String` keeps the allocation and capacity of
+`values`. This function does not allocate and does not copy.
+
+#### Errors
+
+- [`InvalidUtf8`](#InvalidUtf8) if `values` is not valid UTF-8. `offset` gives the position of the first
+  invalid byte. The storage of `values` is released.
+
+::Anchor{id="String.impl.fromBytesUnchecked"}
+
+### Associated function `fromBytesUnchecked`
+
+```silk
+pub unsafe fn fromBytesUnchecked(values: Bytes) -> String
+```
+
+Returns `values` as a `String` that keeps the same storage, with no UTF-8 check.
+
+#### When to use
+
+Use this function only when earlier code proves that all bytes of `values` are valid UTF-8.
+Use [`String.fromBytes`](#String.impl.fromBytes) in other cases.
+
+#### Gotchas
+
+This function is `unsafe`. If `values` is not valid UTF-8, the behavior of later text
+operations is not defined.
+
+::Anchor{id="String.impl.intoBytes"}
+
+### Method `intoBytes`
+
+```silk
+pub fn intoBytes(self: Self) -> Bytes
+```
+
+Returns the storage of the string as `Bytes`, with no copy.
+
+#### Details
+
+This function consumes the string. The result keeps the allocation, the capacity, and the
+UTF-8 contents. After the conversion, the bytes can change to any value.
+
+::Anchor{id="String.impl.copy"}
+
+### Associated function `copy`
+
+```silk
+pub effect fn copy(value: string) -> String ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns a new `String` that holds a copy of `value`.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage.
+
+::Anchor{id="String.impl.copyUtf8"}
+
+### Associated function `copyUtf8`
+
+```silk
+pub effect fn copyUtf8(values: &[u8]) -> Result<String, InvalidUtf8> ! OutOfMemoryError ? &mut Allocator
+```
+
+Checks that `values` is valid UTF-8 and returns a new `String` that holds a copy.
+
+#### When to use
+
+Use `copyUtf8` when the text must live longer than the buffer of `values`. Use
+[`String.fromUtf8`](#String.impl.fromUtf8) to borrow the bytes without allocation.
+
+#### Errors
+
+- [`InvalidUtf8`](#InvalidUtf8) as the `Result` failure if `values` is not valid UTF-8. `offset` gives the
+  position of the first invalid byte. The function does not allocate.
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage.
+
+::Anchor{id="String.impl.append"}
+
+### Method `append`
+
+```silk
+pub effect fn append(self: &mut Self, value: string) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Adds a copy of `value` at the end of the string.
+
+#### When to use
+
+Use `append` for borrowed text. Use [`String.appendOwned`](#String.impl.appendOwned) when the suffix is an owned
+[`String`](#String).
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage. The string does not change.
+
+::Anchor{id="String.impl.appendOwned"}
+
+### Method `appendOwned`
+
+```silk
+pub effect fn appendOwned(self: &mut Self, value: String) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Adds the text of `value` at the end of the string and consumes `value`.
+
+#### When to use
+
+Use `appendOwned` when the suffix is an owned [`String`](#String) that the caller does not need again.
+Use [`String.append`](#String.impl.append) for borrowed text.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage. The string does not change,
+  and `value` is dropped.
+
+::Anchor{id="String.impl.view"}
+
+### Method `view`
+
+```silk
+pub fn view(self: &Self) -> string
+```
+
+Returns a `string` view of the text. This function does not allocate or copy.
+
+::Anchor{id="String.impl.utf8Bytes"}
+
+### Associated function `utf8Bytes`
+
+```silk
+pub fn utf8Bytes(value: string) -> &[u8]
+```
+
+Returns the UTF-8 bytes of `value` as a shared slice.
+
+::Anchor{id="String.impl.byteLength"}
+
+### Associated function `byteLength`
+
+```silk
+pub fn byteLength(value: string) -> usize
+```
+
+Returns the number of UTF-8 bytes in `value`. This is not the number of characters.
+
+::Anchor{id="String.impl.ownedUtf8Bytes"}
+
+### Method `ownedUtf8Bytes`
+
+```silk
+pub fn ownedUtf8Bytes(self: &Self) -> &[u8]
+```
+
+Returns the UTF-8 bytes of the string as a shared slice.
+
+::Anchor{id="String.impl.ownedByteLength"}
+
+### Method `ownedByteLength`
+
+```silk
+pub fn ownedByteLength(self: &Self) -> usize
+```
+
+Returns the number of UTF-8 bytes in the string. This is not the number of characters.
+
+::Anchor{id="String.impl.scalarCursor"}
+
+### Associated function `scalarCursor`
+
+```silk
+pub fn scalarCursor() -> ScalarCursor
+```
+
+Returns a cursor at the start of a string, before the first scalar.
+
+#### Details
+
+Give the cursor to [`String.nextScalar`](#String.impl.nextScalar) to read the first scalar.
+
+::Anchor{id="String.impl.cursorByteOffset"}
+
+### Associated function `cursorByteOffset`
+
+```silk
+pub fn cursorByteOffset(cursor: &ScalarCursor) -> usize
+```
+
+Returns the byte position of `cursor` in its string.
+
+::Anchor{id="String.impl.scalarValue"}
+
+### Associated function `scalarValue`
+
+```silk
+pub fn scalarValue(step: &ScalarStep) -> char
+```
+
+Returns the Unicode scalar that `step` read.
+
+::Anchor{id="String.impl.scalarByteOffset"}
+
+### Associated function `scalarByteOffset`
+
+```silk
+pub fn scalarByteOffset(step: &ScalarStep) -> usize
+```
+
+Returns the byte position where the scalar of `step` starts.
+
+::Anchor{id="String.impl.nextCursor"}
+
+### Associated function `nextCursor`
+
+```silk
+pub fn nextCursor(step: ScalarStep) -> ScalarCursor
+```
+
+Returns the cursor after the scalar of `step`, and consumes `step`.
+
+#### Details
+
+Give the cursor to [`String.nextScalar`](#String.impl.nextScalar) to read the next scalar.
+
+::Anchor{id="String.impl.nextScalar"}
+
+### Associated function `nextScalar`
+
+```silk
+pub fn nextScalar(value: string, cursor: ScalarCursor) -> Option<ScalarStep>
+```
+
+Reads the scalar at `cursor` in `value`. Returns `None` at the end of the text.
+
+#### Details
+
+A present [`ScalarStep`](#ScalarStep) holds the scalar, its byte position, and the cursor after it. Read
+them with [`String.scalarValue`](#String.impl.scalarValue), [`String.scalarByteOffset`](#String.impl.scalarByteOffset), and [`String.nextCursor`](#String.impl.nextCursor). This
+function does not allocate.
+
+#### Gotchas
+
+`cursor` must come from [`String.scalarCursor`](#String.impl.scalarCursor) or [`String.nextCursor`](#String.impl.nextCursor) for the same `value`.
+A cursor from a different string gives incorrect results.
+
+::Anchor{id="InvalidUtf8"}
+
+## `InvalidUtf8`
+
+```silk
+pub struct InvalidUtf8
+```
+
+The error value of a UTF-8 check: the position of the first invalid byte.
+
+::Anchor{id="InvalidUtf8.offset"}
+
+### Field `offset`
+
+```silk
+pub offset: usize
+```
+
+The zero-based position of the first byte that is not valid UTF-8.
+
+::Anchor{id="ScalarCursor"}
+
+## `ScalarCursor`
+
+```silk
+pub struct ScalarCursor
+```
+
+A position in a string for traversal one scalar at a time.
+
+### Details
+
+Get the first cursor from [`String.scalarCursor`](#String.impl.scalarCursor) and the next one from [`String.nextCursor`](#String.impl.nextCursor).
+
+::Anchor{id="ScalarStep"}
+
+## `ScalarStep`
+
+```silk
+pub struct ScalarStep
+```
+
+One scalar that [`String.nextScalar`](#String.impl.nextScalar) read, with its byte position and the cursor after it.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -1,0 +1,63 @@
+Write a struct as a JSON object from its fields, without writing each field by hand.
+
+## When to use
+Use [`JsonReflect.write`](#JsonReflect.impl.write) for a struct whose fields each implement `Serialize`. Call it
+directly, or from the `Serialize` implementation of the struct.
+
+## Details
+The fields are written in declaration order. Only the fields that this module can see are
+written, so the private fields of a type from another module are left out. It does not allocate.
+
+## Errors
+- `JsonError` from a field value.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+## Gotchas
+There is no matching read function. To read a struct from JSON, implement `Deserialize`.
+
+Import as `JsonReflect` with `import silk.json_reflect { JsonReflect }`.
+
+Public declarations: 1.
+
+::Anchor{id="JsonReflect"}
+
+## `JsonReflect`
+
+```silk
+pub struct JsonReflect
+```
+
+The owner type of the reflection writer. It has no fields and is never constructed.
+
+::Anchor{id="JsonReflect.impl"}
+
+## Implementation `JsonReflect`
+
+```silk
+impl JsonReflect
+```
+
+::Anchor{id="JsonReflect.impl.write"}
+
+### Associated function `write`
+
+```silk
+pub effect fn write<T>(value: &T, options: &JsonOptions)
+    -> () ! JsonError | WriterError ? &mut Writer
+```
+
+Writes `value` as a JSON object with one member for each field that is visible here, in
+declaration order.
+
+#### Details
+
+Each field must implement `Serialize`. A type that is not a struct with named fields, or a
+field without `Serialize`, is a compile error.
+
+#### Errors
+
+- `JsonError` from a field value.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+  The object can be incomplete.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

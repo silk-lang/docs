@@ -1,0 +1,242 @@
+Encrypt and authenticate data with AES-128-GCM or AES-256-GCM (NIST SP 800-38D).
+
+## When to use
+Use [`AesGcm.seal`](#AesGcm.impl.seal) to encrypt a message so that only holders of the key can read it and any
+change is detected. Use [`AesGcm.open`](#AesGcm.impl.open) to check and decrypt it. If the protocol does not name
+an algorithm, `silk.chacha20_poly1305` is also a good choice.
+
+## Details
+The key is 16 bytes (AES-128) or 32 bytes (AES-256), the nonce is 12 bytes, and the tag is 16
+bytes. The tag is separate from the ciphertext ("detached"), so store or send both. The
+associated data (`aad`) is authenticated but not encrypted. Use it for headers that must stay
+readable. The ciphertext has the same length as the plaintext. Nothing allocates.
+
+## Errors
+The functions return an [`AesGcmError`](#AesGcmError). All checks come before the first write, and on any
+error the output buffers do not change. [`AesGcm.open`](#AesGcm.impl.open) writes no plaintext unless the tag is
+correct.
+
+## Gotchas
+The same key and nonce must never encrypt two messages. If they do, an attacker can recover the
+XOR of the two plaintexts and forge tags. Use a counter, or 12 random bytes from `silk.random`
+for a small number of messages per key.
+
+Authentication does not stop replay: an attacker can send an old valid message again. The
+functions do not erase their copies of the key.
+
+## Examples
+### Encrypt and decrypt a message
+```silk
+import silk.aes_gcm { AesGcm, AesGcmError }
+import silk.result { Result }
+
+pub fn main() -> i32 {
+  let key: [u8; 16] = [0; 16]
+  let nonce: [u8; 12] = [0; 12]
+  let plaintext: [u8; 16] = [0; 16]
+  let mut ciphertext: [u8; 16] = [0; 16]
+  let mut tag: [u8; 16] = [0; 16]
+  match AesGcm.seal(&key, &nonce, b"header", &plaintext, &mut ciphertext, &mut tag) {
+    Result<(), AesGcmError>.Success { value: _ } => {}
+    Result<(), AesGcmError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // For this key and nonce, the ciphertext starts with 0388dace.
+  if ciphertext[0] != 0x03 || ciphertext[1] != 0x88 {
+    return 1
+  }
+  let mut decrypted: [u8; 16] = [1; 16]
+  return match AesGcm.open(&key, &nonce, b"header", &ciphertext, &tag, &mut decrypted) {
+    Result<(), AesGcmError>.Success { value: _ } => {
+      if decrypted[0] != 0 || decrypted[15] != 0 {
+        return 1
+      }
+      return 0
+    }
+    Result<(), AesGcmError>.Failure { error: _ } => 1
+  }
+}
+```
+
+### Detect a changed message
+```silk
+import silk.aes_gcm { AesGcm, AesGcmError }
+import silk.result { Result }
+
+pub fn main() -> i32 {
+  let key: [u8; 32] = [7; 32]
+  let nonce: [u8; 12] = [1; 12]
+  let mut ciphertext: [u8; 5] = [0; 5]
+  let mut tag: [u8; 16] = [0; 16]
+  match AesGcm.seal(&key, &nonce, b"", b"hello", &mut ciphertext, &mut tag) {
+    Result<(), AesGcmError>.Success { value: _ } => {}
+    Result<(), AesGcmError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  ciphertext[0] = ciphertext[0] + 1
+  let mut plaintext: [u8; 5] = [0; 5]
+  return match AesGcm.open(&key, &nonce, b"", &ciphertext, &tag, &mut plaintext) {
+    Result<(), AesGcmError>.Failure { error: AesGcmError.AuthenticationFailed } => {
+      // The output does not change when the tag is wrong.
+      if plaintext[0] != 0 {
+        return 1
+      }
+      return 0
+    }
+    _ => 1
+  }
+}
+```
+
+Import as `AesGcm` with `import silk.aes_gcm { AesGcm }`.
+
+Public declarations: 2.
+
+::Anchor{id="AesGcmError"}
+
+## `AesGcmError`
+
+```silk
+pub union AesGcmError
+```
+
+The reason that [`AesGcm.seal`](#AesGcm.impl.seal) or [`AesGcm.open`](#AesGcm.impl.open) rejected a call. The output buffers do not
+change.
+
+::Anchor{id="AesGcmError.InvalidKeyLength"}
+
+### `InvalidKeyLength`
+
+```silk
+InvalidKeyLength
+```
+
+The key is not 16 or 32 bytes.
+
+::Anchor{id="AesGcmError.InvalidNonceLength"}
+
+### `InvalidNonceLength`
+
+```silk
+InvalidNonceLength
+```
+
+The nonce is not 12 bytes.
+
+::Anchor{id="AesGcmError.InvalidTagLength"}
+
+### `InvalidTagLength`
+
+```silk
+InvalidTagLength
+```
+
+The tag, or the tag output, is not 16 bytes.
+
+::Anchor{id="AesGcmError.OutputTooSmall"}
+
+### `OutputTooSmall`
+
+```silk
+OutputTooSmall
+```
+
+The output is shorter than the input message.
+
+::Anchor{id="AesGcmError.LimitExceeded"}
+
+### `LimitExceeded`
+
+```silk
+LimitExceeded
+```
+
+The message is longer than 2^36 - 32 bytes, or the associated data is longer than 2^61 - 1
+bytes.
+
+::Anchor{id="AesGcmError.AuthenticationFailed"}
+
+### `AuthenticationFailed`
+
+```silk
+AuthenticationFailed
+```
+
+The tag is not correct for the key, nonce, associated data, and ciphertext. The message was
+changed, or a value is wrong.
+
+::Anchor{id="AesGcm"}
+
+## `AesGcm`
+
+```silk
+pub struct AesGcm
+```
+
+Functions that encrypt and decrypt with AES-GCM.
+
+::Anchor{id="AesGcm.impl"}
+
+## Implementation `AesGcm`
+
+```silk
+impl AesGcm
+```
+
+::Anchor{id="AesGcm.impl.seal"}
+
+### Associated function `seal`
+
+```silk
+pub fn seal(
+    key: &[u8],
+    nonce: &[u8],
+    aad: &[u8],
+    plaintext: &[u8],
+    ciphertext: &mut [u8],
+    tag: &mut [u8],
+  ) -> Result<(), AesGcmError>
+```
+
+Encrypts `plaintext` into `ciphertext` and writes the 16-byte authentication tag to `tag`.
+
+`aad` is authenticated but not encrypted. `ciphertext` can be longer than `plaintext`. The
+bytes after the written prefix do not change. The buffers must not overlap.
+
+#### Errors
+- `InvalidKeyLength`, `InvalidNonceLength`, or `InvalidTagLength` for a wrong length.
+- `OutputTooSmall` if `ciphertext` is shorter than `plaintext`.
+- `LimitExceeded` if `plaintext` or `aad` is too long.
+
+#### Gotchas
+Use a new nonce for each message under the same key. The function does not make one.
+
+::Anchor{id="AesGcm.impl.open"}
+
+### Associated function `open`
+
+```silk
+pub fn open(
+    key: &[u8],
+    nonce: &[u8],
+    aad: &[u8],
+    ciphertext: &[u8],
+    tag: &[u8],
+    plaintext: &mut [u8],
+  ) -> Result<(), AesGcmError>
+```
+
+Checks `tag`, and if it is correct, decrypts `ciphertext` into `plaintext`.
+
+`aad` must be the same bytes that were given to [`AesGcm.seal`](#AesGcm.impl.seal). The function checks all 16
+tag bytes before it writes `plaintext`. The bytes after the written prefix do not change.
+
+#### Errors
+- `AuthenticationFailed` if the tag is not correct. `plaintext` does not change.
+- `InvalidKeyLength`, `InvalidNonceLength`, `InvalidTagLength`, `OutputTooSmall`, or
+  `LimitExceeded` as for [`AesGcm.seal`](#AesGcm.impl.seal).
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

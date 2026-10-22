@@ -1,0 +1,208 @@
+Low-level JSON output: strings, numbers, and punctuation, and the [`JsonOptions`](#JsonOptions) for layout.
+
+## When to use
+Use [`JsonOptions.compact`](#JsonOptions.impl.compact) or [`JsonOptions.indented`](#JsonOptions.impl.indented) to choose the layout for
+`Json.serialize` and `Json.writeWith`. Use [`JsonOutput`](#JsonOutput) directly only when you write JSON by
+hand, for example in a `Serialize` implementation that `JsonObject` cannot express.
+
+## Details
+Each operation writes to the `Writer` at once. It does not flush and does not allocate.
+
+## Errors
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+- `JsonError` from [`JsonOutput.writeNumber`](#JsonOutput.impl.writeNumber) for text that is not a JSON number, and from
+  [`JsonOptions.child`](#JsonOptions.impl.child) when the nesting is too deep.
+
+## Examples
+### Choose two-space indentation
+```silk
+import silk.json_output { JsonOptions }
+
+pub fn main() -> i32 {
+  let options = JsonOptions.indented(2)
+  if options.indent != 2 || options.depthLimit != 64 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `JsonOutput` with `import silk.json_output { JsonOutput }`.
+
+Public declarations: 2.
+
+::Anchor{id="JsonOptions"}
+
+## `JsonOptions`
+
+```silk
+pub struct JsonOptions
+```
+
+The layout and depth limit for JSON output.
+
+### Details
+
+Make one with [`JsonOptions.compact`](#JsonOptions.impl.compact) or [`JsonOptions.indented`](#JsonOptions.impl.indented). The writers make a child with
+[`JsonOptions.child`](#JsonOptions.impl.child) for each nested array or object.
+
+::Anchor{id="JsonOptions.indent"}
+
+### Field `indent`
+
+```silk
+pub indent: usize
+```
+
+The number of spaces for each level of indentation. 0 means compact output on one line.
+
+::Anchor{id="JsonOptions.depth"}
+
+### Field `depth`
+
+```silk
+pub depth: usize
+```
+
+The depth of the current array or object. 0 at the top level.
+
+::Anchor{id="JsonOptions.depthLimit"}
+
+### Field `depthLimit`
+
+```silk
+pub depthLimit: usize
+```
+
+The largest depth that the writers allow.
+
+::Anchor{id="JsonOptions.impl.Copy"}
+
+## Implementation `Copy for JsonOptions`
+
+```silk
+impl Copy for JsonOptions
+```
+
+::Anchor{id="JsonOutput"}
+
+## `JsonOutput`
+
+```silk
+pub struct JsonOutput
+```
+
+The owner type of the low-level output operations. It has no fields and is never constructed.
+
+::Anchor{id="JsonOptions.impl"}
+
+## Implementation `JsonOptions`
+
+```silk
+impl JsonOptions
+```
+
+::Anchor{id="JsonOptions.impl.compact"}
+
+### Associated function `compact`
+
+```silk
+pub fn compact() -> JsonOptions
+```
+
+Returns options for compact output on one line, with a depth limit of 64 (`MAX_DEPTH`).
+
+::Anchor{id="JsonOptions.impl.indented"}
+
+### Associated function `indented`
+
+```silk
+pub fn indented(width: usize) -> JsonOptions
+```
+
+Returns options for output with `width` spaces for each level, with a depth limit of 64.
+
+::Anchor{id="JsonOptions.impl.child"}
+
+### Method `child`
+
+```silk
+pub effect fn child(self: &JsonOptions) -> JsonOptions ! JsonError
+```
+
+Returns the options for a nested array or object, one level deeper.
+
+#### Errors
+
+- `JsonError` with reason `DepthExceeded` if the depth is already at the limit.
+
+::Anchor{id="JsonOutput.impl"}
+
+## Implementation `JsonOutput`
+
+```silk
+impl JsonOutput
+```
+
+::Anchor{id="JsonOutput.impl.writeString"}
+
+### Associated function `writeString`
+
+```silk
+pub effect fn writeString(value: string) -> () ! WriterError ? &mut Writer
+```
+
+Writes `value` as a quoted JSON string. It escapes `"`, `\`, and control characters.
+
+#### Errors
+
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+::Anchor{id="JsonOutput.impl.writeNumber"}
+
+### Associated function `writeNumber`
+
+```silk
+pub effect fn writeNumber(value: string) -> () ! JsonError | WriterError ? &mut Writer
+```
+
+Writes `value` as a JSON number, without changes, after it checks that `value` is a valid JSON
+number.
+
+#### Errors
+
+- `JsonError` with reason `InvalidNumber` if `value` is not a valid JSON number, such as
+  `"NaN"` or `"01"`. Nothing is written.
+- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+
+::Anchor{id="JsonOutput.impl.separator"}
+
+### Associated function `separator`
+
+```silk
+pub effect fn separator(options: &JsonOptions, first: bool) -> () ! WriterError ? &mut Writer
+```
+
+Writes a comma if `first` is `false`, then a newline and indentation if indentation is on.
+
+::Anchor{id="JsonOutput.impl.line"}
+
+### Associated function `line`
+
+```silk
+pub effect fn line(options: &JsonOptions) -> () ! WriterError ? &mut Writer
+```
+
+Writes a newline and the indentation for the current depth. Writes nothing for compact output.
+
+::Anchor{id="JsonOutput.impl.colon"}
+
+### Associated function `colon`
+
+```silk
+pub effect fn colon(options: &JsonOptions) -> () ! WriterError ? &mut Writer
+```
+
+Writes `:` after a key. It adds a space if indentation is on.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

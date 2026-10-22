@@ -1,0 +1,71 @@
+The normal names of the sealed thread properties `Transferable` and `Concurrent`.
+
+## When to use
+- Bound a type parameter on [`Transferable`](#Transferable) when a value of it moves to another thread.
+- Bound it on [`Concurrent`](#Concurrent) when several threads use one shared borrow of it at the same time.
+- Write `impl Transferable for T {}` or `impl Concurrent for T {}` to assert a property for a
+  type whose stored parts cannot prove it, such as a type that owns storage through a raw
+  pointer.
+
+## Details
+Both names are transparent `type` aliases (TYPE-004) of the compiler-sealed properties
+`Intrinsic.Transferable` and `Intrinsic.Concurrent` (THREAD-001). The compiler derives both from
+the stored parts of a type (THREAD-002):
+
+| Type | `Transferable` | `Concurrent` | |---|---|---| | Scalars, text, enums | Yes | Yes | |
+Raw pointers, `Shared<T>` | No | No | | `&T` | If `T` is `Concurrent` | If `T` is `Concurrent` |
+| Record, union, array, closure | If every stored part is | If every stored part is |
+
+## Gotchas
+An `impl` of either property is an unchecked assertion (THREAD-003). The compiler does not look
+inside the type. The module that declares the type must synchronize the storage that the type
+reaches. The `impl` declares no members.
+
+## Examples
+### Require a value that can move to another thread
+```silk
+import silk.thread { Transferable }
+
+struct Job {
+  id: i32
+}
+
+// Accepts only values that can move to another thread.
+fn handOff<T: Transferable>(value: T) -> T {
+  return move value
+}
+
+pub fn main() -> i32 {
+  let job = handOff(Job { id: 42 })
+  if job.id != 42 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `Transferable` with `import silk.thread { Transferable }`.
+
+Public declarations: 2.
+
+::Anchor{id="Transferable"}
+
+## `Transferable`
+
+```silk
+pub type Transferable = Intrinsic.Transferable
+```
+
+The sealed property of types whose values can move to another thread.
+
+::Anchor{id="Concurrent"}
+
+## `Concurrent`
+
+```silk
+pub type Concurrent = Intrinsic.Concurrent
+```
+
+The sealed property of types whose shared borrows several threads can use at the same time.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

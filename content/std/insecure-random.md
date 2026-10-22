@@ -1,0 +1,162 @@
+The `InsecureRandom` effect: a fast pseudorandom sequence that repeats for the same seed.
+
+## When to use
+Require `&mut InsecureRandom` for simulations, games, shuffles in tests, and other uses where
+the same seed must give the same results. Provide [`InsecureRandom.seeded`](#InsecureRandom.impl.seeded) with a seed. Never
+use it for keys, nonces, tokens, passwords, or protection against hash collisions. Use
+`silk.random` for those.
+
+## Details
+A provider implements [`InsecureRandom.nextU64`](#InsecureRandom.nextU64). [`InsecureRandom.nextBool`](#InsecureRandom.impl.nextBool),
+[`InsecureRandom.below`](#InsecureRandom.impl.below), and [`InsecureRandom.fillBytes`](#InsecureRandom.impl.fillBytes) use it in a fixed way, so the results
+are the same on each target. [`InsecureRandom.seeded`](#InsecureRandom.impl.seeded) returns a [`Xoshiro256StarStar`](#Xoshiro256StarStar)
+generator. It expands the seed with SplitMix64.
+
+## Gotchas
+The output is predictable. An observer who sees a few values can compute the next values.
+
+## Examples
+### Get the same first value from the same seed
+```silk
+import silk.effect { Effect }
+import silk.insecure_random { InsecureRandom }
+
+pub fn main() -> i32 {
+  let mut provider = InsecureRandom.seeded(0)
+  let first = run InsecureRandom.nextU64() |> Effect.provideMut<InsecureRandom>(&mut provider)
+  if first != 0x99ec5f36cb75f2b4 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `InsecureRandom` with `import silk.insecure_random { InsecureRandom }`.
+
+Public declarations: 2.
+
+::Anchor{id="InsecureRandom"}
+
+## `InsecureRandom`
+
+```silk
+pub service InsecureRandom
+```
+
+The effect for a pseudorandom sequence that is not secure.
+
+### Details
+
+The provider owns its state. Each call moves only the provider of the current effect forward.
+
+### Gotchas
+
+Do not use it for secrets, keys, nonces, tokens, or protection against hash collisions.
+
+::Anchor{id="InsecureRandom.nextU64"}
+
+### Operation `nextU64`
+
+```silk
+effect fn nextU64() -> u64 ? &mut InsecureRandom
+```
+
+Returns the next `u64` of the sequence.
+
+::Anchor{id="InsecureRandom.impl"}
+
+## Implementation `InsecureRandom`
+
+```silk
+impl InsecureRandom
+```
+
+::Anchor{id="InsecureRandom.impl.seeded"}
+
+### Associated function `seeded`
+
+```silk
+pub fn seeded(seed: u64) -> Xoshiro256StarStar
+```
+
+Returns a [`Xoshiro256StarStar`](#Xoshiro256StarStar) generator that starts from `seed`.
+
+#### Details
+
+The same seed gives the same sequence on each target. Each seed works, also 0, because the
+seed is expanded with four SplitMix64 steps.
+
+::Anchor{id="InsecureRandom.impl.nextBool"}
+
+### Associated function `nextBool`
+
+```silk
+pub effect fn nextBool() -> bool ? &mut InsecureRandom
+```
+
+Returns `true` if the highest bit of the next `u64` is set.
+
+::Anchor{id="InsecureRandom.impl.below"}
+
+### Associated function `below`
+
+```silk
+pub effect fn below(upperExclusive: u64) -> Option<u64> ? &mut InsecureRandom
+```
+
+Returns a value from 0 to `upperExclusive - 1`, with the same chance for each value. Returns
+an absent option if `upperExclusive` is 0.
+
+#### Details
+
+It drops `u64` values that would make some results more likely than others, so it can read
+more than one value.
+
+::Anchor{id="InsecureRandom.impl.fillBytes"}
+
+### Associated function `fillBytes`
+
+```silk
+pub effect fn fillBytes(output: &mut [u8]) -> () ? &mut InsecureRandom
+```
+
+Fills `output` with bytes from the sequence. Each `u64` gives 8 bytes, least significant byte
+first.
+
+#### Details
+
+An empty slice reads nothing. If the length is not a multiple of 8, the last `u64` is read in
+full and its extra bytes are dropped.
+
+::Anchor{id="Xoshiro256StarStar"}
+
+## `Xoshiro256StarStar`
+
+```silk
+pub struct Xoshiro256StarStar
+```
+
+A xoshiro256** generator. Make one with [`InsecureRandom.seeded`](#InsecureRandom.impl.seeded) and provide it as
+`InsecureRandom`.
+
+### Details
+
+The sequence is the same on each target. It is not secure.
+
+::Anchor{id="Xoshiro256StarStar.impl.InsecureRandom"}
+
+## Implementation `InsecureRandom for Xoshiro256StarStar`
+
+```silk
+impl InsecureRandom for Xoshiro256StarStar
+```
+
+::Anchor{id="Xoshiro256StarStar.impl.InsecureRandom.nextU64"}
+
+### Operation `nextU64`
+
+```silk
+nextU64: Xoshiro256StarStar.xoshiroNext
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

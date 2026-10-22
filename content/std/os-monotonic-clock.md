@@ -1,0 +1,127 @@
+The native provider of the `MonotonicClock` effect: a clock that never goes back.
+
+## When to use
+Provide [`OsMonotonicClock`](#OsMonotonicClock) for `MonotonicClock` in a native program, to measure time and to
+wait for deadlines. In a test, provide a fake clock that you advance yourself.
+
+## Details
+`waitUntil` blocks until the deadline. `waitFor` reads the clock one time, adds the duration,
+and then waits until that deadline.
+
+## Gotchas
+- An `Instant` from this clock means nothing to other clocks. Do not mix it with `SystemClock`
+  times.
+- A wait blocks the whole thread. It does not let another fiber run.
+- A failure of the clock is a trap.
+- On Linux, the clock stops while the system sleeps, and needs glibc 2.17 or later. On macOS, it
+  counts the time of sleep.
+- [`OsMonotonicClock.make`](#OsMonotonicClock.impl.make) fails to compile on targets other than Darwin on aarch64, and Linux
+  with GNU libc on x86_64 or aarch64.
+
+## Examples
+### Measure a wait
+```silk
+import silk.effect { Effect }
+import silk.monotonic_clock { MonotonicClock }
+import silk.os_monotonic_clock { OsMonotonicClock }
+import silk.system_clock { Instant, SystemClock }
+
+// Returns the nanoseconds from `start` to `end`.
+fn elapsed(start: &Instant, end: &Instant) -> i64 {
+  return (SystemClock.seconds(end) - SystemClock.seconds(start)) * 1000000000
+    + SystemClock.nanoseconds(end)
+    - SystemClock.nanoseconds(start)
+}
+
+effect fn measure() -> i32
+  ? &mut MonotonicClock {
+  let start = run MonotonicClock.now()
+
+  // Wait for 1 millisecond.
+  run MonotonicClock.waitFor(1000000)
+  let end = run MonotonicClock.now()
+  if elapsed(&start, &end) < 1000000 {
+    return 1
+  }
+  return 0
+}
+
+pub fn main() -> i32 {
+  let mut clock = OsMonotonicClock.make()
+  return run measure() |> Effect.provideMut<MonotonicClock>(&mut clock)
+}
+```
+
+Import as `OsMonotonicClock` with `import silk.os_monotonic_clock { OsMonotonicClock }`.
+
+Public declarations: 1.
+
+::Anchor{id="OsMonotonicClock"}
+
+## `OsMonotonicClock`
+
+```silk
+pub struct OsMonotonicClock
+```
+
+The native `MonotonicClock` provider. It has no state. A failure is a trap.
+
+::Anchor{id="OsMonotonicClock.impl"}
+
+## Implementation `OsMonotonicClock`
+
+```silk
+impl OsMonotonicClock
+```
+
+::Anchor{id="OsMonotonicClock.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> OsMonotonicClock
+```
+
+Returns a clock. It does not read the time.
+
+::Anchor{id="OsMonotonicClock.impl.MonotonicClock"}
+
+## Implementation `MonotonicClock for OsMonotonicClock`
+
+```silk
+impl MonotonicClock for OsMonotonicClock
+```
+
+::Anchor{id="OsMonotonicClock.impl.MonotonicClock.now"}
+
+### Operation `now`
+
+```silk
+effect fn now(self: &mut Self) -> Instant
+```
+
+::Anchor{id="OsMonotonicClock.impl.MonotonicClock.getResolution"}
+
+### Operation `getResolution`
+
+```silk
+effect fn getResolution(self: &mut Self) -> u64
+```
+
+::Anchor{id="OsMonotonicClock.impl.MonotonicClock.waitUntil"}
+
+### Operation `waitUntil`
+
+```silk
+effect fn waitUntil(self: &mut Self, when: Instant) -> ()
+```
+
+::Anchor{id="OsMonotonicClock.impl.MonotonicClock.waitFor"}
+
+### Operation `waitFor`
+
+```silk
+effect fn waitFor(self: &mut Self, howLong: u64) -> ()
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

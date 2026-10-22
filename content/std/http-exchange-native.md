@@ -1,0 +1,850 @@
+Native TCP, Unix socket, and TLS connections for HTTP clients.
+
+## When to use
+Most code uses `silk.http_client_native` or `silk.http_fetch_native`, which call this module.
+Use it directly to control the connection:
+- [`withConnection`](#withConnection) opens a connection to one origin and lends it to a handler. The handler
+  sends its exchanges with `silk.http_exchange`.
+- [`withUnixConnection`](#withUnixConnection) does the same through a Unix socket, for example to a local daemon.
+- [`withProxyRoute`](#withProxyRoute) connects through a route from `silk.http_proxy`.
+- [`acquireOwned`](#acquireOwned) and [`acquireUnixOwned`](#acquireUnixOwned) return the connection, for a pool. The caller closes
+  it.
+
+## Details
+A connection does these steps:
+1. It checks the [`Options`](#Options) and the deadline with [`preflight`](#preflight).
+2. It resolves the host, and tries the addresses until one connects.
+3. For an `https` origin, it does TLS. The certificate is checked against the original origin,
+   not a `Host` field and not a Unix path.
+
+The deadline in [`Options`](#Options) is absolute, and each step gets it unchanged. When the handler
+returns or fails, the connection is closed. Closing does not flush and does not send a TLS close
+message.
+
+[`withConnection`](#withConnection) and [`withUnixConnection`](#withUnixConnection) load trust from the `TrustSource` service for an
+`https` origin. The `acquire` functions and [`withProxyRoute`](#withProxyRoute) take a trust snapshot that you
+prepare.
+
+## Errors
+- [`NativeExchangeError`](#NativeExchangeError) for options that are not valid, a deadline that cannot be honored,
+  missing trust, or a failed ALPN negotiation.
+- `ResolverError`, `NativeSocketError`, `ConnectionError`, and `IdentityError` from resolution,
+  the socket, TLS, and the certificate check.
+- `ExchangeError` and the error of the handler.
+
+## Gotchas
+- Resolution of a host name cannot stop at a deadline. A host name with a deadline fails with
+  `UnsupportedDeadline` before any contact. An IP address with a deadline is accepted.
+- Only Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
+  targets, a call that is used fails to compile. Unused imports and [`Options`](#Options) still compile.
+
+## Examples
+### Check a deadline before contact
+```silk
+import silk.http_exchange_native { NativeExchangeError, Options, preflight }
+import silk.http_origin { Origin, OriginError }
+import silk.option { Option }
+import silk.result { Result }
+import silk.system_clock { Instant, SystemClock }
+import silk.uri { Uri }
+import silk.uri_reference { ParseError }
+
+fn origin(text: string<'static>) -> Option<Origin> {
+  let uri = match Uri.parse(text) {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      return Option<Origin>.none()
+    }
+  }
+  return match Origin.fromUri(&uri) {
+    Result<Origin, OriginError>.Success { value } => Option<Origin>.some(value)
+    Result<Origin, OriginError>.Failure { error: _ } => Option<Origin>.none()
+  }
+}
+
+fn passes(checked: Result<(), NativeExchangeError>) -> bool {
+  return match move checked {
+    Result.Success { value: _ } => true
+    Result.Failure { error: _ } => false
+  }
+}
+
+pub fn main() -> i32 {
+  let named = match origin("https://example.com/") {
+    Option.Some { value } => value
+    Option.None => {
+      return 1
+    }
+  }
+  let numeric = match origin("http://127.0.0.1:8080/") {
+    Option.Some { value } => value
+    Option.None => {
+      return 1
+    }
+  }
+  let mut options = Options.defaults()
+
+  // With no deadline, both origins pass.
+  if !passes(preflight(&named, &options)) {
+    return 1
+  }
+
+  // The resolver cannot stop at a deadline, so a host name with a deadline fails.
+  options.deadline = Option<Instant>.some(SystemClock.make(5, 0))
+  let rejected = match move preflight(&named, &options) {
+    Result.Success { value: _ } => false
+    Result.Failure { error } => match move error {
+      NativeExchangeError.UnsupportedDeadline => true
+      _ => false
+    }
+  }
+  if !rejected {
+    return 1
+  }
+
+  // An IP address needs no resolver, so the deadline is accepted.
+  if !passes(preflight(&numeric, &options)) {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `HttpExchangeNative` with `import silk.http_exchange_native as HttpExchangeNative`.
+
+Public declarations: 16.
+
+::Anchor{id="NativeRoute"}
+
+## `NativeRoute`
+
+```silk
+pub struct NativeRoute
+```
+
+How a native connection reaches its peer: direct TCP, or a Unix socket path.
+
+::Anchor{id="NativeRoute.impl.Copy"}
+
+## Implementation `Copy for NativeRoute`
+
+```silk
+impl Copy for NativeRoute
+```
+
+::Anchor{id="NativeRoute.impl"}
+
+## Implementation `NativeRoute`
+
+```silk
+impl NativeRoute
+```
+
+::Anchor{id="NativeRoute.impl.isUnix"}
+
+### Method `isUnix`
+
+```silk
+pub fn isUnix(self: &Self) -> bool
+```
+
+Returns whether the route uses a Unix socket.
+
+::Anchor{id="NativeRoute.impl.path"}
+
+### Method `path`
+
+```silk
+pub fn path<'a>(self: &'a Self) -> &'a [u8]
+```
+
+Returns the Unix socket path, or an empty slice for direct TCP.
+
+::Anchor{id="NativeExchangeError"}
+
+## `NativeExchangeError`
+
+```silk
+pub union NativeExchangeError
+```
+
+The error of a native HTTP connection, before or during TLS.
+
+::Anchor{id="NativeExchangeError.InvalidConnectOptions"}
+
+### `InvalidConnectOptions`
+
+```silk
+InvalidConnectOptions
+```
+
+The poll interval or the attempt count of [`Options`](#Options) is out of range. See
+`silk.native_socket`.
+
+::Anchor{id="NativeExchangeError.UnsupportedDeadline"}
+
+### `UnsupportedDeadline`
+
+```silk
+UnsupportedDeadline
+```
+
+A host name must be resolved, and there is a deadline. Resolution cannot stop at a deadline.
+
+::Anchor{id="NativeExchangeError.TrustRequired"}
+
+### `TrustRequired`
+
+```silk
+TrustRequired
+```
+
+The origin uses `https`, and no trust snapshot was given.
+
+::Anchor{id="NativeExchangeError.AlpnMismatch"}
+
+### `AlpnMismatch`
+
+```silk
+AlpnMismatch
+```
+
+The policy is `RequiredHttp11`, and the server did not select `http/1.1`.
+
+::Anchor{id="NativeExchangeError.AlpnMismatch.error"}
+
+#### Field `error`
+
+```silk
+pub error: ConnectionError
+```
+
+The TLS error.
+
+::Anchor{id="AlpnPolicy"}
+
+## `AlpnPolicy`
+
+```silk
+pub enum AlpnPolicy
+```
+
+How TLS negotiates the HTTP version (ALPN).
+
+::Anchor{id="AlpnPolicy.OptionalHttp11"}
+
+### `OptionalHttp11`
+
+```silk
+OptionalHttp11
+```
+
+Offers `http/1.1`. The server can select it or select nothing.
+
+::Anchor{id="AlpnPolicy.RequiredHttp11"}
+
+### `RequiredHttp11`
+
+```silk
+RequiredHttp11
+```
+
+Offers `http/1.1`. If the server does not select it, the connection fails with `AlpnMismatch`.
+
+::Anchor{id="AlpnPolicy.Http10"}
+
+### `Http10`
+
+```silk
+Http10
+```
+
+Sends no ALPN extension. Use it for a server that supports only HTTP/1.0.
+
+::Anchor{id="Options"}
+
+## `Options`
+
+```silk
+pub struct Options
+```
+
+The settings of a native connection. Start from [`Options.defaults`](#Options.impl.defaults).
+
+::Anchor{id="Options.maximumAddresses"}
+
+### Field `maximumAddresses`
+
+```silk
+pub maximumAddresses: usize
+```
+
+The maximum number of addresses to keep from resolution.
+
+::Anchor{id="Options.family"}
+
+### Field `family`
+
+```silk
+pub family: FamilySelection
+```
+
+The address families to use: IPv4, IPv6, or both.
+
+::Anchor{id="Options.noDelay"}
+
+### Field `noDelay`
+
+```silk
+pub noDelay: bool
+```
+
+Whether to disable Nagle's algorithm on the socket.
+
+::Anchor{id="Options.pollIntervalNanoseconds"}
+
+### Field `pollIntervalNanoseconds`
+
+```silk
+pub pollIntervalNanoseconds: u64
+```
+
+The time between checks while a socket connects. It is 1 nanosecond through 1 second.
+
+::Anchor{id="Options.maximumAttempts"}
+
+### Field `maximumAttempts`
+
+```silk
+pub maximumAttempts: usize
+```
+
+The maximum number of connection attempts. It is 1 through 1024.
+
+::Anchor{id="Options.deadline"}
+
+### Field `deadline`
+
+```silk
+pub deadline: Option<Instant>
+```
+
+The absolute deadline for the whole operation, on the monotonic clock. See [`preflight`](#preflight) for
+host names.
+
+::Anchor{id="Options.handshakeNanoseconds"}
+
+### Field `handshakeNanoseconds`
+
+```silk
+pub handshakeNanoseconds: u64
+```
+
+The maximum duration of the TLS handshake.
+
+::Anchor{id="Options.tls"}
+
+### Field `tls`
+
+```silk
+pub tls: ClientLimits
+```
+
+The storage limits of the TLS client.
+
+::Anchor{id="Options.trust"}
+
+### Field `trust`
+
+```silk
+pub trust: TrustLoadLimits
+```
+
+The limits for loading trust anchors.
+
+::Anchor{id="Options.alpn"}
+
+### Field `alpn`
+
+```silk
+pub alpn: AlpnPolicy
+```
+
+How TLS negotiates the HTTP version.
+
+::Anchor{id="Options.impl"}
+
+## Implementation `Options`
+
+```silk
+impl Options
+```
+
+::Anchor{id="Options.impl.defaults"}
+
+### Associated function `defaults`
+
+```silk
+pub fn defaults() -> Options
+```
+
+Returns the default settings.
+
+They are: 16 addresses, any family, Nagle on, a 1 ms poll interval, 64 attempts, no deadline,
+30 seconds for the handshake, and `OptionalHttp11`.
+
+::Anchor{id="NativeTransport"}
+
+## `NativeTransport`
+
+```silk
+pub struct NativeTransport
+```
+
+The transport of a native HTTP connection. It owns its socket or TLS connection.
+
+::Anchor{id="NativeRouteProvider"}
+
+## `NativeRouteProvider`
+
+```silk
+pub struct NativeRouteProvider
+```
+
+The plain socket of a connection through [`withProxyRoute`](#withProxyRoute).
+
+### Details
+It is connected to the peer that the route selects: the origin or the proxy. After a `CONNECT`
+tunnel, TLS uses the same socket. The HTTP side and the byte side share one closed state, so the
+socket is never used by two owners.
+
+::Anchor{id="NativeRouteProvider.impl"}
+
+## Implementation `NativeRouteProvider`
+
+```silk
+impl NativeRouteProvider
+```
+
+::Anchor{id="NativeRouteProvider.impl.HttpTransport"}
+
+## Implementation `HttpTransport for NativeRouteProvider`
+
+```silk
+impl HttpTransport for NativeRouteProvider
+```
+
+::Anchor{id="NativeRouteProvider.impl.HttpTransport.readSomeRaw"}
+
+### Operation `readSomeRaw`
+
+```silk
+readSomeRaw: NativeRouteProvider.readHttp
+```
+
+::Anchor{id="NativeRouteProvider.impl.HttpTransport.writeSomeRaw"}
+
+### Operation `writeSomeRaw`
+
+```silk
+writeSomeRaw: NativeRouteProvider.writeHttp
+```
+
+::Anchor{id="NativeRouteProvider.impl.HttpTransport.flush"}
+
+### Operation `flush`
+
+```silk
+flush: NativeRouteProvider.flushHttp
+```
+
+::Anchor{id="NativeRouteProvider.impl.HttpTransport.close"}
+
+### Operation `close`
+
+```silk
+close: NativeRouteProvider.closeHttp
+```
+
+::Anchor{id="NativeRouteProvider.impl.ByteDuplex"}
+
+## Implementation `ByteDuplex for NativeRouteProvider`
+
+```silk
+impl ByteDuplex for NativeRouteProvider
+```
+
+::Anchor{id="NativeRouteProvider.impl.ByteDuplex.readSomeRaw"}
+
+### Operation `readSomeRaw`
+
+```silk
+readSomeRaw: NativeRouteProvider.readBytes
+```
+
+::Anchor{id="NativeRouteProvider.impl.ByteDuplex.writeSomeRaw"}
+
+### Operation `writeSomeRaw`
+
+```silk
+writeSomeRaw: NativeRouteProvider.writeBytes
+```
+
+::Anchor{id="NativeRouteProvider.impl.ByteDuplex.flushRaw"}
+
+### Operation `flushRaw`
+
+```silk
+flushRaw: NativeRouteProvider.flushBytes
+```
+
+::Anchor{id="NativeRouteProvider.impl.ByteDuplex.shutdownWriteRaw"}
+
+### Operation `shutdownWriteRaw`
+
+```silk
+shutdownWriteRaw: NativeRouteProvider.shutdownBytes
+```
+
+::Anchor{id="NativeRouteProvider.impl.ByteDuplex.closeRaw"}
+
+### Operation `closeRaw`
+
+```silk
+closeRaw: NativeRouteProvider.closeBytes
+```
+
+::Anchor{id="acquireOwned"}
+
+## `acquireOwned`
+
+```silk
+pub effect fn acquireOwned(
+  origin: Origin,
+  options: Options,
+  limits: Limits,
+  preparedTrust: Option<TrustSnapshot>,
+  acquisitionDeadline: Option<Instant>,
+) -> Connection<NativeTransport>
+! NativeExchangeError | ExchangeError | ResolverError | NativeSocketError | ConnectionError | IdentityError | OutOfMemoryError
+? &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random
+```
+
+Opens a direct TCP or HTTPS connection to `origin`, and returns it.
+
+### Details
+The opening deadline is the earlier of `options.deadline` and `acquisitionDeadline`. For
+`https`, it uses `preparedTrust` and checks the certificate against `origin`. The returned
+connection keeps no deadline. Close it, or give it to another owner such as a pool.
+
+### Errors
+- `NativeExchangeError.TrustRequired` if `origin` uses `https` and `preparedTrust` is none.
+- `NativeSocketError.Timeout` if the deadline has passed.
+- The errors of [`preflight`](#preflight), resolution, the socket, and TLS.
+
+::Anchor{id="admitUnixRoute"}
+
+## `admitUnixRoute`
+
+```silk
+pub effect fn admitUnixRoute(path: &[u8]) -> NativeRoute ! NativeSocketError
+```
+
+Returns a route for the Unix socket at `path`. It copies `path` and does not connect.
+
+### Errors
+`NativeSocketError` if `path` is too long for a socket address on the target.
+
+::Anchor{id="acquireUnixOwned"}
+
+## `acquireUnixOwned`
+
+```silk
+pub effect fn acquireUnixOwned(
+  path: &[u8],
+  origin: Origin,
+  options: Options,
+  limits: Limits,
+  preparedTrust: Option<TrustSnapshot>,
+  acquisitionDeadline: Option<Instant>,
+) -> Connection<NativeTransport>
+! NativeExchangeError | ExchangeError | NativeSocketError | ConnectionError | IdentityError | OutOfMemoryError
+? &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random
+```
+
+Opens an HTTP or HTTPS connection to `origin` through the Unix socket at `path`, and returns it.
+
+### Details
+`path` selects only the socket. For `https`, TLS checks the certificate against `origin`. The
+deadlines work as in [`acquireOwned`](#acquireOwned). The returned connection keeps no deadline.
+
+::Anchor{id="withConnection"}
+
+## `withConnection`
+
+```silk
+pub effect<'env> fn withConnection<
+  A,
+  E,
+  ?R,
+  H: ConnectionHandler<NativeTransport, A, E ? R> + 'env,
+  'env,
+>(origin: Origin, options: Options, limits: Limits, handler: H) -> A
+! E | ExchangeError | NativeExchangeError | ResolverError | NativeSocketError | ConnectionError | IdentityError | TrustSourceError | OutOfMemoryError
+? R | &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random | &mut TrustSource
+where R in Without<R, HttpTransport>
+```
+
+Opens a connection to `origin`, lends it to `handler`, and closes it after.
+
+### Details
+For `https`, it loads trust from the `TrustSource` service before it connects, and checks the
+certificate against `origin`. A `Host` field never changes the identity that is checked.
+
+### Errors
+- The errors of [`preflight`](#preflight) and [`acquireOwned`](#acquireOwned).
+- `TrustSourceError` if trust cannot be loaded.
+- The error of the handler.
+
+::Anchor{id="withUnixConnection"}
+
+## `withUnixConnection`
+
+```silk
+pub effect<'env> fn withUnixConnection<
+  A,
+  E,
+  ?R,
+  H: ConnectionHandler<NativeTransport, A, E ? R> + 'env,
+  'env,
+>(path: &[u8], origin: Origin, options: Options, limits: Limits, handler: H) -> A
+! E | ExchangeError | NativeExchangeError | NativeSocketError | ConnectionError | IdentityError | TrustSourceError | OutOfMemoryError
+? R | &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random | &mut TrustSource
+where R in Without<R, HttpTransport>
+```
+
+Opens a connection to `origin` through the Unix socket at `path`, lends it to `handler`, and
+closes it after.
+
+### Details
+`path` selects only the socket. For `https`, it loads trust from the `TrustSource` service and
+checks the certificate against `origin`.
+
+::Anchor{id="withProxyRoute"}
+
+## `withProxyRoute`
+
+```silk
+pub effect<'env> fn withProxyRoute<
+  'configuration,
+  A,
+  E,
+  ?R,
+  H: RouteHandler<'configuration, NativeRouteProvider, A, E ? R> + 'env,
+  'env,
+>(
+  route: Route<'configuration>,
+  options: Options,
+  limits: Limits,
+  preparedTrust: Option<TrustSnapshot>,
+  handler: H,
+) -> A
+! E | ProxyError | ExchangeError | NativeExchangeError | ResolverError | NativeSocketError | ConnectionError | IdentityError | OutOfMemoryError
+? R | &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random
+where R in Without<R, ByteDuplex>, R in Without<R, HttpTransport>
+```
+
+Connects through `route`, lends the connection to `handler`, and closes it after.
+
+### Details
+It connects only to the peer that the route selects: the origin for `Direct`, or the proxy for
+`Forward` and `Tunnel`. For `Tunnel`, it sends `CONNECT`, then does TLS with the origin through
+the tunnel. `options.deadline` is used unchanged for all steps. `limits` applies to the HTTP
+connection and to the `CONNECT` exchange.
+
+### Errors
+- `ProxyError` if the proxy rejects `CONNECT`, or the route is not valid.
+- `NativeExchangeError.TrustRequired` if the origin uses `https` and `preparedTrust` is none.
+- The errors of resolution, the socket, TLS, and the handler.
+
+::Anchor{id="NativeTransport.impl"}
+
+## Implementation `NativeTransport`
+
+```silk
+impl NativeTransport
+```
+
+::Anchor{id="NativeTransport.impl.route"}
+
+### Method `route`
+
+```silk
+pub fn route(self: &Self) -> NativeRoute
+```
+
+Returns the route of the transport.
+
+::Anchor{id="NativeTransport.impl.HttpTransport"}
+
+## Implementation `HttpTransport for NativeTransport`
+
+```silk
+impl HttpTransport for NativeTransport
+```
+
+::Anchor{id="NativeTransport.impl.HttpTransport.readSomeRaw"}
+
+### Operation `readSomeRaw`
+
+```silk
+readSomeRaw: NativeTransport.read
+```
+
+::Anchor{id="NativeTransport.impl.HttpTransport.writeSomeRaw"}
+
+### Operation `writeSomeRaw`
+
+```silk
+writeSomeRaw: NativeTransport.write
+```
+
+::Anchor{id="NativeTransport.impl.HttpTransport.flush"}
+
+### Operation `flush`
+
+```silk
+flush: NativeTransport.flushOutput
+```
+
+::Anchor{id="NativeTransport.impl.HttpTransport.close"}
+
+### Operation `close`
+
+```silk
+close: NativeTransport.closeLease
+```
+
+::Anchor{id="preflight"}
+
+## `preflight`
+
+```silk
+pub fn preflight(origin: &Origin, options: &Options) -> Result<(), NativeExchangeError>
+```
+
+Checks if a connection to `origin` with `options` can start. It does no I/O.
+
+### Errors
+`UnsupportedDeadline` if the host of `origin` is a name and `options.deadline` is set.
+
+::Anchor{id="preflightProxyRoute"}
+
+## `preflightProxyRoute`
+
+```silk
+pub fn preflightProxyRoute<'configuration>(route: &Route<'configuration>, options: &Options) -> Result<
+  Origin,
+  ProxyError | NativeExchangeError,
+>
+```
+
+Returns the peer that `route` connects to, after the same checks as [`preflight`](#preflight).
+
+The peer is the origin for `Direct`, and the proxy for `Forward` and `Tunnel`.
+
+::Anchor{id="NativeRedirectClient"}
+
+## `NativeRedirectClient`
+
+```silk
+pub struct NativeRedirectClient<'configuration, 'policy, A, HandlerError, ?HandlerRequirements>
+```
+
+Opens a new native connection for each attempt of a redirect operation.
+
+### Details
+`silk.http_fetch_native` uses it with `silk.http_redirect`. For each attempt, it selects the
+route for the current URI again, checks the request and the route before contact, and uses the
+deadline of the operation. Each `https` attempt loads fresh trust. A tunnel still checks the
+certificate of the original origin.
+
+::Anchor{id="NativeRedirectClient.impl"}
+
+## Implementation `NativeRedirectClient<'configuration, 'policy, A, HandlerError, HandlerRequirements>`
+
+```silk
+impl<'configuration, 'policy, A, HandlerError, ?HandlerRequirements> NativeRedirectClient<
+  'configuration,
+  'policy,
+  A,
+  HandlerError,
+  HandlerRequirements,
+>
+```
+
+::Anchor{id="NativeRedirectClient.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make(route: Route<'configuration>, options: Options, limits: Limits) -> NativeRedirectClient<
+    'configuration,
+    'policy,
+    A,
+    HandlerError,
+    HandlerRequirements,
+  >
+```
+
+Returns a client that starts from `route`, with `options` and `limits` for each attempt.
+
+::Anchor{id="NativeRedirectClient.impl-2"}
+
+## Implementation `NativeRedirectClient<'configuration, 'policy, A, HandlerError, HandlerRequirements>`
+
+```silk
+impl<'configuration, 'policy, A, HandlerError, ?HandlerRequirements> NativeRedirectClient<
+  'configuration,
+  'policy,
+  A,
+  HandlerError,
+  HandlerRequirements,
+>
+```
+
+::Anchor{id="NativeRedirectClient.impl.AttemptClient"}
+
+## Implementation `AttemptClient<'policy, NativeRouteProvider, A, HandlerError, ProxyError | RequestError | ValueError | OriginError | ExchangeError | NativeExchangeError | ResolverError | NativeSocketError | ConnectionError | IdentityError | TrustSourceError | OutOfMemoryError, &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random | &mut TrustSource, HandlerRequirements> for NativeRedirectClient<'configuration, 'policy, A, HandlerError, HandlerRequirements>`
+
+```silk
+impl<'configuration, 'policy, A, HandlerError, ?HandlerRequirements> AttemptClient<
+  'policy,
+  NativeRouteProvider,
+  A,
+  HandlerError,
+  ProxyError | RequestError | ValueError | OriginError | ExchangeError | NativeExchangeError | ResolverError | NativeSocketError | ConnectionError | IdentityError | TrustSourceError | OutOfMemoryError,
+  &mut Allocator | &mut MonotonicClock | &mut SystemClock | &mut Random | &mut TrustSource,
+  HandlerRequirements,
+> for NativeRedirectClient<'configuration, 'policy, A, HandlerError, HandlerRequirements>
+```
+
+::Anchor{id="NativeRedirectClient.impl.AttemptClient.withAttempt"}
+
+### Operation `withAttempt`
+
+```silk
+withAttempt: NativeRedirectClient.withAttempt
+```
+
+::Anchor{id="route"}
+
+## `route`
+
+```silk
+pub fn route(connection: &Connection<NativeTransport>) -> NativeRoute
+```
+
+Returns the route of a native connection.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -1,0 +1,312 @@
+Optional owned values that are present or absent, with no explanation for the absence.
+
+## When to use
+Use [`Option`](#Option) when "no value" is a normal answer, such as a lookup that finds nothing. Use
+`silk.result.Result` when the caller must know why the value is missing.
+
+Use [`map`](#Option.impl.map) to transform a present value, [`flatMap`](#Option.impl.flatMap) when the next step can also produce no
+value, and [`unwrapOr`](#Option.impl.unwrapOr) to get a plain value with a fallback. Use `match` when the present and
+absent cases need different custom behavior.
+
+## Details
+`Option<T>` is a union with the variants [`Some`](#Option.Some) and [`None`](#Option.None). Each combinator consumes the
+option. A present value moves into the result. A value that the operation does not use is
+dropped. No combinator copies `T`, so `T` does not need to be `Copy`.
+
+## Examples
+### Look up a port and fall back to a default
+```silk
+import silk.option { Option }
+
+fn portFor(scheme: string) -> Option<i32> {
+  if scheme == "http" {
+    return Option<i32>.some(80)
+  }
+  return Option<i32>.none()
+}
+
+fn secure(port: i32) -> Option<i32> {
+  if port == 80 {
+    return Option<i32>.some(443)
+  }
+  return Option<i32>.none()
+}
+
+pub fn main() -> i32 {
+  let known = portFor("http") |> Option<i32>.flatMap<i32>(secure) |> Option<i32>.unwrapOr(8080)
+  let unknown = portFor("gopher") |> Option<i32>.flatMap<i32>(secure) |> Option<i32>.unwrapOr(8080)
+  if known != 443 || unknown != 8080 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `Option` with `import silk.option { Option }`.
+
+Public declarations: 1.
+
+::Anchor{id="Option"}
+
+## `Option`
+
+```silk
+pub union Option<T>
+```
+
+An owned value of type `T` that is present ([`Some`](#Option.Some)) or absent ([`None`](#Option.None)).
+
+### When to use
+
+Use `Option` as a return type when "no value" is a normal result and needs no reason. Use
+`silk.result.Result` when the caller must know why the value is missing.
+
+### Details
+
+Create values with [`some`](#Option.impl.some) and [`none`](#Option.impl.none). Use [`map`](#Option.impl.map), [`flatMap`](#Option.impl.flatMap), and [`unwrapOr`](#Option.impl.unwrapOr) for the
+common cases. Use `match` when the two cases need different custom behavior. The option owns its
+value, so dropping a present option also drops the value.
+
+### Examples
+
+#### Handle both cases with `match`
+
+```silk
+import silk.option { Option }
+
+fn describe(found: Option<i32>) -> i32 {
+  return match move found {
+    Option<i32>.Some { value } => value
+    Option<i32>.None => -1
+  }
+}
+
+pub fn main() -> i32 {
+  let found = describe(Option<i32>.some(3))
+  let missing = describe(Option<i32>.none())
+  if found != 3 || missing != -1 {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="Option.None"}
+
+### `None`
+
+```silk
+None
+```
+
+The absent case. It carries no value and no reason for the absence.
+
+::Anchor{id="Option.Some"}
+
+### `Some`
+
+```silk
+Some
+```
+
+The present case. It owns one value of type `T`.
+
+::Anchor{id="Option.Some.value"}
+
+#### Field `value`
+
+```silk
+pub value: T
+```
+
+The owned present value.
+
+::Anchor{id="Option.impl"}
+
+## Implementation `Option<T>`
+
+```silk
+impl<T> Option<T>
+```
+
+::Anchor{id="Option.impl.none"}
+
+### Associated function `none`
+
+```silk
+pub fn none() -> Option<T>
+```
+
+Returns an absent `Option<T>`.
+
+#### Details
+
+The result holds no value and allocates no memory. Write the element type explicitly, as in
+`Option<i32>.none()`, because no argument gives the compiler that type.
+
+::Anchor{id="Option.impl.some"}
+
+### Associated function `some`
+
+```silk
+pub fn some(value: T) -> Option<T>
+```
+
+Returns a present `Option<T>` that owns `value`.
+
+#### Details
+
+This function moves `value` into the option. The caller can no longer use the original binding.
+
+::Anchor{id="Option.impl.map"}
+
+### Method `map`
+
+```silk
+pub fn map<U>(self: Self, transform: once fn(T) -> U) -> Option<U>
+```
+
+Returns `transform(value)` as a present option if `self` is present. Returns an absent option
+if `self` is absent.
+
+#### When to use
+
+Use `map` when the transform always succeeds. Use [`flatMap`](#Option.impl.flatMap) when the transform can also
+produce no value.
+
+#### Details
+
+`transform` runs one time for a present value and does not run for an absent value. This
+function consumes `self` and moves the present value into `transform`.
+
+#### Gotchas
+
+The original option is not available after the call. To read the value and keep the option,
+use `match` on a borrow of the option.
+
+#### Examples
+
+##### Double a present value
+
+```silk
+import silk.option { Option }
+
+fn double(value: i32) -> i32 {
+  return value * 2
+}
+
+pub fn main() -> i32 {
+  let doubled = Option<i32>.some(21) |> Option<i32>.map<i32>(double) |> Option<i32>.unwrapOr(0)
+  if doubled != 42 {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="Option.impl.flatMap"}
+
+### Method `flatMap`
+
+```silk
+pub fn flatMap<U>(self: Self, transform: once fn(T) -> Option<U>) -> Option<U>
+```
+
+Returns the option that `transform` produces for a present value. Returns an absent option if
+`self` is absent.
+
+#### When to use
+
+Use `flatMap` to chain steps where each step can produce no value. The result is one
+`Option<U>`, not a nested `Option<Option<U>>`. Use [`map`](#Option.impl.map) when the step always produces a
+value.
+
+#### Details
+
+`transform` runs one time for a present value and does not run for an absent value. This
+function consumes `self` and moves the present value into `transform`.
+
+#### Examples
+
+##### Reject a value in the second step
+
+```silk
+import silk.option { Option }
+
+fn positive(value: i32) -> Option<i32> {
+  if value > 0 {
+    return Option<i32>.some(value)
+  }
+  return Option<i32>.none()
+}
+
+pub fn main() -> i32 {
+  let kept = Option<i32>.some(5) |> Option<i32>.flatMap<i32>(positive) |> Option<i32>.unwrapOr(0)
+  let rejected = Option<i32>.some(-5) |> Option<i32>.flatMap<i32>(positive)
+    |> Option<i32>.unwrapOr(0)
+  if kept != 5 || rejected != 0 {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="Option.impl.unwrapOr"}
+
+### Method `unwrapOr`
+
+```silk
+pub fn unwrapOr(
+    self: Self,
+    /// The value to return if `self` is absent. It is dropped if `self` is present.
+    fallback: T,
+  ) -> T
+```
+
+Returns the present value. Returns `fallback` if `self` is absent.
+
+#### When to use
+
+Use `unwrapOr` at the end of an option chain when a default value is correct for the absent
+case. Use `match` when the absent case needs different control flow, such as an early return.
+
+#### Details
+
+This function consumes `self` and `fallback`. It returns one of the two values and drops the
+other value.
+
+#### Gotchas
+
+The caller evaluates `fallback` before the call, also when `self` is present. If the fallback
+is expensive to make, use `match` and make the fallback only in the absent case.
+
+#### Examples
+
+##### Use a present value and an absent value
+
+```silk
+import silk.option { Option }
+
+pub fn main() -> i32 {
+  let present = Option<i32>.some(7)
+  let absent = Option<i32>.none()
+  let first = move present |> Option<i32>.unwrapOr(0)
+  let second = move absent |> Option<i32>.unwrapOr(5)
+  if first != 7 || second != 5 {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="Option.impl.unwrapOr.fallback"}
+
+#### Parameter `fallback`
+
+```silk
+fallback: T
+```
+
+The value to return if `self` is absent. It is dropped if `self` is present.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
