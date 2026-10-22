@@ -59,7 +59,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/app (llvm, x86_64-unknown-linux-gnu, 236 symbols)
 2 spaces
 ```
 

@@ -155,7 +155,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 514 symbols)
 sent 19 bytes as b9a44880 in 0 ms
 ```
 
@@ -270,7 +269,7 @@ impl MonotonicClock for VirtualClock {
 
 `MonotonicClock` has four operations. `VirtualClock` reads a stored mark, and time moves only when someone waits: `waitUntil` jumps forward to the requested mark and `waitFor` adds to it. A test that waits five seconds therefore finishes in microseconds. `millis` lets a test read the clock afterwards.
 
-Build instants with `SystemClock.make(seconds, nanoseconds)` and `MonotonicClock.deadlineAfter(&start, nanoseconds)`. `SystemClock.make` needs a nanosecond part below one billion; anything else traps, and the trap reads `fatal trap: division by zero`. So for "5000 ms after zero", write `MonotonicClock.deadlineAfter(&SystemClock.make(0, 0), 5000000000)`, not `SystemClock.make(0, 5000000000)`.
+Build instants with `SystemClock.make(seconds, nanoseconds)` and `MonotonicClock.deadlineAfter(&start, nanoseconds)`. `SystemClock.make` carries whole seconds out of the nanosecond part, so "5000 ms after zero" can be `SystemClock.make(0, 5000000000)`, which is 5 seconds and 0 nanoseconds. A negative part borrows: `SystemClock.make(0, -1)` is -1 seconds and 999,999,999 nanoseconds. Only a total beyond the `i64` range of seconds traps.
 
 ### A counting allocator
 
@@ -596,7 +595,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 733 symbols)
   tests::logFailureComesAfterSending
     PASS  55 us
   tests::missingFileSendsNothing
@@ -619,7 +617,6 @@ The times vary from run to run; the results do not. `--no-cache` is required in 
 Suppose you expect the log line to say `in 0 ms`, as it did when you ran the program for real. Change line 75 of `src/tests.silk` to that and run again:
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/beacon (llvm, x86_64-unknown-linux-gnu, 733 symbols)
   tests::logFailureComesAfterSending
     PASS  56 us
   tests::missingFileSendsNothing
@@ -657,7 +654,7 @@ Provide every service inside the test or in a helper it calls, as `send` does. T
 - Give each fake a way to fail on cue, like `failAt` here and in `Logger.inMemoryProviderFailAt`. Most bugs are in the failure paths.
 - Check what did not happen as well as what did: no bytes sent, no id drawn, nothing logged.
 - Keep fakes in their own module, such as `tests/Fakes.silk`, so tests in several modules can share them.
-- A fake for `Writer` works the same way: a struct with a buffer, and an `impl Writer` whose `writeAll` copies the bytes into it and whose `flush` does nothing.
+- A fake for `Writer` works the same way: a struct with a buffer, and an `impl Writer` whose `writeAll` copies the bytes into it, whose `writeVectored` passes the slices to `Writer.writeEach`, and whose `flush` does nothing.
 
 ## API reference
 

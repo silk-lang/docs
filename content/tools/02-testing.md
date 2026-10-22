@@ -46,7 +46,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 520 symbols)
   Circle::diameterIsTwiceRadius
     PASS  <1 us
   lib::areaMultipliesSides
@@ -59,6 +58,8 @@ Time   50 us
 ```
 
 The runner is a separate executable, built under `build/test/llvm/<target>/<profile>/` with the package's name. It always runs on the host, so `--target` must name the host. Each test is printed as `module::name`, where the module is the file's path under the source root: `Circle` is `src/Circle.silk`.
+
+While it builds the runner, `silk test` prints no progress rows, unlike `silk build`. A compile error is printed as its diagnostic line, and the command exits 1 without running any test.
 
 The summary line counts tests at each stage. Discovered tests were found by the compiler, selected ones passed the filters, and executed ones ran. Cached is always 0 in this release. The command exits 0 when every selected test passed. Without `--file` or `--filter`, that includes a package with no tests.
 
@@ -73,7 +74,6 @@ test effect fn diameterIsTwiceRadius() -> () ! AssertionError<'static> {
 ```
 
 ```
-Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 520 symbols)
   Circle::diameterIsTwiceRadius
     assertion failed: radius 5
     FAIL  15 us
@@ -106,7 +106,6 @@ That matters most for programs. A test in `src/extra.silk` is not found while `m
   ```
 
   ```
-  Compiled src/extra.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 488 symbols)
     extra::extraRuns
       PASS  <1 us
   
@@ -124,7 +123,6 @@ silk test --no-cache --filter circle::
 ```
 
 ```
-Compiled src/lib.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 520 symbols)
   Circle::diameterIsTwiceRadius
     PASS  1 us
 
@@ -134,7 +132,7 @@ Time   58 us
 
 `--file <path>` keeps the tests declared in one source file. The path is relative to the package directory, so it is `src/Circle.silk` even when you run the command from inside `src/`. Unlike `--root`, it does not change discovery; it only selects.
 
-Both options only select. When a `--file` or `--filter` matches no test, nothing was verified, so the command fails with exit status 1. A misspelled filter prints, after the `Compiled` line:
+Both options only select. When a `--file` or `--filter` matches no test, nothing was verified, so the command fails with exit status 1. A misspelled filter prints:
 
 ```
 Tests  0 passed, 0 failed (0 cached, 0 executed, 0 selected, 3 discovered)
@@ -204,7 +202,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/greeter (llvm, x86_64-unknown-linux-gnu, 536 symbols)
   main::emptyNamesAreSkipped
     PASS  6 us
   main::onlyEmptyNamesLogNothing

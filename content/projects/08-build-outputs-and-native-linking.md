@@ -35,11 +35,19 @@ build/
 | `object` | `<name>.o` | `-c` |
 | `final` | as above | compiles and, for an executable, links |
 
-`<name>` is `[package].name`, hyphens kept: `libtext-utils.a`. A non-final stage stops before linking, so it works for any target. For a single file, `silk build <source> -o <output> --emit <stage>` does the same.
+`<name>` is `[package].name`, hyphens kept: `libtext-utils.a`. A non-final stage stops before linking, so it works for any target. For a single file, `silk build <source> -o <output> --emit <stage>` does the same. With `stage = "assembly"` in `[build]`, the package from `silk init hello` builds `hello.s`:
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.07s
+  check    1 module                          0.06s
+  codegen  422 functions                     0.22s
+  borrow   137 bodies                        0.00s
+  link     clang                             0.15s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello.s in 0.55s
 ```
+
+The `link` row is the Clang step whatever the stage; for `assembly` it runs `clang -S`.
 
 ## The symbol map
 
@@ -50,7 +58,7 @@ main	export	hello@0.1.0:silk/native_start.silk::_._.enter
 silk_5d3308971cc4722980f0a2011e60fca5	function	hello@0.1.0:silk/native_start.silk::_._.enter
 ```
 
-Kinds are `export` (a C name), `function`, `drop` and `helper`. The count in the `Compiled` line is the number of lines in this file.
+Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled src/main.silk -> hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)`, with both paths relative to the current directory, or in full when a file is outside it. Its symbol count is the number of lines in this file.
 
 ## Finding Clang
 
@@ -67,11 +75,11 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The count in the
 
 | Problem | Message |
 | --- | --- |
-| No `clang` on `PATH` | `silk: cannot find clang on PATH; set SILK_CLANG to the Clang executable` |
+| No `clang` on `PATH` | `silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable` |
 | `--clang` name not found | `silk: cannot find nosuchclang on PATH; pass --clang the path of the Clang executable` |
 | The chosen Clang does not start | `silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable`. The parenthesis is `from SILK_CLANG`, `from --clang` or `found on PATH`. |
 
-Each of these fails the target, prints its `failed (exit 2)` line and summary, and exits 2.
+Each of these fails the target and exits 2. `silk build` and `silk run` print the message, then a `link     failed` row and a `Failed` line.
 
 ## macOS SDK
 
@@ -158,7 +166,6 @@ silk run; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/cmix (llvm, x86_64-unknown-linux-gnu, 182 symbols)
 exit 42
 ```
 
@@ -168,7 +175,7 @@ A bad entry stops the build with exit status 1 and names the manifest and the en
 silk: invalid native link input: /home/you/cmix/silk.toml: [build].native-link-inputs[0]: object /tmp/abs.o must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files
 ```
 
-An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. An entry for another platform names only the entry: `silk: invalid native link input: framework Security links only on macOS targets`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
+An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. An entry for another platform is refused the same way: `silk: invalid native link input: /home/you/cmix/silk.toml: [build].native-link-inputs[0]: framework Security links only on macOS targets`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
 
 See **Unsafe code and C interop** in the reference for `extern "C"`.
 
@@ -187,8 +194,8 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | Key | Meaning |
 | --- | --- |
 | `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
-| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. |
-| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `build.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. |
+| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. A name not listed in `runtimes` is refused at its line: `build.composition.defaults entry "main" names no runtime in build.composition.runtimes; it lists "start"`, or `it lists none`. |
+| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `build.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. So is one that is not a string (`build.composition.components.bindings.operation must be a string: create, acquire, release or destroy`), and an entry with no `operation` at the entry's line (`build.composition.components.bindings entry has no operation; use create, acquire, release or destroy`). |
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
 | `requirements` | Must be empty: `build.composition.requirements is not supported by the native compiler yet`. |
 
@@ -233,20 +240,22 @@ silk run -- a b; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/sync (llvm, x86_64-unknown-linux-gnu, 97 symbols)
 exit 3
 ```
 
 A `main` the runtime cannot start is SEM0225. Here `main` is a plain `pub fn main() -> i32`:
 
 ```
+Compiling tiny (x86_64-unknown-linux-gnu, debug)
+  load     45 modules, 1 in package          0.10s
+  check    1 module                          0.00s
+  codegen  failed: 89 functions, 1 error     0.09s
 [x86_64-unknown-linux-gnu]
 /home/you/tiny/src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/native_start_sync` cannot start
-run x86_64-unknown-linux-gnu: failed (exit 1)
-Run summary: 0 succeeded, 1 failed
+Failed tiny in 0.26s
 ```
 
-A composition that leaves no single runtime, or a default it does not list, is `silk: the build selects no single runtime (ARTIFACT-001)`. Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/raw_start` case.
+A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/raw_start` case.
 
 ## Building without a runtime
 
@@ -272,16 +281,20 @@ silk run; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/bare/bare (llvm, x86_64-unknown-linux-gnu, 2 symbols)
 exit 7
 ```
 
 An executable that exports no C `main` is refused before Clang runs, with exit status 2. Here `main` is a plain `pub fn main() -> i32`, and `silk build` prints:
 
 ```
+Compiling tiny (x86_64-unknown-linux-gnu, bare)
+  load     40 modules, 1 in package          0.06s
+  check    1 module                          0.00s
+  codegen  0 functions                       0.00s
+  borrow   1 body                            0.00s
+[x86_64-unknown-linux-gnu]
 silk: an executable built with runtime = { kind = "none" } has no `main`; export one, as `export "C" fn start() -> i32 as "main"` does, or select a runtime
-build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
+Failed tiny in 0.06s
 ```
 
 - `silk check` does not look for the C `main`; only an executable build does.

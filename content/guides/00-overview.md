@@ -2,7 +2,7 @@
 
 ## Overview
 
-Each guide covers one area of the standard library by building one small working program. It explains the choices the program makes, shows its real output, and ends with an API reference list of every module it used. The programs were compiled and run with this release. Where a feature is not finished yet, such as building for a target without libc, the guide says so and shows the message you get.
+Each guide covers one area of the standard library by building one small working program. It explains the choices the program makes, shows its real output, and ends with an API reference list of every module it used. The programs were compiled and run with this release. After a `silk run`, an output block shows only what the program printed; the build's progress rows, which `silk run` prints on standard error first, are left out. Where a feature is not finished yet, such as building for a target without libc, the guide says so and shows the message you get.
 
 The guides sit between the book and the reference. The book teaches the language from the start, and the guides assume you have read its first chapters: effects, services and providers, typed failures. The language reference states the rules, and the std lib API reference lists every module, type and function. The guides show how those pieces fit together for one task, and point you to the API pages for the details. Simple lookups, such as integer types, hashing primitives and URI helpers, have no guide of their own; read their API pages.
 

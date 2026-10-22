@@ -58,7 +58,7 @@ silk-version = "0.1.0"
 root = "src/main.silk"
 ```
 
-The `name` is the package name, and it also names the program you build. `version` is your package's own version. `silk-version` is the language version the code was written for. `root` is the root module, the file where the compiler starts reading. Every other file in the package is found by following imports from there.
+The `name` is the package name, and it also names the program you build. `version` is your package's own version. `silk-version` is the Silk release the package runs with: an installed `silk` hands every command here to that version. `root` is the root module, the file where the compiler starts reading. Every other file in the package is found by following imports from there.
 
 `.gitignore` holds one line, `/build/`. The build folder is where compiled output goes, and you never commit it.
 
@@ -86,11 +86,17 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 210 symbols)
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    1 module                          0.16s
+  codegen  422 functions                     0.40s
+  borrow   137 bodies                        0.01s
+  link     clang                             0.25s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.96s
 Hello, world!
 ```
 
-`silk run` compiles the package and then starts the program. The first line comes from the compiler. It says which root module it compiled, where it put the program, and the target it compiled for: here, 64-bit Linux. The second line is the program's own output.
+`silk run` compiles the package and then starts the program. The lines before `Hello, world!` are the compiler reporting its progress, one row per phase, on standard error. "Check before you run", below, explains the rows. Everything after the `Finished` line is your program's output. From now on, the book shows only the program's output after `silk run`.
 
 Look closely at your terminal. Your shell prompt probably appears right after `Hello, world!` on the same line. That is because the program never printed a line break. Silk prints exactly the bytes you give it, and adds nothing. You fix that below.
 
@@ -146,7 +152,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 210 symbols)
 tasks: nothing to track yet
 ```
 
@@ -181,7 +186,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 212 symbols)
 tasks 0.1: nothing to track yet
 ```
 
@@ -203,26 +207,30 @@ silk run
 ```
 
 ```
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    failed: 1 module, 1 error         0.15s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
-run x86_64-unknown-linux-gnu: failed (exit 1)
-Run summary: 0 succeeded, 1 failed
+Failed tasks in 0.27s
 ```
 
-The program did not compile, so nothing ran. You get the same report without building anything from `silk check`:
+The program did not compile, so nothing ran, and `silk run` exits with status 1. You get the same report without building anything from `silk check`:
 
 ```sh
 silk check
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.04s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.19s
 ```
 
-`silk check` type-checks the package for each target without producing a program, so it is fast. Each error line has a file, a line and a column, then the error code in brackets, then a message.
+`silk check` type-checks the package for each target without producing a program, so it is fast. While it works, it reports its progress: the package and target it is checking, one row per phase with what the phase covered and how long it took, and a last line that says whether it finished or failed. Here `load` read your one module and 52 modules of the standard library, and `check` stopped with one error. Then come the errors themselves. Each error line has a file, a line and a column, then the error code in brackets, then a message.
 
 Line 9, column 7 is the start of the `Effect.log` call. The template is checked by the standard library module `silk/format`, which runs while your code compiles. When it finds a placeholder with no matching field, it asks the compiler to stop the build, and the compiler reports the stop at your call. SEM0177 means library code requested the failure, and the message is the text the library gave: the placeholder it could not fill, `{versoin}`, and the fields you did pass, here just `version`. Compare the two and the typo is plain.
 
@@ -233,9 +241,14 @@ silk check
 ```
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.04s
+  check    2 modules                         0.20s
+  borrow   144 bodies                        0.00s
+Finished tasks in 0.25s
 ```
+
+The `borrow` row is the ownership check, which runs over each function body once the types are known. Chapter 4 explains what it looks for. The times on your machine will differ.
 
 Make `silk check` a habit. Run it whenever you change code, and use `silk run` once it passes. Every error shown in this book comes from `silk check`.
 
@@ -248,12 +261,16 @@ silk build
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 212 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tasks/build/llvm/x86_64-unknown-linux-gnu/debug/tasks
-Build summary: 1 succeeded, 0 failed
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.05s
+  check    1 module                          0.19s
+  codegen  462 functions                     0.25s
+  borrow   155 bodies                        0.01s
+  link     clang                             0.19s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.72s
 ```
 
-The program is a native executable at `build/llvm/<target>/debug/tasks`. On 64-bit Linux the target is `x86_64-unknown-linux-gnu`. `debug` is the default build: compiled quickly, without optimizations. You can run the file directly, with no `silk` involved:
+A build runs the same phases as a check, then two more: `codegen` turns the functions your program uses into machine code, and `link` runs Clang to make the executable. The last line names the file it wrote. The program is a native executable at `build/llvm/<target>/debug/tasks`. On 64-bit Linux the target is `x86_64-unknown-linux-gnu`. `debug` is the default build: compiled quickly, without optimizations. You can run the file directly, with no `silk` involved:
 
 ```sh
 ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks

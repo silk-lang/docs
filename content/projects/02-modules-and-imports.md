@@ -132,7 +132,6 @@ silk run; echo "exit $?"
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/shapes (llvm, x86_64-unknown-linux-gnu, 184 symbols)
 exit 12
 ```
 
@@ -143,10 +142,12 @@ import geometry.Point { secret }
 ```
 
 ```
+Checking shapes (x86_64-unknown-linux-gnu)
+  load     53 modules, 3 in package          0.06s
+  check    failed: 4 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 /home/you/shapes/src/main.silk:1:25: error[SEM0015] An import or qualified reference naming a private member of another module
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed shapes in 0.20s
 ```
 
 ## Diagnostics

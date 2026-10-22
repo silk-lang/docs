@@ -69,10 +69,12 @@ silk check --target wasm32-unknown-unknown
 ```
 
 ```
+Checking hello (wasm32-unknown-unknown)
+  load     50 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.05s
 [wasm32-unknown-unknown]
 /home/you/hello/src/main.silk:3:25: error[SEM0014] Module silk/os_logger has no member StdoutLogger
-check wasm32-unknown-unknown: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed hello in 0.11s
 ```
 
 Use `silk check --target <name>` to see what a target offers before you build for it. See **Targets and profiles**.

@@ -184,10 +184,12 @@ impl<'text> Order for Count<'text> { compare: compareCounts }
 Leave out the `impl Order` and `rows.sort()` stops the build:
 
 ```
+Checking wordfreq (x86_64-unknown-linux-gnu)
+  load     55 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
 /home/you/wordfreq/src/main.silk:177:7: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed wordfreq in 0.21s
 ```
 
 The "conditional requirement" is `Count: Order`, which `sort` declares as `sort<T: Order>`. The location is the `run rows.sort()` line.
@@ -282,7 +284,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/wordfreq (llvm, x86_64-unknown-linux-gnu, 444 symbols)
 16 words
 6 distinct words after dropping 3 stop words
 2 cat

@@ -44,7 +44,7 @@ root = "src/main.silk"
 | --- | --- |
 | `name` | The package name. The executable gets this name too. |
 | `version` | Your package's own version. |
-| `silk-version` | The Silk version the code was written for. `silk init` writes the version of the compiler that made it. |
+| `silk-version` | The Silk toolchain the package runs with. `silk init` writes the version of the compiler that made it. |
 | `root` | The root module. The compiler starts reading here and finds other files through imports. |
 
 `.gitignore` holds one line, `/build/`. Compiled output goes to `build/`, and you don't commit it.
@@ -74,11 +74,19 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 210 symbols)
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    1 module                          0.16s
+  codegen  422 functions                     0.40s
+  borrow   137 bodies                        0.01s
+  link     clang                             0.25s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.96s
 Hello, world!
 ```
 
-`silk run` builds the package and starts the program. The first line is from the compiler: the root module, where the executable went, and the target. The second is your program. The log message has no `\n` at the end, so your prompt shows up right after `Hello, world!`.
+`silk run` builds the package and starts the program. The first lines are the build's progress: one row per compiler phase, then the path of the program it built. They go to standard error, and the program's own output follows on standard output, so `silk run > out.txt` captures only `Hello, world!`. In a terminal the rows are redrawn in place while they run. `silk run --quiet` keeps only the `Finished` line. From here on, the output shown after `silk run` is the program's alone.
+
+The log message has no `\n` at the end, so your prompt shows up right after `Hello, world!`.
 
 ## Read an argument and choose the exit status
 
@@ -135,7 +143,6 @@ echo $?
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 257 symbols)
 Hello, Ada!
 0
 ```
@@ -148,7 +155,6 @@ echo $?
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 257 symbols)
 usage: hello <name>
 2
 ```
@@ -166,9 +172,14 @@ silk check
 ```
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking hello (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.07s
+  check    2 modules                         0.30s
+  borrow   175 bodies                        0.01s
+Finished hello in 0.38s
 ```
+
+While it works, `silk check` reports each phase on standard error: `load` reads your module and the standard library modules it imports, `check` type-checks them, and `borrow` checks ownership in each function body. The last line says the check finished and how long it took. Errors, when there are any, appear between the phase rows and a closing `Failed` line.
 
 ## Build an executable
 
@@ -177,10 +188,16 @@ silk build
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/hello (llvm, x86_64-unknown-linux-gnu, 257 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/hello/build/llvm/x86_64-unknown-linux-gnu/debug/hello
-Build summary: 1 succeeded, 0 failed
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.07s
+  check    1 module                          0.01s
+  codegen  550 functions                     0.48s
+  borrow   186 bodies                        0.01s
+  link     clang                             0.22s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.83s
 ```
+
+A build adds two phases: `codegen` generates machine code for the functions the program uses, and `link` runs Clang to produce the executable. The last line names it.
 
 The executable lands at `build/llvm/<target>/debug/<name>`. It runs on its own, with no `silk` involved:
 

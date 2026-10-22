@@ -12,12 +12,16 @@ Fibers add no new syntax. They are library operations from `silk/fiber`, `silk/s
 
 ## Two waits that overlap
 
-Try the idea in a scratch copy of your project first, so the real program stays untouched:
+Try the idea in a scratch copy of your project first, so the real program stays untouched. The copy replaces the small scratch project from chapter 2. Without the `rm`, `cp -r` would put the copy inside the old `scratch` folder instead. From the `tasks` folder:
 
 ```sh
+cd ..
+rm -rf scratch
 cp -r tasks scratch
 cd scratch
 ```
+
+The copy keeps the name `tasks` in its `silk.toml`, so `silk check` there prints `Checking tasks`.
 
 Replace `src/main.silk` with this. Each `estimate` pretends to need a slow 300 ms lookup:
 
@@ -68,9 +72,13 @@ TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 723 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/scratch/build/llvm/x86_64-unknown-linux-gnu/debug/tasks
-Build summary: 1 succeeded, 0 failed
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     62 modules, 1 in package          0.07s
+  check    1 module                          0.53s
+  codegen  2,188 functions                   0.69s
+  borrow   412 bodies                        0.03s
+  link     clang                             0.52s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.90s
 115 minutes in total
 time 0.604s
 ```
@@ -91,9 +99,13 @@ effect fn total() -> i32
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 802 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/scratch/build/llvm/x86_64-unknown-linux-gnu/debug/tasks
-Build summary: 1 succeeded, 0 failed
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     62 modules, 1 in package          0.07s
+  check    1 module                          0.56s
+  codegen  2,425 functions                   0.88s
+  borrow   446 bodies                        0.03s
+  link     clang                             0.55s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.16s
 115 minutes in total
 time 0.303s
 ```
@@ -160,7 +172,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 795 symbols)
 task 2: 25, task 9: -1
 ```
 
@@ -201,10 +212,12 @@ silk check
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     55 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:14:49: error[SEM0076] A callable value whose signature cannot satisfy the expected callable type
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.17s
 ```
 
 The message is general. Column 49 is the argument to `forkChild`, and the "expected callable type" is what a fiber may be: `shout()` needs a `Logger`, and a fiber is not allowed to ask for one. Replace `shout` with a child that borrows a title instead:
@@ -224,10 +237,12 @@ effect fn root<'text>(title: string<'text>) -> () ! OutOfMemoryError | TaskIdExh
 (This version imports `silk.string { String }` instead of the logger.) It fails on the same line, but with a lifetime error:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     55 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:14:15: error[SEM0212] A lifetime that must outlive another but is not known to
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.19s
 ```
 
 Column 15 is the `run` of the fork. SEM0212 means one lifetime has to outlive another and does not. Here the child must be `'static`, but `measure(title)` borrows `title`, which is only valid during `'text`.
@@ -238,7 +253,13 @@ That leaves a puzzle. How do fibers report back if they cannot borrow? With `Sha
 
 ## Planning the reminders
 
-Back in the real `tasks` project. Here is the plan for `tasks remind`:
+Back in the real `tasks` project:
+
+```sh
+cd ../tasks
+```
+
+Here is the plan for `tasks remind`:
 
 - One fiber per open task, at most eight.
 - Each fiber sleeps by priority: 100 ms for high, 200 for normal, 400 for low. Then it records its task id.
@@ -305,10 +326,12 @@ effect fn remind(reminder: Reminder, fired: Shared<Fired>) -> ()
 The closure receives `state: &mut Fired` and hands it to `record`. Check it:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     67 modules, 1 in package          0.07s
+  check    failed: 2 modules, 1 error        4.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:573:63: error[OWN0003] Moving state requires an explicit move
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/tasks/src/main.silk:576:63: error[OWN0003] Moving state requires an explicit move
+Failed tasks in 4.19s
 ```
 
 A `&mut` is a unique loan, so passing it on moves it, and Silk wants every move written out. Silk does not quietly reborrow a `&mut` for you, as you saw in chapter 9. Write `move state`:
@@ -403,10 +426,12 @@ pub effect fn main() -> i32 ! OutOfMemoryError | TaskIdExhaustedError | Cancelle
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     55 modules, 1 in package          0.04s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:16:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.14s
 ```
 
 SEM0071 is the "missing provider" error from chapter 8. Line 16 runs `root()`, which needs a `Scheduler` that nothing provides. Wrap the call in `LocalScheduler.execute` and provide a clock, as `runReminders` does.
@@ -471,10 +496,12 @@ effect fn parseMilliseconds(word: string) -> u64 ! UsageError {
 `u32.toU64` lives in the `silk/u32` module, which is why the import list gained `import silk.u32`. Leave that import out and the compiler says so:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     67 modules, 1 in package          0.09s
+  check    failed: 2 modules, 1 error        4.36s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:467:33: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/tasks/src/main.silk:470:33: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
+Failed tasks in 4.46s
 ```
 
 The message names what the compiler could not find and suggests the likely cause. Conversions like `u32.toU64`, `usize.toI32` and `u8.toU64` each need their type's module imported.
@@ -659,7 +686,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1475 symbols)
   main::finishingRecordsTheClockTime
     PASS  89 us
   main::slowRemindersAreCancelled

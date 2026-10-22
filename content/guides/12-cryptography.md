@@ -1,6 +1,6 @@
 # Cryptography
 
-This guide builds `sealnote`, a small program that touches each part of the cryptography in the std lib. It hashes text, checks a webhook tag, verifies a release signature, agrees on a key between two parties, and seals a note with authenticated encryption. Every primitive is a plain function on bytes, except the ones that need fresh randomness, which require the `Random` service.
+This guide builds `sealnote`, a small program that touches each part of the cryptography in the std lib. It hashes text, checks a webhook tag, verifies two release signatures, agrees on a key between two parties, and seals a note with authenticated encryption. Every primitive is a plain function on bytes, except the ones that need fresh randomness, which require the `Random` service.
 
 ## What the std lib gives you
 
@@ -8,12 +8,12 @@ The crypto modules are portable and allocate nothing. They work on byte slices (
 
 | Need | Module | Type |
 | --- | --- | --- |
-| Digest | `silk/sha2`, `silk/sha3`, `silk/sha1` | `Sha256`, `Sha384`, `Sha512`, `Sha3_256`, `Sha1`, ... |
+| Digest | `silk/sha2`, `silk/sha3`, `silk/blake2b`, `silk/sha1` | `Sha256`, `Sha384`, `Sha512`, `Sha3_256`, `Blake2b512`, `Sha1`, ... |
 | Keyed tag | `silk/hmac` | `HmacSha256`, `HmacSha384` |
 | Key derivation | `silk/hkdf` | `HkdfSha256`, `HkdfSha384` |
 | Authenticated encryption | `silk/chacha20_poly1305`, `silk/aes_gcm` | `ChaCha20Poly1305`, `AesGcm` |
 | Key agreement | `silk/x25519`, `silk/p256` | `X25519`, `P256` |
-| Signature verification | `silk/p256`, `silk/p384`, `silk/rsa` | `EcdsaP256Sha256`, `EcdsaP384Sha384`, `RsaPublicKey` |
+| Signature verification | `silk/ed25519`, `silk/p256`, `silk/p384`, `silk/rsa` | `Ed25519PublicKey`, `EcdsaP256Sha256`, `EcdsaP384Sha384`, `RsaPublicKey` |
 | Secure random bytes | `silk/random`, `silk/os_random` | `Random`, `OsRandom` |
 
 There is no signing and no general-purpose public-key encryption. The signature modules verify only: they exist so that TLS and your own code can check signatures made elsewhere. `silk/hash` is a different thing. It hashes collection keys for `HashMap` and is not cryptographic.
@@ -29,7 +29,9 @@ Replace `src/main.silk` piece by piece as you read. The pieces below, in order, 
 
 ```silk
 import silk.base64 { Base64 }
+import silk.blake2b { Blake2b512 }
 import silk.chacha20_poly1305 { AeadError, ChaCha20Poly1305 }
+import silk.ed25519 { Ed25519PublicKey }
 import silk.effect { Effect }
 import silk.hkdf { HkdfSha256 }
 import silk.hmac { HmacSha256 }
@@ -78,14 +80,17 @@ effect fn digests() -> () ! LogError ? &mut Logger {
   state.update(b"bc")
   let sha3 = state.finish()
   run Effect.log("sha3-256 {d}\n", &.{ d: hex(&sha3, &mut text) })
+
+  let blake = Blake2b512.hash(b"abc")
+  run Effect.log("blake2b  {d}\n", &.{ d: hex(&blake, &mut text) })
 }
 ```
 
 Each digest type has the same three entry points. `hash` takes the whole message at once. `make`, then `update` any number of times, then `finish`, does the same in pieces, which is how you hash a file or a stream. `finish` consumes the state, so the compiler stops you from updating a finished hash.
 
-The result is a fixed array: `[u8; 32]` for SHA-256 and SHA3-256, `[u8; 48]` for SHA-384, `[u8; 64]` for SHA-512. `b"abc"` is a byte string literal, a `&[u8]`.
+The result is a fixed array: `[u8; 32]` for SHA-256 and SHA3-256, `[u8; 48]` for SHA-384, `[u8; 64]` for SHA-512 and BLAKE2b. `b"abc"` is a byte string literal, a `&[u8]`.
 
-Pick SHA-256 unless a protocol says otherwise. SHA-3 exists for protocols that require it. `silk/sha1` is there for old protocols such as WebSocket handshakes and should not be used for anything new.
+Pick SHA-256 unless a protocol says otherwise. SHA-3 exists for protocols that require it. `Blake2b512` from `silk/blake2b` is unkeyed BLAKE2b with a 64-byte digest (RFC 7693), for formats that name it, such as minisign's prehashed signatures. It has no key, salt, personalization or shorter digest lengths. `silk/sha1` is there for old protocols such as WebSocket handshakes and should not be used for anything new.
 
 ## Check a keyed tag with HMAC
 
@@ -160,6 +165,38 @@ effect fn checkRelease() -> () ! LogError | Broken ? &mut Logger {
 The error tells you why a check failed (`InvalidKey`, `InvalidEncoding`, and so on), but a wrong signature over a well-formed message is simply a failure. Treat every `Failure` as "not valid".
 
 For P-384 use `EcdsaP384Sha384.verify` from `silk/p384`, with a 97-byte key. For RSA, `RsaPublicKey.fromComponents(modulus, exponent)` from `silk/rsa` admits a 2048 to 4096-bit key with exponent 65537, and `verifyPss` checks a SHA-256 PSS signature. Each of these modules also has a `verifyCertificate` that the certificate code in `silk/certificate_profile` uses.
+
+## Verify an Ed25519 signature
+
+A mirror of the release server signs the same text with Ed25519 instead. The key is 32 bytes and the signature always 64:
+
+```silk
+effect fn checkMirror() -> () ! LogError | Broken ? &mut Logger {
+  let mut publicKey: [u8; 32] = [0; 32]
+  let mut signature: [u8; 64] = [0; 64]
+  drop run decode(b"A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=", &mut publicKey)
+  drop run decode(b"/sVi4mB7r9385B5GA0l88z2l78KzcjoAD0JbZWfRxmwmdoQgYCA6lDA5xFfBALxuWPlfQacqGyDpc0H5HRQFCA==", &mut signature)
+
+  let key = match move Ed25519PublicKey.fromBytes(&publicKey) {
+    Result.Success { value } => move value
+    Result.Failure { error } => { fail Broken { step: "ed25519 key" } }
+  }
+  let good = match move key.verify(b"release 1.4.2", &signature) {
+    Result.Success { value } => true
+    Result.Failure { error } => false
+  }
+  let forged = match move key.verify(b"release 1.4.3", &signature) {
+    Result.Success { value } => true
+    Result.Failure { error } => false
+  }
+  run Effect.log("ed25519 on 1.4.2 valid: {good}\n", &.{ good: good })
+  run Effect.log("ed25519 on 1.4.3 valid: {forged}\n", &.{ forged: forged })
+}
+```
+
+`Ed25519PublicKey.fromBytes(bytes)` from `silk/ed25519` decodes and checks the key once, and fails with `Ed25519Error.InvalidKeyLength` or `InvalidKey`. `verify(message, signature)` then returns `Result<(), Ed25519Error>`, failing with `InvalidSignatureLength` or `InvalidSignature`. Unlike ECDSA there is no separate hash to pick: Ed25519 hashes the message itself with SHA-512. For a prehashed format, such as minisign's `ED` algorithm, pass the BLAKE2b digest as the message.
+
+Verification works on public data and does not try to run in constant time. Like the other signature modules, `silk/ed25519` cannot sign.
 
 ## Agree on a key
 
@@ -264,6 +301,7 @@ pub effect fn main() -> () ! LogError | Broken {
   run digests() |> Effect.provideMut(&mut logger)
   run checkWebhook() |> Effect.provideMut(&mut logger)
   run checkRelease() |> Effect.provideMut(&mut logger)
+  run checkMirror() |> Effect.provideMut(&mut logger)
   run sealNote()
     |> Effect.provideMut<Random>(&mut random)
     |> Effect.provideMut<Logger>(&mut logger)
@@ -279,13 +317,15 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/sealnote (llvm, x86_64-unknown-linux-gnu, 481 symbols)
 sha256   ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
 sha3-256 3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532
+blake2b  ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923
 hmac     7eaf83970d7ec8ac8821fb679caa6197a556926ca35aaee7893bc5f4461a6bba
 webhook tag matches: true
 signature on 1.4.2 valid: true
 signature on 1.4.3 valid: false
+ed25519 on 1.4.2 valid: true
+ed25519 on 1.4.3 valid: false
 agreed on a 32-byte key
 opened: meet at the north gate
 tampered: rejected
@@ -300,10 +340,12 @@ silk check
 ```
 
 ```
+Checking sealnote (x86_64-unknown-linux-gnu)
+  load     67 modules, 1 in package          0.08s
+  check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-/home/you/sealnote/src/main.silk:169:3: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/sealnote/src/main.silk:192:3: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+Failed sealnote in 0.27s
 ```
 
 `sealNote` still needs `&mut Random`, and `main` neither provides it nor can declare it, so the program does not compile. A program cannot use secure randomness without choosing a source. See **Services and providers** in the reference.
@@ -319,12 +361,14 @@ Check summary: 0 succeeded, 1 failed
 
 - `silk/sha2`: `Sha256`, `Sha224`, `Sha384`, `Sha512`, `Sha512_224`, `Sha512_256`
 - `silk/sha3`: `Sha3_224`, `Sha3_256`, `Sha3_384`, `Sha3_512`
+- `silk/blake2b`: `Blake2b512`
 - `silk/sha1`: `Sha1`
 - `silk/hmac`: `HmacSha256`, `HmacSha384`
 - `silk/hkdf`: `HkdfSha256`, `HkdfSha384`, `OutputTooLongError`
 - `silk/chacha20_poly1305`: `ChaCha20Poly1305`, `AeadError`
 - `silk/aes_gcm`: `AesGcm`, `AesGcmError`
 - `silk/x25519`: `X25519`, `X25519Error`
+- `silk/ed25519`: `Ed25519PublicKey`, `Ed25519Error`
 - `silk/p256`: `P256`, `P256Error`, `EcdsaP256Sha256`, `P256SignatureError`
 - `silk/p384`: `EcdsaP384Sha384`, `P384SignatureError`
 - `silk/rsa`: `RsaPublicKey`, `RsaError`

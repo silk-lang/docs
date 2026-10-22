@@ -79,7 +79,6 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 - `arena.reset(ArenaReset.Release)` stops allocating from the current chunk. `arena.reset(ArenaReset.RetainCapacity)` keeps the current chunk for the next allocations when nothing in it is still alive, and otherwise acts like `Release`.
 - `arena.available()` returns the bytes left in the current chunk.
 - The child can be any provider, including another arena.
-- On `wasm32-unknown-unknown`, dropping arena allocations is broken in this release. Once two allocations from one chunk are dropped, the module stops with `RuntimeError: memory access out of bounds`. Use arenas on native targets for now.
 
 ## Building collections
 

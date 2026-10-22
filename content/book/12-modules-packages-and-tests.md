@@ -108,7 +108,6 @@ silk test -p taskcore --no-cache
 
 ```
 Package taskcore (/home/you/tasks-workspace/taskcore)
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 503 symbols)
   lib::addsTwoNumbers
     PASS  1 us
 
@@ -117,7 +116,7 @@ Time   47 us
 Workspace summary: 1 package succeeded, 0 failed
 ```
 
-The library works before it holds anything of yours. Note the `../build` in the `Compiled` line: every package in a workspace builds into one shared `build` folder at the workspace root. The rest of this chapter fills `taskcore` with the board code.
+The library works before it holds anything of yours. The rest of this chapter fills `taskcore` with the board code.
 
 ## Modules are files
 
@@ -141,15 +140,20 @@ import cli.command { Command, UnknownCommand, UsageError, Words, parseCommand }
 ```
 
 ```sh
-silk check
+silk check -p tasks
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     79 modules, 7 in package          0.07s
+  check    failed: 8 modules, 1 error        0.74s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks-workspace/tasks/src/main.silk:21:8: error[MOD0001] Unknown module cli.command
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.81s
+Failed 1 of 1 package in 0.85s
 ```
+
+The `load` row counts every module the build read: the seven of `tasks` itself and the standard library modules they import. When a command covers members of a workspace, a last line counts the packages that finished or failed.
 
 MOD0001 says the module does not exist and prints the path it looked for, `cli.command`. Column 8 points at that path, which is the part to fix.
 
@@ -213,15 +217,18 @@ The privacy boundary is the module, not the package. That matters, because `Boar
 ```
 
 ```sh
-silk check
+silk check -p taskcore
 ```
 
 ```
+Checking taskcore (x86_64-unknown-linux-gnu)
+  load     47 modules, 5 in package          0.06s
+  check    failed: 5 modules, 2 errors       0.19s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks-workspace/taskcore/src/Board.silk:52:23: error[SEM0021] Constructing a struct at a site where its raw constructor is not available
-/home/you/tasks-workspace/taskcore/src/Store.silk:116:21: error[SEM0028] A field projection naming a private field of another module's struct
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/tasks-workspace/taskcore/src/Store.silk:119:21: error[SEM0028] A field projection naming a private field of another module's struct
+Failed taskcore in 0.25s
+Failed 1 of 1 package in 0.26s
 ```
 
 The messages talk about structs, because a union variant with fields is built and read like one. SEM0021, in `Board.silk`, is about building a value: `Status.Done { at: at }` needs every field to be visible, and `at` is not. SEM0028, in `Store.silk`, is about reading: the pattern `Status.Done { at } => at` binds a private field. Put the `pub` back and both go away.
@@ -271,14 +278,17 @@ fn broken() -> i32 {
 ```
 
 ```sh
-silk check
+silk check -p taskcore
 ```
 
 ```
+Checking taskcore (x86_64-unknown-linux-gnu)
+  load     47 modules, 5 in package          0.05s
+  check    failed: 5 modules, 1 error        0.77s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/taskcore/src/Store.silk:184:10: error[SEM0129] Return expected i32 but received bool
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/tasks-workspace/taskcore/src/Store.silk:187:10: error[SEM0129] Return expected i32 but received bool
+Failed taskcore in 0.83s
+Failed 1 of 1 package in 0.84s
 ```
 
 `silk test --no-cache` stops on the same line and runs nothing. A mistake in an exported module can't hide, and neither can its tests. Take `broken` out again.
@@ -286,7 +296,11 @@ Check summary: 0 succeeded, 1 failed
 The list itself has to be right. An entry that names no module is refused before anything compiles. Misspell `"Store"` as `"Stores"` and check:
 
 ```
+Checking taskcore (x86_64-unknown-linux-gnu)
+  load     failed: 1 error                   0.00s
 silk: invalid exports of taskcore@0.1.0: Stores is not a module of the package
+Failed taskcore in 0.00s
+Failed 1 of 1 package in 0.00s
 ```
 
 Fix the spelling. With that in place, build the library on its own:
@@ -297,12 +311,16 @@ silk build
 ```
 
 ```
-Compiled src/lib.silk -> ../build/llvm/x86_64-unknown-linux-gnu/debug/libtaskcore.a (llvm, x86_64-unknown-linux-gnu, 0 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/libtaskcore.a
-Build summary: 1 succeeded, 0 failed
+Compiling taskcore (x86_64-unknown-linux-gnu, debug)
+  load     47 modules, 5 in package          0.05s
+  check    5 modules                         0.67s
+  codegen  0 functions                       0.00s
+  borrow   191 bodies                        0.01s
+  link     clang                             0.05s
+Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/libtaskcore.a in 0.80s
 ```
 
-The archive is empty, which is fine. The program that depends on `taskcore` compiles its source along with its own. What the library build tells you is that the package is sound on its own.
+Note the path in the last line: every package in a workspace builds into one shared `build` folder at the workspace root. That folder is outside `taskcore/`, where you ran the command, so the path is printed in full. The archive is empty, which is fine: `codegen` emitted no functions. The program that depends on `taskcore` compiles its source along with its own. What the library build tells you is that the package is sound on its own.
 
 ## Depending on `taskcore`
 
@@ -370,10 +388,12 @@ silk check
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     78 modules, 7 in package          0.09s
+  check    failed: 8 modules, 1 error        1.67s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks-workspace/tasks/src/main.silk:19:38: error[SEM0015] An import or qualified reference naming a private member of another module
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 1.76s
 ```
 
 Line 19, column 38 is `fileText` in the import of `taskcore.Store`. SEM0015 means the name exists but is private.
@@ -385,10 +405,12 @@ import taskcore.Secret { salt }
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     79 modules, 7 in package          0.07s
+  check    failed: 8 modules, 1 error        5.39s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks-workspace/tasks/src/main.silk:27:8: error[MOD0003] Module Secret is not exported by package taskcore@0.1.0
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 5.46s
 ```
 
 This one has a clear message. `pub` decides what a module shows to other modules. `exports` decides which modules a package shows to other packages. You need both.
@@ -403,16 +425,16 @@ import taskcore.Board { Board, DuplicateTask, NoSuchTask }
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     78 modules, 7 in package          0.09s
+  check    failed: 8 modules, 1 error        1.56s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/main.silk:18:17: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/tasks-workspace/tasks/src/main.silk:43:37: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/tasks-workspace/tasks/src/main.silk:83:38: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/tasks-workspace/tasks/src/main.silk:90:34: error[SEM0016] Two bindings in one scope claiming the same spelling
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/tasks-workspace/tasks/src/main.silk:19:25: error[SEM0016] Multiple bindings claim Board
+  note: /home/you/tasks-workspace/tasks/src/main.silk:18:17: related location
+Failed tasks in 1.65s
 ```
 
-SEM0016 is a binding conflict: the name `Board` is bound twice, once to the module and once to the struct. The compiler reports the import and then every use of `Board`. Give the module another name with `as`:
+SEM0016 is a binding conflict: the name `Board` is bound twice, once to the module and once to the struct. The error points at the second binding, the struct in the second import, and the note points at the first, the module. Give the module another name with `as`:
 
 ```silk
 import taskcore.Board as Boards
@@ -424,8 +446,11 @@ fn openCount(board: &Board) -> i32 {
 ```
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     78 modules, 7 in package          0.08s
+  check    8 modules                         5.37s
+  borrow   826 bodies                        0.07s
+Finished tasks in 5.46s
 ```
 
 `as` works for single names too. You will meet it in the next chapter, where three standard library modules each export a type called `Limits`.
@@ -448,10 +473,12 @@ pub param barWidth: usize = 20
 and draw the bar with `run bar(barWidth, done, total)`:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     78 modules, 7 in package          0.09s
+  check    failed: 8 modules, 1 error        3.50s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks-workspace/tasks/src/cli/Show.silk:11:1: error[SEM0214] Invalid compilation configuration: package parameter `barWidth` is not declared in the root package's root module, the only module that may declare `param`
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 3.59s
 ```
 
 It is the SEM0214 from chapter 11, and this time the message gives the reason: the parameter is outside the root module. Line 11 is the `param` declaration itself, not the line that reads it.
@@ -492,12 +519,16 @@ silk build
 ```
 
 ```
-Compiled src/main.silk -> ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1413 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks
-Build summary: 1 succeeded, 0 failed
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     78 modules, 7 in package          0.09s
+  check    7 modules                         4.49s
+  codegen  4,312 functions                   2.06s
+  borrow   845 bodies                        0.08s
+  link     clang                             1.00s
+Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 7.85s
 ```
 
-The program now lives in the workspace's shared `build` folder, so from `tasks/` its path starts with `../build`. The old `tasks/build` folder from earlier chapters is no longer used, and you can delete it.
+The program now lives in the workspace's shared `build` folder, so from `tasks/` you start it as `../build/...`. The old `tasks/build` folder from earlier chapters is no longer used, and you can delete it.
 
 ```sh
 ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Buy milk'
@@ -569,7 +600,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 680 symbols)
   Board::duplicateTitlesAreRefused
     PASS  21 us
   Store::damagedLinesAreReported
@@ -591,7 +621,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::finishingRecordsTheClockTime
     PASS  96 us
   tests::slowRemindersAreCancelled
@@ -612,7 +641,6 @@ silk test --no-cache --filter Reminders
 ```
 
 ```
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::slowRemindersAreCancelled
     PASS  231 us
 
@@ -628,7 +656,6 @@ silk test --no-cache --filter Store::
 ```
 
 ```
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 680 symbols)
   Store::damagedLinesAreReported
     PASS  8 us
   Store::fileFormatRoundTrips
@@ -651,7 +678,6 @@ silk test --workspace --no-cache
 
 ```
 Package taskcore (/home/you/tasks-workspace/taskcore)
-Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskcore (llvm, x86_64-unknown-linux-gnu, 680 symbols)
   Board::duplicateTitlesAreRefused
     PASS  15 us
   Store::damagedLinesAreReported
@@ -664,7 +690,6 @@ Compiled src/lib.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/taskc
 Tests  4 passed, 0 failed (0 cached, 4 executed, 4 selected, 4 discovered)
 Time   125 us
 Package tasks (/home/you/tasks-workspace/tasks)
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::finishingRecordsTheClockTime
     PASS  83 us
   tests::slowRemindersAreCancelled
@@ -688,7 +713,6 @@ silk run version
 ```
 
 ```
-Compiled src/main.silk -> ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1413 symbols)
 tasks 0.12 (linux, debug build)
 tasks file /tasks.txt, reminders wait 300ms
 ```
@@ -720,7 +744,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> ../build/test/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 1596 symbols)
   tests::finishingRecordsTheClockTime
     PASS  101 us
   tests::slowRemindersAreCancelled

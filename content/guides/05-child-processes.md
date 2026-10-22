@@ -220,7 +220,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/runcheck (llvm, x86_64-unknown-linux-gnu, 427 symbols)
 echo
   exit code 0
   stdout: two  spaces $HOME *.silk

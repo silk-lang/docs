@@ -32,10 +32,16 @@ silk build --target aarch64-unknown-linux-gnu
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/aarch64-unknown-linux-gnu/debug/tiny.o (llvm, aarch64-unknown-linux-gnu, 182 symbols)
-build llvm/aarch64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/aarch64-unknown-linux-gnu/debug/tiny.o
-Build summary: 1 succeeded, 0 failed
+Compiling tiny (aarch64-unknown-linux-gnu, debug)
+  load     51 modules, 1 in package          0.06s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.20s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.18s
+Finished build/llvm/aarch64-unknown-linux-gnu/debug/tiny.o in 0.50s
 ```
+
+With an object stage, the `link` row is Clang compiling the object; nothing is linked.
 
 ## Choosing targets
 
@@ -48,11 +54,24 @@ silk check --target aarch64-apple-darwin --target aarch64-unknown-linux-gnu --ta
 ```
 
 ```
-check aarch64-apple-darwin: ok
-check aarch64-unknown-linux-gnu: ok
-check wasm32-unknown-unknown: ok
-Check summary: 3 succeeded, 0 failed
+Checking tiny (aarch64-apple-darwin)
+  load     51 modules, 1 in package          0.06s
+  check    2 modules                         0.12s
+  borrow   98 bodies                         0.00s
+Finished tiny in 0.18s
+Checking tiny (aarch64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.04s
+  check    2 modules                         0.10s
+  borrow   98 bodies                         0.00s
+Finished tiny in 0.14s
+Checking tiny (wasm32-unknown-unknown)
+  load     47 modules, 1 in package          0.05s
+  check    2 modules                         0.04s
+  borrow   26 bodies                         0.00s
+Finished tiny in 0.10s
 ```
+
+Each target is a separate unit with its own rows and its own last line. On a terminal, each finished target collapses to one line.
 
 Code can ask which target and profile it is built for at compile time: `silk/target` (`Target`) and `silk/compilation` (`Compilation`). See **Static control flow and reflection** in the reference.
 
@@ -71,10 +90,16 @@ silk build --release
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/release/tiny (llvm, x86_64-unknown-linux-gnu, 182 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/x86_64-unknown-linux-gnu/release/tiny
-Build summary: 1 succeeded, 0 failed
+Compiling tiny (x86_64-unknown-linux-gnu, release)
+  load     51 modules, 1 in package          0.06s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.20s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.45s
+Finished build/llvm/x86_64-unknown-linux-gnu/release/tiny in 0.76s
 ```
+
+The heading names the profile in parentheses after the target.
 
 ## Named profiles
 
@@ -92,9 +117,13 @@ silk build --profile fast
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/fast/tiny (llvm, x86_64-unknown-linux-gnu, 182 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/x86_64-unknown-linux-gnu/fast/tiny
-Build summary: 1 succeeded, 0 failed
+Compiling tiny (x86_64-unknown-linux-gnu, fast)
+  load     51 modules, 1 in package          0.05s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.22s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.45s
+Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.79s
 ```
 
 - A named profile builds into a directory with its own name, beside `debug` and `release`.
@@ -122,14 +151,22 @@ The manifest page lists every field and its values. The native build applies the
 | `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. `"default"` and `"none"` take no other key, so `{ kind = "default", name = "x" }` is refused as `profiles.u.runtime.name is not a supported field`. See Build outputs and native linking. |
 | `relocation` | `pic` or `static` code for object, archive and IR output. |
 | `deployment` | macOS minimum version for the link. Only `aarch64-apple-darwin` takes it. |
-| `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts only the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere. |
+| `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere; x86-64 Linux also takes the levels `x86-64-v2`, `x86-64-v3` and `x86-64-v4`. |
 | `codeModel` | `large` passes `-mcmodel=large`. x86-64 targets only. |
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
 | `artifact` | Must name the same form as `[build].artifact`. Set the output form there. |
 | `threading` | `multi` on wasm32 builds with atomics and a shared memory (see below). Refused on other targets. |
 | `maxMemory` | wasm32 only: the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
 
-`cpu.features` takes `aes`, `avx`, `avx2`, `sse2` and `sse4.2` on x86-64 Linux, and `crc`, `crypto`, `fp-armv8`, `lse` and `neon` on the arm64 targets. Code can test them with `Target.hasCpuFeature`. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
+`cpu.features` takes these names:
+
+| Target | Features |
+| --- | --- |
+| x86-64 Linux | `aes`, `avx`, `avx2`, `avx512bw`, `avx512cd`, `avx512dq`, `avx512f`, `avx512vbmi`, `avx512vl`, `bmi`, `bmi2`, `cx16`, `f16c`, `fma`, `lzcnt`, `movbe`, `pclmul`, `popcnt`, `sha`, `sse2`, `sse3`, `sse4.1`, `sse4.2`, `ssse3`, `xsave` |
+| arm64 | `aes`, `crc`, `crypto`, `dotprod`, `fp-armv8`, `fullfp16`, `i8mm`, `lse`, `neon`, `rdm`, `sha2`, `sha3` |
+| wasm32 | `atomics`, `bulk-memory`, `mutable-globals`, `relaxed-simd`, `sign-ext`, `simd128` |
+
+A feature also turns on the features it implies, so `avx2` brings `avx` and the SSE levels below it. A level model brings its features: `x86-64-v3` includes `avx2`, `fma` and `bmi2`, and `x86-64-v4` the AVX-512 set. SSE2 on x86-64 and NEON on arm64 are always on. Code can test any of them with `Target.hasCpuFeature`, `silk/simd` uses them to pick a vector width, and `silk/arch` to pick an instruction (see SIMD vectors and masks in Values and primitive types). To test the running machine instead, see CPU features at run time below. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
 
 ```toml
 [profiles.fast]
@@ -153,10 +190,14 @@ file build/llvm/x86_64-unknown-linux-gnu/fast/tiny
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/fast/tiny (llvm, x86_64-unknown-linux-gnu, 182 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/tiny/build/llvm/x86_64-unknown-linux-gnu/fast/tiny
-Build summary: 1 succeeded, 0 failed
-build/llvm/x86_64-unknown-linux-gnu/fast/tiny: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=cdea8134f07c4bd5d436d11d6e872dbe1703a0cd, for GNU/Linux 3.2.0, not stripped
+Compiling tiny (x86_64-unknown-linux-gnu, fast)
+  load     51 modules, 1 in package          0.05s
+  check    1 module                          0.00s
+  codegen  362 functions                     0.21s
+  borrow   114 bodies                        0.00s
+  link     clang                             0.39s
+Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.72s
+build/llvm/x86_64-unknown-linux-gnu/fast/tiny: ELF 64-bit LSB executable, x86-64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=800f30f73d46b54cc9ec80f7f6bbea4225a993b1, for GNU/Linux 3.2.0, not stripped
 ```
 
 The other fields are valid values that the native compiler cannot build yet. Rather than ignore them, it refuses a profile that changes them from the default:
@@ -200,6 +241,70 @@ These combinations are refused when the manifest is read:
 
 The profile names in these messages are the ones used to produce them; yours shows its own. LINE is the line of the field, or of the `[profiles.<name>]` header when the field is missing, as for the thread sanitizer without `threading`. A field inside an inline table written over several lines, such as `features` in `cpu = { model = "x86-64",` followed by `features = ["avx512"] }` on the next line, is reported at the line that writes it.
 
+## CPU features at run time
+
+A profile's `cpu` features apply to the whole program, and the program needs a machine that has them. To ship one binary that runs everywhere and goes faster where it can, keep the profile at the baseline, compile the hot function for more features, and call it only after the machine reports them.
+
+- `silk/cpu`, `CpuFeatures`: `CpuFeatures.detect()` asks the running machine; `CpuFeatures.selected()` is the set the profile selects. `has(&features, "avx2")` tests one name, spelled as in `cpu.features`; `containsAll(&features, &other)` tests a whole set.
+- `detect()` reads `cpuid` on x86-64 Linux, with or without libc, counting AVX and AVX-512 only when the operating system saves their registers. It reads `getauxval` on arm64 Linux with GNU libc and `sysctlbyname` on arm64 macOS. Elsewhere, such as in a wasm32 module, which cannot ask the engine, it reports the selected set. The result always includes the selected set.
+- Every name in the `cpu.features` table above can be tested, `sha` and `aes` included. The examples in Intrinsics include one that runs `sha256rnds2` only where `detect()` reports `sha`.
+- Detection is not cached. Call `detect()` once at start and keep the value.
+- `with Intrinsic.machine(features: ("avx2",))` on an `unsafe fn` compiles that function with the listed features, the features they imply and the profile's own. Each call is `unsafe`: the caller has checked the machine. The rules are in Intrinsics, under Functions compiled for CPU features.
+- A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `features` list. The `silk/arch` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
+
+The same portable loop, compiled twice. In a release build the optimizer inlines `total` into `totalAvx2` and vectorizes it with 32-byte AVX2 registers; the rest of the program stays at the default x86-64 level:
+
+```silk
+import silk.cpu { CpuFeatures }
+import silk.effect { Effect }
+import silk.logger { LogError }
+import silk.os_logger { StdoutLogger }
+import silk.u32
+import silk.usize
+
+// The portable kernel: every machine can run it.
+fn total(values: &[u32]) -> u32 {
+  let mut sum: u32 = 0
+  let mut at: usize = 0
+  while at < values.length {
+    sum = u32.wrappingAdd(sum, values[at])
+    at = at + 1
+  }
+  return sum
+}
+
+// The same kernel compiled for AVX2. A caller must know the machine has it.
+unsafe fn totalAvx2(values: &[u32]) -> u32 with Intrinsic.machine(features: ("avx2",)) {
+  return total(values)
+}
+
+pub effect fn main() -> () ! LogError {
+  let mut logger = StdoutLogger.make()
+  let mut values: [u32; 1000] = [0; 1000]
+  let mut at: usize = 0
+  while at < 1000 {
+    values[at] = usize.toU32(at)
+    at = at + 1
+  }
+  let machine = CpuFeatures.detect()
+  if CpuFeatures.has(&machine, "avx2") {
+    let sum = unsafe totalAvx2(&values)
+    run Effect.log("avx2 kernel: {sum}\n", &.{ sum: sum }) |> Effect.provideMut(&mut logger)
+  } else {
+    let sum = total(&values)
+    run Effect.log("portable kernel: {sum}\n", &.{ sum: sum }) |> Effect.provideMut(&mut logger)
+  }
+}
+```
+
+`silk run --release` prints, after the build lines, on a machine with AVX2:
+
+```
+avx2 kernel: 499500
+```
+
+On a machine without it, the program prints `portable kernel: 499500`. The `features` list names x86-64 features, so a program that also builds for other targets puts `totalAvx2` and its call under `static if Target.arch() == Arch.X86_64`; a name the target lacks is SEM0242.
+
 ## Linux without libc
 
 A no-libc program uses the `silk.raw_start` runtime and `silk.raw_linux` system calls. Its `main` takes the process inputs:
@@ -230,16 +335,22 @@ relocation = "static"
 `silk check` accepts this package. `silk build` stops in the runtime's entry point, which this compiler cannot generate yet:
 
 ```
+Compiling bare (x86_64-unknown-linux-gnu, bare)
+  load     44 modules, 1 in package          0.05s
+  check    1 module                          0.00s
+  codegen  failed: 12 functions, 1 error     0.00s
+[x86_64-unknown-linux-gnu]
 <silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
-build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
+Failed bare in 0.10s
 ```
+
+The command exits with status 2.
 
 Without the composition, `libc = "none"` finds no runtime in the std lib catalog: `silk: the build selects no single runtime (ARTIFACT-001)`.
 
 ## WebAssembly
 
-`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name:
+`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. Clang 18 builds it. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name:
 
 ```silk
 export "C" fn add(left: i32, right: i32) -> i32 {
@@ -256,9 +367,13 @@ silk build --target wasm32-unknown-unknown
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/wasm32-unknown-unknown/debug/web (llvm, wasm32-unknown-unknown, 32 symbols)
-build llvm/wasm32-unknown-unknown: ok /home/you/web/build/llvm/wasm32-unknown-unknown/debug/web
-Build summary: 1 succeeded, 0 failed
+Compiling web (wasm32-unknown-unknown, debug)
+  load     47 modules, 1 in package          0.07s
+  check    1 module                          0.00s
+  codegen  32 functions                      0.02s
+  borrow   24 bodies                         0.00s
+  link     clang                             0.10s
+Finished build/llvm/wasm32-unknown-unknown/debug/web in 0.23s
 ```
 
 A host instantiates it with an empty import object and calls `main()` (42) or `add(2, 3)` (5). `node <silk>/lib/silk/stdlib/host/wasm-runner.mjs <module>` runs `main` and exits with its result. On wasm32, a C function takes and returns scalars and pointers only; C statics, variadic functions and callbacks are refused. `artifact = "object"` and `"static-library"` build too.
@@ -278,4 +393,4 @@ The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32
 
 ## See also
 
-The manifest, The standard library, Build outputs and native linking; **Package parameters** and **Static control flow and reflection** in the reference; chapter 11 of the book.
+The manifest, The standard library, Build outputs and native linking; **Package parameters**, **Static control flow and reflection** and **Intrinsics** in the reference; chapter 11 of the book; `silk/cpu`, `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`.

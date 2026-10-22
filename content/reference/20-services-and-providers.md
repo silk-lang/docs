@@ -1,6 +1,6 @@
 # Services and providers
 
-A service is a named capability that effect functions require and callers supply. This page covers service and role declarations, requirement rows (`? &S`, `? &mut S`), provider implementations, the `Effect` operations that supply providers, row variables, `Without`, and `provides` and `in` constraints.
+A service is a named capability that effect functions require and callers supply. This page covers service and role declarations, requirement rows (`? &S`, `? &mut S`), provider implementations, the `Effect` operations that supply providers, row variables, `Without`, `provides` and `in` constraints, and optional services (`? &Option<&S>`).
 
 ## Syntax
 
@@ -34,7 +34,7 @@ Constraint       = Type 'in' Type
 - A requirement row `? R` follows the result type and any failure row of an `effect fn`. It lists the services the function needs.
 - Each entry is a borrowed service: `&S` (shared) or `&mut S` (exclusive). Entries are joined with `|`. Order does not matter.
 - A written row may not name one service (and role) with both accesses. `? &Counter | &mut Counter` is SEM0233; write `? &mut Counter`.
-- An entry must name one concrete service type. A struct, an owned `S` without `&`, or a plain type parameter is SEM0070.
+- An entry must name one concrete service type. A struct, an owned `S` without `&`, or a plain type parameter is SEM0070. The one exception is `&Option<&S>`, an optional service (see "Optional services").
 - An ordinary `fn` cannot declare a requirement row. This release reports SEM0062, whose message mentions failure channels.
 - The `Effect` type carries the same row: `Effect<'env; A ! E ? R>`. See Effects and run.
 
@@ -136,6 +136,26 @@ These operations live in `Effect` from `silk/effect`. Each takes an Effect and a
 - `where S in R` between two row variables states that every entry of `S` is in `R`. A function declaring `? R` may then run an Effect whose row is `S`.
 - At a call, a row argument for `S` with an entry missing from `R`, or with stronger access than `R` gives, is rejected with SEM0234, which names the premise: "This call does not prove the requirement premise `&mut main.Logger in &main.Logger`". A row variable that appears only in the result cannot be inferred (SEM0099); write the row arguments.
 - `in` between failure types is covered in Typed failures.
+
+## Optional services
+
+- `? &Option<&S>` declares an optional service: the effect runs with or without a provider of `S`. `Option` is the one from `silk/option`; the compiler recognizes it in requirement rows, selectors and `Without`.
+- `&Option<&S>` is its own requirement entry, separate from `&S`. A row may hold both.
+- Branch on it with `withSome<&S>(absent, present)` from `silk/option`. Both arguments are Effects. `present` may also require `S`; `absent` may not. The provider decides at run time which branch runs, and the other is dropped. The type argument may be omitted when the arguments determine it.
+- Both branches share every other requirement of the row. The rest of the row must not contain `S` (`where R in Without<R, S>`). An `absent` branch that requires `S` is SEM0234.
+- Three providers satisfy `&Option<&S>`:
+
+| Provider | Branch that runs |
+| --- | --- |
+| `Effect.provide(e, &Option<P>.some(p))`, where `&P` provides `S` | `present`, with `p` |
+| `Effect.provide(e, &Option<P>.none())` or `&Option<never>.none()` | `absent` |
+| `provideSome<&S>(e, &p)` from `silk/option` | `present`, with the borrowed `p` |
+
+- `Option<never>.none()` is the absent provider when no provider type is at hand: `never` serves every service and has no values.
+- A provider of `S` alone does not satisfy `&Option<&S>`. Providing one is SEM0123. Lift it with `provideSome`.
+- A function that declares `? &S` cannot run an Effect that needs `&Option<&S>` without providing it (SEM0071).
+- The optional service must be shared. An `Option` provider lends its service through a shared borrow, so nothing could provide `&Option<&mut S>`, and the requirement itself is SEM0240, reported where the row is written: "An optional service takes shared access only: an `Option` provider lends its service through a shared borrow, so nothing can provide `&Option<&mut S>`; require `&mut S`, or `&Option<&S>`".
+- Diagnostics may name the service the key stands for as `OptionService`, declared in `silk/option`. Code does not name it.
 
 ## What main is given
 
@@ -337,6 +357,59 @@ pub effect fn main() -> i32 ! HostInputError ? &mut HostInput {
 }
 ```
 
+An optional tracer. `measure` runs `traced` when a `Tracer` is provided and `plain` otherwise:
+
+```silk
+import silk.effect { Effect }
+import silk.option { Option, provideSome, withSome }
+
+service Tracer {
+  effect fn trace(value: i32) -> i32 ? &Tracer
+}
+
+struct Offset {
+  amount: i32
+}
+
+impl Tracer for Offset {
+  effect fn trace(self: &Self, value: i32) -> i32 {
+    return value + self.amount
+  }
+}
+
+effect fn plain() -> i32 {
+  return 1
+}
+
+effect fn traced() -> i32 ? &Tracer {
+  return run Tracer.trace(1)
+}
+
+// Runs with or without a Tracer.
+effect fn measure() -> i32 ? &Option<&Tracer> {
+  return run withSome<&Tracer>(plain(), traced())
+}
+
+pub fn main() -> i32 {
+  let offset = Offset { amount: 10 }
+  let owned = Option<Offset>.some(Offset { amount: 20 })
+  let missing = Option<Offset>.none()
+  let none = Option<never>.none()
+  let lifted = run provideSome<&Tracer>(measure(), &offset)
+  let present = run Effect.provide(measure(), &owned)
+  let absent = run Effect.provide(measure(), &missing)
+  let never = run Effect.provide(measure(), &none)
+  if lifted != 11 || present != 21 || absent != 1 || never != 1 { return 1 }
+  return 0
+}
+```
+
+A `main` that provides the plain provider instead, `let offset = Offset { amount: 10 }` followed by `return run Effect.provide(measure(), &offset)`, is rejected:
+
+```
+/home/you/trace/src/main.silk:33:14: error[SEM0123] The provider matches no compatible requirement
+```
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -351,19 +424,20 @@ pub effect fn main() -> i32 ! HostInputError ? &mut HostInput {
 | SEM0088 | Row variable used where a type is expected |
 | SEM0090 | Service contains a field, body or default |
 | SEM0099 | Selected entry or row argument cannot be inferred |
-| SEM0123 | Provider matches no requirement entry |
+| SEM0123 | Provider matches no requirement entry, including a plain provider of `S` for `&Option<&S>` |
 | SEM0125 | Provider matches more than one entry; select one explicitly |
 | SEM0126 | Selected row does not have exactly one member |
 | SEM0131 | Provider access cannot satisfy the entry, for example a shared borrow for `&mut S` |
 | SEM0225 | `main` declares a requirement other than `&mut HostInput` |
 | SEM0233 | A requirement row names one service with both shared and exclusive access |
-| SEM0234 | A call does not prove a `where S in R` premise of its callee, including `R in Without<R, S>` |
+| SEM0234 | A call does not prove a `where S in R` premise of its callee, including `R in Without<R, S>`, as when the `absent` branch of `withSome` requires `S` |
+| SEM0240 | An optional service with exclusive access, `&Option<&mut S>` |
 | OWN0010 | One provider lent exclusively to two entries at once |
 | OWN0011 | Provider used while an unconsumed Effect still borrows it |
 
 ## See also
 
-Effects and run · Typed failures · Fibers and scheduling · Suspension and cancellation · Interfaces and impls · Generics · Borrowing · Lifetimes · Allocation and shared ownership · Program entry and termination · Intrinsics · `silk/effect` · `silk/host_input` · `silk/allocator` · `silk/monotonic_clock`
+Effects and run · Typed failures · Fibers and scheduling · Suspension and cancellation · Interfaces and impls · Generics · Borrowing · Lifetimes · Allocation and shared ownership · Program entry and termination · Intrinsics · `silk/effect` · `silk/option` · `silk/host_input` · `silk/allocator` · `silk/monotonic_clock`
 
 ## Open questions
 

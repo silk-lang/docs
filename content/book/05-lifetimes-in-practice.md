@@ -32,11 +32,13 @@ silk check
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 2 errors       0.14s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:29:17: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
 /home/you/tasks/src/main.silk:55:16: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.20s
 ```
 
 Two errors from one change. Here is what happened. A field type with no lifetime doesn't mean "no lifetime". It quietly gives the struct a hidden lifetime parameter. `Task` is now really "a task borrowing from *some* text", and `Board`, which holds tasks, picked up a hidden parameter too.
@@ -207,7 +209,7 @@ fn part(text: string, start: usize, end: usize) -> string {
 
 That compiles and runs just the same, as long as the `Result<string<'text>, ...>` patterns inside also drop the `<'text>`. The book keeps the names in `part` and `parseBoard` because they document the promise, and because the next rule is about to bite.
 
-The fourth rule covers a function with two borrowed inputs. Make a scratch project with `silk init scratch` and put this in its `src/main.silk`:
+The fourth rule covers a function with two borrowed inputs. Put this in the `src/main.silk` of the scratch project from chapter 2:
 
 ```silk
 import silk.string { String }
@@ -228,10 +230,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.04s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:3:43: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.14s
 ```
 
 The error points at the result type. The result could be `left` or `right`, so it could borrow from either one. The compiler won't pick for you, because each choice means something different to the caller. Say what you mean:
@@ -253,15 +257,17 @@ Back in `tasks`, look again at the first line of `parseBoard`:
 Inside a function body you usually don't write lifetimes; the compiler works them out. Try removing this one, so the line is `let mut board = Board.make()`:
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:145:18: error[SEM0012] A call argument whose type mismatches its parameter
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/tasks/src/main.silk:145:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
+Failed tasks in 0.20s
 ```
 
-The line numbers here refer to the whole file at the end of the chapter. SEM0012 says an argument's type doesn't match its parameter. Line 145 is `let id = board.add(Draft {`, and the argument is the draft.
+The line numbers here refer to the whole file at the end of the chapter. SEM0012 says an argument's type doesn't match its parameter. Line 145 is `let id = board.add(Draft {`, and the argument is the draft. `add` expects a `Draft<'static>`, but the draft borrows from `text`. The `'_` stands for a lifetime that has no name in your code.
 
-What went wrong is that `Board.make()` has a lifetime parameter, and nothing in that call says what it should be. The compiler fixes it right there, at the call, rather than looking ahead to the `add` that comes later. By the time you add a draft borrowing from `text`, the board has already been given some other lifetime, and the draft doesn't fit. Writing `Board<'text>` tells the compiler up front which text the board borrows from. Put the annotation back.
+What went wrong is that `Board.make()` has a lifetime parameter, and nothing in that call says what it should be. The compiler fixes it right there, at the call, rather than looking ahead to the `add` that comes later. By the time you add a draft borrowing from `text`, the board has already been given another lifetime, `'static`, and the draft doesn't fit. Writing `Board<'text>` tells the compiler up front which text the board borrows from. Put the annotation back.
 
 When an `add` or a method call on a new value fails with SEM0012, and lifetimes are involved, annotate the `let`.
 
@@ -300,7 +306,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 282 symbols)
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
 [ ] #3 Water the plants (low)
@@ -323,13 +328,15 @@ If you leave the lifetime off, elision applies its second rule and ties the resu
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 2 errors       0.14s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:197:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
   note: /home/you/tasks/src/main.silk:196:17: related location
 /home/you/tasks/src/main.silk:198:57: error[OWN0019] A borrowed value is used beyond the validity of its referent
   note: /home/you/tasks/src/main.silk:196:17: related location
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.20s
 ```
 
 Both notes point at `board.longestTitle()` on line 196, where the loan began.
@@ -339,7 +346,6 @@ OWN0011 at `drop board` means you touched an owner while a loan on it was still 
 Here, that fear is wrong: the title really points into `SEED`, which lives forever. But the compiler checks callers against the signature, not against the body. The signature is the contract. Put `string<'text>` back, keep the new `report` lines, and it runs:
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 282 symbols)
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
 [ ] #3 Water the plants (low)
@@ -384,11 +390,13 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:21:6: error[OWN0019] A borrowed value is used beyond the validity of its referent
   note: /home/you/scratch/src/main.silk:19:35: related location
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.18s
 ```
 
 The note points at `&buffer` on line 19, the borrow that outlives `buffer`.

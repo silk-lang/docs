@@ -42,10 +42,12 @@ silk check
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:13:7: error[SEM0121] `main.Status: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Status`
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.25s
 ```
 
 The error points at the `Effect.log` call. `Effect.log` walks the template at compile time, and for each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface from `silk/format`. The message reads as a claim the compiler had to prove, `main.Status: silk/format.Display`, "`Status` in module `main` implements `Display`", and the reason it could not: there is no implementation.
@@ -139,10 +141,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:9:15: error[SEM0157] Direct ordering of scalar enum values
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.18s
 ```
 
 SEM0157 says that enum values can't be ordered directly. Silk won't guess that the order you declared the members in is an order you meant. Maybe `High` is first for a reason. You decide by implementing the `Order` interface from `silk/order`.
@@ -177,10 +181,12 @@ Notice the comment: the operators work on references. `Order.compare` takes `&Se
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:122:18: error[SEM0135] Operator == does not accept (main.TaskId, main.TaskId)
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.21s
 ```
 
 SEM0135 says that `==` is backed by an interface, and no impl of it accepts two `TaskId` values. The `main.` in front is the module that declares the type. Enums get `==` for free, by value. Tuples and structs don't, because "equal" can mean different things for different data. The `Equal` interface from `silk/equal` lets you say what it means, and like `Order` it works on references:
@@ -274,13 +280,15 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.04s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:7:1: error[SEM0083] An invalid source-declared capability implementation
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/scratch/src/main.silk:7:1: error[SEM0083] Invalid conformance: `Filter` requires `keep`, which this implementation does not define
+Failed scratch in 0.19s
 ```
 
-SEM0083 calls the impl invalid. It is the code for an impl that doesn't fit its interface: a member is missing, extra, repeated or has the wrong signature. The location is the `impl` line. Compare the impl to the interface one member at a time.
+SEM0083 is the code for an impl that doesn't fit its interface: a member is missing, extra, repeated or has the wrong signature. The message names the interface and the member. A missing member is reported at the `impl` line. A member with the wrong signature is reported at that member, and the message says what differs, such as ``member `keep` does not match the operation of `Filter`: it returns a different type``.
 
 ## Generic functions
 
@@ -377,10 +385,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:7:10: error[SEM0077] Invoking a stored callable through a place without the access its contract requires
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.16s
 ```
 
 The error is at the call, `next()` on line 7. Because the body assigns to `added`, `next` is a `mut fn`: each call changes state. Silk makes that visible at the binding, the same way it does for a mutable variable. SEM0077 says the call needs more access to `next` than the binding gives. Here, you called a `mut fn` through a binding that isn't `mut`.
@@ -429,7 +439,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 300 symbols)
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
 [ ] #3 Water the plants (low)

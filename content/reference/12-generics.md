@@ -30,7 +30,7 @@ ExactType         = 'typeof' '(' Path ')'
 - An inherent `impl<T> Type<T>` must list exactly the owner's parameters, in order, and cannot bound them (SEM0194).
 - Members of an inherent impl may add their own parameters: `fn map<U>(self: Self, u: U) -> Box<U>`.
 - A parameter name may appear only once in a list (SEM0050). An interface cannot declare `Self` as a parameter, since `Self` is already bound there (SEM0050).
-- Using a parameter of one kind where another kind is expected is SEM0088, for example `Box<'a>` for a type parameter.
+- Using a parameter of one kind where another kind is expected is SEM0088, for example `Box<'a>` for a type parameter. Leaving out a requirement-row argument, as in `Holder<i32>` for `struct Holder<T, ?R>`, is SEM0088 too; write `Holder<i32 ? never>` for an empty row.
 
 ## Type arguments and inference
 

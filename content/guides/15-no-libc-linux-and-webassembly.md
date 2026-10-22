@@ -103,9 +103,17 @@ static if Target.arch() == Arch.Wasm32 {
     }
   }
 
+  effect fn writeVectored(self: &mut RawStdout, vals: &[&[u8]]) -> () ! WriterError {
+    return run Writer.writeEach(&mut self, vals)
+  }
+
   effect fn flush(self: &mut RawStdout) -> () ! WriterError {}
 
-  impl Writer for RawStdout { writeAll: RawStdout.writeAll flush: RawStdout.flush }
+  impl Writer for RawStdout {
+    writeAll: RawStdout.writeAll
+    writeVectored: RawStdout.writeVectored
+    flush: RawStdout.flush
+  }
 
   pub fn main(inputs: &ProcessInputs) -> i32 {
     let mut out = RawStdout {}
@@ -129,8 +137,8 @@ static if Target.arch() == Arch.Wasm32 {
 
 The rest is three versions of `main`, chosen by a module-level `static if`. `Target.arch()` from `silk/target` and `Compilation.libc()` from `silk/compilation` are static functions: the compiler knows their answers before it type-checks, so only the selected arm exists in the build. That is why each arm can import modules the others cannot use. See **Static control flow and reflection** in the reference.
 
-- On wasm32, `main` returns the number. The host reads it as the call's result. `silk/wasm_start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225, even though that error's text describes the hosted runtime's shapes.
-- On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. With that provider, the same `report` runs unchanged.
+- On wasm32, `main` returns the number. The host reads it as the call's result. `silk/wasm_start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225: "Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements".
+- On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. `writeVectored`, which writes several slices as one, has no faster way here and hands each slice to `writeAll` through `Writer.writeEach`. With that provider, the same `report` runs unchanged.
 - Everywhere else, `StdoutWriter` from `silk/os_writer` does the job.
 
 `silk/target` also has `operatingSystem()`, `abi()`, `endianness()`, `pointerBits` and `hasCpuFeature("...")`. `silk/compilation` reports the rest of the build request, such as `artifact()`, `safety()` and `threading()`.
@@ -144,7 +152,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/squares (llvm, x86_64-unknown-linux-gnu, 223 symbols)
 sum of squares to 10: 385
 ```
 
@@ -155,8 +162,11 @@ silk check --profile bare
 ```
 
 ```
-check x86_64-unknown-linux-gnu: ok
-Check summary: 1 succeeded, 0 failed
+Checking squares (x86_64-unknown-linux-gnu)
+  load     47 modules, 1 in package          0.07s
+  check    2 modules                         0.35s
+  borrow   74 bodies                         0.00s
+Finished squares in 0.42s
 ```
 
 ```sh
@@ -164,8 +174,11 @@ silk check --profile web
 ```
 
 ```
-check wasm32-unknown-unknown: ok
-Check summary: 1 succeeded, 0 failed
+Checking squares (wasm32-unknown-unknown)
+  load     51 modules, 1 in package          0.07s
+  check    2 modules                         0.05s
+  borrow   28 bodies                         0.00s
+Finished squares in 0.12s
 ```
 
 Run these checks in CI. They are the cheapest way to keep a portable library portable.
@@ -179,19 +192,23 @@ silk check --profile web
 ```
 
 ```
+Checking squares (wasm32-unknown-unknown)
+  load     51 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.07s
 [wasm32-unknown-unknown]
 /home/you/squares/src/main.silk:23:27: error[SEM0014] Module silk/os_writer has no member StdoutWriter
-check wasm32-unknown-unknown: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed squares in 0.13s
 ```
 
 `silk/os_writer` exists on wasm32, but its wasm32 page declares nothing. Now try a provider that is declared everywhere but refuses wasm32. Put `let random = OsRandom.make()` in the wasm32 `main`, with `import silk.os_random { OsRandom }`:
 
 ```
+Checking squares (wasm32-unknown-unknown)
+  load     53 modules, 1 in package          0.07s
+  check    failed: 2 modules, 1 error        0.06s
 [wasm32-unknown-unknown]
 /home/you/squares/src/main.silk:26:18: error[SEM0177] OsRandom requires a supported Darwin or GNU libc profile
-check wasm32-unknown-unknown: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed squares in 0.13s
 ```
 
 SEM0177 means library code asked the compiler to stop. The check runs inside `OsRandom.make`, and the error is reported at your call to it. On such a target, write a `Random` provider over whatever entropy the host gives you.
@@ -203,9 +220,13 @@ silk build --profile web
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/wasm32-unknown-unknown/web/squares (llvm, wasm32-unknown-unknown, 31 symbols)
-build llvm/wasm32-unknown-unknown: ok /home/you/squares/build/llvm/wasm32-unknown-unknown/web/squares
-Build summary: 1 succeeded, 0 failed
+Compiling squares (wasm32-unknown-unknown, web)
+  load     51 modules, 1 in package          0.05s
+  check    1 module                          0.02s
+  codegen  31 functions                      0.02s
+  borrow   25 bodies                         0.00s
+  link     clang                             0.70s
+Finished build/llvm/wasm32-unknown-unknown/web/squares in 0.83s
 ```
 
 The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports two things: its `memory` and `main`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
@@ -252,10 +273,16 @@ silk build --profile bare
 ```
 
 ```
+Compiling squares (x86_64-unknown-linux-gnu, bare)
+  load     47 modules, 1 in package          0.07s
+  check    1 module                          0.40s
+  codegen  failed: 77 functions, 1 error     0.01s
+[x86_64-unknown-linux-gnu]
 <silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
-build llvm/x86_64-unknown-linux-gnu: failed (exit 2)
-Build summary: 0 succeeded, 1 failed
+Failed squares in 0.51s
 ```
+
+The command exits with status 2.
 
 The compiler cannot generate the raw runtime's entry point yet. Until it can, use the `bare` profile to check code, and keep the code it checks portable.
 

@@ -60,8 +60,9 @@ FailStatement  = 'fail' Expression
 - A handler declared `-> never ! F` re-raises a different failure. The success type stays `A`.
 - For `catchAll`, the handler's parameter type is the whole failure row, for example `A | B`. Match on it to tell members apart. See Patterns and match.
 - A handler may be a partially applied effect function. The given arguments fill the trailing parameters and the failure fills the first: with `effect fn recover(error: Missing, base: i32) -> i32`, `Effect.catchAll(recover(5))` runs `recover(error, 5)`.
-- For `catch`, `S` may be written explicitly or inferred from the handler's parameter. `S` must be a member of the row (`where S in E`). Otherwise it is SEM0067.
-- For `catchAll`, a handler whose parameter does not accept every failure of the row is SEM0067 at the handler. With `explain(failure: Oops)` for a row `Oops | LogError`: "Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union".
+- For `catch`, `S` may be written explicitly or inferred from the handler's parameter. `S` must be a member of the row (`where S in E`). Otherwise it is SEM0067: "Invalid Effect.catch handler: `main.Other` is not a failure of the handled Effect, which fails with `main.Problem`".
+- A handler is an effect function. A plain `fn` handler is SEM0067, and the message says to declare it `effect fn` with the same parameter and result.
+- For `catchAll`, a handler whose parameter does not accept every failure of the row is SEM0067 at the handler. With `explain(failure: Oops)` for a row `Oops | LogError`: "Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union". The message is the same for a union parameter that lacks a member, for an Effect with a single failure, and in the pipeline form `e |> Effect.catchAll(h)`. With several missing failures it lists them all and says "add them to the parameter's union".
 - Requirements of the protected Effect and of the handler both remain. See Services and providers.
 - `retry` takes a reusable `mut Effect`. `retry(e, 0)` runs once. Earlier failure values are dropped before the next attempt; the last failure propagates.
 
@@ -243,5 +244,4 @@ Effects and run · Services and providers · Program entry and termination · Ow
 ## Open questions
 
 - SEM0061 ("failure type must be a detached ordinary value type") has no producer in the compiler. A reference failure type such as `! &i32` is accepted, and `Effect.catchAll` can recover it.
-- A `catchAll` handler that misses a failure gets the detailed SEM0067 message only when its parameter is a single type. When the parameter is a union that lacks a member, SEM0067 prints only its one-line meaning. When the handled Effect has a single failure and the parameter is an unrelated type, `silk check` stops with "unsupported: this construct is not supported by the native compiler yet" (exit 2). In the pipeline form, `e |> Effect.catchAll(h)`, any mismatch is SEM0052 ("A generic call whose type arguments its values do not determine").
 - A plain `fn` handler passed to `Effect.catchAll` stops `silk check` with "unsupported: this construct is not supported by the native compiler yet", even when its parameter type is right.

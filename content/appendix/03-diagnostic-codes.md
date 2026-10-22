@@ -6,19 +6,19 @@ Every compiler error carries a stable code: three letters for the family and fou
 
 A diagnostic prints as `path:line:column: error[CODE] message`. When the compiler knows a second place that matters, such as the earlier declaration a duplicate clashes with, an indented `note: path:line:column: related location` line follows it. `silk check --json` prints one JSON object per diagnostic with `code`, `line`, `column`, `message`, `notes` and `related` locations. A failed check or build exits with status 1.
 
-The message is either a filled-in template, such as `Unknown type Size`, or, when the compiler cannot fill the template, the code's one-line meaning, such as `` A conditional whose condition is not `bool`  ``. The meaning names the rule but not the names or values involved; read the line and column. Entries below give the template when the printed message is the meaning.
+The message is either a filled-in template, such as `Unknown type Size`, or, when the compiler cannot fill the template, the code's one-line meaning, such as ``A `run` whose failures the enclosing signature does not declare``. The meaning names the rule but not the names or values involved; read the line and column. Entries below give the template when the printed message is the meaning.
 
 A construct the compiler parses but cannot compile yet is not a coded error. It prints `unsupported: this construct is not supported by the native compiler yet` or `unsupported[Reason] not supported by the native compiler yet`, and the command exits with status 2.
 
 | Family | Phase | Codes |
 | --- | --- | --- |
-| LEX | Lexing tokens and literals | LEX0001-LEX0012 |
+| LEX | Lexing tokens and literals | LEX0001-LEX0014 |
 | PAR | Parsing | PAR0001-PAR0007 |
 | MOD | Module and package resolution | MOD0001-MOD0004 |
-| OWN | Ownership, moves and loans | OWN0001-OWN0020 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0237 |
+| OWN | Ownership, moves and loans | OWN0001-OWN0019 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0245 |
 
-There is no LAY family. Gaps in the numbering are codes that were retired; they are never reused.
+There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
 
 Each example is the whole `src/main.silk` of a package named `demo` in `/home/you/demo`, run with `silk check` unless the entry says `silk build`. Output lines are quoted as printed. Codes the compiler never reports are listed in the last section.
 
@@ -41,7 +41,7 @@ pub fn main() -> i32 {
 
 ```text
 /home/you/demo/src/main.silk:2:15: error[LEX0001] Unsupported byte sequence
-/home/you/demo/src/main.silk:2:16: error[SEM0087] An expression statement whose result cannot be intentionally ignored
+/home/you/demo/src/main.silk:2:16: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
 ```
 
 The parser then reads the `5` as an expression statement and also reports SEM0087.
@@ -62,10 +62,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:2:15: error[LEX0002] An identifier-like modifier outside the closed literal vocabulary
+/home/you/demo/src/main.silk:2:15: error[LEX0002] Unknown static-literal modifier: `x`
 ```
-
-Message template, not filled by this compiler: `Unknown static-literal modifier: {modifier}`.
 
 Fix: Use a known prefix, such as `b"hello"` for bytes, or none. See Lexical structure.
 
@@ -83,12 +81,10 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:2:15: error[LEX0003] A literal whose matching closing delimiter is absent
+/home/you/demo/src/main.silk:2:15: error[LEX0003] Unterminated string literal
 ```
 
 An unterminated byte string, `b"hello`, is the same code. An unclosed character, `'a`, reads as a lifetime and gives PAR0001 and PAR0002 instead.
-
-Message template, not filled by this compiler: `Unterminated {subject} literal`.
 
 Fix: Close the literal: `"hello"`. See Lexical structure.
 
@@ -207,12 +203,10 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:2:16: error[LEX0009] An identifier-like suffix outside the duration unit vocabulary
+/home/you/demo/src/main.silk:2:16: error[LEX0009] Unknown duration unit `sec`
 ```
 
 The column is the suffix. A letter that is no unit at all, as in `5q`, is the same code.
-
-Message template, not filled by this compiler: `Unknown duration unit {spelling}`.
 
 Fix: Use a unit from the vocabulary: `5s`. See Lexical structure.
 
@@ -230,10 +224,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:2:18: error[LEX0010] A duration unit repeated within one compact literal
+/home/you/demo/src/main.silk:2:18: error[LEX0010] Duration unit `h` may appear only once
 ```
-
-Message template, not filled by this compiler: `Duration unit {unit} may appear only once`.
 
 Fix: Write each unit once: `3h`. See Lexical structure.
 
@@ -251,10 +243,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:2:19: error[LEX0011] Duration components that do not descend from larger to smaller units
+/home/you/demo/src/main.silk:2:19: error[LEX0011] Duration unit `m` must not follow `s`
 ```
-
-Message template, not filled by this compiler: `Duration unit {unit} must not follow {previous}`.
 
 Fix: Write the larger unit first: `2m30s`. See Lexical structure.
 
@@ -272,12 +262,52 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:2:17: error[LEX0012] A subordinate duration component outside its canonical field bound
+/home/you/demo/src/main.silk:2:17: error[LEX0012] Subordinate `m` component 75 exceeds 59
 ```
 
-Message template, not filled by this compiler: `Subordinate {unit} component {amount} exceeds {maximum}`.
-
 Fix: Carry into the larger unit: `2h15m`, or write the amount alone: `135m`. See Lexical structure.
+
+### LEX0013
+
+A digit or letter in a base-prefixed integer literal that is not a digit of its base.
+
+```silk
+pub fn main() -> i32 {
+  let value = 0xG1
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0013] Base-16 integer literal contains `G`, which is not a base-16 digit
+```
+
+The column is the literal. The message names the base and the first bad digit: `0o9` gives ``Base-8 integer literal contains `9`, which is not a base-8 digit``, and `0b102` gives the same for base 2.
+
+Fix: Use only digits of the base: `0x1F`, `0o7`, `0b101`. See Lexical structure.
+
+### LEX0014
+
+A numeric literal written with a type suffix.
+
+```silk
+pub fn main() -> i32 {
+  let value = 7u8
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0014] Numeric literals take no type suffix such as `u8`; write the type as an annotation instead, as in `let value: u8 = 7`
+```
+
+The column is the start of the literal, and the message repeats its digits and suffix: `5usize` gives ``as in `let value: usize = 5` ``. Every integer and float type name is caught this way, after an integer or a float: `1.5f32` gives ``such as `f32`; write the type as an annotation instead, as in `let value: f32 = 1.5` ``. A float with an integer suffix gets its own wording. `2.5e3u8` gives ``Numeric literals take no type suffix such as `u8`; `2.5e3` is a float literal, which integer type `u8` cannot hold, so write a float type as an annotation instead, as in `let value: f64 = 2.5e3` ``.
+
+Fix: Drop the suffix and give the type where the value is used: `let value: u8 = 7`, or pass `7` to a `u8` parameter. See Lexical structure and Values and primitive types.
 
 The well-formed spellings `0x0F`, `1_000_000`, `1.5e3`, `'a'`, `"hello"`, `b"hello"`, `1500ms`, `1h15m` and `2m30s` all pass `silk check`. See Lexical structure and Values and primitive types.
 
@@ -414,7 +444,7 @@ pub fn main() -> i32 {
 /home/you/demo/src/main.silk:2:10: error[PAR0007] `?T` is not a Silk type; write an optional type as `Option<T>`
 ```
 
-The error is reported once, at the `?`, wherever a type is expected: a `let`, a parameter, a return type, a field or a `param`. The rest of the declaration is still checked, so `param o: ?i32 = 1` reports PAR0007 alone. Inside type arguments, as in `Option<?i32>`, `?` starts a requirement row instead, and the error is SEM0088. Nullable pointers `?*T` and `?R` requirement rows are not affected.
+The error is reported once, at the `?`, wherever a type is expected: a `let`, a parameter, a return type, a field or a `param`. The rest of the declaration is still checked, so `param o: ?i32 = 1` reports PAR0007 alone. Inside type arguments, as in `Option<?i32>`, it is the same error at the `?`, and `??i32` is reported once. Nullable pointers `?*T` and `?R` requirement rows are not affected.
 
 Fix: Write `Option<i32>`. See Enums and unions.
 
@@ -956,12 +986,6 @@ Message template, not filled by this compiler: `Lifetime {lifetime} does not rem
 
 Fix: Declare every referent before the borrow and in the same or an outer block, so it outlives each use. See Lifetimes, Borrowing.
 
-### OWN0020
-
-An owner cannot be preserved by the suspension frame at this run boundary.
-
-The catalog documents OWN0020 but defines no code for it, so no compiler path can report it.
-
 ## SEM: names, types and patterns (SEM0001-SEM0058)
 
 ### SEM0001
@@ -1095,7 +1119,7 @@ Fix: Pass exactly the declared number of arguments. See Functions and methods, C
 
 ### SEM0008
 
-A binding whose name repeats a parameter or an earlier binding.
+A `let` whose name repeats an earlier binding in the same block.
 
 ```silk
 pub fn main() -> i32 {
@@ -1108,10 +1132,10 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:3:7: error[SEM0008] A binding whose name repeats a parameter or an earlier binding
+/home/you/demo/src/main.silk:3:7: error[SEM0008] Cannot rebind n
 ```
 
-Message template, not filled by this compiler: `Cannot rebind {spelling}`.
+A body may rebind a parameter: in `fn next(n: i32) -> i32`, the line `let n = n + 1` is accepted.
 
 Fix: Use a new name, or declare `let mut n` and assign. See Bindings and statements.
 
@@ -1173,10 +1197,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:3:6: error[SEM0011] A conditional whose condition is not `bool`
+/home/you/demo/src/main.silk:3:6: error[SEM0011] Condition must be bool, found i32
 ```
-
-Message template, not filled by this compiler: `Condition must be bool, found {actual}`.
 
 Fix: Write a `bool` condition: `if n != 0`. See Control flow.
 
@@ -1198,6 +1220,8 @@ pub fn main() -> i32 {
 ```text
 /home/you/demo/src/main.silk:4:13: error[SEM0012] Expected i64 but received i32
 ```
+
+When the types differ only in a lifetime, the message names both, as in `Expected string<'static> but received string` for a borrowed `string` passed to a `string<'static>` parameter. A lifetime the compiler has not named prints as `'_`, as in `Expected main.Draft<'static> but received main.Draft<'_>`.
 
 Fix: Pass the parameter type. Integers do not widen implicitly: use `i32.toI64(small)` after `import silk.i32`. See Functions and methods.
 
@@ -1258,10 +1282,24 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:19: error[SEM0016] Two bindings in one scope claiming the same spelling
+/home/you/demo/src/main.silk:2:8: error[SEM0016] Multiple bindings claim List
+  note: /home/you/demo/src/main.silk:1:19: related location
 ```
 
-Message template, not filled by this compiler: `Multiple bindings claim {spelling}`.
+The error is at the second binding, here the struct, with a note on the first. Two imports that bind one name are reported the same way, once, at the second import:
+
+```silk
+import silk.format { Format }
+import silk.inflate { Format }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:23: error[SEM0016] Multiple bindings claim Format
+  note: /home/you/demo/src/main.silk:1:22: related location
+```
 
 Fix: Rename the local declaration, or import under another name with `as`. See Modules and imports.
 
@@ -1319,6 +1357,25 @@ pub fn main() -> i32 { return 0 }
 Message template, not filled by this compiler: `Public declaration exposes private type {type}`.
 
 Fix: Make the type `pub`, or make the function private. See Functions and methods.
+
+### SEM0020
+
+Aggregates that contain themselves inline and so have no finite layout.
+
+```silk
+struct Node { next: Node }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:1: error[SEM0020] Inline recursive aggregate layout: main.Node
+```
+
+The struct is refused at its declaration, whether or not it is used.
+
+Fix: Store the recursive part behind an owning pointer or in a collection, such as `next: Option<Box<Node>>` or `children: List<Node>`. See Allocation and shared ownership.
 
 ### SEM0021
 
@@ -1584,10 +1641,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:4:10: error[SEM0032] Indexing a value whose type does not support indexing
+/home/you/demo/src/main.silk:4:10: error[SEM0032] Cannot index i32
 ```
-
-Message template, not filled by this compiler: `Cannot index {actual}`.
 
 Fix: Index arrays and slices only. See Structs, tuples and arrays.
 
@@ -1708,10 +1763,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:2:3: error[SEM0038] `break` or `continue` outside any loop
+/home/you/demo/src/main.silk:2:3: error[SEM0038] break is only valid inside a loop
 ```
-
-Message template, not filled by this compiler: `{transfer} is only valid inside a loop`.
 
 Fix: Use `break` and `continue` only inside `while`. See Control flow.
 
@@ -2237,10 +2290,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:7:14: error[SEM0067] An `Effect.catch` handler that does not fit the failures it handles
+/home/you/demo/src/main.silk:7:14: error[SEM0067] Invalid Effect.catch handler: `main.Other` is not a failure of the handled Effect, which fails with `main.Missing`
 ```
-
-Message template, not filled by this compiler: `Invalid Effect.catch handler: {detail}`.
 
 The same code covers an `Effect.catchAll` handler whose parameter does not accept every failure of the handled Effect. When the parameter is a single type, the message names the missing failure:
 
@@ -2267,15 +2318,33 @@ pub effect fn main() -> i32 ! LogError {
 }
 ```
 
-`silk check` and `silk build` print:
+`silk check` prints:
 
 ```text
 /home/you/demo/src/main.silk:18:41: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union
 ```
 
-When the parameter is already a union that misses a member, the message is the one-line meaning above. In the pipeline form, `work() |> Effect.catchAll(explain)`, the same mistake is SEM0052.
+The message names the missing failures the same way when the parameter is a union that lacks a member, when the handled Effect has a single failure, and in the pipeline form, `work() |> Effect.catchAll(explain)`. With several missing it says ``does not accept `main.B`, `main.C`, failures of the handled Effect; add them to the parameter's union``.
 
-Fix: Make the handler take the failure type it handles: `Effect.catch<Missing>(load(), recover)` with `recover(error: Missing)`. For `catchAll`, give the parameter every failure in the row: `failure: Oops | LogError`. See Typed failures.
+A handler that is a plain `fn` is the same code. A handler returns an Effect, so it must be an `effect fn`:
+
+```silk
+import silk.effect { Effect }
+struct Problem {}
+effect fn load() -> i32 ! Problem { fail Problem {} }
+fn recover(error: Problem) -> i32 { return 0 }
+pub effect fn main() -> i32 {
+  return run Effect.catchAll(load(), recover)
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:6:38: error[SEM0067] Invalid Effect.catch handler: the handler is a plain `fn` that returns `i32`, but a handler returns the Effect that recovers; declare it `effect fn` with the same parameter and result
+```
+
+Fix: Make the handler take the failure type it handles: `Effect.catch<Missing>(load(), recover)` with `recover(error: Missing)`. For `catchAll`, give the parameter every failure in the row: `failure: Oops | LogError`. Declare a handler `effect fn recover(error: Problem) -> i32`. See Typed failures.
 
 ### SEM0070
 
@@ -2362,12 +2431,29 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:10:20: error[SEM0076] A callable value whose signature cannot satisfy the expected callable type
+/home/you/demo/src/main.silk:10:20: error[SEM0076] Callable value with mode `once` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow
 ```
 
-Message template, not filled by this compiler: `Callable {actual} cannot satisfy {expected}`.
+A closure that assigns a captured variable is a `mut fn`, and passing it for a plain `fn` parameter is the same error at the argument:
 
-Fix: Pass a callable or Effect whose mode and environment fit the parameter. Take `once Effect` to run it once. See Closures and callable types.
+```silk
+fn apply(f: fn() -> i32) -> i32 { return f() }
+pub fn main() -> i32 {
+  let mut n = 0
+  return apply(fn() -> i32 {
+    n = n + 1
+    return n
+  })
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:4:16: error[SEM0076] Callable value with mode `mut` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow
+```
+
+Fix: Pass a callable or Effect whose mode and environment fit the parameter. Take `once Effect` to run it once, and `mut fn` to accept a closure that mutates its captures. See Closures and callable types.
 
 ### SEM0077
 
@@ -2471,12 +2557,20 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:5:1: error[SEM0083] An invalid source-declared capability implementation
+/home/you/demo/src/main.silk:5:1: error[SEM0083] Invalid conformance: `Shape` requires `area`, which this implementation does not define
 ```
 
-Message template, not filled by this compiler: `Invalid conformance: {detail}`.
+The column is the start of the `impl` for a missing operation, and the member's line for a member that is wrong. The message names the interface and the member:
 
-Fix: Implement every interface member. `Copy` needs every field to be `Copy`. See Interfaces and impls.
+- Several missing operations are listed together: ``Invalid conformance: `Box3` requires `width` and `depth`, which this implementation does not define``.
+- A member whose signature differs says how: ``Invalid conformance: member `decode` does not match the operation of `Info`: it returns a different type``. Other endings are ``it takes a different number of parameters`` and ``its parameter 1 takes stronger access than promised, or consumes a borrowed operand``, as when a provider takes `&mut Self` for an operation that requires `&Service`.
+- A member the interface does not have: ``Invalid conformance: `other` is not an operation of `Info` ``.
+- A member in `impl Copy`: ``Invalid conformance: `impl Copy` declares no members; the compiler copies the value``.
+
+- A second identical `impl`, at the second one: ``Invalid conformance: `Square` implements `Shape` twice; keep one implementation``.
+- A member defined twice, at the second definition: ``Invalid conformance: `area` is defined twice in the implementation of `Shape` for `Square` ``.
+
+Fix: Implement every interface member, with the interface's signature, and nothing else. `Copy` needs every field to be `Copy`. See Interfaces and impls.
 
 ### SEM0084
 
@@ -2552,12 +2646,26 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:3:3: error[SEM0087] An expression statement whose result cannot be intentionally ignored
+/home/you/demo/src/main.silk:3:3: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
 ```
 
-Message template, not filled by this compiler: `Expression statement produces {actual}, but only () or never may be ignored`.
+An Effect that is built and never run gets its own message. Here `compute` is an `effect fn`:
 
-Fix: Bind the result (`let n = one()`) or drop it (`drop one()`). See Bindings and statements.
+```silk
+effect fn compute() -> i32 { return 1 }
+pub effect fn main() -> i32 {
+  compute()
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:3:3: error[SEM0087] Expression statement produces an Effect of `i32` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
+```
+
+Fix: Bind the result (`let n = one()`) or drop it (`drop one()`). Run an Effect with `run compute()`, and discard its result with `drop run compute()`. See Bindings and statements, and Effects and run.
 
 ### SEM0088
 
@@ -2571,12 +2679,24 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:20: error[SEM0088] Using a generic binder in a value, failure-row, or requirement-row position of another kind
+/home/you/demo/src/main.silk:1:20: error[SEM0088] Generic parameter `?R` has kind a requirement row, expected a type
 ```
 
-Message template, not filled by this compiler: `Generic parameter {spelling} has kind {actual}, expected {expected}`.
+A type argument list that leaves out a requirement row is the same code:
 
-Fix: Use the binder in the position of its kind: `?R` in a requirement row, `T` in a value position. See Generics.
+```silk
+struct Holder<T, ?R> { value: T }
+fn take(h: Holder<i32>) -> i32 { return h.value }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:18: error[SEM0088] Generic parameter `?R` has kind none because its row argument is omitted, expected a requirement row; write `? never` for an empty row
+```
+
+Fix: Use the binder in the position of its kind: `?R` in a requirement row, `T` in a value position. Write `Holder<i32 ? never>` for an empty row. See Generics.
 
 ### SEM0090
 
@@ -2663,7 +2783,8 @@ pub fn add(a: i32) -> i32 { return a }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:16: error[SEM0016] Two bindings in one scope claiming the same spelling
+/home/you/demo/src/main.silk:2:4: error[SEM0016] Multiple bindings claim add
+  note: /home/you/demo/src/main.silk:1:16: related location
 /home/you/demo/src/main.silk:3:14: error[SEM0109] A `typeof` item whose name belongs to more than one declaration
 ```
 
@@ -3044,10 +3165,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:3:1: error[SEM0130] A reachable non-unit function fallthrough
+/home/you/demo/src/main.silk:3:1: error[SEM0130] A reachable path must return i32
 ```
-
-Message template, not filled by this compiler: `A reachable path must return {expected}`.
 
 Fix: End every path with `return`. See Functions and methods.
 
@@ -3974,7 +4093,43 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0237)
+## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0245)
+
+### SEM0185
+
+A foreign function whose ABI string is not "C".
+
+```silk
+unsafe extern "Rust" fn abs(value: i32) -> i32
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:15: error[SEM0185] Foreign ABI "Rust" is not supported; only "C" is available
+```
+
+The declaration is refused whether or not it is called. The column is the ABI string.
+
+Fix: Write `extern "C"`. See Unsafe code and C interop.
+
+### SEM0186
+
+A foreign function declared without the mandatory unsafe qualifier.
+
+```silk
+extern "C" fn abs(value: i32) -> i32
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:1: error[SEM0186] Foreign function abs must be declared unsafe
+```
+
+Fix: Declare it `unsafe extern "C" fn` and call it inside `unsafe { }`. See Unsafe code and C interop.
 
 ### SEM0187
 
@@ -3991,9 +4146,40 @@ pub fn main() -> i32 { unsafe { if flag(1.0) { return 0 } } return 1 }
 /home/you/demo/src/main.silk:2:36: error[SEM0187] A foreign parameter or result type outside the C-compatible scalar subset
 ```
 
-Message template, not filled by this compiler: `{type} is not admitted by the {abi} ABI`.
+A vector with no C vector type fills the template `{type} is not admitted by the {abi} ABI`: `mask<N>`, `simd<isize, N>` and `simd<usize, N>` print, for example, `mask<4> is not admitted by the C ABI`. For an imported function it is reported at each call, at the callee's name, and a declaration that is never called is not checked. For an `export "C"` function it is reported at the parameter or result type.
 
 Fix: Use C scalar types (integers, `f32`, `f64`, raw pointers) in foreign signatures. `bool` is not one of them. See Unsafe code and C interop.
+
+### SEM0188
+
+Silk-only contract syntax retained on a foreign function declaration.
+
+```silk
+unsafe extern "C" fn first<T>(value: i32) -> i32
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:28: error[SEM0188] A foreign function declaration must not include generic parameters
+```
+
+The message names what is not allowed. Generic parameters, `static` and `effect` are each refused on an `extern` declaration. An exported function may not be an `effect fn` either, and the message names the export:
+
+```silk
+struct Problem {}
+export "C" effect fn tick() -> i32 ! Problem { fail Problem {} }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:1: error[SEM0188] An `export "C"` function must not include effect
+```
+
+Fix: Declare the C function with concrete C types, and write any generic or effectful wrapper as an ordinary Silk function that calls it. Export a plain `fn`. See Unsafe code and C interop.
 
 ### SEM0189
 
@@ -4112,12 +4298,43 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:3:3: error[SEM0195] An inherent impl member that cannot be an associated member
+/home/you/demo/src/main.silk:3:3: error[SEM0195] Point.x collides with the field x of Point
 ```
 
-Message template, not filled by this compiler: `impl {owner} cannot declare a drop hook; declare impl Drop for {owner} instead` / `{owner}.{member} collides with the {collidesWith} {member} of {owner}` / `impl {owner} cannot map {member} to another declaration; only a conformance maps operations`.
+A mapping member, `name: target`, is the same code in an inherent impl. Only a conformance maps operations:
 
-Fix: Rename the member. Inherent members cannot share a field name or be named `drop` (use `impl Drop`). See Functions and methods.
+```silk
+struct Point { x: i32 }
+fn make() -> Point { return Point { x: 0 } }
+impl Point {
+  origin: make
+}
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:4:3: error[SEM0195] impl Point cannot map origin to another declaration; only a conformance maps operations
+```
+
+An inherent member named `drop` is the same code:
+
+```silk
+struct Point { x: i32 }
+impl Point {
+  fn drop(self: &mut Point) -> () {}
+}
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:3:3: error[SEM0195] impl Point cannot declare a drop hook; declare impl Drop for Point instead
+```
+
+Fix: Rename the member. Inherent members cannot share a field name or be named `drop` (use `impl Drop`). Declare a member as a function, `fn origin() -> Point { return make() }`, instead of mapping it. See Functions and methods.
 
 ### SEM0196
 
@@ -4186,9 +4403,32 @@ pub fn main() -> i32 { return 0 }
 /home/you/demo/src/main.silk:3:62: error[SEM0200] A receiver operation declared by more than one bound of one type parameter
 ```
 
-Message template, not filled by this compiler: `{member} is declared by more than one bound of {parameter} ({interfaces}); call it through the bound, as {interfaces}.{member}(...)`.
+Message template, not filled by this compiler: `{member} is declared by more than one bound of {parameter} ({interfaces}); call it through the bound, as {calls}`.
 
 Fix: Call through one interface: `Named.name(value)`. See Interfaces and impls.
+
+### SEM0201
+
+An `export "C"` function whose body may suspend.
+
+```silk
+import silk.fiber { Fiber }
+export "C" fn waits() -> i32 {
+  run Fiber<(), ()>.yieldNow()
+  return 0
+}
+pub fn main() -> i32 { return 0 }
+```
+
+`silk build` prints:
+
+```text
+/home/you/demo/src/main.silk:2:1: error[SEM0201] Exported function waits may suspend; a C-callable body must be synchronous
+```
+
+Only a build reports it; `silk check` accepts the program. A C caller has no scheduler to resume a parked body, so the build refuses any exported body that can park, directly or through what it calls. The check is conservative and may refuse a body that would not park in practice.
+
+Fix: Keep exported bodies synchronous. Do parking work in Silk code under a scheduler, not behind the C boundary. See Unsafe code and C interop, Suspension and cancellation.
 
 ### SEM0202
 
@@ -4209,7 +4449,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:8:12: error[SEM0202] name is supplied to main.Point by more than one interface (Named or Labeled); call it through one, as Named or Labeled.name(...)
+/home/you/demo/src/main.silk:8:12: error[SEM0202] name is supplied to main.Point by more than one interface (Named or Labeled); call it through one, as Named.name(...) or Labeled.name(...)
 ```
 
 Fix: Call through one interface: `Named.name(&p)`. See Interfaces and impls.
@@ -4508,6 +4748,8 @@ pub fn main() -> u64 { return 0 }
 /home/you/demo/src/main.silk:1:8: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput`
 ```
 
+The message describes the runtime that was selected. For a wasm32 build with `silk/wasm_start`, `pub effect fn main() -> i32` gives ``Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements``.
+
 Fix: Return `i32` or `()` from `main`, or an Effect that produces one of them. See Program entry and termination.
 
 ### SEM0226
@@ -4617,10 +4859,12 @@ pub fn main() -> i32 { return naked() }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:19: error[SEM0236] This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine` apply only to `extern "C"` or `export "C"` functions
+/home/you/demo/src/main.silk:1:19: error[SEM0236] This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` only to other runtime functions
 ```
 
-Fix: Put `Intrinsic.machine` and `Intrinsic.foreign` only on `extern "C"` or `export "C"` functions. See Unsafe code and C interop, Intrinsics.
+The same code covers `Intrinsic.machine(features:)` on an `extern "C"`, `export "C"` or `static` function, a `features:` clause with another field beside it, and either property on an interface or service operation.
+
+Fix: Put `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` only on `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` alone on an ordinary `unsafe fn`. See Unsafe code and C interop, Intrinsics.
 
 ### SEM0237
 
@@ -4643,20 +4887,234 @@ The column points at the memory order. A store takes `"relaxed"`, `"release"` or
 
 Fix: Use an order the operation admits: `"release"` here. Most code should use `silk/atomic` instead of the intrinsics. See Intrinsics.
 
+### SEM0238
+
+A type named through a module import in a value position.
+
+```silk
+import silk.inflate
+pub fn main() -> i32 {
+  let format = inflate.Format.Gzip
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:3:16: error[SEM0238] Format is a type of module silk.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.inflate { Format }`
+```
+
+A module import lets you name the module's types in type positions, such as `inflate.Format` in a signature, but not reach their members as values.
+
+Fix: Import the type by name and use it directly: `import silk.inflate { Format }`, then `Format.Gzip`. See Modules and imports.
+
+### SEM0239
+
+A SIMD vector or mask type whose lane type or lane count is not admitted, or a SIMD operation used on a shape it does not take.
+
+```silk
+fn take(value: simd<bool, 4>) -> i32 {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:16: error[SEM0239] A SIMD vector needs a numeric lane type and a power-of-two lane count with a total width of 16 to 512 bits; a mask needs a power-of-two lane count from 2 to 64
+```
+
+The column is the type. `simd<i32, 3>` is refused the same way, because 3 is not a power of two.
+
+An `Intrinsic.simd*` member whose type arguments break one of its rules gets the same code with a message for that rule, at the call:
+
+- ``Intrinsic.simdSqrt takes a SIMD vector with floating-point lanes, but simd<u8, 16> is not one``; `simdShiftLeft` asks for integer lanes and `simdMaskAny` for a mask.
+- ``Intrinsic.simdConvert needs simd<u8, 16> and simd<f32, 4> to have the same lane count, but they have 16 and 4``.
+- ``Intrinsic.simdBitcast needs simd<u32, 4> and simd<u32, 8> to have the same width in bits, but they have 128 and 256``.
+- ``Intrinsic.simdShuffle needs simd<u32, 4> and simd<i32, 4> to have the same lane type, but they have u32 and i32``.
+- ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices. A `shuffle` from a `silk/simd` module prints this too, at your call to it.
+
+An architecture member given a shape it does not take gets the same code, with the shapes it takes: ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. Intrinsics lists the shapes each one takes.
+
+Fix: For a shape, use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. For a member, give it the lanes it names, or vectors that agree in the measure it names. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
+
+### SEM0240
+
+A requirement for an optional service with exclusive access, `&Option<&mut S>`.
+
+```silk
+import silk.option { Option }
+
+service Counter {
+  effect fn bump() -> i32 ? &mut Counter
+}
+
+effect fn measure() -> i32 ? &Option<&mut Counter> {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:7:31: error[SEM0240] An optional service takes shared access only: an `Option` provider lends its service through a shared borrow, so nothing can provide `&Option<&mut S>`; require `&mut S`, or `&Option<&S>`
+```
+
+The column is the `Option` in the requirement row. The error is reported at the requirement, so a function that declares it is refused even before anything provides it.
+
+Fix: Require `? &mut Counter` when the code needs exclusive access, or `? &Option<&Counter>` for an optional service with shared operations. See Services and providers.
+
+### SEM0241
+
+An architecture intrinsic whose target or CPU feature is not enabled for the function that calls it.
+
+```silk
+pub fn main() -> i32 {
+  let bytes = Intrinsic.simdSplat<simd<u8, 16>>(1)
+  let picked = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(bytes, bytes)
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:3:16: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`
+```
+
+The default x86-64 profile has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
+
+Fix: Call the `silk/arch` wrapper, here `x86.shuffleBytes` from `silk.arch.x86`, which falls back to portable code. Or select the feature in the profile (`cpu.model = "x86-64-v2"`) and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` with `with Intrinsic.machine(features: ("ssse3",))`. See Intrinsics and Targets and profiles.
+
+### SEM0242
+
+A `features` entry that is not a text literal naming a CPU feature of the target.
+
+```silk
+unsafe fn fast(value: u32) -> u32 with Intrinsic.machine(features: ("neon",)) {
+  return value
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:69: error[SEM0242] neon is not a CPU feature of x86_64-unknown-linux-gnu; `features` lists text literals from the target's catalog
+```
+
+The column is the entry. A constant or another non-literal entry prints "a non-literal entry" in place of the name. An empty list, `features: ()`, prints `` `features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the clause ``, at the `()`. Level names such as `"x86-64-v3"` are refused too: they are CPU models, not features.
+
+Fix: List features from the target's catalog in Targets and profiles, as text literals. Put a function for another architecture under `static if Intrinsic.targetArchitecture() == "aarch64"` or the like, so other targets never check it.
+
+### SEM0243
+
+A function that lists CPU `features` but is not declared `unsafe`.
+
+```silk
+fn fast(value: u32) -> u32 with Intrinsic.machine(features: ("avx2",)) {
+  return value
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:1: error[SEM0243] fast enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them
+```
+
+Running AVX2 code on a machine without AVX2 is undefined, so each call must be `unsafe`.
+
+Fix: Declare it `unsafe fn fast(...)`, and call it inside `unsafe` after `CpuFeatures.detect()` from `silk/cpu` reports the features. See Intrinsics.
+
+### SEM0244
+
+A SIMD vector in a C call that the target's C ABI cannot pass in a vector register the profile selects.
+
+```silk
+unsafe extern "C" fn total(values: simd<f32, 8>) -> f32
+
+pub fn main() -> i32 {
+  let sum = unsafe total(Intrinsic.simdSplat<simd<f32, 8>>(1.0))
+  if sum != 8.0 { return 1 }
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:4:20: error[SEM0244] simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`
+```
+
+For an imported function the column is the callee's name; each call is reported, and a declaration that is never called is not. An `export "C"` function is checked at its declaration, by `silk check` as well as `silk build`, at the vector type. On x86-64, 128-bit vectors need nothing, 256-bit ones `avx` and 512-bit ones `avx512f`. A width the target's C ABI has no register for prints the other form, as for `simd<u8, 8>` on x86-64: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width". A function's own `features` list does not count.
+
+Fix: Select the feature in the profile, as in `[profiles.fast.cpu] features = ["avx"]` or `model = "x86-64-v3"`, and build with `--profile fast`. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and profiles.
+
+### SEM0245
+
+An anonymous function or `effect {}` block that the native compiler cannot specialize yet: one run from a function with `static` parameters, or one in a `static for` body.
+
+```silk
+import silk.effect { Effect }
+
+effect fn again<'env, A, E, ?R>(mut action: mut Effect<'env; A ! E ? R>) -> A ! E ? R {
+  return run action
+}
+
+effect fn one() -> i32 {
+  return 1
+}
+
+effect fn scaled(static factor: i32) -> i32 {
+  let got = run again(effect { return run one() })
+  return got * factor
+}
+
+pub fn main() -> i32 {
+  return run scaled(3)
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:12:23: error[SEM0245] An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled`
+```
+
+The column is the block. An anonymous function prints "An anonymous function" in place of "An `effect {}` block". Inside a `static for` body the message is the other template: ``An `effect {}` block inside a `static for` body is not supported by the native compiler yet: every unrolled iteration would share its one declaration; move the code that builds and runs it into a named function and call that from the loop body``.
+
+Fix: Move the code that builds and runs the block into a named function without `static` parameters, such as `effect fn oneAgain() -> i32 { return run again(effect { return run one() }) }`, and call it from `scaled` or from the loop body. See Writing effect combinators and Static control flow and reflection.
+
 ## Codes this compiler does not report
 
 These SEM codes are in the catalog, but no path in this compiler reports them, or the case they describe is refused or accepted another way. The last column says what happened when the case was tried; "Not tried" means no reachable program was found.
 
 | Code | Meaning | Catalog message | Tried | What happens |
 | --- | --- | --- | --- | --- |
-| SEM0020 | Aggregates that contain themselves inline and so have no finite layout. | `Inline recursive aggregate layout: {members}` | `struct Node { next: Node }` | `check` and `build` accept it while unused. Used in a function, `build` refuses with `unsupported[InlineStorageUnavailable] not supported by the native compiler yet`. |
 | SEM0059 | Passing an array where a slice is expected without an explicit borrow. | `Passing an array as {expected} requires an explicit borrow` | `sum(xs)` with `xs: [i32; 3]` for `&[i32]` | SEM0012 at the argument. |
 | SEM0061 | A type that cannot inhabit an Effect failure channel. | `Effect failure {type} must be a detached ordinary value type` | `effect fn boom() -> i32 ! &i32` | SEM0210 for the elided lifetime. |
 | SEM0068 | A mutable binding inside an effect recipe. | `Effect recipe bindings are immutable` | `let mut n` assigned inside `effect { }` | Accepted. |
 | SEM0080 | Merging callable values from different construction sites without explicit erasure. | `Cannot merge callable values from different construction sites without explicit erasure` |  | Not tried. |
 | SEM0089 | A failure or requirement row that cannot be finitely decomposed. | `Requirement row does not contain &mut {capability}@{role}` / `Requirement row does not contain &{capability}@{role}` / `Requirement {capability} has role {actual}, expected {expected}` / `Requirement {capability}@{role} has access {actual}, expected {expected}` / `Requirement row remainder is ambiguous across {parameters}` / `Requirement row specialization is not finite and concrete` / `Failure type does not contain selected member {member}` |  | Not tried. |
 | SEM0093 | One reachable intrinsic unavailable on the requested execution target. | `{operation} is unavailable for {target}` |  | Not tried. |
-| SEM0095 | A float literal spelling no floating-point value can represent. | `Invalid float literal: {spelling}` | `let x = 1e999` | Accepted by `check` and `build`. |
+| SEM0095 | A float literal spelling no floating-point value can represent. | `Invalid float literal: {spelling}` | `let x = 1e999` | Accepted by `check` and `build`, by design: a float literal too large for its type is infinity. |
 | SEM0097 | A bound operation call whose receiver names more than one bounded parameter. | `{spelling} is ambiguous across bounded type parameters {parameters}` |  | Not tried. |
 | SEM0100 | An explicit type argument contradicting the type its value arguments imply. | `Type argument {parameter} of {target} is {written}, but the supplied values imply {implied}` |  | Not tried. |
 | SEM0101 | A bound operation whose selected witness has no lowering. | `{spelling} has no witness that can be lowered for {provider}` |  | Not tried. |
@@ -4680,13 +5138,8 @@ These SEM codes are in the catalog, but no path in this compiler reports them, o
 | SEM0174 | Attempting to join distinct anonymous aggregate occurrences. | `Separate anonymous aggregate occurrences do not acquire a common type` |  | Not tried. |
 | SEM0175 | Attempting named-field construction of a positional aggregate. | `{type} is positional and cannot be constructed with named fields` | `Pair { first: 1, second: 2 }` for `tuple Pair(i32, i32)` | SEM0018. |
 | SEM0182 | Exhausting the static evaluator's residual-growth budget. | `Static evaluation exceeded its residual-growth limit of {limit} nodes for {target}` |  | Not tried. |
-| SEM0185 | A foreign function whose ABI string is not "C". | `Foreign ABI "{abi}" is not supported; only "C" is available` | `unsafe extern "Rust" fn abs(value: i32) -> i32` | `check` accepts it; `build` refuses with `unsupported[foreign-abi] not supported by the native compiler yet`. |
-| SEM0186 | A foreign function declared without the mandatory unsafe qualifier. | `Foreign function {name} must be declared unsafe` | `extern "C" fn abs(value: i32) -> i32` | The declaration is accepted; a call outside `unsafe` gets SEM0082. |
-| SEM0188 | Silk-only contract syntax retained on a foreign function declaration. | `A foreign function declaration must not include {restriction}` | `unsafe extern "C" fn first<T>(value: i32) -> i32` | `check` accepts it; `build` refuses with `unsupported[foreign-contract] not supported by the native compiler yet`. |
 | SEM0193 | One reachable foreign call unavailable on the requested execution surface. | `Foreign function {symbol} is unavailable for {surface}` |  | Not tried. |
 | SEM0197 | A selective import naming an inherent member as if it were a root declaration. | `{module} has no root declaration {member}; it is a member of {owner}, so import {owner} and write {owner}.{member}` | `import shapes { area }` for an inherent member | SEM0014. |
-| SEM0199 | Nesting one anonymous callable body inside another in the first language slice. | `Anonymous callable bodies cannot be nested in this language slice` | a function literal inside another | Accepted. |
-| SEM0201 | An `export "C"` function whose body may suspend. | `Exported function {symbol} may suspend; a C-callable body must be synchronous` | `export "C" fn` whose body runs `Fiber.yieldNow()` | Accepted by `check` and `build`. |
 | SEM0203 | Naming a conformance-supplied receiver operation as a value instead of calling it. | `{member} is supplied to {receiver} by an interface and must be called; it has no value form` | `let f = p.name` for an interface method | SEM0027. |
 | SEM0207 | A value that cannot become an exact noncapturing C callback address. | `{name} cannot be used as a C callback: {detail}` |  | Not tried. |
 | SEM0208 | Reachable C data on an execution surface without native symbol linkage. | `Foreign static {symbol} is unavailable on {surface}; C data symbols require native LLVM linkage` |  | Not tried. |
@@ -4694,4 +5147,4 @@ These SEM codes are in the catalog, but no path in this compiler reports them, o
 | SEM0216 | A diagnostic observer callback lacks a complete direct-execution proof. | `Diagnostic observer callback requires direct execution: {detail}` |  | Not tried. |
 | SEM0217 | Terminal observation is provably outside a selected failure handler. | `Terminal diagnostic observation requires a selected failure context` |  | Not tried. |
 | SEM0219 | Emitted code references a function instance whose valid body native lowering does not support yet. | `Native lowering does not support this function body yet` |  | Not tried. |
-| SEM0222 | A namespace-qualified type named where a value is required (NAME-005). | `{member} in {module} is a type, not a value; select it with an import and write {member}.<member> for its members` |  | Not tried. |
+| SEM0222 | A namespace-qualified type named where a value is required (NAME-005). | `{member} in {module} is a type, not a value; select it with an import and write {member}.<member> for its members` | `let format = inflate.Format.Gzip` after `import silk.inflate` | SEM0238. |

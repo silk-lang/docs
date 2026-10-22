@@ -38,13 +38,15 @@ pub effect fn main() -> () ! LogError {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.10s
+  check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:11:3: error[SEM0087] An expression statement whose result cannot be intentionally ignored
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+/home/you/scratch/src/main.silk:11:3: error[SEM0087] Expression statement produces an Effect of `()` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
+Failed scratch in 0.29s
 ```
 
-Line 11 is `greet()`. It builds an Effect and throws it away, which is never what you meant. SEM0087 says an Effect is a result you may not drop silently. Either `run` it, store it, or say `drop` to discard it on purpose.
+Line 11 is `greet()`. It builds an Effect and throws it away, which is never what you meant. SEM0087 says an Effect is a result you may not drop silently, and the message names both ways out: `run` it, or say `drop` to discard it on purpose. You can also store it and run it later.
 
 Storing it shows what laziness means:
 
@@ -63,7 +65,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/scratch (llvm, x86_64-unknown-linux-gnu, 220 symbols)
 built, not run yet
 hello
 hello
@@ -133,10 +134,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:5:5: error[SEM0063] Only effect functions may originate a typed failure
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.17s
 ```
 
 This time the message says it all. A plain `fn` promises to return a value, so its callers never need to think about failure.
@@ -164,10 +167,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:10:3: error[SEM0066] A `run` whose failures the enclosing signature does not declare
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.15s
 ```
 
 SEM0066 is the heart of the system, and its message says it plainly. `run complete(id)` can fail with `NoSuchTask`, and `finish` says it can't fail at all. You have two honest choices: declare the failure, or handle it. For `parseBoard`, declare both:
@@ -367,7 +372,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/scratch (llvm, x86_64-unknown-linux-gnu, 187 symbols)
 unhandled error: main.NoSuchTask
   at main.complete (main:5:5)
   at main.main (main:11:3)
@@ -440,10 +444,12 @@ pub fn main() -> i32 {
 ```
 
 ```
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     51 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:18:37: error[SEM0099] One named type parameter left undetermined by an explicit prefix and the arguments
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed scratch in 0.15s
 ```
 
 SEM0099 says a type parameter was left undetermined. The handler is generic over `'text`, and in the pipeline form the compiler can't work out which lifetime to use. Pass both arguments directly and it can:
@@ -469,10 +475,12 @@ The obvious finalizer is a log line:
 ```
 
 ```
+Checking tasks (x86_64-unknown-linux-gnu)
+  load     53 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:390:17: error[SEM0052] A generic call whose type arguments its values do not determine
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed tasks in 0.24s
 ```
 
 SEM0052 says the compiler found no type arguments for `ensuring` that fit the values you passed. The value that doesn't fit is the finalizer: `ensuring` wants one whose failure row is `never`. A finalizer must not fail. If it could, which failure would win, the command's or the cleanup's? `Effect.log` can fail with `LogError`, so it isn't allowed as is. Handle its failure first, inside the finalizer:
@@ -545,7 +553,6 @@ silk run -- list
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/tasks (llvm, x86_64-unknown-linux-gnu, 396 symbols)
 [x] #1 Buy milk (normal)
 [ ] #2 Write the Silk book (high)
 [ ] #3 Water the plants (low)
@@ -638,7 +645,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/scratch (llvm, x86_64-unknown-linux-gnu, 252 symbols)
 finished #2
 no task #9, carrying on
 ```

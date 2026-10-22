@@ -317,7 +317,7 @@ effect<'call> fn useChannel<'call, 'transport: 'call>(
 effect<'call> fn chat<'call, 'request: 'call, 'connection: 'request, 'transport: 'connection>(
   request: &'call mut Request<'request, 'connection, 'transport, Connection>,
 ) -> u16 ! UpgradeError | ServerError | OutOfMemoryError ? &mut MonotonicClock | &mut Allocator {
-  let outcome = run withUpgrade<u16, UpgradeError, never>(move request, UpgradeLimits.default(), Option<Instant>.none(), AcceptAll {}, useChannel)
+  let outcome = run withUpgrade<u16, UpgradeError, never>(move request, UpgradeLimits.defaults(), Option<Instant>.none(), AcceptAll {}, useChannel)
   return match move outcome {
     Outcome.Upgraded { value } => value
     Outcome.Rejected { .. } => 0
@@ -327,7 +327,7 @@ effect<'call> fn chat<'call, 'request: 'call, 'connection: 'request, 'transport:
 
 `AcceptAll` accepts every handshake. A real server looks at the `Offer` first: `offer.origin()` for the browser origin, `offer.protocolAt(i)` for the subprotocols the client asked for. It then returns `Decision.Accept`, optionally naming one protocol, or `Decision.Reject` with an HTTP status. Origin is policy input, not authentication.
 
-`DecisionHandler<D, ?R>` takes a failure row and a requirement row. Spell both in the `impl`, as here; leaving the requirement row out is SEM0088. `? never` is the empty row.
+`DecisionHandler<D, ?R>` takes a failure row and a requirement row. Spell both in the `impl`, as here. Leaving the requirement row out is SEM0088, and the message says how to write an empty one: "Generic parameter `?R` has kind none because its row argument is omitted, expected a requirement row; write `? never` for an empty row".
 
 `readEvent` reads one complete message into your buffer and returns an `Event`:
 
@@ -473,9 +473,13 @@ silk build
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/greeter (llvm, x86_64-unknown-linux-gnu, 1273 symbols)
-build llvm/x86_64-unknown-linux-gnu: ok /home/you/greeter/build/llvm/x86_64-unknown-linux-gnu/debug/greeter
-Build summary: 1 succeeded, 0 failed
+Compiling greeter (x86_64-unknown-linux-gnu, debug)
+  load     75 modules, 1 in package          0.13s
+  check    1 module                          2.24s
+  codegen  2,654 functions                   1.34s
+  borrow   813 bodies                        0.10s
+  link     clang                             1.29s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/greeter in 5.23s
 ```
 
 The plain routes, with curl:

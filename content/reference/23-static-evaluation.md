@@ -91,6 +91,7 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - Inside the function, the parameter is static. It may feed `let static`, `static if` and other static parameters.
 - Static parameter types include integers, scalar enums, `string`, fixed arrays and structs without `Drop`.
 - Recursion through static parameters must reach a base case. `countdown(n - 1)` guarded by `static if n == 0` is accepted. Recursion whose static argument keeps growing is refused as not supported.
+- An anonymous function or `effect { ... }` block in a function with a `static` parameter is not supported yet: the native compiler does not build it once per static argument. It is SEM0245 at the literal: ``An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled` ``. Put the literal in a named function without `static` parameters and call that.
 
 ## Static text
 
@@ -282,6 +283,7 @@ pub fn main() -> i32 {
 | SEM0182 | The residual-growth budget of one specialization is exhausted |
 | SEM0210 | An omitted result lifetime has no unique input to come from, as in a `static fn` returning bare `string` |
 | SEM0223 | Constants depend on each other in a cycle |
+| SEM0245 | An anonymous function or `effect {}` block in a function with `static` parameters |
 
 ## See also
 

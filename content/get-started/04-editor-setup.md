@@ -1,10 +1,10 @@
 # Editor setup
 
-Silk has syntax highlighting for VS Code, Zed, any editor that loads tree-sitter grammars, and web pages. That is what works today. There is no language server yet, so editors do not show errors as you type, jump to definitions or complete names. A language server is planned. Until then, run `silk check` in a terminal next to your editor.
+Silk has syntax highlighting for VS Code, Zed, any editor that loads tree-sitter grammars, and web pages. The compiler also has an early language server, `silk lsp`, that shows errors as you type. It does not complete names yet, so keep `silk check` at hand in a terminal next to your editor.
 
 | Where | Use | What you get |
 | --- | --- | --- |
-| VS Code | The Silk extension, `silk-lang.silk` | Highlighting, comment toggling, bracket matching and auto-closing, indentation |
+| VS Code | The Silk extension, `silk-lang.silk` | Highlighting, comment toggling, bracket matching and auto-closing, indentation, and the language server |
 | Zed | The extension in the `zed/` folder of tree-sitter-silk | Highlighting, brackets, indentation |
 | Neovim, Helix and others | The tree-sitter grammar, tree-sitter-silk | Highlighting, indentation, folds, locals and tags queries |
 | Web pages | The npm package `silk-lang` | Highlighting with Shiki or TanStack Highlight |
@@ -25,20 +25,24 @@ It applies to every `.silk` file. Besides highlighting, it gives you:
 - Matching and auto-closing for `{}`, `[]`, `()` and `""`.
 - Indentation after an opening bracket, and outdent on a closing one.
 - Doc comments that continue: press Enter on a `///` or `//!` line and the next line starts with the same marker.
+- From version 0.1.0, the language server: see **The language server** below. The **Silk: Restart Language Server** command restarts it.
 
-The extension is not on Open VSX, so editors that use that registry (VSCodium, for example) can't find it by search. Build the package from the silk-lang/silk-vscode repository and install the file:
+The extension is not on Open VSX, so editors that use that registry (VSCodium, for example) can't find it by search. Build the package from the silk-lang/silk-vscode repository and install the file. The repository uses [Bun](https://bun.sh): `bun run package` bundles the language client into `dist/extension.js` and then packages it.
 
 ```sh
 git clone https://github.com/silk-lang/silk-vscode
 cd silk-vscode
-npx @vscode/vsce package --no-dependencies
+bun install --frozen-lockfile
+bun run package
 ```
 
+The output ends with:
+
 ```
- DONE  Packaged: /home/you/silk-vscode/silk-0.0.1.vsix (9 files, 26.49 KB)
+ DONE  Packaged: /home/you/silk-vscode/silk-0.1.0.vsix (11 files, 103.08 KB)
 ```
 
-Then install `silk-0.0.1.vsix` with your editor's "Install from VSIX" command.
+Then install `silk-0.1.0.vsix` with your editor's "Install from VSIX" command.
 
 ## Zed
 
@@ -109,9 +113,23 @@ const html = highlighter.highlightToHtml('let mut sum = 0', { lang: 'silk' })
 
 `shiki` (1.0 or newer) and `@tanstack/highlight` (1.1 or newer) are optional peer dependencies: install the one you use.
 
+## The language server
+
+`silk lsp` speaks the Language Server Protocol over standard input and output. The VS Code extension, from version 0.1.0, starts it for Silk files; the `silk.path` setting names the `silk` command it runs. It starts one server per workspace folder, in that folder. When the folder's `silk.toml` pins a toolchain that is not installed, the extension offers to install it with `silk toolchain install` instead of failing. In another editor, register `silk lsp` as the language server command for `.silk` files, with no arguments. When the toolchain the project pins is not installed there, the server starts anyway and shows an error naming the `silk toolchain install` command to run, instead of crashing.
+
+| Feature | State in this release |
+| --- | --- |
+| Errors as you type | Works: each diagnostic is shown at its code and range |
+| Document outline | Works: the file's declarations |
+| Folding | Works |
+| Format document | Works, with the same layout as `silk format` |
+| Hover, go to definition, signature help | Work for the functions you call, from your package or the std lib: hover shows the signature and the doc comment, and definition opens the declaring file, std lib files included. Hover and definition also work on a local variable where it is used. They show nothing on a type or module name written in a body, such as `Effect` in `Effect.log`, on the name a `let` introduces, on a field name in a record literal, or on a placeholder inside a template string |
+| Inlay hints | Work: the type of each `let` binding, such as `: StdoutLogger` after `let mut logger` |
+| Completion, rename, find references | Not available |
+
 ## Errors in the editor
 
-Without a language server, the compiler is how you find errors. `silk check` is fast because it builds nothing. `silk check --json` prints each diagnostic as one line of JSON on standard output, before the usual summary lines. An editor task or problem matcher can read it:
+The compiler is still the complete way to find errors. `silk check` is fast because it builds nothing. `silk check --json` prints each diagnostic as one line of JSON on standard error, with no progress rows around it. An editor task or problem matcher can read it:
 
 ```json
 {"target":"x86_64-unknown-linux-gnu","code":"OWN0003","severity":"error","path":"/home/you/tour/src/main.silk","line":76,"column":38,"start":2022,"end":2025,"message":"Moving tea requires an explicit move","notes":[],"related":[]}

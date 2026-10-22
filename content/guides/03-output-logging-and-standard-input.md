@@ -12,7 +12,7 @@ cd numberlines
 | Service | Module | Native provider | Operation | Failure |
 | --- | --- | --- | --- | --- |
 | `Writer` | `silk/writer` | `StdoutWriter`, `StderrWriter` in `silk/os_writer` | `writeAll(bytes)`, `flush()` | `WriterError` |
-| `Logger` | `silk/logger` | `StdoutLogger` in `silk/os_logger` | `log(level, template, args)` | `LogError` |
+| `Logger` | `silk/logger` | `StderrLogger`, `StdoutLogger` in `silk/os_logger` | `log(level, template, args)` | `LogError` |
 | `StandardInput` | `silk/standard_input` | `OsStandardInput` in `silk/os_standard_input` | `read(buffer)` | `StreamReadError` |
 
 A `Writer` moves bytes. A `Logger` receives whole events, each with a level. Use a writer for the program's output and a logger for messages about the run. Code that needs one says so with `? &mut Writer`, `? &mut Logger` or `? &mut StandardInput`, and never names a provider. `main` picks the real ones.
@@ -21,21 +21,17 @@ The native providers exist only on Linux and macOS with libc. On WebAssembly and
 
 ## Writing output
 
-`emit` writes one numbered line. The number is right-aligned in four columns with `Format.displayWith`, and the rest goes through a template with `Format.format`:
+`emit` writes one numbered line through a template with `Format.format`. The placeholder `{number:>4}` right-aligns the number in four columns:
 
 ```silk
 // Writes one numbered line: the number right-aligned in four columns.
 effect fn emit(number: u32, line: &[u8]) -> () ! WriterError | LogError ? &mut Writer | &mut Logger {
   match String.fromUtf8(line) {
     Result.Success { value } => {
-      let mut options = Format.defaultOptions()
-      options.width = Option<usize>.some(4)
-      options.alignment = Alignment.Right
-      run Format.displayWith(&number, move options)
-      run Format.format("  {text}\n", &.{ text: value })
+      run Format.format("{number:>4}  {text}\n", &.{ number: number, text: value })
     }
     Result.Failure { error } => {
-      run Effect.logWarning("line {number} is not UTF-8 (byte {offset}); skipped\n", &.{
+      run Effect.logWarning("line {number} is not UTF-8 (byte {offset}); skipped", &.{
         number: number,
         offset: error.offset,
       })
@@ -44,15 +40,22 @@ effect fn emit(number: u32, line: &[u8]) -> () ! WriterError | LogError ? &mut W
 }
 ```
 
-Both `Format` functions write to the ambient `Writer`. For bytes with no template, use `Writer.writeString(text)` or `Writer.writeAll(bytes)`. The guide "Text and formatting" covers templates and options in full.
+`Format.format` writes to the ambient `Writer`. For bytes with no template, use `Writer.writeString(text)` or `Writer.writeAll(bytes)`. The guide "Text and formatting" covers templates and options in full.
 
-`StdoutWriter` and `StderrWriter` have no buffer of their own: each write goes straight to the descriptor, and `flush` does nothing. A failed write may already have written a prefix.
+`StdoutWriter` and `StderrWriter` have no buffer of their own: each write goes straight to the descriptor, and `flush` does nothing. Each `StderrWriter` write holds the standard error lock, described below, for its duration. A failed write may already have written a prefix.
 
 ## Logging
 
 `Effect.logWarning` from `silk/effect` sends one event at level `Warning` to the ambient `Logger`. There is one helper per level of `LogLevel`: `logTrace`, `logDebug`, `logInfo`, `logWarning` and `logError`. `Effect.log` is `logInfo`, and `Effect.logAt(level, ...)` takes the level as a value. The template rules are the same as for `Format.format`.
 
-The logger adds nothing to the message: no newline, no timestamp, no level label. That is the provider's choice. `StdoutLogger` writes the message to standard output exactly as formatted and ignores the level.
+What a message looks like is the provider's choice. `silk/os_logger` has two:
+
+| Provider | Writes to | Each message becomes |
+| --- | --- | --- |
+| `StderrLogger` | Standard error | The level name, `: `, the message and a newline, such as `warning: line 5 is not UTF-8` |
+| `StdoutLogger` | Standard output | The message exactly as formatted. It ignores the level and adds no newline |
+
+Neither adds a timestamp. `StderrLogger` adds the newline itself, so its templates must not end with one. It also holds the standard error lock for the whole line, so lines from different threads never mix. Use `StdoutLogger` only when the log messages are the program's output.
 
 ## Reading standard input
 
@@ -91,7 +94,7 @@ effect fn numberLines() -> u32
     number = number + 1
     run emit(number, line.asSlice())
   }
-  run Effect.logInfo("{lines} lines, {bytes} bytes\n", &.{ lines: number, bytes: total })
+  run Effect.logInfo("{lines} lines, {bytes} bytes", &.{ lines: number, bytes: total })
   return number
 }
 ```
@@ -106,52 +109,13 @@ The 64-byte buffer is deliberately small: a line may be split across reads, so t
 
 The signature lists four services. Reading, writing and logging are three of them, and `Bytes.append` needs the allocator.
 
-## A logger of your own
-
-The program should keep standard output clean for the numbered lines, so logs must go to standard error. The std lib has no stderr logger, but a `Logger` provider is short to write:
-
-```silk
-// A Logger provider that writes to standard error, with the level in front.
-struct StderrLogger {}
-
-fn label(level: LogLevel) -> string<'static> {
-  return match level {
-    LogLevel.Trace => "trace: "
-    LogLevel.Debug => "debug: "
-    LogLevel.Info => "info: "
-    LogLevel.Warning => "warning: "
-    LogLevel.Error => "error: "
-  }
-}
-
-effect fn writeEvent<Args>(level: LogLevel, static template: string<'static>, args: &Args) -> ()
-! WriterError ? &mut Writer {
-  run Writer.writeString(label(level))
-  run Format.format<Args>(template, args)
-}
-
-effect fn stderrFailed(error: WriterError) -> () ! LogError {
-  fail Logger.failure(3)
-}
-
-impl Logger for StderrLogger {
-  effect fn log<Args>(self: &mut Self, level: LogLevel, static template: string<'static>, args: &Args) -> () ! LogError {
-    let mut stderr = StderrWriter.make()
-    let writing = writeEvent<Args>(level, template, args) |> Effect.provideMut<Writer>(&mut stderr)
-    run Effect.catchAll(move writing, stderrFailed)
-  }
-}
-```
-
-`Logger.log` is generic over the argument pack, and its template is a `static` parameter, because templates are checked at compile time. Your provider passes both on to `Format.format`. The operation may only fail with `LogError`, so `stderrFailed` turns a `WriterError` into `Logger.failure(3)`. The code is yours to choose. `StdoutLogger` uses 3 for a failed write too, and `Logger.errorCode` reads it back.
-
 ## Wiring it in main
 
 ```silk
 pub effect fn main() -> i32 ! StreamReadError | WriterError | LogError | OutOfMemoryError {
   let mut input = OsStandardInput.make()
   let mut out = StdoutWriter.make()
-  let mut logger = StderrLogger {}
+  let mut logger = StderrLogger.make()
   let mut allocator = Allocator.systemAllocatorProvider()
   drop run numberLines()
     |> Effect.provideMut<StandardInput>(&mut input)
@@ -162,17 +126,17 @@ pub effect fn main() -> i32 ! StreamReadError | WriterError | LogError | OutOfMe
 }
 ```
 
-Making the providers does no I/O. `OsStandardInput.make()` reads nothing until the first `receive`. The imports for the program and its tests:
+The program keeps standard output clean for the numbered lines, so the logger is `StderrLogger`. Making the providers does no I/O. `OsStandardInput.make()` reads nothing until the first `receive`. The imports for the program and its tests:
 
 ```silk
 import silk.allocator { Allocator, OutOfMemoryError, SystemAllocator }
 import silk.bytes { Bytes }
 import silk.effect { Effect }
-import silk.format { Alignment, Format }
+import silk.format { Format }
 import silk.logger { Logger, LogError, LogLevel }
-import silk.option { Option }
+import silk.os_logger { StderrLogger }
 import silk.os_standard_input { OsStandardInput }
-import silk.os_writer { StderrWriter, StdoutWriter }
+import silk.os_writer { StdoutWriter }
 import silk.result { Result }
 import silk.standard_input { ReadOutcome, StandardInput, StreamReadError }
 import silk.string { String }
@@ -224,6 +188,50 @@ With empty input, the first read reports the end:
 info: 0 lines, 0 bytes
 ```
 
+## A quick message on standard error
+
+While you look for a bug, you often want to see one value without threading a logger through the code. `StderrWriter.print` from `silk/os_writer` formats a template and writes it to standard error. It is a plain function, so it needs no service and no `run`. Add one line to the read loop of `numberLines`, and import `StderrWriter`:
+
+```silk
+    total = total + count
+    StderrWriter.print("read {} bytes\n", &(count, ))
+```
+
+```
+read 58 bytes
+   1  first line
+   2  second line
+   3  
+   4  café
+warning: line 5 is not UTF-8 (byte 4); skipped
+   6  no newline at end
+info: 6 lines, 58 bytes
+```
+
+The template is checked like any other. `print` adds no newline, formats into a 64-byte buffer on the stack, and ignores a failed write. Take it out again when you are done; for messages that stay, use the logger.
+
+Both `print` and `StderrLogger` hold the process's standard error lock while they write, so a message from one thread never lands in the middle of another's. To write one line from several parts under the lock, take it yourself with `StderrWriter.lock`. It returns a `LockedStderr`, a `Writer` that collects the writes in a buffer you lend and sends them when the buffer fills, on `flush`, and when it drops:
+
+```silk
+// Writes one line from several parts while holding the standard error lock.
+effect fn progress(done: u32, total: u32) -> () ! WriterError ? &mut Writer {
+  run Writer.writeString("progress: ")
+  run Format.format("{done}/{total}", &.{ done: done, total: total })
+  run Writer.writeString("\n")
+}
+
+pub effect fn main() -> i32 ! WriterError {
+  let mut buffer: [u8; 64] = [0; 64]
+  let mut stderr = StderrWriter.lock(&mut buffer)
+  run progress(3, 8) |> Effect.provideMut<Writer>(&mut stderr)
+  run Writer.flush() |> Effect.provideMut<Writer>(&mut stderr)
+  drop stderr
+  return 0
+}
+```
+
+This prints `progress: 3/8` on standard error. Other threads that write to standard error wait while you hold the lock, so drop it soon. The drop ignores a failed write; call `flush` first to see the failure. Bytes still in the buffer are lost if the program traps before the drop.
+
 ## Swapping providers in a test
 
 `numberLines` never names a provider, so a test can hand it fakes. You need three.
@@ -255,7 +263,7 @@ impl StandardInput for ScriptedInput {
 
 `StandardInput.filled(n)` and `StandardInput.endOfInput()` build the two outcomes. A provider follows the same rules as the native one: an empty buffer gets `filled(0)`, and after the end, every read reports the end again.
 
-**Output.** `CapturingWriter` appends every write to a `Bytes`. `writeAll` may only fail with `WriterError` and has no allocator in its row, so the writer carries its own `SystemAllocator` and maps `OutOfMemoryError` to `Writer.failure()`:
+**Output.** `CapturingWriter` appends every write to a `Bytes`. `writeAll` may only fail with `WriterError` and has no allocator in its row, so the writer carries its own `SystemAllocator` and maps `OutOfMemoryError` to `Writer.failure()`. A `Writer` also implements `writeVectored`, which writes several slices as one; a provider with no faster way to do that hands it to `Writer.writeEach`, which calls `writeAll` for each slice:
 
 ```silk
 // A Writer that keeps everything written to it.
@@ -273,6 +281,9 @@ impl Writer for CapturingWriter {
   effect fn writeAll(self: &mut Self, bytes: &[u8]) -> () ! WriterError ? &mut Writer {
     let appending = Effect.catchAll(appendBytes(&mut self.out, bytes), writerFull)
     run move appending |> Effect.provideMut<Allocator>(&mut self.allocator)
+  }
+  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> () ! WriterError ? &mut Writer {
+    return run Writer.writeEach(&mut self, vals)
   }
   effect fn flush(self: &mut Self) -> () ! WriterError ? &mut Writer {
     return ()
@@ -326,7 +337,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/numberlines (llvm, x86_64-unknown-linux-gnu, 594 symbols)
   main::numbersEveryLine
     PASS  40 us
   main::warnsAboutInvalidUtf8
@@ -339,7 +349,6 @@ Time   146 us
 When an expectation fails, the runner prints its message under the test's name. Expect four lines instead of three, `lines == 4`, and the run exits with status 1:
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/numberlines (llvm, x86_64-unknown-linux-gnu, 594 symbols)
   main::numbersEveryLine
     assertion failed: three lines
     FAIL  64 us
@@ -349,10 +358,10 @@ Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/numberl
 Tests  1 passed, 1 failed (0 cached, 2 executed, 2 selected, 2 discovered)
 Time   139 us
 unhandled error: silk/testing.AssertionError<'static>
-  at silk/testing.Testing.expect (silk/testing:32:7)
-  at main.numbersEveryLine (main:183:3)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
+  at silk/testing.Testing.expect (silk/testing:67:7)
+  at main.numbersEveryLine (main:132:3)
+  at silk/effect.Effect.flatMap (silk/effect:412:19)
+  at silk/effect.Effect.flatMap (silk/effect:412:19)
 ```
 
 The message is the text you passed to `expect`, unchanged, which is why it still says three. Put the 3 back.
@@ -362,9 +371,9 @@ Without the flag, `silk test` exits with status 2 and prints `SILK_GAP test-resu
 ## API reference
 
 - `silk/writer`: `Writer`, `WriterError`
-- `silk/os_writer`: `StdoutWriter`, `StderrWriter`
+- `silk/os_writer`: `StdoutWriter`, `StderrWriter` (`print`, `lock`), `LockedStderr`
 - `silk/logger`: `Logger`, `LogLevel`, `LogError`, `InMemoryLogger`
-- `silk/os_logger`: `StdoutLogger`
+- `silk/os_logger`: `StderrLogger`, `StdoutLogger`
 - `silk/standard_input`: `StandardInput`, `ReadOutcome`, `StreamReadError`
 - `silk/os_standard_input`: `OsStandardInput`
 - `silk/effect`: `Effect` (`log`, `logInfo`, `logWarning`, `provideMut`, `catchAll`)

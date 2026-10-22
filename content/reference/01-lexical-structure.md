@@ -42,6 +42,8 @@ param  pub  return  role  run  service  static  struct  true  tuple  type  union
 unsafe  while
 ```
 
+A reserved word in a name position is PAR0001, "Expected identifier", at the word. That includes functions and methods: `fn run(job: &Job) -> i32` inside an `impl` is refused at `run`.
+
 These words have special meaning only in certain positions, and are ordinary identifiers everywhere else:
 
 | Word | Where it's special |
@@ -80,9 +82,9 @@ IntegerLiteral = decimal | '0x' hexDigits | '0b' binaryDigits | '0o' octalDigits
 ```
 
 - Digits may be grouped with `_`, but only between two digits: `1_000_000`, `0xFF_FF`. A separator right after a base prefix (`0x_FF`), at the end (`1_`) or doubled (`1__0`) is an error (LEX0005). A leading `_`, as in `_1`, starts an identifier instead.
-- A prefix needs at least one digit after it (LEX0004).
-- There are no type suffixes. A literal takes its type from where it's used: an annotation, a parameter, a field. With no context it is `i32`.
-- A literal that doesn't fit its type is an error (SEM0002). For `usize` and `isize` the limit is the target's word size (LAY0001).
+- A prefix needs at least one digit after it (LEX0004). Every digit must belong to the base: `0xG1`, `0o9` and `0b102` are LEX0013, reported at the literal.
+- There are no type suffixes. A literal takes its type from where it's used: an annotation, a parameter, a field. With no context it is `i32`. A suffix such as `7u8` or `5usize` is LEX0014, reported at the literal: "Numeric literals take no type suffix such as `u8`; write the type as an annotation instead, as in `let value: u8 = 7`". A float with a suffix, as in `1.5f32`, is LEX0014 too, and the message names its suffix: ``such as `f32`; write the type as an annotation instead, as in `let value: f32 = 1.5` ``. A float with an integer suffix, as in `2.5e3u8`, gets a message that suggests a float type: ``such as `u8`; `2.5e3` is a float literal, which integer type `u8` cannot hold, so write a float type as an annotation instead, as in `let value: f64 = 2.5e3` ``.
+- A literal that doesn't fit its type is an error (SEM0002). For `usize` and `isize` the limit is the target's word size, so `let x: usize = 4294967296` compiles for `x86_64-unknown-linux-gnu` and is SEM0002 for `wasm32-unknown-unknown`.
 - Negative numbers are the unary `-` operator applied to a literal.
 
 ## Float literals
@@ -192,8 +194,9 @@ first
 | LEX0010 | Duration unit repeated |
 | LEX0011 | Duration units not largest first |
 | LEX0012 | Duration amount too large for its unit |
-| SEM0002 | Integer literal outside its type's range |
-| LAY0001 | `usize` or `isize` literal outside the target's word size |
+| LEX0013 | Digit outside the base of a prefixed integer |
+| LEX0014 | Type suffix on a numeric literal, such as `7u8` |
+| SEM0002 | Integer literal outside its type's range, including a `usize` or `isize` literal outside the target's word size |
 
 `silk check` and `silk build` report the LEX codes at the invalid token and exit with status 1. Parse errors inside the invalid token are not reported. `let value = 0x` prints:
 

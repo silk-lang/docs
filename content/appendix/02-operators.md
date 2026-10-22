@@ -25,7 +25,7 @@ Silk has eleven binary operator levels, one prefix level and one postfix level. 
 
 ```
 /home/you/demo/src/main.silk:2:17: error[PAR0002] Unexpected `<`; expected valid syntax
-/home/you/demo/src/main.silk:2:19: error[SEM0087] An expression statement whose result cannot be intentionally ignored
+/home/you/demo/src/main.silk:2:19: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
 ```
 
 - An index `[i]` must start on the same line as its operand. A call, `.name` or `|>` may start on the next line.
@@ -68,17 +68,21 @@ Silk has eleven binary operator levels, one prefix level and one postfix level. 
 
 ## Generic code and primitives
 
-A bound such as `T: Add<T, T>` lets generic code use an operator. In this release the primitive types conform to only two of the interfaces as bounds:
+A bound such as `T: Add<T, T>` lets generic code use an operator. A primitive type satisfies an operator bound when its built-in operator accepts it:
 
 | Bound | Primitive types that satisfy it |
 | --- | --- |
-| `Add<T, T>` | `i8` to `i64`, `isize`, `u8` to `u64`, `usize` |
-| `Order` | the same ten integer types |
+| `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder` | the integer types, `f32`, `f64` |
+| `Negate` | the signed integer types, `f32`, `f64` |
+| `BitAnd`, `BitOr`, `BitXor`, `BitNot` | the integer types |
+| `Not` | `bool` |
+| `Equal` | the integer types, `f32`, `f64`, `bool`, `char` |
+| `Order` | the integer types, `char` |
 
-Every other bound on a primitive is SEM0121 at the call: `T: Subtract<T, T>` with `i32`, `T: Add<T, T>` with `f64`, `T: Equal` with `i32`, `T: Order` with `char`.
+Floats compare with `<` but do not satisfy `Order`. Any other bound on a primitive is SEM0121 at the call, for example `T: Subtract<T, T>` with `bool`:
 
 ```
-/home/you/demo/src/main.silk:4:7: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
+/home/you/demo/src/main.silk:4:14: error[SEM0121] `bool: intrinsic/operators.Subtract<bool, bool>` cannot be proved: no implementation of `intrinsic/operators.Subtract<bool, bool>` exists for `bool`
 ```
 
 ## Example
