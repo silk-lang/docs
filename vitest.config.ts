@@ -6,6 +6,9 @@ import { islandAttributes } from './src/docs/islands.ts'
 
 export default defineConfig({
   plugins: [markdown({ islands: islandAttributes })],
+  resolve: {
+    alias: { 'virtual:silk-releases': '/src/releases/fixture.ts' },
+  },
   test: {
     include: ['src/**/*.{test,spec}.ts'],
     environment: 'happy-dom',

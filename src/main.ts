@@ -29,6 +29,7 @@ import { Message } from './message'
 import { DocState, Flags, Model } from './model'
 import * as DocsPage from './page/docs'
 import * as Home from './page/home'
+import * as Releases from './page/releases'
 import { AppRoute, homeRouter, urlToAppRoute } from './route'
 
 export { Flags, Message, Model }
@@ -234,13 +235,21 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
   })
 }
 
+// Static files such as /releases/index.json sit beside the pages but are not
+// routes, so the browser loads them directly.
+const isStaticFile = (url: Url): boolean => /\.[a-z0-9]+$/i.test(url.pathname)
+
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
     ClickedLink: ({ request }) =>
       UrlRequest.match<UpdateReturn>(request, {
         Internal: ({ url }) => ({
           model,
-          commands: [NavigateInternal({ url: urlToString(url) })],
+          commands: [
+            isStaticFile(url)
+              ? LoadExternal({ href: urlToString(url) })
+              : NavigateInternal({ url: urlToString(url) }),
+          ],
         }),
         External: ({ href }) => ({
           model,
@@ -468,18 +477,7 @@ const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
         onNone: () => notFound(`/docs/${directory}/${slug}`, h),
         onSome: page => DocsPage.pageView(model, page, h),
       }),
-    Releases: () =>
-      Layout.page(
-        'Releases',
-        [
-          placeholder(
-            'Download Silk',
-            'Prebuilt toolchains for macOS and Linux.',
-            h,
-          ),
-        ],
-        h,
-      ),
+    Releases: () => Releases.view(model.copiedCodeIds, h),
     NotFound: ({ path }) => notFound(path, h),
   })
 

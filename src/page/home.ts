@@ -145,13 +145,13 @@ const ALPHA_NOTES: ReadonlyArray<Row> = [
 
 const sectionClass = 'mx-auto w-full max-w-[1440px] px-5 md:px-20'
 
-const label = (text: string, h: HtmlBuilder<Message>): Html =>
+export const label = (text: string, h: HtmlBuilder<Message>): Html =>
   h.p([h.Class('label text-muted')], [text])
 
-const badge = (text: string, h: HtmlBuilder<Message>): Html =>
+export const badge = (text: string, h: HtmlBuilder<Message>): Html =>
   h.span([h.Class('label rounded-full bg-ink px-3 py-1.5 text-paper')], [text])
 
-const tag = (text: string, h: HtmlBuilder<Message>): Html =>
+export const tag = (text: string, h: HtmlBuilder<Message>): Html =>
   h.span(
     [h.Class('rounded-full border border-ink px-2.5 py-1 text-xs')],
     [text],
