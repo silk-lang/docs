@@ -123,8 +123,8 @@ const html = highlighter.highlightToHtml('let mut sum = 0', { lang: 'silk' })
 | Document outline | Works: the file's declarations |
 | Folding | Works |
 | Format document | Works, with the same layout as `silk format` |
-| Hover, go to definition, signature help | Work for functions declared in your package. Std lib names and local variables show nothing, and some function bodies return nothing |
-| Inlay hints | Advertised, but returns no hints |
+| Hover, go to definition, signature help | Work for the functions you call, from your package or the std lib: hover shows the signature and the doc comment, and definition opens the declaring file, std lib files included. Hover and definition also work on a local variable where it is used. They show nothing on a type or module name written in a body, such as `Effect` in `Effect.log`, on the name a `let` introduces, on a field name in a record literal, or on a placeholder inside a template string |
+| Inlay hints | Work: the type of each `let` binding, such as `: StdoutLogger` after `let mut logger` |
 | Completion, rename, find references | Not available |
 
 ## Errors in the editor

@@ -134,7 +134,13 @@ warning: /home/you/demo/src/main.silk:1: documentation link [`size`] is ambiguou
 
 Only package documentation is checked this way; `silk doc --stdlib` prints no warnings.
 
-A link to a private declaration resolves, but reference pages show only public declarations, so the rendered text stays unlinked.
+A link to a private declaration resolves only when private declarations are extracted too, with `silk doc --include-private`. Without it, the private declaration is not in the output, so the link gets the same warning as a name that does not exist:
+
+```
+warning: /home/you/shapes/src/main.silk:1: documentation link [`helper`] names no declaration and stays plain code
+```
+
+Here `twice` is public and its comment links ``[`helper`]``, a private function. Reference pages show only public declarations, so link to private code only in documentation meant for the package's own developers.
 
 To show brackets and code without a link, escape the bracket: `\[`. An ordinary Markdown link, `[text](url)` or a reference link with a definition, is never treated as a declaration link.
 

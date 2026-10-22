@@ -154,7 +154,7 @@ These operations live in `Effect` from `silk/effect`. Each takes an Effect and a
 - `Option<never>.none()` is the absent provider when no provider type is at hand: `never` serves every service and has no values.
 - A provider of `S` alone does not satisfy `&Option<&S>`. Providing one is SEM0123. Lift it with `provideSome`.
 - A function that declares `? &S` cannot run an Effect that needs `&Option<&S>` without providing it (SEM0071).
-- The optional service must be shared. `? &Option<&mut S>` is accepted in a row, but no provider satisfies it: `Option<P>` serves `S` through `&P`, so providing it is SEM0131, and `provideSome<&mut S>` with `&mut p` is SEM0012.
+- The optional service must be shared. An `Option` provider lends its service through a shared borrow, so nothing could provide `&Option<&mut S>`, and the requirement itself is SEM0240, reported where the row is written: "An optional service takes shared access only: an `Option` provider lends its service through a shared borrow, so nothing can provide `&Option<&mut S>`; require `&mut S`, or `&Option<&S>`".
 - Diagnostics may name the service the key stands for as `OptionService`, declared in `silk/option`. Code does not name it.
 
 ## What main is given
@@ -431,6 +431,7 @@ A `main` that provides the plain provider instead, `let offset = Offset { amount
 | SEM0225 | `main` declares a requirement other than `&mut HostInput` |
 | SEM0233 | A requirement row names one service with both shared and exclusive access |
 | SEM0234 | A call does not prove a `where S in R` premise of its callee, including `R in Without<R, S>`, as when the `absent` branch of `withSome` requires `S` |
+| SEM0240 | An optional service with exclusive access, `&Option<&mut S>` |
 | OWN0010 | One provider lent exclusively to two entries at once |
 | OWN0011 | Provider used while an unconsumed Effect still borrows it |
 

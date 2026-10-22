@@ -79,18 +79,18 @@ Compiling pricing (x86_64-unknown-linux-gnu, debug)
   codegen  0 functions                       0.00s
   borrow   3 bodies                          0.00s
   link     clang                             0.03s
-Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a in 0.10s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a in 0.10s
 Compiling store (x86_64-unknown-linux-gnu, debug)
   load     53 modules, 1 in package          0.04s
   check    1 module                          0.00s
   codegen  364 functions                     0.19s
   borrow   115 bodies                        0.00s
   link     clang                             0.19s
-Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s
 Finished 2 packages in 0.59s
 ```
 
-- Each member reports its own phases and ends with its own `Finished` or `Failed` line. The path in a member's `Finished` line is relative to the member's folder, so from the root it starts with `../build` even though the folder is `build/` under the root.
+- Each member reports its own phases and ends with its own `Finished` or `Failed` line. The path in a member's `Finished` line is relative to the folder you ran the command in. Run from inside a member, it is outside that folder, so it is printed in full: `Finished /home/you/shop/build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s`.
 - The last line counts packages. A failing member does not stop the others; the last line then reads like `Failed 1 of 3 packages in 2.10s`, and the command exits 1.
 - On a terminal, each finished member collapses to one line, and the member in progress is labeled with its position, such as `[2/2] store`. See **Diagnostics and silk check** in Tools for how progress output works.
 - `silk test` still prints a `Package <name> (<dir>)` heading for each member and ends with `Workspace summary: 2 packages succeeded, 0 failed`.
@@ -152,7 +152,7 @@ silk run -p tools
 
 ## The shared output directory
 
-All members build into the workspace's output directory, so paths in reports start with `../build` when seen from a member. After `silk build` and `silk test` at the root, `build/` holds, among symbol maps:
+All members build into the workspace's output directory, so from inside a member the program is at `../build/...`. After `silk build` and `silk test` at the root, `build/` holds, among symbol maps:
 
 ```
 build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a

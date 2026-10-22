@@ -12,11 +12,11 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 
 | Family | Phase | Codes |
 | --- | --- | --- |
-| LEX | Lexing tokens and literals | LEX0001-LEX0013 |
+| LEX | Lexing tokens and literals | LEX0001-LEX0014 |
 | PAR | Parsing | PAR0001-PAR0007 |
 | MOD | Module and package resolution | MOD0001-MOD0004 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0238 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0240 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
 
@@ -287,6 +287,27 @@ pub fn main() -> i32 {
 The column is the literal. The message names the base and the first bad digit: `0o9` gives ``Base-8 integer literal contains `9`, which is not a base-8 digit``, and `0b102` gives the same for base 2.
 
 Fix: Use only digits of the base: `0x1F`, `0o7`, `0b101`. See Lexical structure.
+
+### LEX0014
+
+A numeric literal written with a type suffix.
+
+```silk
+pub fn main() -> i32 {
+  let value = 7u8
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:15: error[LEX0014] Numeric literals take no type suffix such as `u8`; write the type as an annotation instead, as in `let value: u8 = 7`
+```
+
+The column is the start of the literal, and the message repeats its digits and suffix: `5usize` gives ``as in `let value: usize = 5` ``. Every integer and float type name is caught this way. A suffix after a fractional number, such as `1.5f32`, is read as a duration unit instead and gives LEX0008.
+
+Fix: Drop the suffix and give the type where the value is used: `let value: u8 = 7`, or pass `7` to a `u8` parameter. See Lexical structure and Values and primitive types.
 
 The well-formed spellings `0x0F`, `1_000_000`, `1.5e3`, `'a'`, `"hello"`, `b"hello"`, `1500ms`, `1h15m` and `2m30s` all pass `silk check`. See Lexical structure and Values and primitive types.
 
@@ -2269,10 +2290,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:7:14: error[SEM0067] An `Effect.catch` handler that does not fit the failures it handles
+/home/you/demo/src/main.silk:7:14: error[SEM0067] Invalid Effect.catch handler: `main.Other` is not a failure of the handled Effect, which fails with `main.Missing`
 ```
-
-Message template, not filled by this compiler: `Invalid Effect.catch handler: {detail}`.
 
 The same code covers an `Effect.catchAll` handler whose parameter does not accept every failure of the handled Effect. When the parameter is a single type, the message names the missing failure:
 
@@ -2305,9 +2324,27 @@ pub effect fn main() -> i32 ! LogError {
 /home/you/demo/src/main.silk:18:41: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union
 ```
 
-The message names the missing failures the same way when the parameter is a union that lacks a member, when the handled Effect has a single failure, and in the pipeline form, `work() |> Effect.catchAll(explain)`. With several missing it says ``does not accept `main.B`, `main.C`, failures of the handled Effect; add them to the parameter's union``. Only `Effect.catch<S>` with an `S` outside the row prints the one-line meaning, as in the first example.
+The message names the missing failures the same way when the parameter is a union that lacks a member, when the handled Effect has a single failure, and in the pipeline form, `work() |> Effect.catchAll(explain)`. With several missing it says ``does not accept `main.B`, `main.C`, failures of the handled Effect; add them to the parameter's union``.
 
-Fix: Make the handler take the failure type it handles: `Effect.catch<Missing>(load(), recover)` with `recover(error: Missing)`. For `catchAll`, give the parameter every failure in the row: `failure: Oops | LogError`. See Typed failures.
+A handler that is a plain `fn` is the same code. A handler returns an Effect, so it must be an `effect fn`:
+
+```silk
+import silk.effect { Effect }
+struct Problem {}
+effect fn load() -> i32 ! Problem { fail Problem {} }
+fn recover(error: Problem) -> i32 { return 0 }
+pub effect fn main() -> i32 {
+  return run Effect.catchAll(load(), recover)
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:6:38: error[SEM0067] Invalid Effect.catch handler: the handler is a plain `fn` that returns `i32`, but a handler returns the Effect that recovers; declare it `effect fn` with the same parameter and result
+```
+
+Fix: Make the handler take the failure type it handles: `Effect.catch<Missing>(load(), recover)` with `recover(error: Missing)`. For `catchAll`, give the parameter every failure in the row: `failure: Oops | LogError`. Declare a handler `effect fn recover(error: Problem) -> i32`. See Typed failures.
 
 ### SEM0070
 
@@ -2604,9 +2641,23 @@ pub fn main() -> i32 {
 /home/you/demo/src/main.silk:3:3: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
 ```
 
-For an Effect that is built and never run, such as a bare `greet()` call to an `effect fn`, the message is the one-line meaning instead.
+An Effect that is built and never run gets its own message. Here `compute` is an `effect fn`:
 
-Fix: Bind the result (`let n = one()`) or drop it (`drop one()`). See Bindings and statements.
+```silk
+effect fn compute() -> i32 { return 1 }
+pub effect fn main() -> i32 {
+  compute()
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:3:3: error[SEM0087] Expression statement produces an Effect of `i32` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
+```
+
+Fix: Bind the result (`let n = one()`) or drop it (`drop one()`). Run an Effect with `run compute()`, and discard its result with `drop run compute()`. See Bindings and statements, and Effects and run.
 
 ### SEM0088
 
@@ -2620,12 +2671,10 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:1:20: error[SEM0088] Using a generic binder in a value, failure-row, or requirement-row position of another kind
+/home/you/demo/src/main.silk:1:20: error[SEM0088] Generic parameter `?R` has kind a requirement row, expected a type
 ```
 
-Message template, not filled for this case: `Generic parameter {spelling} has kind {actual}, expected {expected}`.
-
-A type argument list that leaves out a requirement row is the same code, with a filled message:
+A type argument list that leaves out a requirement row is the same code:
 
 ```silk
 struct Holder<T, ?R> { value: T }
@@ -4108,9 +4157,21 @@ pub fn main() -> i32 { return 0 }
 /home/you/demo/src/main.silk:1:28: error[SEM0188] A foreign function declaration must not include generic parameters
 ```
 
-The message names what is not allowed. Generic parameters, `static` and `effect` are each refused on an `extern` declaration.
+The message names what is not allowed. Generic parameters, `static` and `effect` are each refused on an `extern` declaration. An exported function may not be an `effect fn` either, and the message names the export:
 
-Fix: Declare the C function with concrete C types, and write any generic or effectful wrapper as an ordinary Silk function that calls it. See Unsafe code and C interop.
+```silk
+struct Problem {}
+export "C" effect fn tick() -> i32 ! Problem { fail Problem {} }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:2:1: error[SEM0188] An `export "C"` function must not include effect
+```
+
+Fix: Declare the C function with concrete C types, and write any generic or effectful wrapper as an ordinary Silk function that calls it. Export a plain `fn`. See Unsafe code and C interop.
 
 ### SEM0189
 
@@ -4229,10 +4290,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:3:3: error[SEM0195] An inherent impl member that cannot be an associated member
+/home/you/demo/src/main.silk:3:3: error[SEM0195] Point.x collides with the field x of Point
 ```
-
-Message template, not filled by this compiler: `impl {owner} cannot declare a drop hook; declare impl Drop for {owner} instead` / `{owner}.{member} collides with the {collidesWith} {member} of {owner}` / `impl {owner} cannot map {member} to another declaration; only a conformance maps operations`.
 
 A mapping member, `name: target`, is the same code in an inherent impl. Only a conformance maps operations:
 
@@ -4248,7 +4307,23 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:4:3: error[SEM0195] An inherent impl member that cannot be an associated member
+/home/you/demo/src/main.silk:4:3: error[SEM0195] impl Point cannot map origin to another declaration; only a conformance maps operations
+```
+
+An inherent member named `drop` is the same code:
+
+```silk
+struct Point { x: i32 }
+impl Point {
+  fn drop(self: &mut Point) -> () {}
+}
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:3:3: error[SEM0195] impl Point cannot declare a drop hook; declare impl Drop for Point instead
 ```
 
 Fix: Rename the member. Inherent members cannot share a field name or be named `drop` (use `impl Drop`). Declare a member as a function, `fn origin() -> Point { return make() }`, instead of mapping it. See Functions and methods.
@@ -4823,6 +4898,60 @@ pub fn main() -> i32 {
 A module import lets you name the module's types in type positions, such as `inflate.Format` in a signature, but not reach their members as values.
 
 Fix: Import the type by name and use it directly: `import silk.inflate { Format }`, then `Format.Gzip`. See Modules and imports.
+
+### SEM0239
+
+A SIMD vector or mask type whose lane type or lane count is not admitted.
+
+```silk
+fn take(value: simd<bool, 4>) -> i32 {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:1:16: error[SEM0239] A SIMD vector needs a numeric lane type and a power-of-two lane count with a total width of 16 to 512 bits; a mask needs 2 to 64 lanes
+```
+
+The column is the type. `simd<i32, 3>` is refused the same way, because 3 is not a power of two.
+
+Fix: Use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes.
+
+### SEM0240
+
+A requirement for an optional service with exclusive access, `&Option<&mut S>`.
+
+```silk
+import silk.option { Option }
+
+service Counter {
+  effect fn bump() -> i32 ? &mut Counter
+}
+
+effect fn measure() -> i32 ? &Option<&mut Counter> {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:7:31: error[SEM0240] An optional service takes shared access only: an `Option` provider lends its service through a shared borrow, so nothing can provide `&Option<&mut S>`; require `&mut S`, or `&Option<&S>`
+```
+
+The column is the `Option` in the requirement row. The error is reported at the requirement, so a function that declares it is refused even before anything provides it.
+
+Fix: Require `? &mut Counter` when the code needs exclusive access, or `? &Option<&Counter>` for an optional service with shared operations. See Services and providers.
 
 ## Codes this compiler does not report
 

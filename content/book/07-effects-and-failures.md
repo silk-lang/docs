@@ -39,14 +39,14 @@ pub effect fn main() -> () ! LogError {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     53 modules, 1 in package          0.10s
+  check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:11:3: error[SEM0087] An expression statement whose result cannot be intentionally ignored
-Failed scratch in 0.17s
+/home/you/scratch/src/main.silk:11:3: error[SEM0087] Expression statement produces an Effect of `()` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
+Failed scratch in 0.29s
 ```
 
-Line 11 is `greet()`. It builds an Effect and throws it away, which is never what you meant. SEM0087 says an Effect is a result you may not drop silently. Either `run` it, store it, or say `drop` to discard it on purpose.
+Line 11 is `greet()`. It builds an Effect and throws it away, which is never what you meant. SEM0087 says an Effect is a result you may not drop silently, and the message names both ways out: `run` it, or say `drop` to discard it on purpose. You can also store it and run it later.
 
 Storing it shows what laziness means:
 

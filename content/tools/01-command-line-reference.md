@@ -133,7 +133,7 @@ Finished hello in 0.11s
 | --- | --- |
 | `--progress <auto\|live\|plain\|never>` | How progress rows are shown. `auto`, the default, redraws them in place in a terminal and prints each finished row once otherwise. `never` prints none |
 | `--quiet`, `-q` | Print only the final line and the diagnostics |
-| `--timings` | List the five slowest modules and function bodies before the final line |
+| `--timings` | List the five slowest modules and function bodies before the final line. Bodies are named as written, such as `silk/list.List<T>.appendBytes`; a body inside a conformance shows it in parentheses, such as `main.(Equal for Point).equals` |
 | `--json` | Write each diagnostic as one JSON object per line, with no progress output |
 | `--replay <script>` | Apply the edits in a TOML script in memory and print the incremental checker's counters for each step, on standard output |
 | `--differential` | With `--replay`, also check each step from scratch and exit 1 if the results differ |
@@ -144,7 +144,7 @@ Finished hello in 0.11s
 silk build [project options] [--progress <mode>] [--quiet] [--timings]
 ```
 
-Builds every planned target. The rows add `codegen` and `link`, and the final line names the program, relative to the package directory:
+Builds every planned target. The rows add `codegen` and `link`, and the final line names the program, relative to the current directory, or in full when it is outside it, as from inside a workspace member:
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
@@ -161,10 +161,18 @@ Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.55s
 ## run
 
 ```
-silk run [project options] [arguments...] [-- arguments...]
+silk run [project options] [--progress <mode>] [--quiet] [arguments...] [-- arguments...]
 ```
 
-Builds the host executable and runs it in the current directory. Options are read up to `--`. Any argument that does not start with `-`, and every argument after `--`, is passed to the program in order. The exit status is the program's own. A program whose `main` returns 7 makes `silk run` exit 7.
+Builds the host executable and runs it in the current directory. The build prints the same progress output as `silk build`, on standard error, and ends with `Finished` before the program starts or `Failed` when it does not build. Standard output carries only the program's output. `--progress` and `--quiet` work as for `check`.
+
+Options are read up to `--`. Any argument that does not start with `-`, and every argument after `--`, is passed to the program in order. The exit status is the program's own. A program whose `main` returns 7 makes `silk run` exit 7. A build that fails exits 1, or 2 when Clang is missing or the construct is not supported yet, and the program does not start.
+
+```
+$ silk run --quiet -- Ada
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 1.49s
+Hello, Ada!
+```
 
 At a workspace root, `run` runs the only executable member. With two or more, pass `-p`. A library cannot run:
 
@@ -210,7 +218,7 @@ Formats every `.silk` file under the package's source root, or only the given fi
 silk lsp [--stdlib <directory>]
 ```
 
-Runs a language server that speaks the Language Server Protocol over standard input and output. An editor starts it; you do not run it by hand. It reports diagnostics as you type, lists the declarations in a file, folds blocks, and formats the file the way `silk format` does. Hover, go to definition and signature help work for functions declared in your package, but not yet for std lib names or local variables, and in some function bodies they return nothing. See **Editor setup** in Get started.
+Runs a language server that speaks the Language Server Protocol over standard input and output. An editor starts it; you do not run it by hand. It reports diagnostics as you type, lists the declarations in a file, folds blocks, and formats the file the way `silk format` does. Hover, go to definition and signature help work for the functions you call, from your package or the std lib, and for local variables where they are used. Inlay hints show the type of each `let` binding. Completion, rename and find references are not available. See **Editor setup** in Get started.
 
 ## doc, doctest and doc-reference
 
@@ -220,7 +228,7 @@ silk doctest (-i <json> | --stdlib) [--source-root <directory>] [--target <tripl
 silk doc-reference [--stdlib-root <directory>] -o <directory> [--check]
 ```
 
-`-o` is short for `--output` and `-i` for `--input`. `silk doc --help`, `silk doctest --help` and `silk doc-reference --help` print these three lines. `silk doc` warns on standard error about each documentation link that names no declaration. See **Doc tests and reference generation**.
+`-o` is short for `--output` and `-i` for `--input`. `silk doc --help`, `silk doctest --help` and `silk doc-reference --help` print these three lines. `silk doc` warns on standard error about each documentation link that names no declaration. A link to a private declaration resolves only with `--include-private`. See **Doc tests and reference generation**.
 
 ## changes
 
@@ -247,7 +255,7 @@ silk toolchain default <version>
 silk toolchain uninstall <version>
 ```
 
-Manages the Silk versions installed side by side in `$SILK_HOME/toolchains/<version>` (`SILK_HOME` defaults to `~/.silk`). Each toolchain is a release archive unpacked as is: `bin/silk` beside `lib/silk/stdlib`. No subcommand prompts. Results go to standard output, and `--json` prints one JSON object instead. `silk toolchain help` prints the usage above with notes; `silk toolchain --help` prints only the synopsis line.
+Manages the Silk versions installed side by side in `$SILK_HOME/toolchains/<version>` (`SILK_HOME` defaults to `~/.silk`). When `SILK_HOME` is unset and `HOME` names no existing directory, `install`, `use`, `default` and `uninstall` create nothing and exit 1 with `silk toolchain: cannot find the toolchain directory; set SILK_HOME to an absolute path, or HOME to an existing directory`; `list` and `which` still show the running compiler. Each toolchain is a release archive unpacked as is: `bin/silk` beside `lib/silk/stdlib`. No subcommand prompts. Results go to standard output, and `--json` prints one JSON object instead. `silk toolchain help`, `silk toolchain --help` and `silk toolchain -h` print the usage above with notes and exit 0. `silk help toolchain` is not a command: it prints the general usage and exits 2.
 
 | Subcommand | What it does |
 | --- | --- |
@@ -287,7 +295,7 @@ Here `silk` itself is a compiler built from source, which reports version 0.0.0.
 
 `silk-version = "0.0.0"` pins nothing. A version without build metadata, such as `0.1.0-dev.6`, matches the newest installed build of it, such as `0.1.0-dev.6+1aed5da1a342`.
 
-When the selected version is not the running compiler, `silk` sets `SILK_TOOLCHAIN` to the toolchain's full version and replaces itself with that toolchain's `silk`, which runs the command. `silk toolchain` itself always runs in the compiler you started. `SILK_TOOLCHAIN=local` keeps the running compiler. A compiler built from source reports version 0.0.0 and follows only `+<version>`.
+When the selected version is not the running compiler, `silk` sets `SILK_TOOLCHAIN` to the toolchain's full version and replaces itself with that toolchain's `silk`, which runs the command. `silk toolchain` itself always runs in the compiler you started. `SILK_TOOLCHAIN=local` selects the running compiler; `silk toolchain which` then names its version and path, with the origin `selected by SILK_TOOLCHAIN`. A compiler built from source reports version 0.0.0 and follows only `+<version>`.
 
 When the selected toolchain is not installed, the command does not run. It exits 3:
 
@@ -295,6 +303,13 @@ When the selected toolchain is not installed, the command does not run. It exits
 $ silk +0.3.0 build
 silk: Silk 0.3.0 (selected with +<version>) is not installed.
 Install it with: silk toolchain install 0.3.0
+```
+
+A `+` argument that is not a semantic version is a usage error, exit 2:
+
+```
+$ silk +garbage build
+silk: `+garbage` is not a Silk version; +<version> takes a semantic version such as +0.1.0-dev.6
 ```
 
 With `SILK_AUTO_INSTALL=1` in the environment, or `auto-install = true` in `$SILK_HOME/settings.toml`, a missing toolchain is installed first, with the notice `silk: installing Silk <version> (auto-install is on)` and the install output on standard error, so the command's own output stays alone on standard output.
@@ -320,7 +335,7 @@ $ silk toolchain install 0.1.0-dev.6+1aed5da1a342 --json
 
 A version without build metadata is resolved to its newest published build, which needs the GitHub release listing. A full version does not. `install` does not change the default toolchain or `$SILK_HOME/bin/silk`; `default` and the installer do.
 
-`SILK_TOOLCHAIN_MIRROR` names an absolute directory to install from instead of GitHub, for machines without access to it. It holds one `v<version>` folder of release assets per release, and the same checks apply. A tampered archive is refused with exit status 5:
+`SILK_TOOLCHAIN_MIRROR` names an absolute directory to install from instead of GitHub, for machines without access to it. It holds one `v<version>` folder of release assets per release, and the same checks apply. A relative path is refused with exit status 1: `silk toolchain: SILK_TOOLCHAIN_MIRROR must be an absolute directory path`. A tampered archive is refused with exit status 5:
 
 ```
 silk toolchain: silk-0.1.0-dev.6+1aed5da1a342-x86_64-unknown-linux-gnu.tar.gz is not signed by the Silk release key: the signature does not match the file
@@ -354,7 +369,7 @@ $ silk toolchain uninstall 0.5.0
 | Status | Meaning |
 | --- | --- |
 | 0 | Success, including a command that changed nothing |
-| 1 | Failure: no home directory, no `silk.toml` for `use`, a mirror that cannot be read, a toolchain that cannot be removed |
+| 1 | Failure: no toolchain directory, no `silk.toml` for `use`, a mirror that cannot be read, a toolchain that cannot be removed |
 | 2 | Usage error: unknown subcommand or option, a version that is not a semantic version, `install` with nothing selected |
 | 3 | The selected toolchain is not installed. Any command can exit 3 this way |
 | 4 | A download failed |
@@ -404,7 +419,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_CLANG` | The Clang executable, when `--clang` is not given |
 | `SILK_LLVM_AR` | The archiver for static libraries; default is `llvm-ar` beside Clang |
 | `SDKROOT`, `DEVELOPER_DIR` | macOS SDK selection; an invalid `SDKROOT` is an error |
-| `SILK_PROGRESS` | The progress style for `check` and `build` when `--progress` is not given: `auto`, `live`, `plain` or `never`. An invalid value is ignored |
+| `SILK_PROGRESS` | The progress style for `check`, `build` and `run` when `--progress` is not given: `auto`, `live`, `plain` or `never`. An invalid value is ignored |
 | `NO_COLOR` | Set to a non-empty value, turns off colors in live progress output |
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
@@ -420,4 +435,4 @@ The installer reads `SILK_HOME`, `SILK_RELEASE` and `SILK_CHANNEL`; see **Instal
 
 ## Output streams
 
-Test results, `--replay` lines, the `run ...: failed` lines of `silk run`, `formatted` and `unchanged` go to standard output. Progress rows, diagnostics, refusals, warnings, `needs formatting`, and `SILK_GAP` notices go to standard error. `silk run` and `silk test` print no progress rows. A program started by `silk run` writes to both as it chooses.
+Test results, `--replay` lines, `formatted` and `unchanged` go to standard output. Progress rows, diagnostics, refusals, warnings, `needs formatting`, and `SILK_GAP` notices go to standard error. `silk run` prints its build's progress rows on standard error and leaves standard output to the program, which writes to both as it chooses. `silk test` prints no progress rows.

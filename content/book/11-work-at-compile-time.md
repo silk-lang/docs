@@ -60,10 +60,11 @@ silk check
 ```
 
 ```
-Checking tasks (x86_64-unknown-linux-gnu)
+Checking scratch (x86_64-unknown-linux-gnu)
+  load     failed: 1 error                   0.15s
 [x86_64-unknown-linux-gnu]
 /home/you/scratch/src/main.silk:1:41: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
-Failed tasks in 0.05s
+Failed scratch in 0.15s
 ```
 
 SEM0214 covers every way a build's configuration can be wrong, and the message says which one this is. Column 41 is the start of the predicate. The value 0 failed the check, so the build stops. Nothing has run yet.
@@ -275,6 +276,7 @@ The `where` clause guards bindings too. Change the value to `"90000"` and check:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
+  load     failed: 1 error                   0.09s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:248:43: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
 Failed tasks in 0.09s
@@ -286,6 +288,7 @@ A typo in the parameter name is a different mistake, so it points somewhere else
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
+  load     failed: 1 error                   0.10s
 /home/you/tasks/silk.toml:10: error[SEM0214] invalid package parameter binding: module `main.silk` declares no package parameter `remindBudget`
 Failed tasks in 0.10s
 ```

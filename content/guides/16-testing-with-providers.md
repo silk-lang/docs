@@ -269,7 +269,7 @@ impl MonotonicClock for VirtualClock {
 
 `MonotonicClock` has four operations. `VirtualClock` reads a stored mark, and time moves only when someone waits: `waitUntil` jumps forward to the requested mark and `waitFor` adds to it. A test that waits five seconds therefore finishes in microseconds. `millis` lets a test read the clock afterwards.
 
-Build instants with `SystemClock.make(seconds, nanoseconds)` and `MonotonicClock.deadlineAfter(&start, nanoseconds)`. `SystemClock.make` needs a nanosecond part below one billion; anything else traps, and the trap reads `fatal trap: division by zero`. So for "5000 ms after zero", write `MonotonicClock.deadlineAfter(&SystemClock.make(0, 0), 5000000000)`, not `SystemClock.make(0, 5000000000)`.
+Build instants with `SystemClock.make(seconds, nanoseconds)` and `MonotonicClock.deadlineAfter(&start, nanoseconds)`. `SystemClock.make` carries whole seconds out of the nanosecond part, so "5000 ms after zero" can be `SystemClock.make(0, 5000000000)`, which is 5 seconds and 0 nanoseconds. A negative part borrows: `SystemClock.make(0, -1)` is -1 seconds and 999,999,999 nanoseconds. Only a total beyond the `i64` range of seconds traps.
 
 ### A counting allocator
 

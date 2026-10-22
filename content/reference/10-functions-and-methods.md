@@ -49,7 +49,7 @@ QualifiedCall   = TypePath TypeArguments? '.' Identifier '(' Arguments? ')'
 - The head must name the whole type family: `impl<T> Maybe<T>`, not `impl Maybe<i32>`. Built-in types such as `i32` cannot take inherent impls. Both are SEM0194.
 - Inside the block, `Self` names the owner type with its parameters.
 - Each member name may appear once per owner (SEM0196).
-- A member may not share its name with a field of the owner (SEM0195).
+- A member may not share its name with a field of the owner (SEM0195: "Point.x collides with the field x of Point"). An inherent member may not be named `drop` either; declare `impl Drop for Point` (SEM0195). Mapping a member to another declaration, `origin: make`, works only in a conformance (SEM0195).
 - `pub` on a member makes it callable from other modules. A private member is SEM0015 there.
 
 ## Receivers

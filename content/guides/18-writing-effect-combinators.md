@@ -323,15 +323,15 @@ Failed weather in 0.23s
 
 Column 26 is the `withBudget(...)` argument. `withBudget` takes its action as `once Effect` and keeps it, so the effect it returns can run only once, and `retrying` needs one that can run again. `budgetedRead(&mut station.*)` builds a fresh `withBudget` effect each time it runs, and holds only a `&mut` borrow, so it is a `mut Effect`.
 
-An `effect { ... }` block would normally do the same job without a named function. In this release, passing `effect { return run withBudget(500, readStation(&mut station.*)) }` to `retrying` stops with an error inside `retrying`:
+An `effect { ... }` block would normally do the same job without a named function. In this release, passing `effect { return run withBudget(500, readStation(&mut station.*)) }` to `retrying` stops with an error inside `retrying`. It happens when the function that passes the block also calls `Effect.log`, as `attempt` does:
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules                 0.88s
+  load     53 modules, 1 in package          0.11s
+  check    failed: 2 modules                 1.88s
 [x86_64-unknown-linux-gnu]
 /home/you/weather/src/main.silk:66:10: unsupported[signature-form] not supported by the native compiler yet
-Failed weather in 0.93s
+Failed weather in 1.99s
 ```
 
 The command exits with status 2.

@@ -74,10 +74,19 @@ silk run
 ```
 
 ```
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    1 module                          0.16s
+  codegen  422 functions                     0.40s
+  borrow   137 bodies                        0.01s
+  link     clang                             0.25s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.96s
 Hello, world!
 ```
 
-`silk run` builds the package and starts the program. When the build succeeds, the compiler prints nothing, so the output is your program's alone. The log message has no `\n` at the end, so your prompt shows up right after `Hello, world!`.
+`silk run` builds the package and starts the program. The first lines are the build's progress: one row per compiler phase, then the path of the program it built. They go to standard error, and the program's own output follows on standard output, so `silk run > out.txt` captures only `Hello, world!`. In a terminal the rows are redrawn in place while they run. `silk run --quiet` keeps only the `Finished` line. From here on, the output shown after `silk run` is the program's alone.
+
+The log message has no `\n` at the end, so your prompt shows up right after `Hello, world!`.
 
 ## Read an argument and choose the exit status
 

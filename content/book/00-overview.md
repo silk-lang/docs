@@ -20,7 +20,7 @@ You should be comfortable programming in some language and using a terminal. You
 
 ## How to read it
 
-Every program and every output in the book was compiled and run. Type the code yourself when you can. Each chapter breaks the program on purpose at least once, so you learn to read the compiler's errors before you meet them alone.
+Every program and every output in the book was compiled and run. After `silk run`, the book shows only what the program printed, not the build's progress rows before it. Type the code yourself when you can. Each chapter breaks the program on purpose at least once, so you learn to read the compiler's errors before you meet them alone.
 
 The book never tries to be complete. When a topic has more rules than a chapter needs, it points to the page in the Language reference that covers it, by title, in bold. The std lib API reference lists every module and function.
 

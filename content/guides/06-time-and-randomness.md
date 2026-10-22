@@ -22,7 +22,7 @@ The same split applies to random numbers. `Random` must be unpredictable and has
 
 ## Instants and durations
 
-Both clocks return an `Instant`: signed whole seconds plus a nanosecond part between 0 and 999,999,999. Read the parts with `SystemClock.seconds(&instant)` and `SystemClock.nanoseconds(&instant)`, and build one with `SystemClock.make(seconds, nanoseconds)`. For the system clock, the seconds count from 1970-01-01 00\:00 UTC. For the monotonic clock, they count from an unspecified start.
+Both clocks return an `Instant`: signed whole seconds plus a nanosecond part between 0 and 999,999,999. Read the parts with `SystemClock.seconds(&instant)` and `SystemClock.nanoseconds(&instant)`, and build one with `SystemClock.make(seconds, nanoseconds)`, which carries whole seconds out of a nanosecond part outside that range: `SystemClock.make(0, 1500000000)` is 1 second and 500,000,000 nanoseconds. For the system clock, the seconds count from 1970-01-01 00\:00 UTC. For the monotonic clock, they count from an unspecified start.
 
 A duration is a plain `u64` count of nanoseconds. There is no duration type, so name your units:
 

@@ -297,7 +297,9 @@ The list itself has to be right. An entry that names no module is refused before
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
+  load     failed: 1 error                   0.00s
 silk: invalid exports of taskcore@0.1.0: Stores is not a module of the package
+Failed taskcore in 0.00s
 Failed 1 of 1 package in 0.00s
 ```
 
@@ -315,10 +317,10 @@ Compiling taskcore (x86_64-unknown-linux-gnu, debug)
   codegen  0 functions                       0.00s
   borrow   191 bodies                        0.01s
   link     clang                             0.05s
-Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/libtaskcore.a in 0.80s
+Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/libtaskcore.a in 0.80s
 ```
 
-Note the `../build` in the last line: every package in a workspace builds into one shared `build` folder at the workspace root. The archive is empty, which is fine: `codegen` emitted no functions. The program that depends on `taskcore` compiles its source along with its own. What the library build tells you is that the package is sound on its own.
+Note the path in the last line: every package in a workspace builds into one shared `build` folder at the workspace root. That folder is outside `taskcore/`, where you ran the command, so the path is printed in full. The archive is empty, which is fine: `codegen` emitted no functions. The program that depends on `taskcore` compiles its source along with its own. What the library build tells you is that the package is sound on its own.
 
 ## Depending on `taskcore`
 
@@ -523,10 +525,10 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen  4,312 functions                   2.06s
   borrow   845 bodies                        0.08s
   link     clang                             1.00s
-Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 7.85s
+Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 7.85s
 ```
 
-The program now lives in the workspace's shared `build` folder, so from `tasks/` its path starts with `../build`. The old `tasks/build` folder from earlier chapters is no longer used, and you can delete it.
+The program now lives in the workspace's shared `build` folder, so from `tasks/` you start it as `../build/...`. The old `tasks/build` folder from earlier chapters is no longer used, and you can delete it.
 
 ```sh
 ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Buy milk'

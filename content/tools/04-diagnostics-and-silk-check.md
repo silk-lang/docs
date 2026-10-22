@@ -178,17 +178,39 @@ A few other lines can appear around diagnostics:
 
 ## Progress output
 
-The heading, the phase rows and the final line are progress output. `silk check` and `silk build` print them on standard error, so standard output stays free for a program's own output. `silk run` and `silk test` print no progress rows.
+The heading, the phase rows and the final line are progress output. `silk check`, `silk build` and `silk run` print them on standard error, so standard output stays free for a program's own output. `silk run` prints them for its build, then starts the program after the `Finished` line. `silk test` prints no progress rows.
 
 | Row | Meaning |
 | --- | --- |
 | `load` | Modules read and parsed, and how many of them are in your package |
 | `check` | Modules analyzed |
 | `borrow` | Function bodies checked for ownership and borrowing |
-| `codegen` | Functions turned into machine code (`silk build` only) |
-| `link` | The native linker run (`silk build` only) |
+| `codegen` | Functions turned into machine code (`silk build` and `silk run`) |
+| `link` | The native linker run (`silk build` and `silk run`) |
 
-`silk build` ends with `Finished` and the path of the program it wrote, relative to the package directory. A command that stops on an error ends with `Failed <package> in <time>`.
+`silk build` and `silk run` end with `Finished` and the path of the program they built, relative to the current directory. When the program is outside it, as when you build inside a workspace member, the path is absolute; it never starts with `../`. A command that stops on an error ends with `Failed <package> in <time>`.
+
+A phase that fails says so in its row: `check    failed: 2 modules, 1 error`. A row with nothing more to say reads just `failed`, as the `link` row does when Clang is missing:
+
+```
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    1 module                          0.11s
+  codegen  422 functions                     0.28s
+  borrow   137 bodies                        0.01s
+silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable
+  link     failed                            0.00s
+Failed hello in 0.52s
+```
+
+A build that is refused before any module is checked, such as a package parameter binding that names no parameter or an `exports` entry that names no module, still gets a `load` row, then the message:
+
+```
+Checking taskcore (x86_64-unknown-linux-gnu)
+  load     failed: 1 error                   0.00s
+silk: invalid exports of taskcore@0.1.0: Stores is not a module of the package
+Failed taskcore in 0.00s
+```
 
 How the rows look depends on where standard error goes:
 
@@ -228,22 +250,22 @@ silk check --timings
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    2 modules                         0.10s
-  borrow   99 bodies                         0.00s
+  load     53 modules, 1 in package          0.11s
+  check    2 modules                         0.25s
+  borrow   126 bodies                        0.00s
   Slowest modules to check
-       74.9ms  silk/native_start.silk
-       26.1ms  main.silk
+      244.0ms  silk/native_start.silk
+       6.49ms  main.silk
   Slowest bodies to borrow-check
-       0.20ms  silk/native_diagnostics.makePool
-       0.18ms  silk/native_start. for .code
-       0.17ms  silk/execution_storage.acquire
-       0.17ms  silk/native_start.start
-       0.16ms  silk/list..appendBytes
-Finished hello in 0.15s
+       0.38ms  silk/execution_storage.acquire
+       0.30ms  silk/native_start.(EntryResult<Effect<'env; () ! E ? &mut HostInput>> for Application< Effect<'env; () ! E ? &mut HostInput>, >).code
+       0.30ms  silk/native_diagnostics.makePool
+       0.29ms  silk/native_start.start
+       0.26ms  silk/native_host_input.NativeHostInput.capture
+Finished hello in 0.36s
 ```
 
-`silk build --timings` also lists the slowest functions to emit. Std lib modules appear in the lists because they are checked with your program. Some body names are internal, such as `silk/native_start. for .code` for a loop body. `--quiet` turns the lists off.
+`silk build --timings` also lists the slowest functions to emit. Std lib modules appear in the lists because they are checked with your program. A body is named by its module and its name as written: `silk/native_diagnostics.makePool` for a function, `silk/list.List<T>.appendBytes` for a method. A body inside a conformance shows the conformance in parentheses, as the `code` body of `silk/native_start` does above. A header written over several lines keeps a space where each line break was, as in `Application< Effect<...>, >`. `--quiet` turns the lists off.
 
 ## Replay edits
 

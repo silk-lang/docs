@@ -107,9 +107,14 @@ Put LLVM 18 or newer (22 for no-libc targets) on PATH, or set SILK_CLANG to its 
 With no Clang at all, `silk build` and `silk run` stop at the link step:
 
 ```
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    1 module                          0.11s
+  codegen  422 functions                     0.28s
+  borrow   137 bodies                        0.01s
 silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable
-run x86_64-unknown-linux-gnu: failed (exit 2)
-Run summary: 0 succeeded, 1 failed
+  link     failed                            0.00s
+Failed hello in 0.52s
 ```
 
 If the chosen Clang cannot start, for example because `SILK_CLANG` names a file that does not exist, the message names the path and where it came from: `from SILK_CLANG`, `from --clang` or `found on PATH`.
@@ -121,7 +126,7 @@ Compiling hello (x86_64-unknown-linux-gnu, debug)
   codegen  422 functions                     0.21s
   borrow   137 bodies                        0.00s
 silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable
-  link     failed:                           0.00s
+  link     failed                            0.00s
 Failed hello in 0.36s
 ```
 

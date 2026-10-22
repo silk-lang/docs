@@ -58,7 +58,7 @@ main	export	hello@0.1.0:silk/native_start.silk::_._.enter
 silk_5d3308971cc4722980f0a2011e60fca5	function	hello@0.1.0:silk/native_start.silk::_._.enter
 ```
 
-Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled main.silk -> ../hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)`, with both paths relative to the source file's folder. Its symbol count is the number of lines in this file.
+Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled src/main.silk -> hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)`, with both paths relative to the current directory, or in full when a file is outside it. Its symbol count is the number of lines in this file.
 
 ## Finding Clang
 
@@ -79,7 +79,7 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 | `--clang` name not found | `silk: cannot find nosuchclang on PATH; pass --clang the path of the Clang executable` |
 | The chosen Clang does not start | `silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable`. The parenthesis is `from SILK_CLANG`, `from --clang` or `found on PATH`. |
 
-Each of these fails the target and exits 2. `silk build` shows a `link     failed:` row and a `Failed` line; `silk run` prints `run <target>: failed (exit 2)` and its summary.
+Each of these fails the target and exits 2. `silk build` and `silk run` print the message, then a `link     failed` row and a `Failed` line.
 
 ## macOS SDK
 
@@ -246,10 +246,13 @@ exit 3
 A `main` the runtime cannot start is SEM0225. Here `main` is a plain `pub fn main() -> i32`:
 
 ```
+Compiling tiny (x86_64-unknown-linux-gnu, debug)
+  load     45 modules, 1 in package          0.10s
+  check    1 module                          0.00s
+  codegen  failed: 89 functions, 1 error     0.09s
 [x86_64-unknown-linux-gnu]
 /home/you/tiny/src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/native_start_sync` cannot start
-run x86_64-unknown-linux-gnu: failed (exit 1)
-Run summary: 0 succeeded, 1 failed
+Failed tiny in 0.26s
 ```
 
 A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/raw_start` case.

@@ -508,7 +508,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen  7,485 functions                   5.72s
   borrow   1,349 bodies                      0.14s
   link     clang                             2.80s
-Finished ../build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 14.36s
+Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 14.36s
 ```
 
 ```sh

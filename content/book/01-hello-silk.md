@@ -86,10 +86,17 @@ silk run
 ```
 
 ```
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    1 module                          0.16s
+  codegen  422 functions                     0.40s
+  borrow   137 bodies                        0.01s
+  link     clang                             0.25s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.96s
 Hello, world!
 ```
 
-`silk run` compiles the package and then starts the program. When the program compiles, the compiler prints nothing of its own, so all you see is the program's output.
+`silk run` compiles the package and then starts the program. The lines before `Hello, world!` are the compiler reporting its progress, one row per phase, on standard error. "Check before you run", below, explains the rows. Everything after the `Finished` line is your program's output. From now on, the book shows only the program's output after `silk run`.
 
 Look closely at your terminal. Your shell prompt probably appears right after `Hello, world!` on the same line. That is because the program never printed a line break. Silk prints exactly the bytes you give it, and adds nothing. You fix that below.
 
@@ -200,13 +207,15 @@ silk run
 ```
 
 ```
+Compiling tasks (x86_64-unknown-linux-gnu, debug)
+  load     53 modules, 1 in package          0.10s
+  check    failed: 1 module, 1 error         0.15s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
-run x86_64-unknown-linux-gnu: failed (exit 1)
-Run summary: 0 succeeded, 1 failed
+Failed tasks in 0.27s
 ```
 
-The program did not compile, so nothing ran. You get the same report without building anything from `silk check`:
+The program did not compile, so nothing ran, and `silk run` exits with status 1. You get the same report without building anything from `silk check`:
 
 ```sh
 silk check
