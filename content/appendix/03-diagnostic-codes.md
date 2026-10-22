@@ -16,7 +16,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | PAR | Parsing | PAR0001-PAR0007 |
 | MOD | Module and package resolution | MOD0001-MOD0004 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0243 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0244 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
 
@@ -4092,7 +4092,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0243)
+## SEM: C interop, impls, lifetimes and properties (SEM0187-SEM0244)
 
 ### SEM0185
 
@@ -5041,6 +5041,30 @@ pub fn main() -> i32 {
 Running AVX2 code on a machine without AVX2 is undefined, so each call must be `unsafe`.
 
 Fix: Declare it `unsafe fn fast(...)`, and call it inside `unsafe` after `CpuFeatures.detect()` from `silk/cpu` reports the features. See Intrinsics.
+
+### SEM0244
+
+A SIMD vector in a C call that the target's C ABI cannot pass in a vector register the profile selects.
+
+```silk
+unsafe extern "C" fn total(values: simd<f32, 8>) -> f32
+
+pub fn main() -> i32 {
+  let sum = unsafe total(Intrinsic.simdSplat<simd<f32, 8>>(1.0))
+  if sum != 8.0 { return 1 }
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+/home/you/demo/src/main.silk:4:20: error[SEM0244] simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`
+```
+
+The column is the callee's name; each call is reported, and a declaration that is never called is not. On x86-64, 128-bit vectors need nothing, 256-bit ones `avx` and 512-bit ones `avx512f`. A width the target's C ABI has no register for prints the other form, as for `simd<u8, 8>` on x86-64: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width". A function's own `features` list does not count.
+
+Fix: Select the feature in the profile, as in `[profiles.fast.cpu] features = ["avx"]` or `model = "x86-64-v3"`, and build with `--profile fast`. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and profiles.
 
 ## Codes this compiler does not report
 

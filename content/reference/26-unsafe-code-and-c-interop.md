@@ -1,6 +1,6 @@
 # Unsafe code and C interop
 
-Unsafe code is code whose memory safety the compiler cannot check. This page covers `unsafe` blocks, functions and calls, raw pointer types, and C interoperation: foreign functions and statics, exported functions, C-layout records and callbacks.
+Unsafe code is code whose memory safety the compiler cannot check. This page covers `unsafe` blocks, functions and calls, raw pointer types, and C interoperation: foreign functions and statics, exported functions, SIMD vectors in C signatures, C-layout records and callbacks.
 
 ## Syntax
 
@@ -92,7 +92,7 @@ Unsafe operations (the caller proves the storage contract):
 - `unsafe extern "C" fn name(...) -> T` declares a C function. It has no body.
 - The declaration must be `unsafe` (SEM0186) and its ABI string must be `"C"` (SEM0185). It may not have generic parameters or be `static` or `effect` (SEM0188). Each is reported at the declaration by `silk check`, whether or not the function is called.
 - `as "symbol"` links to a different native name. Without it, the Silk name is the symbol.
-- Parameter and result types must be C-compatible scalars: integer and float types, `usize`, `isize`, raw pointers, C function pointers, and `()` as a result.
+- Parameter and result types must be C-compatible scalars: integer and float types, `usize`, `isize`, raw pointers, C function pointers, and `()` as a result. SIMD vectors cross too, with the limits in SIMD vectors at the C boundary below.
 - `bool` and `char` are rejected (SEM0187). A call that passes or returns a struct, `string` or reference by value is reported as `unsupported[ForeignAggregate]`.
 - A trailing `...` declares a C variadic function. Variadic arguments follow the named ones.
 - A foreign function cannot be used as a value; it can only be called (SEM0189).
@@ -127,6 +127,29 @@ A foreign declaration may carry `with Intrinsic.foreign(...)`. It holds either o
 - An exported function may be declared in any module of the package that the build includes.
 - The exported function's body must not suspend. `silk build` refuses a body that can park, directly or through what it calls, with SEM0201 at the declaration. `silk check` does not report it. An `export "C" effect fn` is SEM0188.
 - Pass an exported function for a C function-pointer parameter. Passing an ordinary `fn` is a type error (SEM0012).
+
+## SIMD vectors at the C boundary
+
+A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function passes by value in one vector register, the way C compilers pass a vector type of the same size. On the C side, declare a vector with the same lane type and count, such as `float __attribute__((vector_size(16)))` for `simd<f32, 4>`.
+
+- Lane types are the fixed-width numbers: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`, `f32`, `f64`.
+- `simd<isize, N>`, `simd<usize, N>` and `mask<N>` do not cross. A call with one is `unsupported[ForeignAggregate]`.
+- The vector's total width must be one the target's C ABI passes in a vector register, and the profile must select that register's CPU feature:
+
+| Target | Width | Needs |
+| --- | --- | --- |
+| x86-64 Linux | 128 bits, such as `simd<f32, 4>` or `simd<u8, 16>` | `sse2`, always on |
+| x86-64 Linux | 256 bits, such as `simd<f64, 4>` | `avx` (`x86-64-v3` brings it) |
+| x86-64 Linux | 512 bits, such as `simd<u8, 64>` | `avx512f` (`x86-64-v4` brings it) |
+| arm64 | 64 and 128 bits, such as `simd<f32, 2>` | `neon`, always on |
+| wasm32 | 128 bits | `simd128` |
+
+- Any other width, such as `simd<u8, 8>` on x86-64, is SEM0244: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width".
+- A width whose feature the profile does not select is also SEM0244: "simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`".
+- For a foreign function, SEM0244 is reported at each call, at the callee's name. A declaration that is never called is not checked.
+- Only the profile's `cpu` counts. A `features` list from `Intrinsic.machine(...)` on the calling function does not satisfy SEM0244. See Targets and profiles for `cpu`.
+- For an `export "C"` function, `silk check` accepts a vector it cannot pass; `silk build` stops with `unsupported[c-abi-vector] not supported by the native compiler yet` at the declaration and exits 2.
+- A C function-pointer type cannot carry a vector: `extern "C" fn(simd<f32, 4>) -> f32` is SEM0187.
 
 ## Native symbols
 
@@ -239,6 +262,61 @@ pub fn main() -> i32 {
 }
 ```
 
+A C function that takes and returns `simd<f32, 4>`, and C code that calls an exported Silk function on `simd<i32, 4>`. The C file `native/vec.c`:
+
+```c
+typedef float f32x4 __attribute__((vector_size(16)));
+typedef int i32x4 __attribute__((vector_size(16)));
+
+f32x4 scale(f32x4 values, float factor) { return values * factor; }
+
+i32x4 add_lanes(i32x4 a, i32x4 b);
+
+int check_add(void) {
+  i32x4 sum = add_lanes((i32x4){1, 2, 3, 4}, (i32x4){10, 20, 30, 40});
+  return sum[0] + sum[1] + sum[2] + sum[3];
+}
+```
+
+Compile it and list the object in the manifest, as in Build outputs and native linking:
+
+```sh
+clang -c -fPIC native/vec.c -o native/vec.o
+```
+
+```toml
+[build]
+native-link-inputs = [{ object = "native/vec.o" }]
+```
+
+```silk
+import silk.simd.f32x4
+
+unsafe extern "C" fn scale(values: simd<f32, 4>, factor: f32) -> simd<f32, 4>
+unsafe extern "C" fn check_add() -> i32
+
+export "C" fn add_lanes(a: simd<i32, 4>, b: simd<i32, 4>) -> simd<i32, 4> {
+  return a + b
+}
+
+pub fn main() -> i32 {
+  let values = f32x4.fromArray([1.0, 2.0, 3.0, 4.0])
+  let scaled = f32x4.toArray(unsafe scale(values, 2.5))
+  if scaled[3] != 10.0 { return 1 }
+  return unsafe check_add()
+}
+```
+
+```sh
+silk run; echo "exit $?"
+```
+
+```
+exit 110
+```
+
+The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way under a profile with `[profiles.avx.cpu] features = ["avx"]`, run with `silk run --profile avx`, and with the C file compiled with `-mavx`. Under the default profile, its call is SEM0244.
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -263,10 +341,11 @@ pub fn main() -> i32 {
 | SEM0215 | Invalid pointer alignment, address space or qualifier conversion |
 | SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause |
 | SEM0236 | `Intrinsic.foreign` or `Intrinsic.machine` on a function without linkage, or on an interface or service operation |
+| SEM0244 | SIMD vector in a foreign call that the target's C ABI cannot pass in a vector register the profile selects |
 
 ## See also
 
-Values and primitive types · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/pointer`, `silk/raw_buffer`, `silk/slot`, `silk/layout`
+Values and primitive types (SIMD vectors and masks) · Targets and profiles · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/pointer`, `silk/raw_buffer`, `silk/slot`, `silk/layout`
 
 ## Open questions
 

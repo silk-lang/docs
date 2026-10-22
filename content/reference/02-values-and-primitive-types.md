@@ -113,6 +113,7 @@ MaskType      = 'mask' '<' Expression '>'
 - Any other shape is SEM0239 at the type: "A SIMD vector needs a numeric lane type and a power-of-two lane count with a total width of 16 to 512 bits; a mask needs a power-of-two lane count from 2 to 64".
 - `simd` and `mask` are not reserved words. A variable may be called `mask`, as the mask modules' parameters are.
 - Vectors and masks are `Copy` values. They pass, return and sit in struct fields by value.
+- A vector with fixed-width lanes also passes to and from C functions in one vector register, when the target's C ABI has a register of its width. A mask does not. See SIMD vectors at the C boundary in Unsafe code and C interop.
 - Lane `0` is at the lowest address in memory.
 
 ### Operators
@@ -448,7 +449,7 @@ fatal trap: arithmetic overflow
 
 ## See also
 
-Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · `silk/i8`, `silk/i16`, `silk/i32`, `silk/i64`, `silk/isize`, `silk/u8`, `silk/u16`, `silk/u32`, `silk/u64`, `silk/usize`, `silk/f32`, `silk/f64`, `silk/numeric`, `silk/bool`, `silk/char`, `silk/string`, `silk/layout`, `silk/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...), `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`
+Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · Unsafe code and C interop · `silk/i8`, `silk/i16`, `silk/i32`, `silk/i64`, `silk/isize`, `silk/u8`, `silk/u16`, `silk/u32`, `silk/u64`, `silk/usize`, `silk/f32`, `silk/f64`, `silk/numeric`, `silk/bool`, `silk/char`, `silk/string`, `silk/layout`, `silk/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...), `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`
 
 ## Open questions
 
