@@ -1,0 +1,75 @@
+Deterministic byte inspection for text available during static evaluation.
+
+## Details
+
+These operations inspect UTF-8 bytes without exposing compiler storage. They are available only
+to static functions and produce finite static values.
+
+Import as `StaticText` with `import silk.static_text { StaticText }`.
+
+Public declarations: 1.
+
+::Anchor{id="StaticText"}
+
+## `StaticText`
+
+```silk
+pub struct StaticText
+```
+
+The scope for StaticText operations.
+
+### Details
+
+This owner carries no data. Select it with `import silk.static_text { StaticText }`
+to access its inherent operations.
+
+::Anchor{id="StaticText.impl"}
+
+## Implementation `StaticText`
+
+```silk
+impl StaticText
+```
+
+::Anchor{id="StaticText.impl.byteLength"}
+
+### Associated function `byteLength`
+
+```silk
+pub static fn byteLength(value: string) -> usize
+```
+
+Returns the UTF-8 byte length of `value` during static evaluation.
+
+::Anchor{id="StaticText.impl.byteAt"}
+
+### Associated function `byteAt`
+
+```silk
+pub static fn byteAt(value: string, index: usize) -> u8
+```
+
+Returns one UTF-8 byte at `index`, or reports a static phase violation when out of bounds.
+
+::Anchor{id="StaticText.impl.concat"}
+
+### Associated function `concat`
+
+```silk
+pub static fn concat(left: string, right: string) -> string<'static>
+```
+
+Concatenates two static texts and retains `left` as the source anchor for diagnostics.
+
+::Anchor{id="StaticText.impl.slice"}
+
+### Associated function `slice`
+
+```silk
+pub static fn slice(value: string, start: usize, end: usize) -> string<'static>
+```
+
+Returns the UTF-8 byte range `start..end` when both boundaries are scalar boundaries.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

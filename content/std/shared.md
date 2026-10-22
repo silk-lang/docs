@@ -1,0 +1,145 @@
+Explicitly allocated, single-threaded shared ownership Shared.with callback-scoped access.
+
+## When to use
+Use [`Shared`](#Shared) when several independently owned local values or dormant computations must retain
+one mutable state without retaining a lexical borrow for their whole lifetimes. Construction is
+the only implicit storage boundary: [`Shared.make`](#Shared.impl.make) allocates once, while [`Shared.clone`](#Shared.impl.clone), [`Shared.with`](#Shared.impl.with), and
+[`Shared.withMut`](#Shared.impl.withMut) allocate nothing themselves.
+
+## Details
+Every handle is affine and local to one execution thread. Cloning adds one strong obligation;
+dropping a non-last handle preserves the value and allocation, while dropping the last handle
+cleans the value and then releases the allocation. Access is callback-scoped and exclusive even
+through [`Shared.with`](#Shared.impl.with): nesting `Shared.with` under `Shared.with`, `Shared.withMut` under `Shared.with`, `Shared.with` under `Shared.withMut`, or
+`Shared.withMut` under `Shared.withMut` through an alias traps before the nested callback receives a reference.
+
+## Gotchas
+Strong-reference cycles leak until ordinary source breaks them. This module does not expose weak
+handles, allocation identity, raw addresses, thread transfer, or post-trap cleanup guarantees.
+Extract work under [`Shared.withMut`](#Shared.impl.withMut) and invoke external callbacks only after the access call returns.
+
+## Examples
+### Share and update one local value
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+
+import silk.effect { Effect }
+
+import silk.shared { Shared }
+
+struct Counter { value: i32 }
+
+fn increment(value: &mut Counter) -> i32 {
+  value.value = value.value + 22
+  return value.value
+}
+
+fn read(value: &Counter) -> i32 { return value.value }
+
+effect fn useCell() -> i32
+! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let creating = Shared<Counter>.make(Counter { value: 20 })
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let cell = run creating
+  let alias = Shared<Counter>.clone(&cell)
+  let updated = Shared<Counter>.withMut<i32>(&alias, increment)
+  return Shared<Counter>.with<i32>(&cell, read)
+}
+
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(useCell(), recover)
+}
+```
+
+Import as `Shared` with `import silk.shared { Shared }`.
+
+Public declarations: 1.
+
+::Anchor{id="Shared"}
+
+## `Shared`
+
+```silk
+pub struct Shared<T>
+```
+
+An affine, non-thread-transferable strong handle to one local value.
+
+### Details
+
+The opaque core is the sole field and supplies recursively derived cleanup and local execution
+affinity. `Shared` declares no source Drop hook.
+
+::Anchor{id="Shared.impl"}
+
+## Implementation `Shared<T>`
+
+```silk
+impl<T> Shared<T>
+```
+
+::Anchor{id="Shared.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect<'env> fn make<'env>(value: T) -> Shared<T> ! OutOfMemoryError ? &mut Allocator
+```
+
+Allocates one control block and transfers `value` into a new strong handle.
+
+#### Details
+
+Allocation failure leaves `value` under ordinary Effect-frame cleanup and produces no handle.
+The returned handle carries no allocator requirement after construction completes.
+
+::Anchor{id="Shared.impl.clone"}
+
+### Method `clone`
+
+```silk
+pub fn clone(self: &Self) -> Shared<T>
+```
+
+Adds one strong handle without allocating or touching the stored value.
+
+#### Details
+
+Count exhaustion traps before mutation and does not produce a partial handle.
+
+::Anchor{id="Shared.impl.withMut"}
+
+### Method `withMut`
+
+```silk
+pub fn withMut<A>(self: &Self, use: once fn(&mut T) -> A) -> A
+```
+
+Runs one take-once callback Shared.with exclusive access to the stored value.
+
+#### Details
+
+The borrow cannot escape the callback or remain live across suspension. Reentrant access through
+any alias traps before the nested callback receives a reference.
+
+::Anchor{id="Shared.impl.with"}
+
+### Method `with`
+
+```silk
+pub fn with<A>(self: &Self, use: once fn(&T) -> A) -> A
+```
+
+Runs one take-once callback Shared.with shared access to the stored value.
+
+#### Details
+
+Inspection delegates through [`Shared.withMut`](#Shared.impl.withMut), so it has the same exclusive runtime access state and
+the same four-way reentrant conflict policy. The callback cannot mutate through its `&T`.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -1,0 +1,371 @@
+Independently owned, caller-funded lazy computations with explicit external parking.
+
+## When to use
+Use [`make`](#Execution.impl.make) when a lazy Effect must outlive the caller which constructs it and be resumed by a
+later owner. Use [`park`](#Execution.impl.park) inside the body when readiness comes from an external registration.
+Use [`drive`](#Execution.impl.drive) for the initial activation and each later eligible activation.
+
+## Details
+Construction obtains one combined package from the selected `Allocator`
+and does not start the Effect. The body representation, continuation, and fixed readiness
+endpoint remain private. A nested `Effect.suspend` transfers execution
+immediately. In contrast, [`park`](#Execution.impl.park) relinquishes the Execution until one [`Wake`](#Wake) makes it
+eligible. The readiness phase and the park generation are ordinary source policy kept together
+in one package control word; the compiler only loads, stores and compare-exchanges it. A Wake
+may be signaled from another thread: every transition is one compare-exchange of that word,
+and readiness is published before the endpoint runs (EXEC-009).
+
+Use [`makeTransferable`](#Execution.impl.makeTransferable) for an Execution that a thread-capable owner moves between threads.
+Its handle is a [`TransferableExecution`](#TransferableExecution), and its body parks with [`parkTransferable`](#Execution.impl.parkTransferable), whose
+[`TransferableWake`](#TransferableWake) may be signaled from any thread (EXEC-010).
+
+## Gotchas
+`Execution` is affine. The readiness callback must be detached and non-parking. [`make`](#Execution.impl.make) can
+report package allocation refusal. Later private execution-stack growth is a fatal trap.
+Dropping a dormant Execution cancels it. A retained Wake keeps the complete inert package alive
+until the Wake is consumed or dropped. [`drive`](#Execution.impl.drive) returns continued ownership only to
+`onSuspend`.
+
+Import as `Execution` with `import silk.execution { Execution }`.
+
+Public declarations: 4.
+
+::Anchor{id="Wake"}
+
+## `Wake`
+
+```silk
+pub struct Wake
+```
+
+The affine readiness authority for one parked generation of one Execution.
+
+### Details
+
+[`Execution.park`](#Execution.impl.park) passes the generation's only Wake to its registration callback.
+[`Execution.wake`](#Execution.impl.wake) consumes it and makes that generation eligible at most once.
+
+### Gotchas
+
+Dropping a Wake publishes nothing. A retained Wake keeps the inert package allocation alive
+after the Execution is dropped, until the Wake is consumed or dropped.
+
+::Anchor{id="TransferableWake"}
+
+## `TransferableWake`
+
+```silk
+pub struct TransferableWake
+```
+
+A Wake that may move to another thread and be signaled there.
+
+### Details
+
+[`Execution.parkTransferable`](#Execution.impl.parkTransferable) passes the generation's only TransferableWake to its
+registration callback. [`Execution.wakeTransferable`](#Execution.impl.wakeTransferable) consumes it from any thread.
+
+### Gotchas
+
+It has the same lifetime rules as [`Wake`](#Wake): dropping it publishes nothing, and a retained one
+keeps the inert package allocation alive.
+
+::Anchor{id="TransferableWake.impl.Transferable"}
+
+## Implementation `Transferable for TransferableWake`
+
+```silk
+impl Transferable for TransferableWake
+```
+
+::Anchor{id="TransferableExecution"}
+
+## `TransferableExecution`
+
+```silk
+pub struct TransferableExecution<A>
+```
+
+The owner of an Execution made by [`Execution.makeTransferable`](#Execution.impl.makeTransferable), which may move to another thread.
+
+### Details
+
+[`local`](#TransferableExecution.impl.local) gives back the `Intrinsic.Execution<A>` handle that [`Execution.drive`](#Execution.impl.drive) takes, and
+[`adopt`](#TransferableExecution.impl.adopt) wraps a handle again, such as the dormant one `onSuspend` receives. The wrapper is
+`Transferable` when `A` is.
+
+### Gotchas
+
+Adopting a handle that [`Execution.make`](#Execution.impl.make) created is a fatal trap.
+
+::Anchor{id="TransferableExecution.impl.Transferable"}
+
+## Implementation `Transferable for TransferableExecution<A>`
+
+```silk
+impl<A: Transferable> Transferable for TransferableExecution<A>
+```
+
+::Anchor{id="TransferableExecution.impl"}
+
+## Implementation `TransferableExecution<A>`
+
+```silk
+impl<A> TransferableExecution<A>
+```
+
+::Anchor{id="TransferableExecution.impl.adopt"}
+
+### Associated function `adopt`
+
+```silk
+pub fn adopt(execution: Intrinsic.Execution<A>) -> TransferableExecution<A>
+```
+
+Wraps a handle to a package made by [`Execution.makeTransferable`](#Execution.impl.makeTransferable).
+
+#### Gotchas
+
+A handle made by [`Execution.make`](#Execution.impl.make) is a fatal state trap.
+
+::Anchor{id="TransferableExecution.impl.local"}
+
+### Method `local`
+
+```silk
+pub fn local(self: Self) -> Intrinsic.Execution<A>
+```
+
+Gives back the handle so the current thread can drive or drop it.
+
+::Anchor{id="TransferableExecution.impl.notifyInitial"}
+
+### Method `notifyInitial`
+
+```silk
+pub fn notifyInitial(self: &mut Self) -> ()
+```
+
+Notifies the fixed readiness endpoint for one `Initial` Execution exactly once.
+
+#### Details
+
+This is [`Execution.notifyInitial`](#Execution.impl.notifyInitial) for the wrapped handle.
+
+::Anchor{id="Execution"}
+
+## `Execution`
+
+```silk
+pub struct Execution
+```
+
+The owner of the execution lifecycle operations.
+
+### Details
+
+This struct carries no data and is never constructed by the library. Every operation is an
+inherent member declared in `impl Execution`, so `import silk.execution { Execution }` is the
+one import that reaches `Execution.make(...)` and the rest. It is unrelated to the builtin
+`Intrinsic.Execution<A>` type.
+
+::Anchor{id="Execution.impl"}
+
+## Implementation `Execution`
+
+```silk
+impl Execution
+```
+
+::Anchor{id="Execution.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect<'static> fn make<
+    A,
+    F: once Effect<'static; A> + Intrinsic.Detached,
+    O: Intrinsic.Detached,
+    R: fn<'static>(&O) -> () + Intrinsic.Detached + Intrinsic.NonParking
+  >(body: F, readyState: O, onReady: R) -> Intrinsic.Execution<A>
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Allocates one combined package and transfers the lazy body and fixed endpoint into it.
+
+#### Details
+
+The returned Execution is `Initial`. The body does not start during this call. Allocation refusal
+produces no Execution and leaves every input under ordinary Effect cleanup. Later private stack
+growth is a fatal trap and is not a `OutOfMemoryError`.
+
+::Anchor{id="Execution.impl.makeTransferable"}
+
+### Associated function `makeTransferable`
+
+```silk
+pub effect<'static> fn makeTransferable<
+    A: Transferable,
+    F: once Effect<'static; A> + Intrinsic.Detached + Transferable,
+    O: Intrinsic.Detached + Transferable + Concurrent,
+    R: fn<'static>(&O) -> () + Intrinsic.Detached + Intrinsic.NonParking + Transferable + Concurrent
+  >(body: F, readyState: O, onReady: R) -> TransferableExecution<A>
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Allocates one package whose handle and Wakes may move to other threads.
+
+#### Details
+
+This is [`make`](#Execution.impl.make) with thread bounds. The body and result must be `Transferable`, because the
+body may resume on any thread that drives it. The endpoint and its state must be
+`Transferable` and `Concurrent`, because each [`TransferableWake`](#TransferableWake) runs the endpoint on the
+thread that signals it. The body parks with [`parkTransferable`](#Execution.impl.parkTransferable).
+
+#### Gotchas
+
+Values the body creates itself need no bound: Silk has no thread-local or global storage, so
+nothing outside the body can reach them while it moves between threads.
+
+::Anchor{id="Execution.impl.drive"}
+
+### Associated function `drive`
+
+```silk
+pub effect<'env> fn drive<
+    'env,
+    A: 'env,
+    D: 'env,
+    C: once fn<'env>(D, A) -> () + Intrinsic.NonParking,
+    S: once fn<'env>(D, Intrinsic.Execution<A>) -> () + Intrinsic.NonParking
+  >(
+    execution: Intrinsic.Execution<A>,
+    branchState: D,
+    onComplete: C,
+    onSuspend: S
+  ) -> ()
+```
+
+Drives one `Initial`, `InitialReady`, or `Eligible` activation and transfers `branchState` to one outcome callback.
+
+#### Details
+
+Completion calls `onComplete`. Relinquishment calls `onSuspend` with the dormant Execution.
+Each activation calls exactly one callback. Nested transfer can complete in the same drive.
+External parking relinquishes ownership until the fixed readiness endpoint reports eligibility.
+The body starts an independent diagnostic invocation. Install observation inside the body to
+retain it across parking. Outcome callbacks run in the driving caller's diagnostic context.
+
+#### Gotchas
+
+Driving a dormant, notifying, completed, or destroyed Execution is a fatal state trap.
+
+::Anchor{id="Execution.impl.notifyInitial"}
+
+### Associated function `notifyInitial`
+
+```silk
+pub fn notifyInitial<A>(execution: &mut Intrinsic.Execution<A>) -> ()
+```
+
+Notifies the fixed readiness endpoint for one `Initial` Execution exactly once.
+
+#### Details
+
+This operation changes the package to `InitialReady` before it invokes the endpoint. It is
+synchronous, does not park, and does not run the body. A later [`drive`](#Execution.impl.drive) starts the body.
+
+#### Gotchas
+
+The Execution must still be `Initial`. Calling this operation again, or calling it after the
+Execution has been driven, parked, completed, or destroyed, is a fatal state trap.
+
+::Anchor{id="Execution.impl.park"}
+
+### Associated function `park`
+
+```silk
+pub effect fn park<
+    'env,
+    G,
+    F: once fn<'env>(Wake) -> G + Intrinsic.NonParking
+  >(register: F) -> ()
+```
+
+Relinquishes the currently Running Execution until one external readiness signal arrives.
+
+#### Details
+
+The registration callback receives the generation's sole affine [`Wake`](#Wake). Its returned guard
+is retained while dormant and dropped immediately before source continues after this call.
+A Wake signaled during registration is latched until [`drive`](#Execution.impl.drive) returns this Execution to its
+owner, which then notifies. The Wake invokes the fixed readiness endpoint at most one time.
+
+#### Gotchas
+
+A caller that keeps a cancelled Wake also keeps the complete inert Execution package alive.
+Consuming or dropping that Wake releases the final package authority.
+
+::Anchor{id="Execution.impl.parkTransferable"}
+
+### Associated function `parkTransferable`
+
+```silk
+pub effect fn parkTransferable<
+    'env,
+    G,
+    F: once fn<'env>(TransferableWake) -> G + Intrinsic.NonParking
+  >(register: F) -> ()
+```
+
+Relinquishes the currently Running Execution and passes a [`TransferableWake`](#TransferableWake) to `register`.
+
+#### Details
+
+This is [`park`](#Execution.impl.park) for a body made by [`makeTransferable`](#Execution.impl.makeTransferable). The Wake may be sent to another
+thread and signaled there with [`wakeTransferable`](#Execution.impl.wakeTransferable).
+
+#### Gotchas
+
+Calling it from a body made by [`make`](#Execution.impl.make) is a fatal state trap, since that endpoint may not
+run on another thread.
+
+::Anchor{id="Execution.impl.wakeTransferable"}
+
+### Associated function `wakeTransferable`
+
+```silk
+pub fn wakeTransferable(wake: TransferableWake) -> ()
+```
+
+Consumes one TransferableWake on any thread and makes its parked generation eligible.
+
+#### Details
+
+This is [`wake`](#Execution.impl.wake); when it publishes readiness, the endpoint runs on the calling thread.
+
+::Anchor{id="Execution.impl.wake"}
+
+### Associated function `wake`
+
+```silk
+pub fn wake(wake: Wake) -> ()
+```
+
+Consumes one Wake and makes its parked generation eligible.
+
+#### Details
+
+A Wake signaled while its generation is still registering is latched until the owner receives
+the Execution back from [`drive`](#Execution.impl.drive). A Wake signaled while its generation is dormant makes the
+Execution eligible and synchronously invokes its fixed readiness endpoint. Signaling never
+drives the Execution.
+
+#### Gotchas
+
+A Wake for a dropped or completed Execution, or for an earlier generation, publishes nothing
+and only releases its package authority.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

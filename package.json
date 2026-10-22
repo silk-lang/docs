@@ -1,0 +1,48 @@
+{
+  "name": "silk-docs",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --outDir dist/client",
+    "typecheck": "tsc --noEmit",
+    "format": "oxfmt",
+    "test": "vitest run",
+    "lint": "oxlint src && effect-tsgo patch --no-typescript --oxlint && oxlint --config .oxlintrc.effect.json --deny-warnings src",
+    "sync-docs": "node scripts/sync-silk-docs.ts",
+    "build:site": "vite build && cp dist/client/404/index.html dist/client/404.html",
+    "deploy": "alchemy deploy --stage prod --yes"
+  },
+  "dependencies": {
+    "@effect/platform-browser": "4.0.0",
+    "@foldkit/markdown": "^0.14.4",
+    "@tanstack/highlight": "1.1.0",
+    "effect": "4.0.0",
+    "foldkit": "0.169.0",
+    "silk-lang": "0.1.0"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "0.50.0",
+    "@foldkit/devtools": "0.169.0",
+    "@foldkit/devtools-mcp": "0.25.0",
+    "@foldkit/oxlint-plugin": "0.15.3",
+    "@foldkit/vite-plugin": "0.28.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "26.4.0",
+    "alchemy": "2.0.0-beta.83",
+    "happy-dom": "^20.14.5",
+    "oxfmt": "^0.66.0",
+    "oxlint": "1.85.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  },
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  }
+}
