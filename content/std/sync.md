@@ -1,0 +1,428 @@
+Shared ownership and locking for values that several native threads use at once.
+
+## When to use
+Use [`Arc`](#Arc) to give several threads ownership of one value, [`Mutex`](#Mutex) to let them change it one
+at a time, and [`Parker`](#Parker) to put a thread to sleep until another thread wakes it.
+
+## Details
+[`Arc`](#Arc) counts its handles atomically, so cloning and dropping handles on different threads is
+safe; the last handle dropped, on whichever thread, drops the value. [`Mutex`](#Mutex) is a futex lock
+built on [`Atomic.wait`](/docs/std/atomic#Atomic.impl.wait) and [`Atomic.notifyOne`](/docs/std/atomic#Atomic.impl.notifyOne): an uncontended lock and unlock are one atomic
+operation each, and a contended lock sleeps in the operating system instead of spinning.
+[`Parker`](#Parker) holds one wakeup token, so an unpark that arrives before the park is not lost.
+
+Each type keeps its shared state in its own allocation and reaches it through raw pointers it
+computed when that allocation was fresh. Handles and guards only copy those pointers, and every
+write to state other threads can see is atomic or made under the lock.
+
+## Gotchas
+These types need the same targets as [`Atomic.wait`](/docs/std/atomic#Atomic.impl.wait): Darwin, GNU libc, or single-threaded
+WebAssembly. Unlike `Shared<T>`, an `Arc<T>` never detects reentrant access; it only hands out
+shared borrows, so mutation goes through a `Mutex` or atomics. Reference cycles of `Arc`
+handles leak.
+
+## Examples
+### Count on several threads
+```silk,ignore
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.native_thread { NativeThread, SpawnError }
+import silk.sync { Arc, Mutex }
+
+fn addOne(total: Arc<Mutex<i32>>) -> i32 {
+  let mut guard = total.get().lock()
+  let value = guard.getMut()
+  value.* = value.* + 1
+  return value.*
+}
+
+effect fn program() -> i32 ! OutOfMemoryError | SpawnError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mutex = run Mutex<i32>.make(41) |> Effect.provideMut<Allocator>(&mut allocator)
+  let total = run Arc<Mutex<i32>>.make(move mutex) |> Effect.provideMut<Allocator>(&mut allocator)
+  let mine = total.clone()
+  let worker = run NativeThread.spawn(fn() -> i32 { return addOne(move mine) })
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  return worker.join()
+}
+```
+
+Import as `Arc` with `import silk.sync { Arc }`.
+
+Public declarations: 5.
+
+::Anchor{id="Arc"}
+
+## `Arc`
+
+```silk
+pub struct Arc<T>
+```
+
+A thread-safe reference-counted handle to one shared value.
+
+### Details
+
+[`get`](#Arc.impl.get) borrows the value for as long as the handle is borrowed. `Arc<T>` is `Transferable` and
+`Concurrent` when `T` is both, since every handle lets its thread read the value.
+
+::Anchor{id="Arc.impl.Transferable"}
+
+## Implementation `Transferable for Arc<T>`
+
+```silk
+impl<T: Transferable + Concurrent> Transferable for Arc<T>
+```
+
+::Anchor{id="Arc.impl.Concurrent"}
+
+## Implementation `Concurrent for Arc<T>`
+
+```silk
+impl<T: Transferable + Concurrent> Concurrent for Arc<T>
+```
+
+::Anchor{id="Arc.impl"}
+
+## Implementation `Arc<T>`
+
+```silk
+impl<T> Arc<T>
+```
+
+::Anchor{id="Arc.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect<'env> fn make<'env>(value: T) -> Arc<T> ! OutOfMemoryError ? &mut Allocator
+```
+
+Moves `value` into a new allocation owned by one handle.
+
+::Anchor{id="Arc.impl.clone"}
+
+### Method `clone`
+
+```silk
+pub fn clone(self: &Self) -> Arc<T>
+```
+
+Adds one handle to the same value.
+
+#### Details
+
+The count is a word, and a count past half its range traps before the handle exists.
+
+::Anchor{id="Arc.impl.get"}
+
+### Method `get`
+
+```silk
+pub fn get<'a>(self: &'a Self) -> &'a T
+```
+
+Borrows the shared value for as long as this handle is borrowed.
+
+::Anchor{id="Arc.impl.count"}
+
+### Method `count`
+
+```silk
+pub fn count(self: &Self) -> usize
+```
+
+The number of handles at the moment of the read; other threads may change it at once.
+
+::Anchor{id="Arc.impl.Drop"}
+
+## Implementation `Drop for Arc<T>`
+
+```silk
+impl<T> Drop for Arc<T>
+```
+
+::Anchor{id="Arc.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut Arc<T>) -> ()
+```
+
+::Anchor{id="Mutex"}
+
+## `Mutex`
+
+```silk
+pub struct Mutex<T>
+```
+
+A lock that gives one thread at a time exclusive access to a value.
+
+### Details
+
+[`lock`](#Mutex.impl.lock) returns a [`MutexGuard`](#MutexGuard), which borrows the value until it is dropped. `Mutex<T>` is
+`Transferable` and `Concurrent` when `T` is `Transferable`: the lock passes the value between
+threads one at a time. Share a mutex by putting it in an [`Arc`](#Arc).
+
+### Gotchas
+
+Locking a mutex again on the thread that holds it deadlocks.
+
+::Anchor{id="Mutex.impl.Transferable"}
+
+## Implementation `Transferable for Mutex<T>`
+
+```silk
+impl<T: Transferable> Transferable for Mutex<T>
+```
+
+::Anchor{id="Mutex.impl.Concurrent"}
+
+## Implementation `Concurrent for Mutex<T>`
+
+```silk
+impl<T: Transferable> Concurrent for Mutex<T>
+```
+
+::Anchor{id="Mutex.impl"}
+
+## Implementation `Mutex<T>`
+
+```silk
+impl<T> Mutex<T>
+```
+
+::Anchor{id="Mutex.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect<'env> fn make<'env>(value: T) -> Mutex<T> ! OutOfMemoryError ? &mut Allocator
+```
+
+Moves `value` into a new, unlocked mutex.
+
+::Anchor{id="Mutex.impl.lock"}
+
+### Method `lock`
+
+```silk
+pub fn lock<'a>(self: &'a Self) -> MutexGuard<'a, T>
+```
+
+Waits until the lock is free, takes it, and returns the guard that releases it.
+
+::Anchor{id="Mutex.impl.tryLock"}
+
+### Method `tryLock`
+
+```silk
+pub fn tryLock<'a>(self: &'a Self) -> Option<MutexGuard<'a, T>>
+```
+
+Takes the lock when it is free, without waiting.
+
+::Anchor{id="Mutex.impl.Drop"}
+
+## Implementation `Drop for Mutex<T>`
+
+```silk
+impl<T> Drop for Mutex<T>
+```
+
+::Anchor{id="Mutex.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut Mutex<T>) -> ()
+```
+
+::Anchor{id="MutexGuard"}
+
+## `MutexGuard`
+
+```silk
+pub struct MutexGuard<'a, T>
+```
+
+Exclusive access to a locked [`Mutex`](#Mutex)'s value; dropping the guard unlocks it.
+
+::Anchor{id="MutexGuard.impl"}
+
+## Implementation `MutexGuard<'a, T>`
+
+```silk
+impl<'a, T> MutexGuard<'a, T>
+```
+
+::Anchor{id="MutexGuard.impl.get"}
+
+### Method `get`
+
+```silk
+pub fn get<'b>(self: &'b Self) -> &'b T
+```
+
+Borrows the locked value.
+
+::Anchor{id="MutexGuard.impl.getMut"}
+
+### Method `getMut`
+
+```silk
+pub fn getMut<'b>(self: &'b mut Self) -> &'b mut T
+```
+
+Borrows the locked value exclusively.
+
+::Anchor{id="MutexGuard.impl.Drop"}
+
+## Implementation `Drop for MutexGuard<'a, T>`
+
+```silk
+impl<'a, T> Drop for MutexGuard<'a, T>
+```
+
+::Anchor{id="MutexGuard.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut MutexGuard<'a, T>) -> ()
+```
+
+::Anchor{id="Parker"}
+
+## `Parker`
+
+```silk
+pub struct Parker
+```
+
+A one-token sleep for the thread that owns it.
+
+### Details
+
+[`park`](#Parker.impl.park) returns at once when a token is waiting and consumes it; otherwise it sleeps until an
+[`Unparker`](#Unparker) supplies one. Tokens do not accumulate: several unparks before one park wake it
+once. A `Parker` stays with its thread, and its [`Unparker`](#Unparker)s go to the threads that wake it.
+
+### Gotchas
+
+`park` may also return without a token, so callers recheck their own condition in a loop.
+
+::Anchor{id="Unparker"}
+
+## `Unparker`
+
+```silk
+pub struct Unparker
+```
+
+The waking side of a [`Parker`](#Parker), which any thread may hold.
+
+::Anchor{id="Unparker.impl.Transferable"}
+
+## Implementation `Transferable for Unparker`
+
+```silk
+impl Transferable for Unparker
+```
+
+::Anchor{id="Unparker.impl.Concurrent"}
+
+## Implementation `Concurrent for Unparker`
+
+```silk
+impl Concurrent for Unparker
+```
+
+::Anchor{id="Parker.impl.Transferable"}
+
+## Implementation `Transferable for Parker`
+
+```silk
+impl Transferable for Parker
+```
+
+::Anchor{id="Parker.impl"}
+
+## Implementation `Parker`
+
+```silk
+impl Parker
+```
+
+::Anchor{id="Parker.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect fn make() -> Parker ! OutOfMemoryError ? &mut Allocator
+```
+
+Makes a parker with no token.
+
+::Anchor{id="Parker.impl.unparker"}
+
+### Method `unparker`
+
+```silk
+pub fn unparker(self: &Self) -> Unparker
+```
+
+Returns an [`Unparker`](#Unparker) that wakes this parker.
+
+::Anchor{id="Parker.impl.park"}
+
+### Method `park`
+
+```silk
+pub fn park(self: &Self) -> ()
+```
+
+Consumes a waiting token, or sleeps until one arrives.
+
+::Anchor{id="Parker.impl.parkTimeout"}
+
+### Method `parkTimeout`
+
+```silk
+pub fn parkTimeout(self: &Self, timeout: u64) -> bool
+```
+
+Like [`park`](#Parker.impl.park), but returns after `timeout` nanoseconds without a token. Returns whether it
+consumed a token.
+
+::Anchor{id="Unparker.impl"}
+
+## Implementation `Unparker`
+
+```silk
+impl Unparker
+```
+
+::Anchor{id="Unparker.impl.unpark"}
+
+### Method `unpark`
+
+```silk
+pub fn unpark(self: &Self) -> ()
+```
+
+Supplies the token, and wakes the parker if it sleeps.
+
+::Anchor{id="Unparker.impl.clone"}
+
+### Method `clone`
+
+```silk
+pub fn clone(self: &Self) -> Unparker
+```
+
+Adds another unparker for the same parker.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

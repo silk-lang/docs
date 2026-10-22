@@ -1,0 +1,137 @@
+Owned certificate sequences decoded atomically from strict PEM input.
+
+## When to use
+
+Use [`CertificateBundle`](#CertificateBundle) for a PEM document with one or more CERTIFICATE blocks.
+Use `silk.certificate.Certificate` when the input must contain exactly one certificate.
+
+## Details
+
+A bundle preserves input order and duplicate certificates. Each certificate owns its DER bytes.
+All input, field, count, and traversal limits are inclusive. Zero never means unlimited.
+A failed call releases prior certificates and returns no partial bundle.
+
+## Gotchas
+
+Successful decoding does not establish trust, signature validity, or certificate-path order.
+Explanatory text, unrelated PEM labels, and malformed later blocks fail the entire call.
+
+Import as `CertificateBundle` with `import silk.certificate_bundle { CertificateBundle }`.
+
+Public declarations: 1.
+
+::Anchor{id="CertificateBundle"}
+
+## `CertificateBundle`
+
+```silk
+pub struct CertificateBundle
+```
+
+An immutable owned sequence that preserves every decoded certificate in input order.
+
+### Details
+
+The bundle releases all certificate storage on drop. Borrowed certificates cannot outlive the bundle.
+Duplicate certificates remain separate entries. Decoding does not assign trust or chain order.
+
+::Anchor{id="CertificateBundle.impl"}
+
+## Implementation `CertificateBundle`
+
+```silk
+impl CertificateBundle
+```
+
+::Anchor{id="CertificateBundle.impl.decodePem"}
+
+### Associated function `decodePem`
+
+```silk
+pub effect fn decodePem(input: &[u8], limits: DecodeLimits) -> Result<
+    CertificateBundle,
+    DecodeError,
+  > ! OutOfMemoryError ? &mut Allocator
+```
+
+Decodes all strict PEM certificate blocks into one owned result, or returns no bundle.
+
+#### Details
+
+The input remains borrowed until the Effect completes or is dropped. A successful result owns independent DER bytes.
+Limits include whitespace and duplicate certificates. All limits are inclusive; zero is a zero budget.
+Malformed input, unsupported labels, and exhausted limits return `DecodeError` in the result.
+Allocation refusal uses `OutOfMemoryError`. Every failure releases accumulated certificates and scratch storage.
+
+#### Gotchas
+
+Only CERTIFICATE labels and SP, HT, CR, and LF whitespace are accepted.
+Explanatory text and malformed later blocks fail the entire document. This operation does not validate trust.
+
+::Anchor{id="CertificateBundle.impl.decodeAnnotatedPem"}
+
+### Associated function `decodeAnnotatedPem`
+
+```silk
+pub effect fn decodeAnnotatedPem(input: &[u8], limits: DecodeLimits) -> Result<CertificateBundle, DecodeError>
+  ! OutOfMemoryError ? &mut Allocator
+```
+
+Imports a platform CA document with explanatory text between strict CERTIFICATE blocks.
+
+#### Details
+
+Printable annotation lines outside blocks are ignored. Every block is decoded strictly;
+malformed boundaries, unrelated labels, invalid base64 or DER reject the whole document.
+Order, duplicates, original error offsets, and all inclusive budgets are preserved.
+Annotation bytes count toward the input budget. An annotation-only document is invalid.
+
+#### Gotchas
+
+This operation establishes no authority. Use [`decodePem`](#CertificateBundle.impl.decodePem) when all non-PEM text must fail.
+
+::Anchor{id="CertificateBundle.impl.length"}
+
+### Method `length`
+
+```silk
+pub fn length(self: &Self) -> usize
+```
+
+Returns the number of certificates, including duplicate entries.
+
+::Anchor{id="CertificateBundle.impl.get"}
+
+### Method `get`
+
+```silk
+pub fn get<'a>(self: &'a Self, index: usize) -> Option<&'a Certificate>
+```
+
+Borrows the certificate at `index`, or returns `None` when the index is outside the bundle.
+
+#### Details
+
+The returned certificate cannot outlive this bundle. This operation allocates nothing and preserves input order.
+
+::Anchor{id="CertificateBundle.impl.intoCertificates"}
+
+### Method `intoCertificates`
+
+```silk
+pub fn intoCertificates(self: Self) -> List<Certificate>
+```
+
+Consumes the bundle and returns every owned certificate without allocating or copying DER.
+
+#### When to use
+
+Use this function when another owner must take the complete decoded sequence. Use [`get`](#CertificateBundle.impl.get) to
+inspect one certificate without consuming the bundle.
+
+#### Details
+
+The returned list preserves input order, duplicate entries, allocation, and capacity. This
+operation assigns no trust and performs no certificate validation.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

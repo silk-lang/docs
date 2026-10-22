@@ -1,0 +1,228 @@
+Native [`FileSystem`](/docs/std/filesystem#FileSystem) provider confined beneath one explicitly owned platform root.
+
+## When to use
+Construct [`OsFileSystem`](#OsFileSystem) at a native application edge and provide it to portable filesystem
+code. Supply an in-memory [`FileSystem`](/docs/std/filesystem#FileSystem) in tests or on targets without native OS access.
+
+## Details
+Portable `/` denotes the provider root rather than the host filesystem root. The native boundary
+rejects malformed portable paths and never follows symlinks below the configured root.
+Ordinary writes retain create-or-truncate semantics and can leave a partial file on failure.
+Exclusive creation refuses every existing entry with AlreadyExists; once claimed, a write or
+close failure leaves the new, possibly partial file in place. Atomic writes instead publish
+complete contents with renameat (replace) or linkat/unlinkat (create-new), staging in the same
+directory under an exclusively claimed temporary name. Replace can replace a final symlink
+entry itself, never its referent; directories and other unsupported destination kinds are refused.
+Directory listings sort complete child paths deterministically. Low-level failures become
+portable [`FileError`](/docs/std/filesystem#FileError) values with retained native codes.
+
+Newly created or atomically published inodes use mode 0666 filtered by the process umask and
+normal filesystem inheritance. Atomic replacement preserves no old permission bits, ownership,
+ACLs, extended attributes or hard-link identity; existing hard links retain the old inode.
+Synchronized atomic writes fsync the actual staged descriptor before publication, then fsync
+the owned parent after publication and staging cleanup. `FileSystem.syncDirectory` also uses fsync.
+On Darwin and GNU/Linux these are ordinary filesystem synchronization, not F_FULLFSYNC or
+guarantees about hardware caches or physical power-loss recovery. Unsupported synchronization
+fails explicitly rather than silently downgrading.
+
+[`make`](#OsFileSystem.impl.make) copies its root. The root must be an absolute, non-empty, NUL-free native path. A root
+that violates this precondition traps. Open handles close on success and failure; close is never
+retried after EINTR. An earlier failure takes precedence over close failure. [`AtomicWriteError`](/docs/std/filesystem#AtomicWriteError)
+distinguishes failure before publication from failure after complete new contents became visible,
+and retains a separate staging-cleanup failure plus its exact residual temporary leaf name.
+The configured root and its ancestors must be trusted; confinement does not promise protection
+against hostile directory renames, privileged mount changes, or tampering with staging entries.
+
+Constructing the provider performs no filesystem operation beyond owning the root bytes.
+Portable code uses `FileSystem` operations after the application supplies `&mut OsFileSystem`
+for the `&mut FileSystem` requirement.
+
+## Gotchas
+This module publishes its provider only for the supported native profiles.
+WebAssembly selection leaves the module empty.
+
+## Examples
+### Construct a provider without accessing the filesystem
+
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+
+import silk.effect { Effect }
+
+import silk.os_filesystem { OsFileSystem }
+
+effect fn program() -> i32
+! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let provider = run OsFileSystem.make(b"/tmp")
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  drop provider
+  return 42
+}
+
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), recover)
+}
+```
+
+Import as `OsFileSystem` with `import silk.os_filesystem { OsFileSystem }`.
+
+Public declarations: 1.
+
+::Anchor{id="OsFileSystem"}
+
+## `OsFileSystem`
+
+```silk
+pub struct OsFileSystem
+```
+
+A native [`FileSystem`](/docs/std/filesystem#FileSystem) provider confined beneath one independently owned platform root.
+
+### Details
+
+Portable absolute paths resolve inside this root. The provider never exposes the root as a
+[`Path`](/docs/std/filesystem#Path), and operations reject lexical or symbolic-link escape from the root.
+
+::Anchor{id="OsFileSystem.impl"}
+
+## Implementation `OsFileSystem`
+
+```silk
+impl OsFileSystem
+```
+
+::Anchor{id="OsFileSystem.impl-2"}
+
+## Implementation `OsFileSystem`
+
+```silk
+impl OsFileSystem
+```
+
+::Anchor{id="OsFileSystem.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect fn make(root: &[u8]) -> OsFileSystem ! OutOfMemoryError ? &mut Allocator
+```
+
+Copies one absolute native root and creates a confined filesystem provider.
+
+#### When to use
+
+Use this function at a native application edge. Provide the result as `&mut FileSystem` to code
+that uses the portable filesystem service.
+
+#### Details
+
+Construction owns the root bytes but does not open the directory. Portable `/` then denotes
+this provider root instead of the host filesystem root.
+
+#### Gotchas
+
+`root` must be non-empty, absolute, and NUL-free. A value that violates this precondition traps.
+Allocation failure leaves no provider value.
+
+::Anchor{id="OsFileSystem.impl.FileSystem"}
+
+## Implementation `FileSystem for OsFileSystem`
+
+```silk
+impl FileSystem for OsFileSystem
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.readFile"}
+
+### Operation `readFile`
+
+```silk
+readFile: OsFileSystem.readFile
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.writeFile"}
+
+### Operation `writeFile`
+
+```silk
+writeFile: OsFileSystem.writeFile
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.createFile"}
+
+### Operation `createFile`
+
+```silk
+createFile: OsFileSystem.createFile
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.writeFileAtomic"}
+
+### Operation `writeFileAtomic`
+
+```silk
+writeFileAtomic: OsFileSystem.writeFileAtomic
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.syncDirectory"}
+
+### Operation `syncDirectory`
+
+```silk
+syncDirectory: OsFileSystem.syncDirectory
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.stat"}
+
+### Operation `stat`
+
+```silk
+stat: OsFileSystem.stat
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.listDirectory"}
+
+### Operation `listDirectory`
+
+```silk
+listDirectory: OsFileSystem.listDirectory
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.createDirectory"}
+
+### Operation `createDirectory`
+
+```silk
+createDirectory: OsFileSystem.createDirectory
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.removeFile"}
+
+### Operation `removeFile`
+
+```silk
+removeFile: OsFileSystem.removeFile
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.removeDirectory"}
+
+### Operation `removeDirectory`
+
+```silk
+removeDirectory: OsFileSystem.removeDirectory
+```
+
+::Anchor{id="OsFileSystem.impl.FileSystem.createTemporaryDirectory"}
+
+### Operation `createTemporaryDirectory`
+
+```silk
+createTemporaryDirectory: OsFileSystem.createTemporaryDirectory
+```
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

@@ -1,0 +1,733 @@
+Bounded TLS 1.3 record protection and partial-byte transport driving.
+
+## When to use
+Use [`TlsRecordSender`](#TlsRecordSender) and [`TlsRecordReceiver`](#TlsRecordReceiver) after a TLS handshake supplies a traffic
+secret, or use their plaintext constructors for the initial handshake record framing.
+
+## Details
+Each direction owns fixed-capacity storage allocated at construction. Later queue, input,
+acknowledgment, and consumption operations allocate nothing and retain no caller buffer.
+Protected epochs support the three TLS 1.3 cipher suites admitted by Silk and stop after
+[`RECORDS_PER_EPOCH`](#RECORDS_PER_EPOCH) records. A record view borrows its receiver until it is consumed.
+
+## Gotchas
+Possession of a traffic secret does not authenticate a server identity. This module does not
+perform a handshake, validate certificates, acquire trust, drive network resources, reserve a
+client KeyUpdate, or decide close-notify policy. Secret copies are not guaranteed to be erased.
+
+Import as `TlsRecordSender` with `import silk.tls_record { TlsRecordSender }`.
+
+Public declarations: 11.
+
+::Anchor{id="RECORDS_PER_EPOCH"}
+
+## `RECORDS_PER_EPOCH`
+
+```silk
+pub const RECORDS_PER_EPOCH: u64
+```
+
+The conservative maximum number of records protected by one traffic epoch.
+
+::Anchor{id="CipherSuite"}
+
+## `CipherSuite`
+
+```silk
+pub enum CipherSuite
+```
+
+One cipher suite in Silk's TLS 1.3 profile.
+
+::Anchor{id="CipherSuite.Aes128GcmSha256"}
+
+### `Aes128GcmSha256`
+
+```silk
+Aes128GcmSha256
+```
+
+TLS_AES_128_GCM_SHA256.
+
+::Anchor{id="CipherSuite.Aes256GcmSha384"}
+
+### `Aes256GcmSha384`
+
+```silk
+Aes256GcmSha384
+```
+
+TLS_AES_256_GCM_SHA384.
+
+::Anchor{id="CipherSuite.ChaCha20Poly1305Sha256"}
+
+### `ChaCha20Poly1305Sha256`
+
+```silk
+ChaCha20Poly1305Sha256
+```
+
+TLS_CHACHA20_POLY1305_SHA256.
+
+::Anchor{id="ContentType"}
+
+## `ContentType`
+
+```silk
+pub enum ContentType
+```
+
+A TLS record content type exposed after complete framing and authentication.
+
+::Anchor{id="ContentType.ChangeCipherSpec"}
+
+### `ChangeCipherSpec`
+
+```silk
+ChangeCipherSpec
+```
+
+Compatibility change_cipher_spec content. It is admitted only by plaintext framing.
+
+::Anchor{id="ContentType.Alert"}
+
+### `Alert`
+
+```silk
+Alert
+```
+
+Exactly one complete two-byte alert.
+
+::Anchor{id="ContentType.Handshake"}
+
+### `Handshake`
+
+```silk
+Handshake
+```
+
+A nonempty handshake fragment.
+
+::Anchor{id="ContentType.ApplicationData"}
+
+### `ApplicationData`
+
+```silk
+ApplicationData
+```
+
+Application data, including an empty fragment.
+
+::Anchor{id="InputDemand"}
+
+## `InputDemand`
+
+```silk
+pub enum InputDemand
+```
+
+The next receive-side action after a successful input call.
+
+::Anchor{id="InputDemand.NeedInput"}
+
+### `NeedInput`
+
+```silk
+NeedInput
+```
+
+Supply more bytes for the current record.
+
+::Anchor{id="InputDemand.RecordReady"}
+
+### `RecordReady`
+
+```silk
+RecordReady
+```
+
+Inspect and consume the completed record.
+
+::Anchor{id="InputDemand.NeedRecordConsumption"}
+
+### `NeedRecordConsumption`
+
+```silk
+NeedRecordConsumption
+```
+
+Consume the already-ready record before supplying more input.
+
+::Anchor{id="InputProgress"}
+
+## `InputProgress`
+
+```silk
+pub struct InputProgress
+```
+
+Exact input progress and the next receive-side action.
+
+::Anchor{id="InputProgress.consumed"}
+
+### Field `consumed`
+
+```silk
+pub consumed: usize
+```
+
+The caller-input prefix copied during this call.
+
+::Anchor{id="InputProgress.demand"}
+
+### Field `demand`
+
+```silk
+pub demand: InputDemand
+```
+
+The resource or action needed next.
+
+::Anchor{id="OutputDemand"}
+
+## `OutputDemand`
+
+```silk
+pub enum OutputDemand
+```
+
+The next send-side action after a successful queue call.
+
+::Anchor{id="OutputDemand.RecordQueued"}
+
+### `RecordQueued`
+
+```silk
+RecordQueued
+```
+
+One record was encoded and is ready for transport.
+
+::Anchor{id="OutputDemand.NeedOutput"}
+
+### `NeedOutput`
+
+```silk
+NeedOutput
+```
+
+A prior record still has unacknowledged output.
+
+::Anchor{id="OutputProgress"}
+
+## `OutputProgress`
+
+```silk
+pub struct OutputProgress
+```
+
+Exact queue progress and the next send-side action.
+
+::Anchor{id="OutputProgress.accepted"}
+
+### Field `accepted`
+
+```silk
+pub accepted: usize
+```
+
+The content prefix accepted into the queued record.
+
+::Anchor{id="OutputProgress.demand"}
+
+### Field `demand`
+
+```silk
+pub demand: OutputDemand
+```
+
+Whether output was queued or an existing record needs acknowledgment.
+
+::Anchor{id="RecordError"}
+
+## `RecordError`
+
+```silk
+pub union RecordError
+```
+
+A semantic record-construction, caller-use, or peer-record failure.
+
+::Anchor{id="RecordError.InvalidSecretLength"}
+
+### `InvalidSecretLength`
+
+```silk
+InvalidSecretLength
+```
+
+A traffic secret did not have the suite hash's exact width.
+
+::Anchor{id="RecordError.InvalidSecretLength.requested"}
+
+#### Field `requested`
+
+```silk
+pub requested: usize
+```
+
+The supplied byte length.
+
+::Anchor{id="RecordError.InvalidSecretLength.expected"}
+
+#### Field `expected`
+
+```silk
+pub expected: usize
+```
+
+The required byte length.
+
+::Anchor{id="RecordError.InvalidState"}
+
+### `InvalidState`
+
+```silk
+InvalidState
+```
+
+The operation is not valid in the direction's current state.
+
+::Anchor{id="RecordError.RecordOverflow"}
+
+### `RecordOverflow`
+
+```silk
+RecordOverflow
+```
+
+A declared or supplied record length exceeds the admitted bound.
+
+::Anchor{id="RecordError.RecordOverflow.requested"}
+
+#### Field `requested`
+
+```silk
+pub requested: usize
+```
+
+The rejected length.
+
+::Anchor{id="RecordError.RecordOverflow.maximum"}
+
+#### Field `maximum`
+
+```silk
+pub maximum: usize
+```
+
+The largest admitted length.
+
+::Anchor{id="RecordError.InvalidContent"}
+
+### `InvalidContent`
+
+```silk
+InvalidContent
+```
+
+A content type, plaintext version, inner plaintext, or alert shape is invalid.
+
+::Anchor{id="RecordError.AuthenticationFailed"}
+
+### `AuthenticationFailed`
+
+```silk
+AuthenticationFailed
+```
+
+A protected record's authenticated header, ciphertext, or tag did not verify.
+
+::Anchor{id="RecordError.InvalidAcknowledgment"}
+
+### `InvalidAcknowledgment`
+
+```silk
+InvalidAcknowledgment
+```
+
+An output acknowledgment exceeds the currently pending suffix.
+
+::Anchor{id="RecordError.InvalidAcknowledgment.requested"}
+
+#### Field `requested`
+
+```silk
+pub requested: usize
+```
+
+The requested acknowledgment count.
+
+::Anchor{id="RecordError.InvalidAcknowledgment.pending"}
+
+#### Field `pending`
+
+```silk
+pub pending: usize
+```
+
+The number of bytes currently pending.
+
+::Anchor{id="RecordError.KeyUsageExhausted"}
+
+### `KeyUsageExhausted`
+
+```silk
+KeyUsageExhausted
+```
+
+This traffic epoch has already protected its maximum record count.
+
+::Anchor{id="RecordView"}
+
+## `RecordView`
+
+```silk
+pub struct RecordView<'owner>
+```
+
+A complete record borrowed from its receiver's verified storage.
+
+::Anchor{id="RecordView.contentType"}
+
+### Field `contentType`
+
+```silk
+pub contentType: ContentType
+```
+
+The authenticated or plaintext content type.
+
+::Anchor{id="RecordView.content"}
+
+### Field `content`
+
+```silk
+pub content: &'owner [u8]
+```
+
+The complete content without header, tag, inner type, or padding.
+
+::Anchor{id="TlsRecordSender"}
+
+## `TlsRecordSender`
+
+```silk
+pub struct TlsRecordSender
+```
+
+An affine owner of one TLS record send epoch and at most one pending record.
+
+### Details
+
+Protected construction validates the traffic-secret width before allocation, derives the AEAD
+key and IV with TLS HKDF, and starts at sequence zero. Plaintext construction has no key epoch.
+Queueing accepts at most 16384 content bytes, adds no protected padding, and reserves one
+protected sequence only after complete encoding. Pending bytes remain stable until acknowledged.
+
+### Gotchas
+
+The later authenticated client owns epoch installation and reserves its final send record for
+KeyUpdate. Standalone users must replace an exhausted sender; no sequence reset is exposed.
+
+::Anchor{id="TlsRecordSender.impl"}
+
+## Implementation `TlsRecordSender`
+
+```silk
+impl TlsRecordSender
+```
+
+::Anchor{id="TlsRecordSender.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect fn make(
+    suite: CipherSuite,
+    trafficSecret: &[u8],
+  ) -> Result<TlsRecordSender, RecordError> ! OutOfMemoryError ? &mut Allocator
+```
+
+Creates a protected send epoch from one exact-width traffic secret.
+
+#### Details
+
+SHA-256 suites require 32 secret bytes and the SHA-384 suite requires 48. A wrong width
+returns `InvalidSecretLength` before allocation. Success acquires fixed pending and staging
+storage once; later operations allocate nothing.
+
+#### Gotchas
+
+A traffic secret proves no peer identity. Install it only after authenticated key agreement.
+
+::Anchor{id="TlsRecordSender.impl.makePlaintext"}
+
+### Associated function `makePlaintext`
+
+```silk
+pub effect fn makePlaintext() -> TlsRecordSender ! OutOfMemoryError ? &mut Allocator
+```
+
+Creates plaintext TLS record framing without a traffic secret or protected epoch.
+
+::Anchor{id="TlsRecordSender.impl.replaceEpoch"}
+
+### Method `replaceEpoch`
+
+```silk
+pub fn replaceEpoch(
+    self: &mut Self,
+    suite: CipherSuite,
+    trafficSecret: &[u8],
+  ) -> Result<(), RecordError>
+```
+
+Installs a fresh protected traffic epoch on an idle sender without allocation.
+
+#### Details
+
+The replacement reuses the owned wire and staging storage and starts at sequence zero. The
+traffic secret must have the selected suite hash width.
+
+#### Gotchas
+
+Pending output makes the replacement invalid. Every failure leaves the complete old epoch
+unchanged. A successful replacement is allowed after the old epoch exhausts its record budget.
+
+::Anchor{id="TlsRecordSender.impl.queueRecord"}
+
+### Method `queueRecord`
+
+```silk
+pub fn queueRecord(
+    self: &mut Self,
+    contentType: ContentType,
+    content: &[u8],
+  ) -> Result<OutputProgress, RecordError>
+```
+
+Queues at most one content fragment without retaining the caller input.
+
+#### Details
+
+An existing pending record returns zero accepted bytes with `NeedOutput`. Otherwise handshake
+content must be nonempty, alerts exactly two bytes, and application content may be empty.
+Inputs longer than 16384 bytes queue one exact prefix. A protected record adds its inner type,
+no padding, an authenticated outer header, and one sequence reservation.
+
+::Anchor{id="TlsRecordSender.impl.pendingOutput"}
+
+### Method `pendingOutput`
+
+```silk
+pub fn pendingOutput<'owner>(self: &'owner Self) -> &'owner [u8]
+```
+
+Borrows the exact unacknowledged output suffix.
+Repeated inspection and inspection before any queued record are idempotent.
+
+::Anchor{id="TlsRecordSender.impl.cancelPending"}
+
+### Method `cancelPending`
+
+```silk
+pub fn cancelPending(self: &mut Self) -> ()
+```
+
+Cancels the complete pending suffix without changing the traffic-key epoch.
+
+#### Gotchas
+
+Callers must close a transport after canceling a partially written record; its already-written
+prefix cannot be completed or reused. Authenticated protocols use this only on terminal failure.
+
+::Anchor{id="TlsRecordSender.impl.recordsRemaining"}
+
+### Method `recordsRemaining`
+
+```silk
+pub fn recordsRemaining(self: &Self) -> u64
+```
+
+Returns the number of records that this protected epoch can still encode.
+Plaintext framing returns zero because it has no traffic-key epoch.
+
+::Anchor{id="TlsRecordSender.impl.ackWritten"}
+
+### Method `ackWritten`
+
+```silk
+pub fn ackWritten(self: &mut Self, count: usize) -> Result<(), RecordError>
+```
+
+Acknowledges a written prefix, or leaves all state unchanged when the count is excessive.
+
+::Anchor{id="TlsRecordReceiver"}
+
+## `TlsRecordReceiver`
+
+```silk
+pub struct TlsRecordReceiver
+```
+
+An affine owner of one TLS record receive epoch and one verified record view.
+
+### Details
+
+Input is copied only into fixed storage, headers are admitted before body bytes, and protected
+plaintext is published only after tag, type, padding, and content validation. A complete record
+remains ready until consumed, and its view structurally borrows this owner.
+
+### Gotchas
+
+Every peer-record failure is terminal for this receiver. Construct a fresh epoch after a valid
+TLS key transition; never attempt to reuse a failed or exhausted receiver.
+
+::Anchor{id="TlsRecordReceiver.impl"}
+
+## Implementation `TlsRecordReceiver`
+
+```silk
+impl TlsRecordReceiver
+```
+
+::Anchor{id="TlsRecordReceiver.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect fn make(
+    suite: CipherSuite,
+    trafficSecret: &[u8],
+  ) -> Result<TlsRecordReceiver, RecordError> ! OutOfMemoryError ? &mut Allocator
+```
+
+Creates a protected receive epoch from one exact-width traffic secret.
+
+::Anchor{id="TlsRecordReceiver.impl.makePlaintext"}
+
+### Associated function `makePlaintext`
+
+```silk
+pub effect fn makePlaintext() -> TlsRecordReceiver ! OutOfMemoryError ? &mut Allocator
+```
+
+Creates plaintext TLS record framing without a traffic secret or protected epoch.
+
+::Anchor{id="TlsRecordReceiver.impl.replaceEpoch"}
+
+### Method `replaceEpoch`
+
+```silk
+pub fn replaceEpoch(
+    self: &mut Self,
+    suite: CipherSuite,
+    trafficSecret: &[u8],
+  ) -> Result<(), RecordError>
+```
+
+Installs a fresh protected traffic epoch on an idle receiver without allocation.
+
+#### Details
+
+The replacement reuses the owned wire and plaintext storage and starts at sequence zero. The
+traffic secret must have the selected suite hash width.
+
+#### Gotchas
+
+A partial, ready, or terminal receiver makes the replacement invalid. Every failure leaves
+the complete old epoch unchanged. A successful replacement is allowed after exhaustion.
+
+::Anchor{id="TlsRecordReceiver.impl.feedInput"}
+
+### Method `feedInput`
+
+```silk
+pub fn feedInput(self: &mut Self, input: &[u8]) -> Result<InputProgress, RecordError>
+```
+
+Copies a prefix for the current record and reports the exact next receive action.
+
+#### Details
+
+Empty input reports zero-consumption `NeedInput`. Header admission occurs after exactly five
+bytes and before any body byte is copied. Completion stops before a coalesced following record.
+A ready record causes zero-consumption `NeedRecordConsumption` until [`consumeRecord`](#TlsRecordReceiver.impl.consumeRecord) or
+[`consumeRecordInto`](#TlsRecordReceiver.impl.consumeRecordInto) succeeds. During a protected epoch, exact plaintext compatibility CCS
+`{1}` is admitted without consuming a protected sequence; every other record remains protected.
+
+#### Gotchas
+
+Header, authentication, content, and key-use failures terminally invalidate this receiver.
+
+::Anchor{id="TlsRecordReceiver.impl.record"}
+
+### Method `record`
+
+```silk
+pub fn record<'owner>(self: &'owner Self) -> Option<RecordView<'owner>>
+```
+
+Borrows the complete current record, or returns `None` while more input is needed.
+
+::Anchor{id="TlsRecordReceiver.impl.readyContentType"}
+
+### Method `readyContentType`
+
+```silk
+pub fn readyContentType(self: &Self) -> Option<ContentType>
+```
+
+Returns the ready record's authenticated content type without borrowing its content.
+
+::Anchor{id="TlsRecordReceiver.impl.readyLength"}
+
+### Method `readyLength`
+
+```silk
+pub fn readyLength(self: &Self) -> usize
+```
+
+Returns the ready record's authenticated content length, or zero when no record is ready.
+
+::Anchor{id="TlsRecordReceiver.impl.consumeRecordInto"}
+
+### Method `consumeRecordInto`
+
+```silk
+pub fn consumeRecordInto(
+    self: &mut Self,
+    destination: &mut [u8],
+  ) -> Result<usize, RecordError>
+```
+
+Copies and consumes one complete authenticated record without retaining an owner-tied view.
+
+#### Gotchas
+
+A destination smaller than the ready content returns `RecordOverflow` and leaves the record
+ready and unchanged. No ready record returns `InvalidState`.
+
+::Anchor{id="TlsRecordReceiver.impl.consumeRecord"}
+
+### Method `consumeRecord`
+
+```silk
+pub fn consumeRecord(self: &mut Self) -> Result<(), RecordError>
+```
+
+Releases the current record and permits input for the next record.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
