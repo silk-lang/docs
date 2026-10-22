@@ -265,18 +265,18 @@ pub effect fn main() -> i32 ! LogError | HostInputError | OutOfMemoryError ? &mu
 
 `word(args, i)` returns argument `i` as a `string`, or `""` if it is missing or not UTF-8. `HostInput.arguments()` copies all arguments into a `List<Bytes>`.
 
-`Effect.catchAll` hands every failure of `execute` to `explain`, including `LogError`, so `explain` must accept all six. Leave `LogError` out of its parameter and the check stops at the handler:
+`Effect.catchAll` hands every failure of `execute` to `explain`, including `LogError`, so `explain` must accept all six. Leave `LogError` out of its parameter, and its arm out of the `match`, and the check stops at the handler:
 
 ```
 Checking notes (x86_64-unknown-linux-gnu)
-  load     57 modules, 1 in package          0.07s
-  check    failed: 2 modules, 1 error        0.93s
+  load     57 modules, 1 in package          0.09s
+  check    failed: 2 modules, 1 error        0.74s
 [x86_64-unknown-linux-gnu]
-/home/you/notes/src/main.silk:190:58: error[SEM0067] An `Effect.catch` handler that does not fit the failures it handles
-Failed notes in 1.00s
+/home/you/notes/src/main.silk:190:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk/filesystem.AtomicWriteError | silk/filesystem.FileError | silk/allocator.OutOfMemoryError` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union
+Failed notes in 0.84s
 ```
 
-Column 58 is `explain`. The message does not say which failure is missing when the parameter is a union, so compare the handler's parameter with the effect's `!` row. The two must also agree on the result type: `execute` returns `i32` like `explain`. With `execute` returning `()`, the `run` in `main` fails with SEM0040, "A union conversion whose source has members its target lacks", because the result would be `() | i32`.
+Column 58 is `explain`, and the message names the failure its parameter is missing. The two must also agree on the result type: `execute` returns `i32` like `explain`. With `execute` returning `()`, the `run` in `main` fails with SEM0040, "A union conversion whose source has members its target lacks", because the result would be `() | i32`.
 
 The imports:
 

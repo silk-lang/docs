@@ -75,11 +75,11 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 
 | Problem | Message |
 | --- | --- |
-| No `clang` on `PATH` | `silk: cannot find clang on PATH; set SILK_CLANG to the Clang executable` |
+| No `clang` on `PATH` | `silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable` |
 | `--clang` name not found | `silk: cannot find nosuchclang on PATH; pass --clang the path of the Clang executable` |
 | The chosen Clang does not start | `silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable`. The parenthesis is `from SILK_CLANG`, `from --clang` or `found on PATH`. |
 
-Each of these fails the target, prints its `failed (exit 2)` line and summary, and exits 2.
+Each of these fails the target and exits 2. `silk build` shows a `link     failed:` row and a `Failed` line; `silk run` prints `run <target>: failed (exit 2)` and its summary.
 
 ## macOS SDK
 
@@ -175,7 +175,7 @@ A bad entry stops the build with exit status 1 and names the manifest and the en
 silk: invalid native link input: /home/you/cmix/silk.toml: [build].native-link-inputs[0]: object /tmp/abs.o must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files
 ```
 
-An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. An entry for another platform names only the entry: `silk: invalid native link input: framework Security links only on macOS targets`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
+An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. An entry for another platform is refused the same way: `silk: invalid native link input: /home/you/cmix/silk.toml: [build].native-link-inputs[0]: framework Security links only on macOS targets`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
 
 See **Unsafe code and C interop** in the reference for `extern "C"`.
 
@@ -194,7 +194,7 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | Key | Meaning |
 | --- | --- |
 | `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
-| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. |
+| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. A name not listed in `runtimes` is refused at its line: `build.composition.defaults entry "main" names no runtime in build.composition.runtimes; it lists "start"`, or `it lists none`. |
 | `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `build.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. So is one that is not a string (`build.composition.components.bindings.operation must be a string: create, acquire, release or destroy`), and an entry with no `operation` at the entry's line (`build.composition.components.bindings entry has no operation; use create, acquire, release or destroy`). |
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
 | `requirements` | Must be empty: `build.composition.requirements is not supported by the native compiler yet`. |
@@ -252,7 +252,7 @@ run x86_64-unknown-linux-gnu: failed (exit 1)
 Run summary: 0 succeeded, 1 failed
 ```
 
-A composition that leaves no single runtime, or a default it does not list, is `silk: the build selects no single runtime (ARTIFACT-001)`. Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/raw_start` case.
+A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/raw_start` case.
 
 ## Building without a runtime
 

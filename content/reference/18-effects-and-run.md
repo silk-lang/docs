@@ -81,7 +81,7 @@ OpaqueResult     = 'some' '<' Identifier ':' Type '>' Type
 
 - `run` consumes a `once` Effect. `run move e` is the same.
 - A parameter of type `once Effect` accepts all three modes. A `mut Effect` parameter accepts `Effect` and `mut Effect`.
-- A `once` Effect passed where `Effect` or `mut Effect` is expected is SEM0076. A `mut` Effect passed where `Effect` is expected is reported as SEM0052.
+- A `once` Effect passed where `Effect` or `mut Effect` is expected, or a `mut` Effect passed where `Effect` is expected, is SEM0076 at the argument. The message names both modes: "Callable value with mode `mut` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow".
 - Passing a stored `once` Effect needs `move` (OWN0003).
 - Dropping an unrun Effect drops the values it captured.
 - Running a stored Effect field needs enough access to the whole aggregate: a `mut Effect` field needs `&mut` (OWN0015).
@@ -240,8 +240,7 @@ pub fn main() -> i32 {
 | SEM0065 | `run` applied to a value that is not an Effect |
 | SEM0066 | `run` leaves failures the enclosing signature does not declare |
 | SEM0071 | `run` leaves requirements the enclosing signature does not provide |
-| SEM0052 | Reported for a `mut` Effect passed where `Effect` is expected (catalog: type arguments cannot be inferred) |
-| SEM0076 | A `once` Effect passed where `Effect` or `mut Effect` is expected |
+| SEM0076 | An Effect passed where a parameter needs a stronger mode: `once` for `Effect` or `mut Effect`, `mut` for `Effect` |
 | SEM0077 | Running a `mut` Effect through an immutable binding |
 | SEM0087 | An unused Effect or non-unit `run` result as a statement |
 | SEM0113 | An opaque result has more than one concrete realization |

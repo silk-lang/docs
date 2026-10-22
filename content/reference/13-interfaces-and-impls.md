@@ -87,7 +87,7 @@ InterfaceType  = Path TypeArguments?
 - `Equal` and `Order` take references, so compare user values as `&a == &b` and `&a < &b`. Comparing the values directly is SEM0135.
 - `Order` maps `<` to `compare == Less`, `<=` to `!= Greater`, `>` to `== Greater` and `>=` to `!= Less`. `Ordering` has `Less`, `Equal` and `Greater`.
 - No conformance accepting the operand types is SEM0135. More than one is SEM0136. The expected result type never selects between them.
-- A generic function uses an operator on `T` only through a bound: `T: Add<T, T>`.
+- A generic function uses an operator on `T` only through a bound: `T: Add<T, T>`. A primitive type satisfies a bound when its built-in operator accepts it: `i32` satisfies `Add<i32, i32>`, `Order` and `BitXor<i32, i32>`, and `f64` satisfies `Add<f64, f64>` and `Equal` but not `Order`. The full table is in the Operators appendix.
 
 ## Copy and Drop
 

@@ -184,34 +184,33 @@ Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profile
 | A value the target cannot use | `UnsupportedCombination: profiles.fast.libc = "system"` |
 | A value the native compiler cannot build yet | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
 | `[build].profile` names no profile | `InvalidInput: build.profile = "fats" names no [profiles.fats] table` |
+| `[build].profile = ""` | `InvalidInput: build.profile` |
 | A key bindings do not have | `build.bindings.extra is not a supported field`, or `profiles.fast.bindings.extra` for a profile's binding |
 | A key a binding's `origin` does not have | `build.bindings.origin.bogus is not a supported field`. `origin` takes `source`, `provenance` and `translator`. |
 | A binding with no `origin` | `InvalidInput: build.bindings: origin is missing; write origin = { source = "silk.toml", provenance = "literal" }` |
 | An `origin` that is not a table | `InvalidInput: build.bindings: origin must be a table such as { source = "silk.toml", provenance = "literal" }` |
-| A missing or non-string `origin.source` | `InvalidInput: build.bindings: origin.source must be a non-empty string` |
+| A missing, empty or non-string `origin.source` | `InvalidInput: build.bindings: origin.source must be a non-empty string` |
 | A missing `origin.provenance`, or one that is not a string | `InvalidInput: build.bindings: origin.provenance is missing`, `InvalidInput: build.bindings: origin.provenance must be a string` |
 | A `provenance` of `"secret"`, `"physical-supply"` or `"runtime"` | `ForbiddenProvenance: build.bindings: origin.provenance = "secret" cannot be bound in a manifest` |
 | `"translated-public"` without a `translator` | `ForbiddenProvenance: build.bindings: origin.provenance = "translated-public" needs origin.translator` |
 | Any other `provenance` | `InvalidInput: build.bindings: origin.provenance = "bogus" is not literal, translated-public, secret, physical-supply or runtime` |
-| A `translator` that is not a string | `InvalidInput: build.bindings: origin.translator must be a non-empty string` |
+| A `translator` that is empty or not a string | `InvalidInput: build.bindings: origin.translator must be a non-empty string` |
 | A `translator` on a binding whose `provenance` is not `"translated-public"` | `InvalidInput: build.bindings: origin.translator: only provenance "translated-public" names a translator` |
 | A key a binding's `value` does not have | `build.bindings.value.extra is not a supported field`. Inside an array the item number shows: `build.bindings.value.values.1.bogus` is the second element. |
 | A binding with no `package`, `module` or `parameter` | `InvalidInput: build.bindings: package is missing; a binding names its package, module and parameter`, or `profiles.fast.bindings: ...` for a profile's binding |
 | A `package`, `module` or `parameter` that is not a string | `InvalidInput: build.bindings: module must be a string` |
 | A binding with no `value` | `InvalidInput: build.bindings: value is missing` |
-| A `value` that is not a table, such as `value = 3` | `InvalidInput: build.bindings: configuration value`, at the binding's header |
+| A `value` that is not a table, such as `value = 3` | `InvalidInput: build.bindings: value must be a table with a kind, such as { kind = "integer", value = "1" }` |
+| A `value` whose `kind` is not one of the value kinds | `InvalidInput: build.bindings: value.kind must be integer, boolean, string, enum, none, some, array or record` |
 | A bad profile name, quoted or not | ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` `` |
 
-LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. A binding's `origin` problems are at the line of its `origin`, and a mistyped `package`, `module` or `parameter` at its own line. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes, except for the elements of an array `value`. Targets and profiles lists every refused combination.
+LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. A binding's `origin` problems are at the line of its `origin`, or at the field's own line when `origin` is written as a `[build.bindings.origin]` sub-table. A mistyped `package`, `module`, `parameter` or `value` is at its own line. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes, except for the elements of an array `value`. Targets and profiles lists every refused combination.
 
 ## Keys that are not checked
 
 Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `platform-supply` and its `support` entries, `[build.composition]` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `description` key stops the build.
 
-Two things are not checked:
-
-- `[changes]`. Builds ignore it; `silk changes` reads it.
-- The emptiness of a binding's `origin.source` and `origin.translator`. `source = ""`, or `translator = ""` with `provenance = "translated-public"`, is accepted, although the message for a missing or mistyped one asks for a non-empty string.
+One table is not checked: `[changes]`. Builds ignore it; `silk changes` reads it.
 
 ## See also
 

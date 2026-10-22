@@ -80,7 +80,7 @@ IntegerLiteral = decimal | '0x' hexDigits | '0b' binaryDigits | '0o' octalDigits
 ```
 
 - Digits may be grouped with `_`, but only between two digits: `1_000_000`, `0xFF_FF`. A separator right after a base prefix (`0x_FF`), at the end (`1_`) or doubled (`1__0`) is an error (LEX0005). A leading `_`, as in `_1`, starts an identifier instead.
-- A prefix needs at least one digit after it (LEX0004).
+- A prefix needs at least one digit after it (LEX0004). Every digit must belong to the base: `0xG1`, `0o9` and `0b102` are LEX0013, reported at the literal.
 - There are no type suffixes. A literal takes its type from where it's used: an annotation, a parameter, a field. With no context it is `i32`.
 - A literal that doesn't fit its type is an error (SEM0002). For `usize` and `isize` the limit is the target's word size (LAY0001).
 - Negative numbers are the unary `-` operator applied to a literal.
@@ -192,6 +192,7 @@ first
 | LEX0010 | Duration unit repeated |
 | LEX0011 | Duration units not largest first |
 | LEX0012 | Duration amount too large for its unit |
+| LEX0013 | Digit outside the base of a prefixed integer |
 | SEM0002 | Integer literal outside its type's range |
 | LAY0001 | `usize` or `isize` literal outside the target's word size |
 

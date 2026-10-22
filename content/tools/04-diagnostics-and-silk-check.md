@@ -79,7 +79,8 @@ Checking hello (x86_64-unknown-linux-gnu)
 [x86_64-unknown-linux-gnu]
 /home/you/hello/src/main.silk:5:4: error[SEM0003] Duplicate declaration name half
   note: /home/you/hello/src/main.silk:1:4: related location
-/home/you/hello/src/main.silk:10:10: error[SEM0016] Two bindings in one scope claiming the same spelling
+/home/you/hello/src/main.silk:5:4: error[SEM0016] Multiple bindings claim half
+  note: /home/you/hello/src/main.silk:1:4: related location
 Failed hello in 0.14s
 ```
 
@@ -140,7 +141,7 @@ Most diagnostics point into your own source. Two kinds point elsewhere:
 - **At your call, for a std lib check.** Some std lib functions check their arguments while your code compiles. When a check fails, the diagnostic is located at your call, with the message the library gave. A misspelled placeholder in a log template is SEM0177 at the `Effect.log` call: `template field {versoin} not found; available visible fields: version`. Chapter 1 of the book walks through this case. A diagnostic can still point into the std lib, with the install shown as `<silk>`, when the std lib's own code is what the compiler cannot handle.
 - **Into a dependency.** An error in a package you depend on is located in that package's file.
 
-A message is sometimes a general description rather than a specific one, such as `Two bindings in one scope claiming the same spelling`. That is the code's catalog meaning, printed when the compiler could not fill in the details. It often follows an earlier error; fix the first diagnostic in the list and check again.
+A message is sometimes a general description rather than a specific one, such as ``A `run` whose failures the enclosing signature does not declare``. That is the code's catalog meaning, printed when the compiler could not fill in the details. It often follows an earlier error; fix the first diagnostic in the list and check again.
 
 ## Code families
 

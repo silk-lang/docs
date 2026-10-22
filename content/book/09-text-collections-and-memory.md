@@ -371,7 +371,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     61 modules, 1 in package          0.07s
   check    failed: 2 modules, 1 error        1.73s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:516:45: error[SEM0012] A call argument whose type mismatches its parameter
+/home/you/tasks/src/main.silk:516:45: error[SEM0012] Expected &main.Board<'_> but received &mut main.Board<'_>
 Failed tasks in 1.81s
 ```
 

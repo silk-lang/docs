@@ -417,5 +417,4 @@ Effects and run · Fibers and scheduling · Typed failures · Allocation and sha
 - SEM0139, and SEM0225 for a parking `main`, are reported only by a build. `silk check` accepts a program that violates `Intrinsic.NonParking`.
 - SEM0139 for a parking provider of a `with Intrinsic.nonParking()` operation can point into `silk/effect`, for example when `main` runs the operation directly. The user site is not named.
 - OWN0016 for a wake inside a callback is reported at `silk/execution.silk`, not at the user's call.
-- SEM0201 (an `export "C"` function that may suspend) is in the catalog, but an `export "C"` function that parks passes `silk check`, and `silk build` reports `unsupported[foreign-contract]` instead.
-- Catalog.silk has a doc comment for OWN0020 ("An owner cannot be preserved by the suspension frame at this run boundary") but no matching code member, so nothing can report it.
+- SEM0201, an `export "C"` function that may park, is also reported only by `silk build`.

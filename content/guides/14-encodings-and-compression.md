@@ -32,23 +32,25 @@ import silk.zstd { Zstd, ZstdError, ZstdLimits, ZstdStatus }
 
 Two modules both export a type called `Format`: `silk/format` (text templates) and `silk/inflate` (the compressed container). One file cannot import both under the same name, so the inflate one is renamed with `Format as Container`. `import silk.inflate` on its own line also brings the module name into scope, for its constant `inflate.MEMORY_BOUND`.
 
-If you import both as `Format`, `silk check` stops at every use of the name:
+If you import both as `Format`, `silk check` stops at the second import and points at the first:
 
 ```
 Checking unpack (x86_64-unknown-linux-gnu)
-  load     60 modules, 1 in package          0.07s
-  check    failed: 2 modules, 6 errors       0.20s
+  load     60 modules, 1 in package          0.09s
+  check    failed: 2 modules, 1 error        0.21s
 [x86_64-unknown-linux-gnu]
-/home/you/unpack/src/main.silk:5:22: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/unpack/src/main.silk:54:7: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/unpack/src/main.silk:75:37: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/unpack/src/main.silk:111:38: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/unpack/src/main.silk:127:7: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/unpack/src/main.silk:148:7: error[SEM0016] Two bindings in one scope claiming the same spelling
-Failed unpack in 0.27s
+/home/you/unpack/src/main.silk:6:45: error[SEM0016] Multiple bindings claim Format
+  note: /home/you/unpack/src/main.silk:5:22: related location
+Failed unpack in 0.30s
 ```
 
-The message does not name `Format`, so look for a name that two imports share. Writing `inflate.Format.Gzip` through the module name does not work either: this release reports it as `unsupported: this construct is not supported by the native compiler yet`. Rename on import instead.
+Writing `inflate.Format.Gzip` through the module name does not work either. A module import names the module's types in type positions, but not their members as values:
+
+```
+/home/you/unpack/src/main.silk:111:38: error[SEM0238] Format is a type of module silk.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.inflate { Format }`
+```
+
+Here `Format` is already taken, so rename on import instead.
 
 ## Base64
 

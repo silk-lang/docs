@@ -314,14 +314,14 @@ Each successful attempt now reports its own time. The slow station's reads all t
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.16s
+  load     53 modules, 1 in package          0.08s
+  check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:126:17: error[SEM0052] A generic call whose type arguments its values do not determine
+/home/you/weather/src/main.silk:126:26: error[SEM0076] Callable value with mode `once` cannot satisfy a parameter with mode `mut`, which may call it more than once
 Failed weather in 0.23s
 ```
 
-`withBudget` takes its action as `once Effect` and keeps it, so the effect it returns can run only once, and `retrying` needs one that can run again. The message does not say this; at a generic call like this one, an Effect of the wrong mode is reported as SEM0052. `budgetedRead(&mut station.*)` builds a fresh `withBudget` effect each time it runs, and holds only a `&mut` borrow, so it is a `mut Effect`.
+Column 26 is the `withBudget(...)` argument. `withBudget` takes its action as `once Effect` and keeps it, so the effect it returns can run only once, and `retrying` needs one that can run again. `budgetedRead(&mut station.*)` builds a fresh `withBudget` effect each time it runs, and holds only a `&mut` borrow, so it is a `mut Effect`.
 
 An `effect { ... }` block would normally do the same job without a named function. In this release, passing `effect { return run withBudget(500, readStation(&mut station.*)) }` to `retrying` stops with an error inside `retrying`:
 
@@ -359,15 +359,15 @@ Failed weather in 0.23s
 
 `reading` holds `&mut station`, so even reading the station is refused. Read it before you build the effect, or after you run it. The rule is the same whether or not the effect ever runs: building it is enough.
 
-If `retrying` declared its predicate as a plain `fn(&E) -> bool`, the closure that updates `checked` would not fit, because a closure with a mutable capture is a `mut fn`. Again the generic call reports SEM0052:
+If `retrying` declared its predicate as a plain `fn(&E) -> bool`, the closure that updates `checked` would not fit, because a closure with a mutable capture is a `mut fn`. The argument is refused the same way, with SEM0076 at the closure:
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.16s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:119:17: error[SEM0052] A generic call whose type arguments its values do not determine
-Failed weather in 0.23s
+/home/you/weather/src/main.silk:119:55: error[SEM0076] Callable value with mode `mut` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow
+Failed weather in 0.20s
 ```
 
 When you write a combinator, accept the weakest mode you can use: `once fn` and `once Effect` if you call it once, `mut fn` and `mut Effect` if you call it repeatedly. Plain `fn` and `Effect` are needed only when something must call or run the value through a shared reference.

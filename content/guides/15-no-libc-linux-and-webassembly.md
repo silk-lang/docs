@@ -129,7 +129,7 @@ static if Target.arch() == Arch.Wasm32 {
 
 The rest is three versions of `main`, chosen by a module-level `static if`. `Target.arch()` from `silk/target` and `Compilation.libc()` from `silk/compilation` are static functions: the compiler knows their answers before it type-checks, so only the selected arm exists in the build. That is why each arm can import modules the others cannot use. See **Static control flow and reflection** in the reference.
 
-- On wasm32, `main` returns the number. The host reads it as the call's result. `silk/wasm_start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225, even though that error's text describes the hosted runtime's shapes.
+- On wasm32, `main` returns the number. The host reads it as the call's result. `silk/wasm_start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225: "Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements".
 - On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. With that provider, the same `report` runs unchanged.
 - Everywhere else, `StdoutWriter` from `silk/os_writer` does the job.
 

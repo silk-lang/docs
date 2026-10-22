@@ -208,7 +208,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 /home/you/tasks/src/main.silk:16:14: error[PAR0001] Expected identifier
-/home/you/tasks/src/main.silk:16:30: error[SEM0087] An expression statement whose result cannot be intentionally ignored
+/home/you/tasks/src/main.silk:16:30: error[SEM0087] Expression statement produces string<'static>, but only () or never may be ignored
 Failed tasks in 0.18s
 ```
 

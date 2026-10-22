@@ -317,7 +317,7 @@ effect<'call> fn useChannel<'call, 'transport: 'call>(
 effect<'call> fn chat<'call, 'request: 'call, 'connection: 'request, 'transport: 'connection>(
   request: &'call mut Request<'request, 'connection, 'transport, Connection>,
 ) -> u16 ! UpgradeError | ServerError | OutOfMemoryError ? &mut MonotonicClock | &mut Allocator {
-  let outcome = run withUpgrade<u16, UpgradeError, never>(move request, UpgradeLimits.default(), Option<Instant>.none(), AcceptAll {}, useChannel)
+  let outcome = run withUpgrade<u16, UpgradeError, never>(move request, UpgradeLimits.defaults(), Option<Instant>.none(), AcceptAll {}, useChannel)
   return match move outcome {
     Outcome.Upgraded { value } => value
     Outcome.Rejected { .. } => 0
@@ -327,7 +327,7 @@ effect<'call> fn chat<'call, 'request: 'call, 'connection: 'request, 'transport:
 
 `AcceptAll` accepts every handshake. A real server looks at the `Offer` first: `offer.origin()` for the browser origin, `offer.protocolAt(i)` for the subprotocols the client asked for. It then returns `Decision.Accept`, optionally naming one protocol, or `Decision.Reject` with an HTTP status. Origin is policy input, not authentication.
 
-`DecisionHandler<D, ?R>` takes a failure row and a requirement row. Spell both in the `impl`, as here; leaving the requirement row out is SEM0088. `? never` is the empty row.
+`DecisionHandler<D, ?R>` takes a failure row and a requirement row. Spell both in the `impl`, as here. Leaving the requirement row out is SEM0088, and the message says how to write an empty one: "Generic parameter `?R` has kind none because its row argument is omitted, expected a requirement row; write `? never` for an empty row".
 
 `readEvent` reads one complete message into your buffer and returns an `Event`:
 

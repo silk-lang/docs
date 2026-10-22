@@ -425,16 +425,14 @@ import taskcore.Board { Board, DuplicateTask, NoSuchTask }
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
   load     78 modules, 7 in package          0.09s
-  check    failed: 8 modules, 4 errors       1.55s
+  check    failed: 8 modules, 1 error        1.56s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/main.silk:18:17: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/tasks-workspace/tasks/src/main.silk:43:37: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/tasks-workspace/tasks/src/main.silk:83:38: error[SEM0016] Two bindings in one scope claiming the same spelling
-/home/you/tasks-workspace/tasks/src/main.silk:90:34: error[SEM0016] Two bindings in one scope claiming the same spelling
-Failed tasks in 1.64s
+/home/you/tasks-workspace/tasks/src/main.silk:19:25: error[SEM0016] Multiple bindings claim Board
+  note: /home/you/tasks-workspace/tasks/src/main.silk:18:17: related location
+Failed tasks in 1.65s
 ```
 
-SEM0016 is a binding conflict: the name `Board` is bound twice, once to the module and once to the struct. The compiler reports the import and then every use of `Board`. Give the module another name with `as`:
+SEM0016 is a binding conflict: the name `Board` is bound twice, once to the module and once to the struct. The error points at the second binding, the struct in the second import, and the note points at the first, the module. Give the module another name with `as`:
 
 ```silk
 import taskcore.Board as Boards

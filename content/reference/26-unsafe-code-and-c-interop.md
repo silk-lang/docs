@@ -90,7 +90,7 @@ Unsafe operations (the caller proves the storage contract):
 ## Foreign functions
 
 - `unsafe extern "C" fn name(...) -> T` declares a C function. It has no body.
-- The ABI string must be `"C"`.
+- The declaration must be `unsafe` (SEM0186) and its ABI string must be `"C"` (SEM0185). It may not have generic parameters or be `static` or `effect` (SEM0188). Each is reported at the declaration by `silk check`, whether or not the function is called.
 - `as "symbol"` links to a different native name. Without it, the Silk name is the symbol.
 - Parameter and result types must be C-compatible scalars: integer and float types, `usize`, `isize`, raw pointers, C function pointers, and `()` as a result.
 - `bool` and `char` are rejected (SEM0187). A call that passes or returns a struct, `string` or reference by value is reported as `unsupported[ForeignAggregate]`.
@@ -125,7 +125,7 @@ A foreign declaration may carry `with Intrinsic.foreign(...)`. It holds either o
 - `export "C" fn name(...) -> T { ... }` defines a function with C linkage. `as "symbol"` sets its native name.
 - `unsafe export "C" fn` is also accepted.
 - An exported function may be declared in any module of the package that the build includes.
-- The exported function's body must not suspend (SEM0201).
+- The exported function's body must not suspend. `silk build` refuses a body that can park, directly or through what it calls, with SEM0201 at the declaration. `silk check` does not report it. An `export "C" effect fn` is SEM0188.
 - Pass an exported function for a C function-pointer parameter. Passing an ordinary `fn` is a type error (SEM0012).
 
 ## Native symbols
@@ -272,8 +272,6 @@ Values and primitive types · Functions and methods · Closures and callable typ
 
 The rules above come from compiler source and the diagnostic catalog. Several are not enforced as written:
 
-- SEM0186: `extern "C" fn abs(value: i32) -> i32` without `unsafe` passes `silk check`, and `silk build` reports `unsupported[foreign-contract] not supported by the native compiler yet`, not SEM0186.
-- SEM0185, SEM0188: on a declaration, `extern "Rust"` is `unsupported[foreign-abi]` at build, and a call to a generic foreign function is `unsupported[ForeignAggregate]` in check and build. The codes fire only for foreign function types.
-- SEM0201, SEM0207, SEM0193, SEM0208 have no producer in the compiler. An `export "C" effect fn` that parks passes check and is `unsupported[foreign-contract]` at build. Without the `callbacks` property, a callback parameter is an unsupported gap (`unsupported[ForeignCallback]`).
+- SEM0207, SEM0193, SEM0208 have no producer in the compiler. Without the `callbacks` property, a callback parameter is an unsupported gap (`unsupported[ForeignCallback]`).
 - A direct Silk call to an `export "C"` function needs `unsafe` and is then an unsupported gap ("foreign-export").
 - `addrspace(n)` other than `0` may be meant for other targets.

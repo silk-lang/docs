@@ -229,4 +229,4 @@ Values and primitive types · Bindings and statements · Enums and unions · Pat
 
 ## Open questions
 
-- The catalog defines SEM0059 (array passed as a slice without a borrow) and SEM0175 (named-field construction of a positional aggregate), but the compiler has no producer for either. It reports SEM0012 ("A call argument whose type mismatches its parameter") and SEM0018 ("A type position whose name resolves to something other than a type") instead.
+- The catalog defines SEM0059 (array passed as a slice without a borrow) and SEM0175 (named-field construction of a positional aggregate), but the compiler has no producer for either. It reports SEM0012 ("Expected &[i32] but received Array<i32, 3>") and SEM0018 ("A type position whose name resolves to something other than a type") instead.

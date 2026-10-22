@@ -52,7 +52,7 @@ A callable's invocation mode follows from its captures:
 - `fn`: only Copy and Shared captures. It can be called any number of times through a shared binding, and it is copied when passed.
 - `mut fn`: at least one Mutable capture. Calling it needs a `let mut` binding or a `mut` parameter (SEM0077). Passing it needs `move`.
 - `once fn`: at least one Move capture. It can be called once; a second call is OWN0001. Passing it needs `move`.
-- A parameter of type `mut fn` accepts a `fn`. A parameter of type `once fn` accepts a `fn` or `mut fn`. The reverse is rejected (SEM0052).
+- A parameter of type `mut fn` accepts a `fn`. A parameter of type `once fn` accepts a `fn` or `mut fn`. The reverse is SEM0076 at the argument, naming both modes, as in "Callable value with mode `once` cannot satisfy a parameter with mode `mut`, which may call it more than once".
 
 ## Callable types
 
@@ -199,7 +199,7 @@ pub fn main() -> i32 {
 | SEM0037 | Assigning a callable of a different type, or an initializer that does not match a callable annotation |
 | SEM0052 | Argument callable does not match a callable parameter type |
 | SEM0075 | Calling a value that is not callable |
-| SEM0076 | Callable does not satisfy a callable bound |
+| SEM0076 | Callable does not satisfy a callable bound, or its mode is weaker than the parameter's |
 | SEM0077 | Calling a `mut fn` through an immutable binding |
 | SEM0078 | Calling a function that has parameters with no arguments |
 | SEM0082 | Calling an `unsafe fn` value outside `unsafe` |
@@ -212,5 +212,4 @@ Functions and methods · Generics · Ownership and moves · Borrowing · Lifetim
 ## Open questions
 
 - The declaration `struct H { f: fn(i32) -> i32 }` checks and builds, but constructing it, as in `H { f: inc }` or with a callable literal, prints "unsupported: this construct is not supported by the native compiler yet" rather than SEM0103.
-- SEM0199 (nested anonymous callable) is in the catalog, but nested literals compile and run.
 - A mismatched callable argument to a `fn(...)` parameter reports SEM0052 ("A generic call whose type arguments its values do not determine"), not SEM0076.

@@ -126,7 +126,13 @@ A link resolves against what the module can see, the same way code would. A name
 warning: /home/you/shapes/src/Circle.silk:17: documentation link [`Nope`] names no declaration and stays plain code
 ```
 
-The same wording is used for a name that matches more than one declaration. Only package documentation is checked this way; `silk doc --stdlib` prints no warnings.
+A name that matches more than one declaration gets its own warning, which lists the candidates. Here a module comment links ``[`size`]`` and two structs, `A` and `B`, each have a public `size` field:
+
+```
+warning: /home/you/demo/src/main.silk:1: documentation link [`size`] is ambiguous: it could name `A.size` or `B.size`; qualify it with the owner, and until then it stays plain code
+```
+
+Only package documentation is checked this way; `silk doc --stdlib` prints no warnings.
 
 A link to a private declaration resolves, but reference pages show only public declarations, so the rendered text stays unlinked.
 

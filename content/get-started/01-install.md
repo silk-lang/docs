@@ -104,7 +104,7 @@ Put LLVM 18 or newer (22 for no-libc targets) on PATH, or set SILK_CLANG to its 
 With no Clang at all, `silk build` and `silk run` stop at the link step:
 
 ```
-silk: cannot find clang on PATH; set SILK_CLANG to the Clang executable
+silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable
 run x86_64-unknown-linux-gnu: failed (exit 2)
 Run summary: 0 succeeded, 1 failed
 ```

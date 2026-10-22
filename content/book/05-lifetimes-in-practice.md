@@ -209,7 +209,7 @@ fn part(text: string, start: usize, end: usize) -> string {
 
 That compiles and runs just the same, as long as the `Result<string<'text>, ...>` patterns inside also drop the `<'text>`. The book keeps the names in `part` and `parseBoard` because they document the promise, and because the next rule is about to bite.
 
-The fourth rule covers a function with two borrowed inputs. Make a scratch project with `silk init scratch` and put this in its `src/main.silk`:
+The fourth rule covers a function with two borrowed inputs. Put this in the `src/main.silk` of the scratch project from chapter 2:
 
 ```silk
 import silk.string { String }
@@ -261,13 +261,13 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:145:18: error[SEM0012] A call argument whose type mismatches its parameter
+/home/you/tasks/src/main.silk:145:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
 Failed tasks in 0.20s
 ```
 
-The line numbers here refer to the whole file at the end of the chapter. SEM0012 says an argument's type doesn't match its parameter. Line 145 is `let id = board.add(Draft {`, and the argument is the draft.
+The line numbers here refer to the whole file at the end of the chapter. SEM0012 says an argument's type doesn't match its parameter. Line 145 is `let id = board.add(Draft {`, and the argument is the draft. `add` expects a `Draft<'static>`, but the draft borrows from `text`. The `'_` stands for a lifetime that has no name in your code.
 
-What went wrong is that `Board.make()` has a lifetime parameter, and nothing in that call says what it should be. The compiler fixes it right there, at the call, rather than looking ahead to the `add` that comes later. By the time you add a draft borrowing from `text`, the board has already been given some other lifetime, and the draft doesn't fit. Writing `Board<'text>` tells the compiler up front which text the board borrows from. Put the annotation back.
+What went wrong is that `Board.make()` has a lifetime parameter, and nothing in that call says what it should be. The compiler fixes it right there, at the call, rather than looking ahead to the `add` that comes later. By the time you add a draft borrowing from `text`, the board has already been given another lifetime, `'static`, and the draft doesn't fit. Writing `Board<'text>` tells the compiler up front which text the board borrows from. Put the annotation back.
 
 When an `add` or a method call on a new value fails with SEM0012, and lifetimes are involved, annotate the `let`.
 

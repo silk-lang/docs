@@ -24,7 +24,7 @@ Every `silk` command, its options and its exit status. `silk --help` prints the 
 | `silk <command> --help`, `-h` | Print that command's usage lines and exit 0 |
 | `silk --version`, `-v` | Print `silk v0.1.0` and exit 0 |
 
-An unknown command prints `` silk: unknown command `frobnicate`  `` and the synopsis, and exits 2.
+An unknown command prints `` silk: unknown command `frobnicate`  `` and the synopsis, and exits 2. A lone argument that is not a command is read as a Silk source file whose syntax tree to print, a debugging aid. When no such file exists, `silk foo.silk` prints `` silk: no such source file `foo.silk`; a lone argument is a command or a Silk source file to dump `` and the synopsis, and exits 2.
 
 ## Finding the project
 
@@ -247,7 +247,16 @@ silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|obje
 silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--optimization none|speed] [--debug true|false] --no-cache
 ```
 
-`--emit` picks the output stage: `llvm-ir` writes LLVM text, `object` an object file. `--stats` prints compiler query counters. These forms print each diagnostic as a `SILK_BUILD_ERROR=` JSON record with the code and byte span, and no message; use `silk check` to read errors.
+`--emit` picks the output stage: `llvm-ir` writes LLVM text, `object` an object file. `--stats` prints compiler query counters. Diagnostics print the same way as `silk check` prints them, and a successful build prints one `Compiled` line. Paths in that line are relative to the current directory, or absolute when the file is outside it:
+
+```
+$ silk build bad.silk -o out
+/home/you/demo/bad.silk:1:31: error[SEM0129] Return expected i32 but received bool
+$ silk build good.silk -o out
+Compiled good.silk -> out (llvm, x86_64-unknown-linux-gnu, 182 symbols)
+```
+
+With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnostic as a `SILK_BUILD_ERROR=` JSON record with the code, byte span and module instead, for tools that read them.
 
 ## Exit status
 
@@ -272,6 +281,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `NO_COLOR` | Set to a non-empty value, turns off colors in live progress output |
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
+| `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
 | `SSL_CERT_FILE` | The certificate bundle for `silk changes since` when it fetches releases over HTTPS |
 | `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE` | Passed through to Clang; no other variable is |
 
