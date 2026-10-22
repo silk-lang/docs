@@ -29,6 +29,7 @@ import { Message } from './message'
 import { DocState, Flags, Model } from './model'
 import * as DocsPage from './page/docs'
 import * as Home from './page/home'
+import * as Releases from './page/releases'
 import { AppRoute, homeRouter, urlToAppRoute } from './route'
 
 export { Flags, Message, Model }
@@ -234,13 +235,21 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
   })
 }
 
+// Static files such as /releases/index.json sit beside the pages but are not
+// routes, so the browser loads them directly.
+const isStaticFile = (url: Url): boolean => /\.[a-z0-9]+$/i.test(url.pathname)
+
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
     ClickedLink: ({ request }) =>
       UrlRequest.match<UpdateReturn>(request, {
         Internal: ({ url }) => ({
           model,
-          commands: [NavigateInternal({ url: urlToString(url) })],
+          commands: [
+            isStaticFile(url)
+              ? LoadExternal({ href: urlToString(url) })
+              : NavigateInternal({ url: urlToString(url) }),
+          ],
         }),
         External: ({ href }) => ({
           model,
@@ -438,11 +447,13 @@ const placeholder = (
     ],
   )
 
-const notFound = (path: string, h: HtmlBuilder<Message>): Html =>
+// The same markup serves as the static 404.html for every missing path, so it
+// does not name the path.
+const notFound = (h: HtmlBuilder<Message>): Html =>
   Layout.page(
     'Home',
     [
-      placeholder('Not found', `Nothing lives at ${path}.`, h),
+      placeholder('Not found', 'There is no page at this address.', h),
       h.p(
         [h.Class('mx-auto max-w-[1440px] px-5 pb-16 md:px-20')],
         [
@@ -465,22 +476,11 @@ const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
     Docs: () => DocsPage.indexView(model, h),
     DocPage: ({ directory, slug }) =>
       Option.match(Catalog.findPage(directory, slug), {
-        onNone: () => notFound(`/docs/${directory}/${slug}`, h),
+        onNone: () => notFound(h),
         onSome: page => DocsPage.pageView(model, page, h),
       }),
-    Releases: () =>
-      Layout.page(
-        'Releases',
-        [
-          placeholder(
-            'Download Silk',
-            'Prebuilt toolchains for macOS and Linux.',
-            h,
-          ),
-        ],
-        h,
-      ),
-    NotFound: ({ path }) => notFound(path, h),
+    Releases: () => Releases.view(model.copiedCodeIds, h),
+    NotFound: () => notFound(h),
   })
 
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({

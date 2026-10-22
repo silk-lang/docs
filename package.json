@@ -10,7 +10,9 @@
     "format": "oxfmt",
     "test": "vitest run",
     "lint": "oxlint src && effect-tsgo patch --no-typescript --oxlint && oxlint --config .oxlintrc.effect.json --deny-warnings src",
-    "sync-docs": "node scripts/sync-silk-docs.ts"
+    "sync-docs": "node scripts/sync-silk-docs.ts",
+    "build:site": "vite build && cp dist/client/404/index.html dist/client/404.html",
+    "deploy": "alchemy deploy --stage prod --yes"
   },
   "dependencies": {
     "@effect/platform-browser": "4.0.0",
@@ -28,6 +30,7 @@
     "@foldkit/vite-plugin": "0.28.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "26.4.0",
+    "alchemy": "2.0.0-beta.83",
     "happy-dom": "^20.14.5",
     "oxfmt": "^0.66.0",
     "oxlint": "1.85.0",
