@@ -180,18 +180,20 @@ The features come from the profile's `cpu` table; see Targets and profiles. With
 
 ### Architecture instructions
 
-Some instructions do in one step what takes several portable operations: byte table lookups, multiply-add steps, saturating packs and sums of absolute differences. The `silk/arch` modules give them as ordinary functions, named after what they compute:
+Some instructions do in one step what takes several portable operations: byte table lookups, multiply-add steps, saturating packs, sums of absolute differences, AES rounds, carry-less multiplication and SHA-256 rounds. The `silk/arch` modules give them as ordinary functions, named after what they compute:
 
 | Module | Functions, with the instruction and the CPU feature it needs |
 | --- | --- |
-| `silk.arch.x86` | `shuffleBytes` (`pshufb`, ssse3), `shuffleBytes256` (avx2), `multiplyAddBytes` (`pmaddubsw`, ssse3), `multiplyAddBytes256` (avx2), `multiplyAddWords` (`pmaddwd`, sse2), `multiplyAddWords256` (avx2), `packUnsigned16` (`packuswb`, sse2), `packUnsigned16x256` (avx2), `packUnsigned32` (`packusdw`, sse4.1), `packSigned16` (`packsswb`, sse2), `packSigned32` (`packssdw`, sse2), `sumAbsoluteDifferences` (`psadbw`, sse2), `sumAbsoluteDifferences256` (avx2) |
-| `silk.arch.aarch64` | `tableLookup` (`tbl`, neon), `dotProduct` (`udot`, dotprod), `dotProductSigned` (`sdot`, dotprod), `pairwiseAdd8`, `pairwiseAdd16`, `pairwiseAdd32` (`addp`, neon) |
+| `silk.arch.x86` | `shuffleBytes` (`pshufb`, ssse3), `shuffleBytes256` (avx2), `multiplyAddBytes` (`pmaddubsw`, ssse3), `multiplyAddBytes256` (avx2), `multiplyAddWords` (`pmaddwd`, sse2), `multiplyAddWords256` (avx2), `packUnsigned16` (`packuswb`, sse2), `packUnsigned16x256` (avx2), `packUnsigned32` (`packusdw`, sse4.1), `packSigned16` (`packsswb`, sse2), `packSigned32` (`packssdw`, sse2), `sumAbsoluteDifferences` (`psadbw`, sse2), `sumAbsoluteDifferences256` (avx2), `aesEncrypt`, `aesEncryptLast`, `aesDecrypt`, `aesDecryptLast`, `aesInverseMixColumns` (`aesenc`, `aesenclast`, `aesdec`, `aesdeclast`, `aesimc`, aes), `carrylessMultiply` (`pclmulqdq`, pclmul), `sha256Rounds2`, `sha256Message1`, `sha256Message2` (`sha256rnds2`, `sha256msg1`, `sha256msg2`, sha) |
+| `silk.arch.aarch64` | `tableLookup` (`tbl`, neon), `dotProduct` (`udot`, dotprod), `dotProductSigned` (`sdot`, dotprod), `pairwiseAdd8`, `pairwiseAdd16`, `pairwiseAdd32` (`addp`, neon), `aesEncrypt`, `aesDecrypt`, `aesMixColumns`, `aesInverseMixColumns` (`aese`, `aesd`, `aesmc`, `aesimc`, aes), `sha256Hash`, `sha256Hash2`, `sha256ScheduleUpdate0`, `sha256ScheduleUpdate1` (`sha256h`, `sha256h2`, `sha256su0`, `sha256su1`, sha2) |
 | `silk.arch.wasm` | `swizzle` (`i8x16.swizzle`, simd128), `relaxedSwizzle` (`i8x16.relaxed_swizzle`, relaxed-simd), `dot` (`i32x4.dot_i16x8_s`, simd128), `narrowUnsigned`, `narrowSigned` (`i8x16.narrow_i16x8_u` and `_s`, simd128) |
 
 - Every function compiles on every target. Where the build targets the module's architecture with the feature enabled, it is the one instruction. Elsewhere it computes the same lanes with portable code, which is correct but slower.
 - The choice is made at compile time from the profile, like `simd.preferredBytes()`. With the default x86-64 profile, `x86.shuffleBytes` takes the portable path; with `cpu.model = "x86-64-v2"` (SSSE3 and SSE4.1) it is `pshufb`, and `x86-64-v3` adds the AVX2 forms.
 - Code that only pays off with the instruction tests `Target.hasCpuFeature` from `silk/target` in a `static if` and keeps a plain loop otherwise.
 - The 256-bit x86 forms work on each 16-byte half separately: a `shuffleBytes256` index picks only within its own half, and `packUnsigned16x256` interleaves the halves of its operands.
+- The AES and SHA-256 functions follow their instructions, so the two modules split the work differently. An x86 AES round is `x86.aesEncrypt(state, key)`; on AArch64 it is `aarch64.aesMixColumns(aarch64.aesEncrypt(state, key))`, because `aese` adds the key first. `silk.arch.aes` has the portable steps (`subBytes`, `shiftRows`, `mixColumns` and their inverses) for checking either. To encrypt data, use `silk/aes_gcm`.
+- `x86.sha256Rounds2` does two rounds on the state split as A, B, E, F and C, D, G, H, highest lane first. `aarch64.sha256Hash` and `sha256Hash2` do four rounds on A to D and E to H in lane order. The message schedule takes one extra add on x86 (see the example below). The std lib digests in `silk/sha2` do not call these functions.
 - Index rules differ. `x86.shuffleBytes` uses the low four bits of an index and gives `0` when bit 7 is set; `aarch64.tableLookup` and `wasm.swizzle` give `0` for any index of 16 or more. `wasm.relaxedSwizzle` leaves those lanes unspecified, and they may differ between engines.
 
 To run a faster path on machines that have a feature the build does not select, see Targets and profiles, under CPU features at run time. The underlying members are in Intrinsics, under Architecture members.
@@ -360,6 +362,48 @@ pub fn main() -> i32 {
   // A set bit 7 gives a zero lane, as pshufb does.
   let cleared = x86.shuffleBytes(nibbles, u8x16.splat(128))
   if cleared != u8x16.splat(0) { return 2 }
+  return 0
+}
+```
+
+The next four SHA-256 message words, computed with each module. It exits with 0 under the default profile, where both take their portable paths, and under `cpu.features = ["sha"]`, which compiles the x86 functions to `sha256msg1` and `sha256msg2`. On arm64 with `sha2`, the AArch64 functions are `sha256su0` and `sha256su1`:
+
+```silk
+import silk.arch.aarch64
+import silk.arch.x86
+import silk.simd.u32x4
+import silk.u32
+
+fn sigma1(x: u32) -> u32 {
+  return u32.rotateRight(x, 17) ^ u32.rotateRight(x, 19) ^ u32.shiftRight(x, 10)
+}
+
+// W[16..19] from W[0..15], the x86 way: two steps, with W[9..12] added between them.
+fn nextX86(w: &[simd<u32, 4>; 4]) -> simd<u32, 4> {
+  let partial = x86.sha256Message1(w[0], w[1])
+  let middle = u32x4.shuffle(w[2], w[3], [1, 2, 3, 4])
+  return x86.sha256Message2(u32x4.wrappingAdd(partial, middle), w[3])
+}
+
+// The same words, the AArch64 way.
+fn nextAarch64(w: &[simd<u32, 4>; 4]) -> simd<u32, 4> {
+  let partial = aarch64.sha256ScheduleUpdate0(w[0], w[1])
+  return aarch64.sha256ScheduleUpdate1(partial, w[2], w[3])
+}
+
+pub fn main() -> i32 {
+  // The one padded block of the message "abc".
+  let w = [
+    u32x4.fromArray([0x61626380, 0, 0, 0]),
+    u32x4.splat(0),
+    u32x4.splat(0),
+    u32x4.fromArray([0, 0, 0, 0x18]),
+  ]
+  let a = nextX86(&w)
+  if a != nextAarch64(&w) { return 1 }
+  // W[16] = W[0] + sigma0(W[1]) + W[9] + sigma1(W[14]), and W[1], W[9] and W[14] are 0.
+  if u32x4.extract(a, 0) != 0x61626380 { return 2 }
+  if u32x4.extract(a, 1) != sigma1(0x18) { return 3 }
   return 0
 }
 ```

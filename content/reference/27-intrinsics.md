@@ -28,7 +28,7 @@ PropertyClause  = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Na
 | Scalar operations | 618 | `<scalar><Operation>`, see below |
 | Pointers | 19 | `pointerFromRef`, `pointerFromMutRef`, `pointerFromSlice`, `pointerFromMutSlice`, `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerAddress`, `pointerIsNull`, `pointerNull`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut` |
 | SIMD vectors | 46 | `simdSplat`, `simdFromArray`, `simdToArray`, `simdExtract`, `simdInsert`, `simdLoad`, `simdStore`, `simdPointerLoad`, `simdPointerStore`, `simdLanesEqual` and the other `simdLanes*` comparisons, `simdSelect`, `simdMinimum`, `simdMaximum`, `simdShuffle`, `simdWrapping*`, `simdSaturating*`, `simdShift*`, `simdRotate*`, `simdSqrt`, `simdMulAdd`, `simdReduce*`, `simdMask*`, `simdConvert`, `simdBitcast` |
-| Architecture operations | 14 | `x86ShuffleBytes`, `x86MultiplyAddBytes`, `x86MultiplyAddWords`, `x86PackUnsignedSaturate`, `x86PackSignedSaturate`, `x86SumAbsoluteDifferences`, `aarch64TableLookup`, `aarch64DotProduct`, `aarch64PairwiseAdd`, `wasmSwizzle`, `wasmRelaxedSwizzle`, `wasmDot`, `wasmNarrowUnsigned`, `wasmNarrowSigned` |
+| Architecture operations | 31 | `x86ShuffleBytes`, `x86MultiplyAddBytes`, `x86MultiplyAddWords`, `x86PackUnsignedSaturate`, `x86PackSignedSaturate`, `x86SumAbsoluteDifferences`, `x86AesEncrypt`, `x86AesEncryptLast`, `x86AesDecrypt`, `x86AesDecryptLast`, `x86AesInverseMixColumns`, `x86CarrylessMultiply`, `x86Sha256Rounds2`, `x86Sha256Message1`, `x86Sha256Message2`, `aarch64TableLookup`, `aarch64DotProduct`, `aarch64PairwiseAdd`, `aarch64AesEncrypt`, `aarch64AesDecrypt`, `aarch64AesMixColumns`, `aarch64AesInverseMixColumns`, `aarch64Sha256Hash`, `aarch64Sha256Hash2`, `aarch64Sha256ScheduleUpdate0`, `aarch64Sha256ScheduleUpdate1`, `wasmSwizzle`, `wasmRelaxedSwizzle`, `wasmDot`, `wasmNarrowUnsigned`, `wasmNarrowSigned` |
 | Atomics | 13 | `atomicLoad`, `atomicStore`, `atomicSwap`, `atomicCompareExchange`, `atomicCompareExchangeWeak`, `atomicFetchAdd`, `atomicFetchSubtract`, `atomicFetchBitAnd`, `atomicFetchBitOr`, `atomicFetchBitXor`, `atomicFetchMinimum`, `atomicFetchMaximum`, `atomicFence` |
 | Allocation and raw storage | 16 | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
 | Shared ownership | 4 | `sharedLayout`, `sharedFromAllocation`, `sharedClone`, `sharedWithMut` |
@@ -98,17 +98,31 @@ Each architecture member stands for one instruction of one target that the porta
 | `x86PackUnsignedSaturate` | `packuswb`, `packusdw` | `simd<i16, 8>` (sse2), `simd<i16, 16>` (avx2), `simd<i32, 4>` (sse4.1) | `simd<u8, 16>`, `simd<u8, 32>`, `simd<u16, 8>` |
 | `x86PackSignedSaturate` | `packsswb`, `packssdw` | `simd<i16, 8>` (sse2), `simd<i32, 4>` (sse2) | `simd<i8, 16>`, `simd<i16, 8>` |
 | `x86SumAbsoluteDifferences` | `psadbw` | `simd<u8, 16>` (sse2), `simd<u8, 32>` (avx2) | `simd<u64, 2>`, `simd<u64, 4>` |
+| `x86AesEncrypt`, `x86AesEncryptLast` | `aesenc`, `aesenclast` | `simd<u64, 2>` state and round key (aes) | same shape |
+| `x86AesDecrypt`, `x86AesDecryptLast` | `aesdec`, `aesdeclast` | `simd<u64, 2>` state and round key (aes) | same shape |
+| `x86AesInverseMixColumns` | `aesimc` | one `simd<u64, 2>` (aes) | same shape |
+| `x86CarrylessMultiply` | `pclmulqdq` with selector 0 | `simd<u64, 2>` (pclmul) | same shape |
+| `x86Sha256Rounds2` | `sha256rnds2` | three `simd<u32, 4>`: `cdgh`, `abef`, `wk` (sha) | same shape |
+| `x86Sha256Message1`, `x86Sha256Message2` | `sha256msg1`, `sha256msg2` | `simd<u32, 4>` (sha) | same shape |
 | `aarch64TableLookup` | `tbl` | `simd<u8, 16>` (neon) | same shape |
 | `aarch64DotProduct` | `udot`, `sdot` | `simd<u32, 4>` sum with two `simd<u8, 16>`, or `simd<i32, 4>` with two `simd<i8, 16>` (dotprod) | the sum's shape |
 | `aarch64PairwiseAdd` | `addp` | `simd<u8, 16>`, `simd<u16, 8>`, `simd<u32, 4>` (neon) | same shape |
+| `aarch64AesEncrypt`, `aarch64AesDecrypt` | `aese`, `aesd` | `simd<u8, 16>` state and round key (aes) | same shape |
+| `aarch64AesMixColumns`, `aarch64AesInverseMixColumns` | `aesmc`, `aesimc` | one `simd<u8, 16>` (aes) | same shape |
+| `aarch64Sha256Hash`, `aarch64Sha256Hash2` | `sha256h`, `sha256h2` | three `simd<u32, 4>` (sha2) | same shape |
+| `aarch64Sha256ScheduleUpdate0` | `sha256su0` | `simd<u32, 4>` (sha2) | same shape |
+| `aarch64Sha256ScheduleUpdate1` | `sha256su1` | three `simd<u32, 4>` (sha2) | same shape |
 | `wasmSwizzle` | `i8x16.swizzle` | `simd<u8, 16>` (simd128) | same shape |
 | `wasmRelaxedSwizzle` | `i8x16.relaxed_swizzle` | `simd<u8, 16>` (relaxed-simd) | same shape |
 | `wasmDot` | `i32x4.dot_i16x8_s` | `simd<i16, 8>` (simd128) | `simd<i32, 4>` |
 | `wasmNarrowUnsigned` | `i8x16.narrow_i16x8_u` | `simd<i16, 8>` (simd128) | `simd<u8, 16>` |
 | `wasmNarrowSigned` | `i8x16.narrow_i16x8_s` | `simd<i16, 8>` (simd128) | `simd<i8, 16>` |
 
-- All take two operands except `aarch64DotProduct`, which takes the sum first and then two byte vectors: `Intrinsic.aarch64DotProduct<simd<u32, 4>>(sum, left, right)`.
-- A call is admitted only when the selected target is the member's architecture and the feature is enabled, either by the profile (see Targets and profiles) or by the `features` list of the function that makes the call (below). A feature counts when an enabled feature implies it: `avx2` admits the `ssse3` and `sse4.1` shapes.
+- Most take two operands. `x86AesInverseMixColumns`, `aarch64AesMixColumns` and `aarch64AesInverseMixColumns` take one. `aarch64DotProduct` takes three, the sum first and then two byte vectors: `Intrinsic.aarch64DotProduct<simd<u32, 4>>(sum, left, right)`. `x86Sha256Rounds2`, `aarch64Sha256Hash`, `aarch64Sha256Hash2` and `aarch64Sha256ScheduleUpdate1` take three as well.
+- The x86 AES members take the 16-byte state as `simd<u64, 2>`; the AArch64 ones take `simd<u8, 16>`. An x86 encryption round is `aesenc` alone; an AArch64 round is `aesmc` of `aese`, because `aese` adds the key first and stops before MixColumns.
+- The two SHA-256 sets hold the eight working variables differently. On x86, `abef` holds A, B, E and F in lanes 3, 2, 1 and 0, `cdgh` holds C, D, G and H the same way, and one `sha256rnds2` does two rounds with the two message-plus-constant words in lanes 0 and 1 of `wk`; it returns the new `abef`, and the old `abef` becomes the new `cdgh`. On AArch64, `abcd` and `efgh` hold the variables in lane order, and `sha256h` and `sha256h2` do four rounds with all four lanes of `wk`, returning the new `abcd` and `efgh`. Give `sha256h2` the `abcd` from before the `sha256h` call.
+- For the message schedule, `x86Sha256Message1` and `aarch64Sha256ScheduleUpdate0` compute `W[i] + sigma0(W[i + 1])` for four words. On x86 the caller adds `W[9..12]` before `x86Sha256Message2`; `aarch64Sha256ScheduleUpdate1` takes those words itself.
+- A call is admitted only when the selected target is the member's architecture and the feature is enabled, either by the profile (see Targets and profiles) or by the `features` list of the function that makes the call (below). A feature counts when an enabled feature implies it: `avx2` admits the `ssse3` and `sse4.1` shapes. On arm64, `crypto` admits the `aes` and `sha2` members.
 - Otherwise the call is SEM0241. With the default x86-64 profile, which has SSE2 but not SSSE3, `Intrinsic.x86ShuffleBytes<simd<u8, 16>>(a, a)` prints "Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`". An AArch64 member on x86-64 prints "needs aarch64 with neon".
 - Code for several targets puts each call under a `static if` on `Target.arch()` and `Target.hasCpuFeature`, or in a function that lists the feature.
 - A shape the member does not take is SEM0239 at the call, and the message lists the shapes it takes: `x86ShuffleBytes<simd<u16, 8>>` prints ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. The shape is checked before the target and features, so this is reported on any target.
@@ -309,6 +323,37 @@ pub fn main() -> i32 {
       if Intrinsic.simdExtract<simd<u8, 32>>(picked, 16) != 19 { return 2 }
     }
   }
+  return 0
+}
+```
+
+Two SHA-256 rounds with `sha256rnds2`, checked against the `silk/arch/x86` wrapper, which takes its portable path under the default profile. The program exits with 0 with or without SHA, and also builds for AArch64:
+
+```silk
+import silk.arch.x86
+import silk.cpu { CpuFeatures }
+import silk.simd.u32x4
+
+static if Intrinsic.targetArchitecture() == "x86_64" {
+  // Compiled for SHA, so sha256rnds2 is admitted in this body.
+  unsafe fn rounds(cdgh: simd<u32, 4>, abef: simd<u32, 4>, wk: simd<u32, 4>) -> simd<u32, 4> with Intrinsic.machine(features: ("sha",)) {
+    return Intrinsic.x86Sha256Rounds2<simd<u32, 4>>(cdgh, abef, wk)
+  }
+}
+
+pub fn main() -> i32 {
+  // The SHA-256 initial state: A, B, E, F and C, D, G, H, highest lane first.
+  let abef = u32x4.fromArray([0x9b05688c, 0x510e527f, 0xbb67ae85, 0x6a09e667])
+  let cdgh = u32x4.fromArray([0x5be0cd19, 0x1f83d9ab, 0xa54ff53a, 0x3c6ef372])
+  // Two message words plus their round constants in lanes 0 and 1.
+  let wk = u32x4.fromArray([0x61626380 + 0x428a2f98, 0x71374491, 0, 0])
+  let portable = x86.sha256Rounds2(cdgh, abef, wk)
+  static if Intrinsic.targetArchitecture() == "x86_64" {
+    let machine = CpuFeatures.detect()
+    if CpuFeatures.has(&machine, "sha") && unsafe rounds(cdgh, abef, wk) != portable { return 1 }
+  }
+  // After rounds 0 and 1 of the "abc" example in FIPS 180-4, A and B are these.
+  if u32x4.extract(portable, 3) != 0x5a6ad9ad || u32x4.extract(portable, 2) != 0x5d6aebcd { return 2 }
   return 0
 }
 ```

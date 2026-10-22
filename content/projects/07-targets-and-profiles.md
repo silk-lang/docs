@@ -162,7 +162,7 @@ The manifest page lists every field and its values. The native build applies the
 
 | Target | Features |
 | --- | --- |
-| x86-64 Linux | `aes`, `avx`, `avx2`, `avx512bw`, `avx512cd`, `avx512dq`, `avx512f`, `avx512vbmi`, `avx512vl`, `bmi`, `bmi2`, `cx16`, `f16c`, `fma`, `lzcnt`, `movbe`, `pclmul`, `popcnt`, `sse2`, `sse3`, `sse4.1`, `sse4.2`, `ssse3`, `xsave` |
+| x86-64 Linux | `aes`, `avx`, `avx2`, `avx512bw`, `avx512cd`, `avx512dq`, `avx512f`, `avx512vbmi`, `avx512vl`, `bmi`, `bmi2`, `cx16`, `f16c`, `fma`, `lzcnt`, `movbe`, `pclmul`, `popcnt`, `sha`, `sse2`, `sse3`, `sse4.1`, `sse4.2`, `ssse3`, `xsave` |
 | arm64 | `aes`, `crc`, `crypto`, `dotprod`, `fp-armv8`, `fullfp16`, `i8mm`, `lse`, `neon`, `rdm`, `sha2`, `sha3` |
 | wasm32 | `atomics`, `bulk-memory`, `mutable-globals`, `relaxed-simd`, `sign-ext`, `simd128` |
 
@@ -247,6 +247,7 @@ A profile's `cpu` features apply to the whole program, and the program needs a m
 
 - `silk/cpu`, `CpuFeatures`: `CpuFeatures.detect()` asks the running machine; `CpuFeatures.selected()` is the set the profile selects. `has(&features, "avx2")` tests one name, spelled as in `cpu.features`; `containsAll(&features, &other)` tests a whole set.
 - `detect()` reads `cpuid` on x86-64 Linux, with or without libc, counting AVX and AVX-512 only when the operating system saves their registers. It reads `getauxval` on arm64 Linux with GNU libc and `sysctlbyname` on arm64 macOS. Elsewhere, such as in a wasm32 module, which cannot ask the engine, it reports the selected set. The result always includes the selected set.
+- Every name in the `cpu.features` table above can be tested, `sha` and `aes` included. Intrinsics, under Architecture members, has an example that runs `sha256rnds2` only where `detect()` reports `sha`.
 - Detection is not cached. Call `detect()` once at start and keep the value.
 - `with Intrinsic.machine(features: ("avx2",))` on an `unsafe fn` compiles that function with the listed features, the features they imply and the profile's own. Each call is `unsafe`: the caller has checked the machine. The rules are in Intrinsics, under Functions compiled for CPU features.
 - A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `features` list. The `silk/arch` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
