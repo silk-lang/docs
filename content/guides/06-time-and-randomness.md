@@ -72,7 +72,7 @@ effect fn wallClock() -> () ! LogError ? &mut SystemClock | &mut Logger {
   let seconds = SystemClock.seconds(&now)
   let date = dateFromDays(seconds / SECONDS_PER_DAY)
   let inDay = seconds % SECONDS_PER_DAY
-  run Effect.log("now: {seconds} s since 1970 = {year}-{month}-{day}, {hour}:{minute} UTC\n", &.{
+  run Effect.log("now: {seconds} s since 1970 = {year}-{month:02}-{day:02}, {hour:02}:{minute:02} UTC\n", &.{
     seconds: seconds,
     year: date.year,
     month: date.month,
@@ -83,7 +83,7 @@ effect fn wallClock() -> () ! LogError ? &mut SystemClock | &mut Logger {
 }
 ```
 
-`SystemClock.now()` is a service operation, so `wallClock` lists `? &mut SystemClock`. It has no failure row: a clock read that fails is a trap, not a typed failure. Templates have no padding options, so March prints as `3`, not `03`. Use `Format.displayWith` with a width and `zeroPad` when you need fixed-width fields; see the guide "Text and formatting".
+`SystemClock.now()` is a service operation, so `wallClock` lists `? &mut SystemClock`. It has no failure row: a clock read that fails is a trap, not a typed failure. The option `:02` pads a number to two digits with zeros, so March prints as `03`, not `3`. The guide "Text and formatting" lists the other placeholder options.
 
 ## Measuring and sleeping
 
@@ -188,10 +188,12 @@ The two services are separate on purpose. Try to provide the seeded generator wh
 ```
 
 ```
+Checking timing (x86_64-unknown-linux-gnu)
+  load     60 modules, 1 in package          0.05s
+  check    failed: 2 modules, 1 error        1.75s
 [x86_64-unknown-linux-gnu]
 /home/you/timing/src/main.silk:144:7: error[SEM0123] The provider matches no compatible requirement
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed timing in 1.81s
 ```
 
 SEM0123 means the value given to `provideMut<Random>` does not implement `Random`. A seeded generator can't stand in for a secure source by accident.
@@ -252,7 +254,6 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/timing (llvm, x86_64-unknown-linux-gnu, 343 symbols)
 now: 1792518771 s since 1970 = 2026-10-20, 17:52 UTC
 asked for 50 ms, slept 50 ms
 token: 8343ba6a350cde8651ecaa655bd7c90f
@@ -344,7 +345,6 @@ silk test --no-cache
 ```
 
 ```
-Compiled src/main.silk -> build/test/llvm/x86_64-unknown-linux-gnu/debug/timing (llvm, x86_64-unknown-linux-gnu, 558 symbols)
   main::convertsDays
     PASS  2 us
   main::sleepUsesTheProvidedClock

@@ -65,9 +65,9 @@ effect fn describe(text: string) -> () ! WriterError ? &mut Writer {
 }
 ```
 
-The second argument is a borrowed record. `{text}` picks the field named `text`. You can use a tuple instead and write `{}` for each field in order: `Format.format("{} has {} tasks\n", &("Julia", 3))`. One template uses names or positions, not both, and a positional template must use every field exactly once.
+The second argument is a borrowed record. `{text}` picks the field named `text`. You can use a tuple instead and write `{}` for each field in order: `Format.format("{} has {} tasks\n", &("Julia", 3))`. One template uses names or positions, not both, and a positional template must use every field exactly once. A placeholder can also carry options after a colon, such as `{bytes:>4}`; **Options in a placeholder** below lists them.
 
-The template is checked while the program compiles. `{{` and `}}` write literal braces. Each value must implement `Display`, which the std lib provides for every integer type, `f32`, `f64`, `bool`, `char` and `string`. A `bool` prints as `true` or `false`, and a `char` as the character itself.
+The template is checked while the program compiles. `{{` and `}}` write literal braces. Each value must implement `Display`, which the std lib provides for every integer type, `f32`, `f64`, `bool`, `char` and `string`. A `bool` prints as `true` or `false`, and a `char` as the character itself. A `{:?}` placeholder uses `Debug` instead, described below.
 
 `describe` needs `? &mut Writer`, and nothing in it says where the bytes go. `main` decides that by providing `StdoutWriter` from `silk/os_writer`. A test could provide a writer that collects bytes instead. The guide "Output, logging and standard input" shows that, and `Effect.log` takes the same templates.
 
@@ -82,10 +82,12 @@ silk check
 ```
 
 ```
+Checking textinfo (x86_64-unknown-linux-gnu)
+  load     52 modules, 1 in package          0.06s
+  check    failed: 2 modules, 1 error        0.24s
 [x86_64-unknown-linux-gnu]
 /home/you/textinfo/src/main.silk:8:7: error[SEM0177] template field {count} not found; available visible fields: name, cuont
-check x86_64-unknown-linux-gnu: failed (exit 1)
-Check summary: 0 succeeded, 1 failed
+Failed textinfo in 0.31s
 ```
 
 The error points at the call, and the message names the missing placeholder and lists the fields you did pass. A positional template is checked the same way. With `Format.format("{} has {} tasks, {} done\n", &("Julia", 3))` the check reports:
@@ -102,24 +104,55 @@ A value whose type has no `Display` stops the build at the call too, with SEM012
 
 Implement `Display` for the type, as the next sections show, or pass one of its fields instead.
 
-## Width and alignment
+## Options in a placeholder
 
-A template always uses default options. For a column, display one value at a time with `Format.displayWith` and a `FormatOptions`:
+After a colon, a placeholder takes options in the same order as Rust's `format!`. Each part is optional:
+
+| Part | Example | Effect |
+| --- | --- | --- |
+| Fill and alignment | `{:>8}`, `{:*^8}` | `<` left, `^` center, `>` right. A fill character goes before the alignment |
+| Sign | `{:+}` | Always write a sign. `-` is the default |
+| Alternate form | `{:#x}` | Add the `0x`, `0o` or `0b` prefix, or pretty-print with `{:#?}` |
+| Zero padding | `{:05}` | Pad a number with zeros after its sign or prefix |
+| Width | `{:8}` | The minimum width, in Unicode scalars |
+| Precision | `{:.2}` | Fractional digits for a float, the minimum digit count for an integer, the maximum length for text |
+| Type | `{:x}`, `{:X}`, `{:o}`, `{:b}`, `{:e}`, `{:E}`, `{:?}` | Hexadecimal, octal or binary for an integer, scientific notation for a float, `Debug` for any value that has it |
+
+Numbers align right by default, and text, `bool` and `char` align left. A named placeholder puts the options after its name, as in `{cost:>8.2}`:
 
 ```silk
-fn column(width: usize, alignment: Alignment) -> FormatOptions {
-  let mut options = Format.defaultOptions()
-  options.width = Option<usize>.some(width)
-  options.alignment = alignment
-  return move options
+// Placeholder options: alignment, fill, precision, sign, bases and scientific notation.
+effect fn options() -> () ! WriterError ? &mut Writer {
+  run Format.format("{:<10}{:>8}\n", &("item", "price"))
+  run Format.format("{name:.<10}{cost:>8.2}\n", &.{ name: "tea", cost: 2.5 })
+  run Format.format("{name:.<10}{cost:>8.2}\n", &.{ name: "biscuits", cost: 12.0 })
+  run Format.format("[{:^9}] [{:.3}] [{:+}] [{:05}]\n", &("mid", "naïve", 7, 0 - 42))
+  run Format.format("{:x} {:#X} {:#o} {:#010b} {:e}\n", &(255, 255, 8, 5, 1234.5))
 }
 ```
 
-`FormatOptions` also has `fill`, `sign`, `zeroPad` and `precision`. Width counts Unicode scalars, not bytes and not terminal cells. Precision on a float means exactly that many fractional digits. Without it, a float prints the shortest decimal that reads back to the same bits.
+The compiler checks the options with the rest of the template. A base type on a float or `e` on an integer stops the build at the call. The width and precision are fixed in the template. To take them from a value, build a `FormatOptions` (it has `width`, `alignment`, `fill`, `sign`, `zeroPad`, `precision` and `style`) and display one value with `Format.displayWith`. `FormatOptions` also has the two settings a template cannot express: `Sign.Space` and `color`.
+
+Checking a template takes compile time, and in this release the time grows quickly with the number of placeholders in one template: 8 placeholders take about a second of `silk check`, 16 take several seconds. Split a long line into several `Format.format` calls.
+
+Precision on a float means exactly that many fractional digits, rounded half to even. Without it, a float prints the shortest decimal that reads back to the same bits.
+
+## Showing a value for debugging
+
+`{:?}` writes a value's `Debug` form, which shows its structure: strings and chars are quoted and escaped, and `Option` and `Result` name their variant. Numbers and `bool` print as with `Display`.
+
+```silk
+// Debug output quotes text and names variants.
+effect fn debugging() -> () ! WriterError ? &mut Writer {
+  run Format.format("{:?} {:?} {:?} {:?}\n", &("tab\there", 'é', Option<i32>.some(3), Option<i32>.none()))
+}
+```
+
+To give a struct of your own a `Debug` form, implement `Debug` from `silk/format` and call `Format.debugFields(self, "Name", &mut formatter)`, which writes `Name { field: value, ... }`. `{:#?}` puts each field on its own line. `Format.debugList` writes a sequence as `[1, 2, 3]`.
 
 ## A type that prints itself
 
-Code points are usually written as `U+00EF`. Implement `Display` for a small `CodePoint` type and it works in templates and with `displayWith` alike:
+Code points are usually written as `U+00EF`. `{:04X}` gets the digits, but a type of your own can do better. Implement `Display` for a small `CodePoint` type and it works in templates, with their options, and with `displayWith` alike:
 
 ```silk
 // A Unicode scalar shown the way the standard writes it: U+00E9.
@@ -160,10 +193,7 @@ effect fn scalars(text: string) -> () ! WriterError ? &mut Writer {
       Option.Some { value } => {
         let offset = String.scalarByteOffset(&value)
         let point = CodePoint { value: char.toU32(String.scalarValue(&value)) }
-        run Format.displayWith(&offset, column(6, Alignment.Right))
-        run Writer.writeString("  ")
-        run Format.displayWith(&point, column(8, Alignment.Left))
-        run Writer.writeString("|\n")
+        run Format.format("{offset:>6}  {point:<8}|\n", &.{ offset: offset, point: move point })
         cursor = String.nextCursor(move value)
       }
       Option.None => {
@@ -174,7 +204,7 @@ effect fn scalars(text: string) -> () ! WriterError ? &mut Writer {
 }
 ```
 
-`Writer.writeString` writes text with no template at all.
+The `{point:<8}` options reach `CodePoint`'s `display` through the `Formatter`, so its own padding calls fill the column.
 
 ## Checking bytes for UTF-8
 
@@ -235,7 +265,7 @@ effect fn decodeChunks(chunks: &[&[u8]]) -> () ! WriterError ? &mut Writer {
 }
 ```
 
-`step` returns `Scalar`, `NeedMore` or `Invalid`. You pass each byte's absolute offset, so an `Invalid` result points into your whole input, not into one chunk. At the end of input, check `pending()`: a scalar that was started but never finished is your error to report. After `Invalid`, make a new decoder before you continue.
+`Writer.writeString` writes text with no template at all. `step` returns `Scalar`, `NeedMore` or `Invalid`. You pass each byte's absolute offset, so an `Invalid` result points into your whole input, not into one chunk. At the end of input, check `pending()`: a scalar that was started but never finished is your error to report. After `Invalid`, make a new decoder before you continue.
 
 The pattern names the field `offset: bad` because `offset` is already a local. Reusing it is SEM0048, "A pattern binding whose spelling collides with an existing declaration".
 
@@ -310,6 +340,8 @@ A `ParseError` holds a `reason` that is either `NotANumber`, with the offset whe
 effect fn report() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut Allocator {
   run describe("Silk")
   run describe("naïve")
+  run options()
+  run debugging()
   run scalars("naïve")
   run validate(b"caf\xC3\xA9")
   run validate(b"caf\xC3")
@@ -343,7 +375,7 @@ The imports at the top of the file:
 import silk.allocator { Allocator, OutOfMemoryError }
 import silk.char
 import silk.effect { Effect }
-import silk.format { Alignment, Display, Format, FormatOptions, Formatter, NotANumber, OutOfRange }
+import silk.format { Display, Format, Formatter, NotANumber, OutOfRange }
 import silk.option { Option }
 import silk.os_writer { StdoutWriter }
 import silk.result { Result }
@@ -360,9 +392,14 @@ silk run
 ```
 
 ```
-Compiled src/main.silk -> build/llvm/x86_64-unknown-linux-gnu/debug/textinfo (llvm, x86_64-unknown-linux-gnu, 371 symbols)
 Silk: 4 bytes, 4 scalars
 naïve: 6 bytes, 5 scalars
+item         price
+tea.......    2.50
+biscuits..   12.00
+[   mid   ] [naï] [+7] [-0042]
+ff 0xFF 0o10 0b00000101 1.2345e3
+"tab\there" 'é' Some(3) None
 offset  scalar
      0  U+006E  |
      1  U+0061  |
@@ -381,7 +418,7 @@ Hello, naïve reader!: 21 bytes, 20 scalars
 {name} is literal; naïve is 5 scalars
 ```
 
-Read it against the code. `ï` takes two bytes, so the offsets jump from 2 to 4. `b"caf\xC3"` stops in the middle of `é`, and the error names byte 3. The decoder sees the same split bytes across two chunks and puts `é` back together.
+Read it against the code. The price column pads `2.50` to 8 columns, `{:.3}` cuts `naïve` to three scalars, and `{:05}` puts the zeros after the minus sign. `{:#010b}` counts the `0b` prefix in its width of 10. `ï` takes two bytes, so the offsets jump from 2 to 4. `b"caf\xC3"` stops in the middle of `é`, and the error names byte 3. The decoder sees the same split bytes across two chunks and puts `é` back together.
 
 ## API reference
 
@@ -389,7 +426,7 @@ Read it against the code. `ï` takes two bytes, so the offsets jump from 2 to 4.
 - `silk/char`: `fromU32`, `toU32`
 - `silk/utf8_decoder`: `Utf8Decoder`, `Utf8Step`
 - `silk/unicode`: `Unicode`
-- `silk/format`: `Format`, `FormatOptions`, `Alignment`, `Display`, `Formatter`, `ParseError`
+- `silk/format`: `Format`, `FormatOptions`, `Display`, `Debug`, `Formatter`, `ParseError`
 - `silk/writer`: `Writer`, `WriterError`
 - `silk/os_writer`: `StdoutWriter`
 - `silk/slice`: `Slice`
