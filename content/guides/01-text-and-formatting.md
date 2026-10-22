@@ -133,7 +133,7 @@ effect fn options() -> () ! WriterError ? &mut Writer {
 
 The compiler checks the options with the rest of the template. A base type on a float or `e` on an integer stops the build at the call. The width and precision are fixed in the template. To take them from a value, build a `FormatOptions` (it has `width`, `alignment`, `fill`, `sign`, `zeroPad`, `precision` and `style`) and display one value with `Format.displayWith`. `FormatOptions` also has the two settings a template cannot express: `Sign.Space` and `color`.
 
-Checking a template takes compile time, and the time grows faster than the number of placeholders. A positional template stays quick: 8 placeholders take well under a second of `silk check`, 16 about two seconds, 40 about eleven. Named placeholders cost more when the record has many fields: 8 fields named once each take about three seconds, 16 about half a minute, 24 about three minutes. For a long line, use positions or split it into several `Format.format` calls.
+Checking a template takes compile time, and the time grows faster than the number of placeholders, whether they are named or positional. A template with 8 placeholders takes about half a second of `silk check`, 16 about one second, 24 about two seconds, and 40 about six. For a long line, split it into several `Format.format` calls.
 
 Precision on a float means exactly that many fractional digits, rounded half to even. Without it, a float prints the shortest decimal that reads back to the same bits.
 

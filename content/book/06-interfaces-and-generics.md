@@ -281,14 +281,14 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     51 modules, 1 in package          0.04s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:7:1: error[SEM0083] An invalid source-declared capability implementation
-Failed scratch in 0.17s
+/home/you/scratch/src/main.silk:7:1: error[SEM0083] Invalid conformance: `Filter` requires `keep`, which this implementation does not define
+Failed scratch in 0.19s
 ```
 
-SEM0083 calls the impl invalid. It is the code for an impl that doesn't fit its interface: a member is missing, extra, repeated or has the wrong signature. The location is the `impl` line. Compare the impl to the interface one member at a time.
+SEM0083 is the code for an impl that doesn't fit its interface: a member is missing, extra, repeated or has the wrong signature. The message names the interface and the member. A missing member is reported at the `impl` line. A member with the wrong signature is reported at that member, and the message says what differs, such as ``member `keep` does not match the operation of `Filter`: it returns a different type``.
 
 ## Generic functions
 

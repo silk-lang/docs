@@ -335,7 +335,7 @@ An `effect { ... }` block does the same job without a named function. Pass it st
 
 The output is the same as with `budgetedRead`. Each time `retrying` runs the block, the block builds a fresh `withBudget` effect, and it holds only a `&mut` borrow of `station`, so it is a `mut Effect` too.
 
-One case still needs a named `effect fn`: a block passed from a generic function, one with type parameters of its own, that also calls `Effect.log`. Here `wrapped<T>` logs a line and passes a block to a one-line combinator, `again`:
+A block also works inside a generic function, one with type parameters of its own. One case still needs a named `effect fn`: a function the compiler builds separately for each static value it is given. That is a function with a `static` parameter, or the body of a `static for`. Here `scaled` takes its factor as a static parameter and passes a block to a one-line combinator, `again`:
 
 ```silk
 effect fn again<'env, A, E, ?R>(mut action: mut Effect<'env; A ! E ? R>) -> A ! E ? R {
@@ -346,24 +346,22 @@ effect fn one() -> i32 {
   return 1
 }
 
-effect fn wrapped<T>(value: T) -> T ! LogError ? &mut Logger {
-  run Effect.log("start\n", &.{})
+effect fn scaled(static factor: i32) -> i32 {
   let got = run again(effect { return run one() })
-  run Effect.log("{v}\n", &.{ v: got })
-  return move value
+  return got * factor
 }
 ```
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.07s
-  check    failed: 2 modules                 0.27s
+  load     51 modules, 1 in package          0.04s
+  check    failed: 2 modules                 0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:6:10: unsupported[signature-form] not supported by the native compiler yet
-Failed weather in 0.34s
+/home/you/weather/src/main.silk:2:10: unsupported[static-residualization] not supported by the native compiler yet
+Failed weather in 0.16s
 ```
 
-The command exits with status 2. Line 6 is `run action` inside `again`. Without the type parameter, or without the `Effect.log` calls, the same code checks and runs. Passing `again(one())` instead of the block works too.
+The command exits with status 2. Line 2 is `run action` inside `again`. Passing `again(one())` instead of the block works, and so does the block once `factor` is an ordinary parameter. Inside a `static for` body the same block is refused at the block itself, with "unsupported: this construct is not supported by the native compiler yet".
 
 ## Borrowing while an effect is alive
 

@@ -111,7 +111,7 @@ Each architecture member stands for one instruction of one target that the porta
 - A call is admitted only when the selected target is the member's architecture and the feature is enabled, either by the profile (see Targets and profiles) or by the `features` list of the function that makes the call (below). A feature counts when an enabled feature implies it: `avx2` admits the `ssse3` and `sse4.1` shapes.
 - Otherwise the call is SEM0241. With the default x86-64 profile, which has SSE2 but not SSSE3, `Intrinsic.x86ShuffleBytes<simd<u8, 16>>(a, a)` prints "Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`". An AArch64 member on x86-64 prints "needs aarch64 with neon".
 - Code for several targets puts each call under a `static if` on `Target.arch()` and `Target.hasCpuFeature`, or in a function that lists the feature.
-- A shape the member does not take, such as `x86ShuffleBytes<simd<u16, 8>>`, is SEM0239 with the code's generic text, "A SIMD vector or mask shape, or SIMD operation type arguments or shuffle indices, that are not admitted".
+- A shape the member does not take is SEM0239 at the call, and the message lists the shapes it takes: `x86ShuffleBytes<simd<u16, 8>>` prints ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. The shape is checked before the target and features, so this is reported on any target.
 - `silk/arch/x86`, `silk/arch/aarch64` and `silk/arch/wasm` wrap each member in a function that compiles to the instruction where the profile enables it and to portable code everywhere else. See Values and primitive types, under SIMD vectors and masks.
 
 ## Type and property members
@@ -144,7 +144,7 @@ unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> wit
 }
 ```
 
-- The value is a tuple of text literals, `("ssse3", "avx2")`, or one literal, `"avx2"`. A name outside the target's feature catalog is SEM0242: `features: ("neon",)` on x86-64 prints "neon is not a CPU feature of x86_64-unknown-linux-gnu; `features` lists text literals from the target's catalog". A constant, an empty tuple or any other non-literal entry is also SEM0242, with "a non-literal entry" in place of the name. Level names such as `"x86-64-v3"` are models, not features.
+- The value is a tuple of text literals, `("ssse3", "avx2")`, or one literal, `"avx2"`. A name outside the target's feature catalog is SEM0242: `features: ("neon",)` on x86-64 prints "neon is not a CPU feature of x86_64-unknown-linux-gnu; `features` lists text literals from the target's catalog". A constant or any other non-literal entry is also SEM0242, with "a non-literal entry" in place of the name. An empty list, `features: ()`, is SEM0242 too: "`features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the clause". Level names such as `"x86-64-v3"` are models, not features.
 - The function must be declared `unsafe fn`; otherwise SEM0243 at the declaration: "safe enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them". Each call is an unsafe operation (SEM0082 outside `unsafe`). Running it on a machine without the features is undefined; check first with `CpuFeatures.detect()` from `silk/cpu`.
 - Free functions, methods, generic functions and effect functions take the clause. `with Intrinsic.nonParking()` may sit beside it. A closure does not take a `with` clause.
 - The function is compiled with the listed features, the features they imply and the profile's features. Architecture members that need them are admitted in its body (SEM0241 otherwise). Functions it calls are compiled for the profile, unless the optimizer inlines them into it.
@@ -327,9 +327,9 @@ pub fn main() -> i32 {
 | SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause, such as `with Intrinsic.detached()` |
 | SEM0236 | Known property on a declaration that does not take it, such as `Intrinsic.machine(naked: true)` on a plain function or `Intrinsic.machine(features:)` on an `export "C"` one |
 | SEM0237 | An atomic member with a memory order or element type it does not admit, such as `atomicStore` with `"acquire"` |
-| SEM0239 | A SIMD member with a vector shape or lane type it does not admit, such as `simdSqrt<simd<u8, 16>>`, or vectors that differ in lane count, width or lane type where they must match |
+| SEM0239 | A SIMD or architecture member with a vector shape or lane type it does not admit, such as `simdSqrt<simd<u8, 16>>` or `x86ShuffleBytes<simd<u16, 8>>`, or vectors that differ in lane count, width or lane type where they must match |
 | SEM0241 | An architecture member whose target or CPU feature is not enabled for the calling function |
-| SEM0242 | A `features` entry that is not a text literal naming a CPU feature of the target |
+| SEM0242 | A `features` entry that is not a text literal naming a CPU feature of the target, or an empty `features` list |
 | SEM0243 | A function with `features` that is not declared `unsafe fn` |
 
 ## See also

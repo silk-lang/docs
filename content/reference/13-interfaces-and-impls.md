@@ -29,7 +29,7 @@ InterfaceType  = Path TypeArguments?
 
 ## Impls
 
-- `impl Interface for Type { ... }` declares a conformance. Every operation must be supplied exactly once, with a matching signature. A missing, extra, repeated or mismatched member is SEM0083.
+- `impl Interface for Type { ... }` declares a conformance. Every operation must be supplied exactly once, with a matching signature. A missing, extra, repeated or mismatched member is SEM0083. The message names the interface and the member: ``Invalid conformance: `Shape` requires `area`, which this implementation does not define``, or ``member `decode` does not match the operation of `Info`: it returns a different type``. A duplicate impl or a repeated member prints only the code's meaning.
 - A member is either a full function definition or a binding `name: path` to an existing function.
 - A binding may name a top-level function (`area: squareArea`), an inherent member (`multiply: Vec2.scale`), or an intrinsic (`mix: Intrinsic.i32WrappingAdd`).
 - A generic impl declares its parameters after `impl`: `impl<T> Marker for Box<T> {}`.

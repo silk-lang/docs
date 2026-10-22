@@ -305,7 +305,7 @@ pub fn main() -> i32 {
 /home/you/demo/src/main.silk:2:15: error[LEX0014] Numeric literals take no type suffix such as `u8`; write the type as an annotation instead, as in `let value: u8 = 7`
 ```
 
-The column is the start of the literal, and the message repeats its digits and suffix: `5usize` gives ``as in `let value: usize = 5` ``. Every integer and float type name is caught this way, after an integer or a float: `1.5f32` gives ``such as `f32`; write the type as an annotation instead, as in `let value: f32 = 1.5` ``. For `2.5e3u8` the message suggests `let value: u8 = 2.5e3`, which is SEM0037 in turn, because a float literal is not a `u8`.
+The column is the start of the literal, and the message repeats its digits and suffix: `5usize` gives ``as in `let value: usize = 5` ``. Every integer and float type name is caught this way, after an integer or a float: `1.5f32` gives ``such as `f32`; write the type as an annotation instead, as in `let value: f32 = 1.5` ``. A float with an integer suffix gets its own wording. `2.5e3u8` gives ``Numeric literals take no type suffix such as `u8`; `2.5e3` is a float literal, which integer type `u8` cannot hold, so write a float type as an annotation instead, as in `let value: f64 = 2.5e3` ``.
 
 Fix: Drop the suffix and give the type where the value is used: `let value: u8 = 7`, or pass `7` to a `u8` parameter. See Lexical structure and Values and primitive types.
 
@@ -2557,12 +2557,19 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-/home/you/demo/src/main.silk:5:1: error[SEM0083] An invalid source-declared capability implementation
+/home/you/demo/src/main.silk:5:1: error[SEM0083] Invalid conformance: `Shape` requires `area`, which this implementation does not define
 ```
 
-Message template, not filled by this compiler: `Invalid conformance: {detail}`.
+The column is the start of the `impl` for a missing operation, and the member's line for a member that is wrong. The message names the interface and the member:
 
-Fix: Implement every interface member. `Copy` needs every field to be `Copy`. See Interfaces and impls.
+- Several missing operations are listed together: ``Invalid conformance: `Box3` requires `width` and `depth`, which this implementation does not define``.
+- A member whose signature differs says how: ``Invalid conformance: member `decode` does not match the operation of `Info`: it returns a different type``. Other endings are ``it takes a different number of parameters`` and ``its parameter 1 takes stronger access than promised, or consumes a borrowed operand``, as when a provider takes `&mut Self` for an operation that requires `&Service`.
+- A member the interface does not have: ``Invalid conformance: `other` is not an operation of `Info` ``.
+- A member in `impl Copy`: ``Invalid conformance: `impl Copy` declares no members; the compiler copies the value``.
+
+Other invalid conformances, such as a second identical `impl` or a member defined twice, print the code's meaning: ``An invalid source-declared capability implementation``.
+
+Fix: Implement every interface member, with the interface's signature, and nothing else. `Copy` needs every field to be `Copy`. See Interfaces and impls.
 
 ### SEM0084
 
@@ -4931,7 +4938,7 @@ An `Intrinsic.simd*` member whose type arguments break one of its rules gets the
 - ``Intrinsic.simdShuffle needs simd<u32, 4> and simd<i32, 4> to have the same lane type, but they have u32 and i32``.
 - ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices. A `shuffle` from a `silk/simd` module prints this too, at your call to it.
 
-An architecture member, such as `Intrinsic.x86ShuffleBytes<simd<u16, 8>>`, given a shape it does not take prints the code's meaning instead: ``A SIMD vector or mask shape, or SIMD operation type arguments or shuffle indices, that are not admitted``. Intrinsics lists the shapes each one takes.
+An architecture member given a shape it does not take gets the same code, with the shapes it takes: ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. Intrinsics lists the shapes each one takes.
 
 Fix: For a shape, use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. For a member, give it the lanes it names, or vectors that agree in the measure it names. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
 
@@ -5007,7 +5014,7 @@ pub fn main() -> i32 {
 /home/you/demo/src/main.silk:1:69: error[SEM0242] neon is not a CPU feature of x86_64-unknown-linux-gnu; `features` lists text literals from the target's catalog
 ```
 
-The column is the entry. A constant, an empty tuple `()` or another non-literal entry prints "a non-literal entry" in place of the name. Level names such as `"x86-64-v3"` are refused too: they are CPU models, not features.
+The column is the entry. A constant or another non-literal entry prints "a non-literal entry" in place of the name. An empty list, `features: ()`, prints `` `features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the clause ``, at the `()`. Level names such as `"x86-64-v3"` are refused too: they are CPU models, not features.
 
 Fix: List features from the target's catalog in Targets and profiles, as text literals. Put a function for another architecture under `static if Intrinsic.targetArchitecture() == "aarch64"` or the like, so other targets never check it.
 
