@@ -1,18 +1,72 @@
-Borrowed RFC 3986 URI references, explicit owned storage, and lossless component views.
+Parse a URI or a relative reference (RFC 3986) and read its components without allocation.
 
 ## When to use
-
-Use [`parse`](#UriReference.impl.parse) for a URI or a relative reference. Use `silk.uri` when a scheme is required.
+Use [`UriReference.parse`](#UriReference.impl.parse) for text that can be relative, such as an HTML `href`, a redirect
+`Location`, or a request target like `/search?q=silk`. Use `silk.uri` when the text must have a
+scheme. To change components or build a reference, use `silk.uri_components`. To decode the
+escapes in a component, use `silk.uri_percent`.
 
 ## Details
+[`UriReference.parse`](#UriReference.impl.parse) checks the generic syntax of RFC 3986 and returns a view that borrows the
+input. The component functions return slices of the input, so nothing is decoded or normalized:
+the case of letters and the spelling of `%XX` escapes do not change. An absent component and an
+empty component are different: `http://a/` has no query, but `http://a/?` has an empty query.
+[`OwnedUriReference`](#OwnedUriReference) holds the text and the parsed ranges together, for a value that lives
+longer than its input.
 
-[`parse`](#UriReference.impl.parse) borrows its input without allocation. [`OwnedUriReference`](#OwnedUriReference) provides explicit owned storage.
-Empty components remain distinct from absent components. Parsing does not decode percent escapes.
+## Errors
+[`UriReference.parse`](#UriReference.impl.parse) returns a [`ParseError`](#ParseError) with the cause, the component, and the byte
+position.
 
 ## Gotchas
+The parser checks syntax only. It does not check that a scheme is known, that a host exists, or
+that a port is in range. Raw non-ASCII bytes, spaces, and IPv6 zone identifiers are not valid
+RFC 3986 syntax. Encode them with `silk.uri_percent` first.
 
-This module checks generic URI syntax. It does not apply scheme, network, or identity policy.
-Raw non-ASCII bytes and IPv6 zone identifiers are not RFC 3986 syntax.
+## Examples
+### Read the parts of a relative reference
+```silk
+import silk.option { Option }
+import silk.result { Result }
+import silk.uri_reference { ParseError, UriReference }
+
+pub fn main() -> i32 {
+  let reference = match UriReference.parse("/search?q=silk#results") {
+    Result<UriReference, ParseError>.Success { value } => value
+    Result<UriReference, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let relative = match UriReference.scheme(&reference) {
+    Option<string>.Some { value: _ } => false
+    Option<string>.None => true
+  }
+  let query = UriReference.query(&reference) |> Option<string>.unwrapOr("")
+  if !relative || UriReference.path(&reference) != "/search" || query != "q=silk" {
+    return 1
+  }
+  return 0
+}
+```
+
+### Find the position of a syntax error
+```silk
+import silk.result { Result }
+import silk.uri_reference { Component, ParseError, ParseReason, UriReference }
+
+pub fn main() -> i32 {
+  return match UriReference.parse("http://example.com:80a/") {
+    Result<UriReference, ParseError>.Failure { error } => {
+      if error.reason != ParseReason.InvalidPort || error.component != Component.Port
+        || error.offset != 21 {
+        return 1
+      }
+      return 0
+    }
+    Result<UriReference, ParseError>.Success { value: _ } => 1
+  }
+}
+```
 
 Import as `UriReference` with `import silk.uri_reference { UriReference }`.
 
@@ -26,7 +80,7 @@ Public declarations: 6.
 pub enum HostKind
 ```
 
-The RFC grammar that matches an authority host.
+The form of a host, from [`UriReference.hostKind`](#UriReference.impl.hostKind).
 
 ::Anchor{id="HostKind.RegName"}
 
@@ -36,7 +90,7 @@ The RFC grammar that matches an authority host.
 RegName
 ```
 
-A registered name, including an empty host.
+A registered name, such as `example.com`. An empty host also has this kind.
 
 ::Anchor{id="HostKind.Ipv4"}
 
@@ -46,7 +100,8 @@ A registered name, including an empty host.
 Ipv4
 ```
 
-Four decimal octets with no leading zero in a multi-digit octet.
+An IPv4 address in dotted decimal form, such as `192.0.2.1`. An octet with more than one digit
+must not start with 0.
 
 ::Anchor{id="HostKind.Ipv6"}
 
@@ -56,7 +111,7 @@ Four decimal octets with no leading zero in a multi-digit octet.
 Ipv6
 ```
 
-A bracketed IPv6 address without a zone identifier.
+An IPv6 address in brackets, such as `[2001:db8::1]`. A zone identifier is not allowed.
 
 ::Anchor{id="HostKind.IpvFuture"}
 
@@ -66,7 +121,7 @@ A bracketed IPv6 address without a zone identifier.
 IpvFuture
 ```
 
-A bracketed future IP literal with a hexadecimal version.
+A future IP literal in brackets, such as `[v1.x]`.
 
 ::Anchor{id="Component"}
 
@@ -76,7 +131,7 @@ A bracketed future IP literal with a hexadecimal version.
 pub enum Component
 ```
 
-The URI component in which syntax validation fails.
+A component of a URI reference.
 
 ::Anchor{id="Component.Scheme"}
 
@@ -86,7 +141,7 @@ The URI component in which syntax validation fails.
 Scheme
 ```
 
-The scheme before its colon.
+The scheme, such as `https`, without the `:`.
 
 ::Anchor{id="Component.Authority"}
 
@@ -96,7 +151,7 @@ The scheme before its colon.
 Authority
 ```
 
-The authority after two slashes.
+The authority after `//`: user information, host, and port.
 
 ::Anchor{id="Component.Userinfo"}
 
@@ -106,7 +161,7 @@ The authority after two slashes.
 Userinfo
 ```
 
-The user information before its at sign.
+The user information before `@`.
 
 ::Anchor{id="Component.Host"}
 
@@ -126,7 +181,7 @@ The registered name or IP literal.
 Port
 ```
 
-The decimal port after its colon.
+The decimal port after the `:` of the authority.
 
 ::Anchor{id="Component.Path"}
 
@@ -136,7 +191,7 @@ The decimal port after its colon.
 Path
 ```
 
-The path before a query or fragment delimiter.
+The path, up to `?` or `#`.
 
 ::Anchor{id="Component.Query"}
 
@@ -146,7 +201,7 @@ The path before a query or fragment delimiter.
 Query
 ```
 
-The query after its question mark.
+The query after `?`.
 
 ::Anchor{id="Component.Fragment"}
 
@@ -156,7 +211,7 @@ The query after its question mark.
 Fragment
 ```
 
-The fragment after its number sign.
+The fragment after `#`.
 
 ::Anchor{id="ParseReason"}
 
@@ -166,7 +221,7 @@ The fragment after its number sign.
 pub enum ParseReason
 ```
 
-A generic URI syntax failure category.
+The cause of a [`ParseError`](#ParseError).
 
 ::Anchor{id="ParseReason.InvalidCharacter"}
 
@@ -176,7 +231,7 @@ A generic URI syntax failure category.
 InvalidCharacter
 ```
 
-A byte is not allowed in the selected component.
+A byte that the component does not allow, such as a space or a non-ASCII byte.
 
 ::Anchor{id="ParseReason.InvalidPercentEscape"}
 
@@ -186,7 +241,7 @@ A byte is not allowed in the selected component.
 InvalidPercentEscape
 ```
 
-A percent sign is not followed by two hexadecimal digits.
+A `%` that is not followed by two hexadecimal digits.
 
 ::Anchor{id="ParseReason.InvalidScheme"}
 
@@ -196,7 +251,8 @@ A percent sign is not followed by two hexadecimal digits.
 InvalidScheme
 ```
 
-A scheme is empty or does not follow the scheme grammar.
+A scheme that is empty or does not start with a letter followed by letters, digits, `+`, `-`,
+or `.`.
 
 ::Anchor{id="ParseReason.InvalidHost"}
 
@@ -206,7 +262,7 @@ A scheme is empty or does not follow the scheme grammar.
 InvalidHost
 ```
 
-An IP literal or host delimiter does not follow the host grammar.
+An IP literal or a host that does not follow the host grammar.
 
 ::Anchor{id="ParseReason.InvalidPort"}
 
@@ -216,7 +272,7 @@ An IP literal or host delimiter does not follow the host grammar.
 InvalidPort
 ```
 
-A port contains a non-decimal byte.
+A port that has a byte that is not a decimal digit.
 
 ::Anchor{id="ParseReason.MissingScheme"}
 
@@ -226,7 +282,7 @@ A port contains a non-decimal byte.
 MissingScheme
 ```
 
-A scheme-bearing URI was requested but the input has no scheme.
+The text has no scheme, but a function such as `Uri.parse` needs one.
 
 ::Anchor{id="ParseError"}
 
@@ -236,7 +292,7 @@ A scheme-bearing URI was requested but the input has no scheme.
 pub struct ParseError
 ```
 
-A syntax failure with its component and original byte position.
+A URI syntax error: the cause, the component, and the byte position.
 
 ::Anchor{id="ParseError.reason"}
 
@@ -246,7 +302,7 @@ A syntax failure with its component and original byte position.
 pub reason: ParseReason
 ```
 
-The failed syntax rule.
+The cause of the error.
 
 ::Anchor{id="ParseError.component"}
 
@@ -256,7 +312,7 @@ The failed syntax rule.
 pub component: Component
 ```
 
-The component that contains the failure.
+The component that has the error.
 
 ::Anchor{id="ParseError.offset"}
 
@@ -266,7 +322,8 @@ The component that contains the failure.
 pub offset: usize
 ```
 
-The zero-based offending byte offset, or the end offset when required syntax is missing.
+The position of the byte that is not valid, from the start of the text. If required syntax is
+missing, it is the position where it must be.
 
 ::Anchor{id="ParseError.impl.Copy"}
 
@@ -284,12 +341,10 @@ impl Copy for ParseError
 pub struct UriReference<'text>
 ```
 
-An immutable parsed reference borrowing its original serialization.
+A parsed URI reference that borrows its text.
 
-### Details
-
-Parsing allocates nothing. The result and its component views cannot outlive the input.
-Use [`copy`](#UriReference.impl.copy) to retain the value independently, or [`OwnedUriReference.fromString`](#OwnedUriReference.impl.fromString) to adopt text.
+It is `Copy` and does not allocate. It cannot live longer than its text. Use
+[`UriReference.copy`](#UriReference.impl.copy) or [`UriReference.parseOwned`](#UriReference.impl.parseOwned) to get an [`OwnedUriReference`](#OwnedUriReference).
 
 ::Anchor{id="UriReference.impl.Copy"}
 
@@ -315,12 +370,13 @@ impl<'text> UriReference<'text>
 pub fn parse(text: string<'text>) -> Result<UriReference<'text>, ParseError>
 ```
 
-Validates and borrows a URI reference without allocating or normalizing.
+Parses `text` as a URI reference: a URI with a scheme, or a relative reference.
 
-#### Details
+It does not allocate, decode, or normalize. If a host is a valid IPv4 address, its kind is
+`Ipv4`, not `RegName`.
 
-Syntax errors identify the failed component and byte. Valid dotted decimal hosts take
-precedence over registered names. The result retains the lifetime of `text`.
+#### Errors
+- [`ParseError`](#ParseError) for the first syntax problem, with its component and byte position.
 
 ::Anchor{id="UriReference.impl.validateComponent"}
 
@@ -330,13 +386,14 @@ precedence over registered names. The result retains the lifetime of `text`.
 pub fn validateComponent(text: string, component: Component) -> Option<ParseError>
 ```
 
-Validates the encoded grammar of one component without allocating.
+Checks that `text` is valid encoded text for one `component`, and returns the error or `None`.
 
-#### Details
+The error `offset` is a position in `text`. A host can be a registered name or an IP literal
+in brackets, but not user information or a port. An empty host or port is valid.
 
-Errors are relative to the supplied component text. Path checks its allowed bytes; assembly
-must additionally check path form against the presence of scheme and authority. Host accepts
-bracketed literals or reg-names, never userinfo or a port. Empty ports and hosts are valid.
+#### Gotchas
+For a path, it checks only the bytes. Some paths are not valid in every position, for example
+a path that starts with `//` when there is no authority.
 
 ::Anchor{id="UriReference.impl.copy"}
 
@@ -346,7 +403,10 @@ bracketed literals or reg-names, never userinfo or a port. Empty ports and hosts
 pub effect fn copy(self: &Self) -> OwnedUriReference ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies a parsed reference into independent owned storage with one allocation for nonempty input.
+Returns an [`OwnedUriReference`](#OwnedUriReference) with a copy of the text. It does not parse again.
+
+#### Errors
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="UriReference.impl.parseOwned"}
 
@@ -358,7 +418,11 @@ pub effect fn parseOwned(text: string<'text>) -> Result<OwnedUriReference, Parse
   ? &mut Allocator
 ```
 
-Validates input and explicitly copies it into owned storage; invalid input does not allocate.
+Parses `text` and returns an [`OwnedUriReference`](#OwnedUriReference) with a copy of it.
+
+#### Errors
+- `Failure` with a [`ParseError`](#ParseError) if `text` is not valid. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="UriReference.impl.format"}
 
@@ -368,7 +432,7 @@ Validates input and explicitly copies it into owned storage; invalid input does 
 pub fn format(self: &Self) -> string<'text>
 ```
 
-Returns the original borrowed serialization, preserving all delimiters and escape spelling.
+Returns the full text of the reference, as it was parsed.
 
 ::Anchor{id="UriReference.impl.scheme"}
 
@@ -378,7 +442,8 @@ Returns the original borrowed serialization, preserving all delimiters and escap
 pub fn scheme(self: &Self) -> Option<string<'text>>
 ```
 
-Borrows the scheme without its colon, or returns `None` for a relative reference.
+Returns the scheme without the `:`, or `None` for a relative reference. The case of the
+letters does not change.
 
 ::Anchor{id="UriReference.impl.authority"}
 
@@ -388,7 +453,8 @@ Borrows the scheme without its colon, or returns `None` for a relative reference
 pub fn authority(self: &Self) -> Option<string<'text>>
 ```
 
-Borrows the authority without its two slashes, including a present empty authority.
+Returns the authority without the `//`. Returns `None` if the component is absent. A component
+that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
 
 ::Anchor{id="UriReference.impl.userinfo"}
 
@@ -398,11 +464,10 @@ Borrows the authority without its two slashes, including a present empty authori
 pub fn userinfo(self: &Self) -> Option<string<'text>>
 ```
 
-Borrows user information without its at sign, or returns `None` when absent.
+Returns the user information without the `@`. Returns `None` if the component is absent. A
+component that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
 
-#### Details
-
-An empty value is present. Colons remain part of the value; no username or password split occurs.
+The text is not split at `:` into a user name and a password.
 
 ::Anchor{id="UriReference.impl.host"}
 
@@ -412,11 +477,9 @@ An empty value is present. Colons remain part of the value; no username or passw
 pub fn host(self: &Self) -> Option<string<'text>>
 ```
 
-Borrows the host with IP-literal brackets intact, or returns `None` when authority is absent.
+Returns the host, with the brackets of an IP literal. Returns `None` if there is no authority.
 
-#### Details
-
-An empty authority has a present empty host. The view borrows from the input without allocation.
+The host of `file:///x` is present and empty.
 
 ::Anchor{id="UriReference.impl.port"}
 
@@ -426,11 +489,10 @@ An empty authority has a present empty host. The view borrows from the input wit
 pub fn port(self: &Self) -> Option<string<'text>>
 ```
 
-Borrows the decimal port without its colon, or returns `None` when the colon is absent.
+Returns the port digits without the `:`. Returns `None` if the component is absent. A
+component that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
 
-#### Details
-
-An empty port is present. This operation does not convert the port to a number or impose a limit.
+It does not convert the port to a number or check its range.
 
 ::Anchor{id="UriReference.impl.path"}
 
@@ -440,7 +502,7 @@ An empty port is present. This operation does not convert the port to a number o
 pub fn path(self: &Self) -> string<'text>
 ```
 
-Borrows the path from the input without allocation; an empty path returns an empty string.
+Returns the path. The path is always present, but it can be empty.
 
 ::Anchor{id="UriReference.impl.query"}
 
@@ -450,7 +512,8 @@ Borrows the path from the input without allocation; an empty path returns an emp
 pub fn query(self: &Self) -> Option<string<'text>>
 ```
 
-Borrows the query without its question mark, including a present empty query.
+Returns the query without the `?`. Returns `None` if the component is absent. A component that
+is present but empty, such as the query of `http://a/?`, returns `Some("")`.
 
 ::Anchor{id="UriReference.impl.fragment"}
 
@@ -460,7 +523,8 @@ Borrows the query without its question mark, including a present empty query.
 pub fn fragment(self: &Self) -> Option<string<'text>>
 ```
 
-Borrows the fragment without its number sign, including a present empty fragment.
+Returns the fragment without the `#`. Returns `None` if the component is absent. A component
+that is present but empty, such as the query of `http://a/?`, returns `Some("")`.
 
 ::Anchor{id="UriReference.impl.hostKind"}
 
@@ -470,7 +534,7 @@ Borrows the fragment without its number sign, including a present empty fragment
 pub fn hostKind(self: &Self) -> Option<HostKind>
 ```
 
-Returns the host grammar classification, or `None` when authority is absent.
+Returns the [`HostKind`](#HostKind) of the host, or `None` if there is no authority.
 
 ::Anchor{id="OwnedUriReference"}
 
@@ -480,12 +544,11 @@ Returns the host grammar classification, or `None` when authority is absent.
 pub struct OwnedUriReference
 ```
 
-An immutable owner of validated URI-reference text and scalar component ranges.
+A URI reference that owns its text and its parsed ranges.
 
-### Details
-
-Owns no references into itself. [`view`](#OwnedUriReference.impl.view) borrows existing storage without reparsing or allocating.
-Use [`fromString`](#OwnedUriReference.impl.fromString) to transfer existing storage, or [`UriReference.parseOwned`](#UriReference.impl.parseOwned) to copy input.
+Get one from [`UriReference.copy`](#UriReference.impl.copy), [`UriReference.parseOwned`](#UriReference.impl.parseOwned), or
+[`OwnedUriReference.fromString`](#OwnedUriReference.impl.fromString). [`OwnedUriReference.view`](#OwnedUriReference.impl.view) returns a [`UriReference`](#UriReference) without
+parsing again.
 
 ::Anchor{id="OwnedUriReference.impl"}
 
@@ -503,11 +566,13 @@ impl OwnedUriReference
 pub fn fromString(text: String) -> Result<OwnedUriReference, ParseError>
 ```
 
-Validates and adopts an existing String without copying or allocating.
+Parses `text` and keeps it, without a copy or an allocation.
+
+#### Errors
+- `Failure` with a [`ParseError`](#ParseError) if `text` is not valid.
 
 #### Gotchas
-
-This operation consumes the String on both success and syntax failure.
+It consumes `text` also when it fails.
 
 ::Anchor{id="OwnedUriReference.impl.view"}
 
@@ -517,7 +582,7 @@ This operation consumes the String on both success and syntax failure.
 pub fn view(self: &Self) -> UriReference
 ```
 
-Borrows a parsed reference from this owner's stored ranges without validation or allocation.
+Returns a [`UriReference`](#UriReference) that borrows this value. It does not parse again or allocate.
 
 ::Anchor{id="OwnedUriReference.impl.intoString"}
 
@@ -527,6 +592,6 @@ Borrows a parsed reference from this owner's stored ranges without validation or
 pub fn intoString(self: Self) -> String
 ```
 
-Transfers the original owned serialization out of the parsed owner without copying.
+Returns the text and consumes the value. It does not copy.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

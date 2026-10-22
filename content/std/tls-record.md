@@ -1,19 +1,94 @@
-Bounded TLS 1.3 record protection and partial-byte transport driving.
+Frame and protect TLS 1.3 records (RFC 8446, section 5) over a byte transport that you drive.
 
 ## When to use
-Use [`TlsRecordSender`](#TlsRecordSender) and [`TlsRecordReceiver`](#TlsRecordReceiver) after a TLS handshake supplies a traffic
-secret, or use their plaintext constructors for the initial handshake record framing.
+Most programs use `silk.tls_connection` or `silk.tls_client`, which use this module. Use
+[`TlsRecordSender`](#TlsRecordSender) and [`TlsRecordReceiver`](#TlsRecordReceiver) directly to build another TLS endpoint or a test
+tool. The `makePlaintext` functions frame records without encryption, for the first handshake
+messages. The `make` functions take a traffic secret and encrypt with the [`CipherSuite`](#CipherSuite).
 
 ## Details
-Each direction owns fixed-capacity storage allocated at construction. Later queue, input,
-acknowledgment, and consumption operations allocate nothing and retain no caller buffer.
-Protected epochs support the three TLS 1.3 cipher suites admitted by Silk and stop after
-[`RECORDS_PER_EPOCH`](#RECORDS_PER_EPOCH) records. A record view borrows its receiver until it is consumed.
+Each direction allocates fixed buffers one time, when you make it. Later calls do not allocate
+and do not keep your buffers. The sender holds at most one encoded record: write
+[`TlsRecordSender.pendingOutput`](#TlsRecordSender.impl.pendingOutput) to the transport, and then call [`TlsRecordSender.ackWritten`](#TlsRecordSender.impl.ackWritten)
+with the number of bytes that the transport took. The receiver takes input in pieces with
+[`TlsRecordReceiver.feedInput`](#TlsRecordReceiver.impl.feedInput), and gives you one complete, authenticated record at a time. A
+traffic key protects at most [`RECORDS_PER_EPOCH`](#RECORDS_PER_EPOCH) records.
+
+## Errors
+- [`RecordError`](#RecordError) for a wrong secret length, a call in the wrong state, a record that is too
+  large or not valid, a record that fails authentication, or a key that is used up.
+- `OutOfMemoryError` from the `make` functions if the `Allocator` fails.
 
 ## Gotchas
-Possession of a traffic secret does not authenticate a server identity. This module does not
-perform a handshake, validate certificates, acquire trust, drive network resources, reserve a
-client KeyUpdate, or decide close-notify policy. Secret copies are not guaranteed to be erased.
+A traffic secret does not prove who the peer is. This module does not do the handshake, check
+certificates, or decide when to send `close_notify`. An error from a peer record is permanent
+for that receiver. Secrets are not erased.
+
+## Examples
+### Send a record and receive it
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.result { Result }
+import silk.tls_record {
+  ContentType,
+  InputDemand,
+  InputProgress,
+  OutputProgress,
+  RecordError,
+  TlsRecordReceiver,
+  TlsRecordSender
+}
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut sender = run TlsRecordSender.makePlaintext()
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut receiver = run TlsRecordReceiver.makePlaintext()
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  match TlsRecordSender.queueRecord(&mut sender, ContentType.Handshake, b"hello") {
+    Result<OutputProgress, RecordError>.Success { value } => {
+      if value.accepted != 5 {
+        return 1
+      }
+    }
+    Result<OutputProgress, RecordError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // The wire bytes are a 5-byte record header and the content.
+  let wire = TlsRecordSender.pendingOutput(&sender)
+  let length = wire.length
+  match TlsRecordReceiver.feedInput(&mut receiver, wire) {
+    Result<InputProgress, RecordError>.Success { value } => {
+      if value.consumed != 10 || value.demand != InputDemand.RecordReady {
+        return 1
+      }
+    }
+    Result<InputProgress, RecordError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  match TlsRecordSender.ackWritten(&mut sender, length) {
+    Result<(), RecordError>.Success { value: _ } => {}
+    Result<(), RecordError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let mut content: [u8; 16] = [0; 16]
+  return match TlsRecordReceiver.consumeRecordInto(&mut receiver, &mut content) {
+    Result<usize, RecordError>.Success { value } => {
+      if value != 5 || content[0] != 104 {
+        return 1
+      }
+      return 0
+    }
+    Result<usize, RecordError>.Failure { error: _ } => 1
+  }
+}
+```
 
 Import as `TlsRecordSender` with `import silk.tls_record { TlsRecordSender }`.
 
@@ -27,7 +102,8 @@ Public declarations: 11.
 pub const RECORDS_PER_EPOCH: u64
 ```
 
-The conservative maximum number of records protected by one traffic epoch.
+The maximum number of records that one traffic key protects. After it, install a new key, for
+example after a KeyUpdate.
 
 ::Anchor{id="CipherSuite"}
 
@@ -37,7 +113,7 @@ The conservative maximum number of records protected by one traffic epoch.
 pub enum CipherSuite
 ```
 
-One cipher suite in Silk's TLS 1.3 profile.
+A TLS 1.3 cipher suite that this module supports.
 
 ::Anchor{id="CipherSuite.Aes128GcmSha256"}
 
@@ -47,7 +123,7 @@ One cipher suite in Silk's TLS 1.3 profile.
 Aes128GcmSha256
 ```
 
-TLS_AES_128_GCM_SHA256.
+`TLS_AES_128_GCM_SHA256`. Its traffic secrets are 32 bytes.
 
 ::Anchor{id="CipherSuite.Aes256GcmSha384"}
 
@@ -57,7 +133,7 @@ TLS_AES_128_GCM_SHA256.
 Aes256GcmSha384
 ```
 
-TLS_AES_256_GCM_SHA384.
+`TLS_AES_256_GCM_SHA384`. Its traffic secrets are 48 bytes.
 
 ::Anchor{id="CipherSuite.ChaCha20Poly1305Sha256"}
 
@@ -67,7 +143,7 @@ TLS_AES_256_GCM_SHA384.
 ChaCha20Poly1305Sha256
 ```
 
-TLS_CHACHA20_POLY1305_SHA256.
+`TLS_CHACHA20_POLY1305_SHA256`. Its traffic secrets are 32 bytes.
 
 ::Anchor{id="ContentType"}
 
@@ -77,7 +153,7 @@ TLS_CHACHA20_POLY1305_SHA256.
 pub enum ContentType
 ```
 
-A TLS record content type exposed after complete framing and authentication.
+The content type of a record.
 
 ::Anchor{id="ContentType.ChangeCipherSpec"}
 
@@ -87,7 +163,8 @@ A TLS record content type exposed after complete framing and authentication.
 ChangeCipherSpec
 ```
 
-Compatibility change_cipher_spec content. It is admitted only by plaintext framing.
+The `change_cipher_spec` record that TLS 1.3 sends only for middlebox compatibility. Only the
+plaintext form, with the content `{1}`, is accepted.
 
 ::Anchor{id="ContentType.Alert"}
 
@@ -97,7 +174,7 @@ Compatibility change_cipher_spec content. It is admitted only by plaintext frami
 Alert
 ```
 
-Exactly one complete two-byte alert.
+An alert. The content is exactly 2 bytes.
 
 ::Anchor{id="ContentType.Handshake"}
 
@@ -107,7 +184,7 @@ Exactly one complete two-byte alert.
 Handshake
 ```
 
-A nonempty handshake fragment.
+Handshake messages. The content is not empty.
 
 ::Anchor{id="ContentType.ApplicationData"}
 
@@ -117,7 +194,7 @@ A nonempty handshake fragment.
 ApplicationData
 ```
 
-Application data, including an empty fragment.
+Application data. The content can be empty.
 
 ::Anchor{id="InputDemand"}
 
@@ -127,7 +204,7 @@ Application data, including an empty fragment.
 pub enum InputDemand
 ```
 
-The next receive-side action after a successful input call.
+What the receiver needs after [`TlsRecordReceiver.feedInput`](#TlsRecordReceiver.impl.feedInput).
 
 ::Anchor{id="InputDemand.NeedInput"}
 
@@ -137,7 +214,7 @@ The next receive-side action after a successful input call.
 NeedInput
 ```
 
-Supply more bytes for the current record.
+The record is not complete. Give more bytes.
 
 ::Anchor{id="InputDemand.RecordReady"}
 
@@ -147,7 +224,7 @@ Supply more bytes for the current record.
 RecordReady
 ```
 
-Inspect and consume the completed record.
+A record is complete. Read it, and then consume it.
 
 ::Anchor{id="InputDemand.NeedRecordConsumption"}
 
@@ -157,7 +234,7 @@ Inspect and consume the completed record.
 NeedRecordConsumption
 ```
 
-Consume the already-ready record before supplying more input.
+A record was already ready, so no bytes were taken. Consume it first.
 
 ::Anchor{id="InputProgress"}
 
@@ -167,7 +244,7 @@ Consume the already-ready record before supplying more input.
 pub struct InputProgress
 ```
 
-Exact input progress and the next receive-side action.
+The result of [`TlsRecordReceiver.feedInput`](#TlsRecordReceiver.impl.feedInput).
 
 ::Anchor{id="InputProgress.consumed"}
 
@@ -177,7 +254,7 @@ Exact input progress and the next receive-side action.
 pub consumed: usize
 ```
 
-The caller-input prefix copied during this call.
+The number of input bytes that the receiver took. Give the rest again later.
 
 ::Anchor{id="InputProgress.demand"}
 
@@ -187,7 +264,7 @@ The caller-input prefix copied during this call.
 pub demand: InputDemand
 ```
 
-The resource or action needed next.
+What the receiver needs next.
 
 ::Anchor{id="OutputDemand"}
 
@@ -197,7 +274,7 @@ The resource or action needed next.
 pub enum OutputDemand
 ```
 
-The next send-side action after a successful queue call.
+What the sender needs after [`TlsRecordSender.queueRecord`](#TlsRecordSender.impl.queueRecord).
 
 ::Anchor{id="OutputDemand.RecordQueued"}
 
@@ -207,7 +284,7 @@ The next send-side action after a successful queue call.
 RecordQueued
 ```
 
-One record was encoded and is ready for transport.
+A record is encoded. Write [`TlsRecordSender.pendingOutput`](#TlsRecordSender.impl.pendingOutput) to the transport.
 
 ::Anchor{id="OutputDemand.NeedOutput"}
 
@@ -217,7 +294,8 @@ One record was encoded and is ready for transport.
 NeedOutput
 ```
 
-A prior record still has unacknowledged output.
+An earlier record is not fully written yet, so nothing was taken. Write and acknowledge it
+first.
 
 ::Anchor{id="OutputProgress"}
 
@@ -227,7 +305,7 @@ A prior record still has unacknowledged output.
 pub struct OutputProgress
 ```
 
-Exact queue progress and the next send-side action.
+The result of [`TlsRecordSender.queueRecord`](#TlsRecordSender.impl.queueRecord).
 
 ::Anchor{id="OutputProgress.accepted"}
 
@@ -237,7 +315,7 @@ Exact queue progress and the next send-side action.
 pub accepted: usize
 ```
 
-The content prefix accepted into the queued record.
+The number of content bytes in the queued record. At most 16384.
 
 ::Anchor{id="OutputProgress.demand"}
 
@@ -247,7 +325,7 @@ The content prefix accepted into the queued record.
 pub demand: OutputDemand
 ```
 
-Whether output was queued or an existing record needs acknowledgment.
+What the sender needs next.
 
 ::Anchor{id="RecordError"}
 
@@ -257,7 +335,7 @@ Whether output was queued or an existing record needs acknowledgment.
 pub union RecordError
 ```
 
-A semantic record-construction, caller-use, or peer-record failure.
+The reason that a record operation failed.
 
 ::Anchor{id="RecordError.InvalidSecretLength"}
 
@@ -267,7 +345,7 @@ A semantic record-construction, caller-use, or peer-record failure.
 InvalidSecretLength
 ```
 
-A traffic secret did not have the suite hash's exact width.
+The traffic secret has the wrong length for the cipher suite.
 
 ::Anchor{id="RecordError.InvalidSecretLength.requested"}
 
@@ -297,7 +375,8 @@ The required byte length.
 InvalidState
 ```
 
-The operation is not valid in the direction's current state.
+The call is not valid now, for example a feed while a record is ready, or any call after a
+peer error.
 
 ::Anchor{id="RecordError.RecordOverflow"}
 
@@ -307,7 +386,7 @@ The operation is not valid in the direction's current state.
 RecordOverflow
 ```
 
-A declared or supplied record length exceeds the admitted bound.
+A record, or the content to copy, is larger than the limit or the buffer.
 
 ::Anchor{id="RecordError.RecordOverflow.requested"}
 
@@ -337,7 +416,7 @@ The largest admitted length.
 InvalidContent
 ```
 
-A content type, plaintext version, inner plaintext, or alert shape is invalid.
+A content type, version, inner plaintext, or alert is not valid.
 
 ::Anchor{id="RecordError.AuthenticationFailed"}
 
@@ -347,7 +426,7 @@ A content type, plaintext version, inner plaintext, or alert shape is invalid.
 AuthenticationFailed
 ```
 
-A protected record's authenticated header, ciphertext, or tag did not verify.
+A protected record failed decryption. It was changed, or the key is wrong.
 
 ::Anchor{id="RecordError.InvalidAcknowledgment"}
 
@@ -357,7 +436,7 @@ A protected record's authenticated header, ciphertext, or tag did not verify.
 InvalidAcknowledgment
 ```
 
-An output acknowledgment exceeds the currently pending suffix.
+An acknowledgment is larger than the pending output.
 
 ::Anchor{id="RecordError.InvalidAcknowledgment.requested"}
 
@@ -387,7 +466,7 @@ The number of bytes currently pending.
 KeyUsageExhausted
 ```
 
-This traffic epoch has already protected its maximum record count.
+The traffic key protected [`RECORDS_PER_EPOCH`](#RECORDS_PER_EPOCH) records. Install a new key.
 
 ::Anchor{id="RecordView"}
 
@@ -397,7 +476,7 @@ This traffic epoch has already protected its maximum record count.
 pub struct RecordView<'owner>
 ```
 
-A complete record borrowed from its receiver's verified storage.
+A complete record from a receiver. It borrows the receiver until you consume the record.
 
 ::Anchor{id="RecordView.contentType"}
 
@@ -407,7 +486,7 @@ A complete record borrowed from its receiver's verified storage.
 pub contentType: ContentType
 ```
 
-The authenticated or plaintext content type.
+The content type, after authentication.
 
 ::Anchor{id="RecordView.content"}
 
@@ -417,7 +496,7 @@ The authenticated or plaintext content type.
 pub content: &'owner [u8]
 ```
 
-The complete content without header, tag, inner type, or padding.
+The content, without the header, the tag, the inner type, or the padding.
 
 ::Anchor{id="TlsRecordSender"}
 
@@ -427,19 +506,14 @@ The complete content without header, tag, inner type, or padding.
 pub struct TlsRecordSender
 ```
 
-An affine owner of one TLS record send epoch and at most one pending record.
+The send direction of a TLS record layer. It holds at most one encoded record.
 
-### Details
-
-Protected construction validates the traffic-secret width before allocation, derives the AEAD
-key and IV with TLS HKDF, and starts at sequence zero. Plaintext construction has no key epoch.
-Queueing accepts at most 16384 content bytes, adds no protected padding, and reserves one
-protected sequence only after complete encoding. Pending bytes remain stable until acknowledged.
+The protected form derives the key and IV from the traffic secret and starts at sequence number
+0. Records are not padded.
 
 ### Gotchas
-
-The later authenticated client owns epoch installation and reserves its final send record for
-KeyUpdate. Standalone users must replace an exhausted sender; no sequence reset is exposed.
+There is no way to reset the sequence number. When the key is used up, install a new one with
+[`TlsRecordSender.replaceEpoch`](#TlsRecordSender.impl.replaceEpoch).
 
 ::Anchor{id="TlsRecordSender.impl"}
 
@@ -460,17 +534,14 @@ pub effect fn make(
   ) -> Result<TlsRecordSender, RecordError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Creates a protected send epoch from one exact-width traffic secret.
+Returns a sender that encrypts with `suite` and `trafficSecret`.
 
-#### Details
+The secret is 32 bytes for the SHA-256 suites and 48 bytes for the SHA-384 suite.
 
-SHA-256 suites require 32 secret bytes and the SHA-384 suite requires 48. A wrong width
-returns `InvalidSecretLength` before allocation. Success acquires fixed pending and staging
-storage once; later operations allocate nothing.
-
-#### Gotchas
-
-A traffic secret proves no peer identity. Install it only after authenticated key agreement.
+#### Errors
+- `Failure` with `InvalidSecretLength` if the secret has the wrong length. Nothing is
+  allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="TlsRecordSender.impl.makePlaintext"}
 
@@ -480,7 +551,7 @@ A traffic secret proves no peer identity. Install it only after authenticated ke
 pub effect fn makePlaintext() -> TlsRecordSender ! OutOfMemoryError ? &mut Allocator
 ```
 
-Creates plaintext TLS record framing without a traffic secret or protected epoch.
+Returns a sender that frames records without encryption, for the first handshake messages.
 
 ::Anchor{id="TlsRecordSender.impl.replaceEpoch"}
 
@@ -494,17 +565,16 @@ pub fn replaceEpoch(
   ) -> Result<(), RecordError>
 ```
 
-Installs a fresh protected traffic epoch on an idle sender without allocation.
+Replaces the traffic key, for example after the handshake or a KeyUpdate. It does not
+allocate.
 
-#### Details
+The sequence number starts at 0 again.
 
-The replacement reuses the owned wire and staging storage and starts at sequence zero. The
-traffic secret must have the selected suite hash width.
+#### Errors
+- `InvalidState` if output is pending.
+- `InvalidSecretLength` if the secret has the wrong length.
 
-#### Gotchas
-
-Pending output makes the replacement invalid. Every failure leaves the complete old epoch
-unchanged. A successful replacement is allowed after the old epoch exhausts its record budget.
+On an error, the old key stays in use.
 
 ::Anchor{id="TlsRecordSender.impl.queueRecord"}
 
@@ -518,14 +588,14 @@ pub fn queueRecord(
   ) -> Result<OutputProgress, RecordError>
 ```
 
-Queues at most one content fragment without retaining the caller input.
+Encodes one record with up to 16384 bytes of `content`, and returns how many bytes it took.
 
-#### Details
+If a record is still pending, it takes nothing and returns `NeedOutput`. It does not keep
+`content`.
 
-An existing pending record returns zero accepted bytes with `NeedOutput`. Otherwise handshake
-content must be nonempty, alerts exactly two bytes, and application content may be empty.
-Inputs longer than 16384 bytes queue one exact prefix. A protected record adds its inner type,
-no padding, an authenticated outer header, and one sequence reservation.
+#### Errors
+- `InvalidContent` for empty handshake content or an alert that is not 2 bytes.
+- `KeyUsageExhausted` if the key is used up.
 
 ::Anchor{id="TlsRecordSender.impl.pendingOutput"}
 
@@ -535,8 +605,8 @@ no padding, an authenticated outer header, and one sequence reservation.
 pub fn pendingOutput<'owner>(self: &'owner Self) -> &'owner [u8]
 ```
 
-Borrows the exact unacknowledged output suffix.
-Repeated inspection and inspection before any queued record are idempotent.
+Returns the bytes of the pending record that are not written yet. It returns an empty slice
+when nothing is pending.
 
 ::Anchor{id="TlsRecordSender.impl.cancelPending"}
 
@@ -546,12 +616,10 @@ Repeated inspection and inspection before any queued record are idempotent.
 pub fn cancelPending(self: &mut Self) -> ()
 ```
 
-Cancels the complete pending suffix without changing the traffic-key epoch.
+Drops the pending record. The key and the sequence number do not change.
 
 #### Gotchas
-
-Callers must close a transport after canceling a partially written record; its already-written
-prefix cannot be completed or reused. Authenticated protocols use this only on terminal failure.
+If part of the record was written, the stream is broken. Close the transport.
 
 ::Anchor{id="TlsRecordSender.impl.recordsRemaining"}
 
@@ -561,8 +629,8 @@ prefix cannot be completed or reused. Authenticated protocols use this only on t
 pub fn recordsRemaining(self: &Self) -> u64
 ```
 
-Returns the number of records that this protected epoch can still encode.
-Plaintext framing returns zero because it has no traffic-key epoch.
+Returns the number of records that the current key can still protect, or 0 for a plaintext
+sender.
 
 ::Anchor{id="TlsRecordSender.impl.ackWritten"}
 
@@ -572,7 +640,10 @@ Plaintext framing returns zero because it has no traffic-key epoch.
 pub fn ackWritten(self: &mut Self, count: usize) -> Result<(), RecordError>
 ```
 
-Acknowledges a written prefix, or leaves all state unchanged when the count is excessive.
+Marks the first `count` pending bytes as written.
+
+#### Errors
+- `InvalidAcknowledgment` if `count` is more than the pending bytes. Nothing changes.
 
 ::Anchor{id="TlsRecordReceiver"}
 
@@ -582,18 +653,13 @@ Acknowledges a written prefix, or leaves all state unchanged when the count is e
 pub struct TlsRecordReceiver
 ```
 
-An affine owner of one TLS record receive epoch and one verified record view.
+The receive direction of a TLS record layer. It holds at most one complete record.
 
-### Details
-
-Input is copied only into fixed storage, headers are admitted before body bytes, and protected
-plaintext is published only after tag, type, padding, and content validation. A complete record
-remains ready until consumed, and its view structurally borrows this owner.
+It checks each header before it copies the body, and it gives you a record only after
+authentication and all content checks.
 
 ### Gotchas
-
-Every peer-record failure is terminal for this receiver. Construct a fresh epoch after a valid
-TLS key transition; never attempt to reuse a failed or exhausted receiver.
+Any error in a peer record is permanent for this receiver. Do not use it again.
 
 ::Anchor{id="TlsRecordReceiver.impl"}
 
@@ -614,7 +680,11 @@ pub effect fn make(
   ) -> Result<TlsRecordReceiver, RecordError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Creates a protected receive epoch from one exact-width traffic secret.
+Returns a receiver that decrypts with `suite` and `trafficSecret`.
+
+#### Errors
+- `Failure` with `InvalidSecretLength` if the secret has the wrong length.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="TlsRecordReceiver.impl.makePlaintext"}
 
@@ -624,7 +694,7 @@ Creates a protected receive epoch from one exact-width traffic secret.
 pub effect fn makePlaintext() -> TlsRecordReceiver ! OutOfMemoryError ? &mut Allocator
 ```
 
-Creates plaintext TLS record framing without a traffic secret or protected epoch.
+Returns a receiver for records without encryption, for the first handshake messages.
 
 ::Anchor{id="TlsRecordReceiver.impl.replaceEpoch"}
 
@@ -638,17 +708,13 @@ pub fn replaceEpoch(
   ) -> Result<(), RecordError>
 ```
 
-Installs a fresh protected traffic epoch on an idle receiver without allocation.
+Replaces the traffic key. It does not allocate. The sequence number starts at 0 again.
 
-#### Details
+#### Errors
+- `InvalidState` if part of a record was received, a record is ready, or the receiver failed.
+- `InvalidSecretLength` if the secret has the wrong length.
 
-The replacement reuses the owned wire and plaintext storage and starts at sequence zero. The
-traffic secret must have the selected suite hash width.
-
-#### Gotchas
-
-A partial, ready, or terminal receiver makes the replacement invalid. Every failure leaves
-the complete old epoch unchanged. A successful replacement is allowed after exhaustion.
+On an error, the old key stays in use.
 
 ::Anchor{id="TlsRecordReceiver.impl.feedInput"}
 
@@ -658,19 +724,16 @@ the complete old epoch unchanged. A successful replacement is allowed after exha
 pub fn feedInput(self: &mut Self, input: &[u8]) -> Result<InputProgress, RecordError>
 ```
 
-Copies a prefix for the current record and reports the exact next receive action.
+Copies bytes of the current record from `input`, and returns how many it took and what it
+needs next.
 
-#### Details
+It stops at the end of a record, so give the rest of `input` again after you consume the
+record. With an encrypted key, a plaintext `change_cipher_spec` record with the content `{1}`
+is still accepted.
 
-Empty input reports zero-consumption `NeedInput`. Header admission occurs after exactly five
-bytes and before any body byte is copied. Completion stops before a coalesced following record.
-A ready record causes zero-consumption `NeedRecordConsumption` until [`consumeRecord`](#TlsRecordReceiver.impl.consumeRecord) or
-[`consumeRecordInto`](#TlsRecordReceiver.impl.consumeRecordInto) succeeds. During a protected epoch, exact plaintext compatibility CCS
-`{1}` is admitted without consuming a protected sequence; every other record remains protected.
-
-#### Gotchas
-
-Header, authentication, content, and key-use failures terminally invalidate this receiver.
+#### Errors
+- `RecordOverflow`, `InvalidContent`, or `AuthenticationFailed` for a bad record. These errors
+  are permanent.
 
 ::Anchor{id="TlsRecordReceiver.impl.record"}
 
@@ -680,7 +743,7 @@ Header, authentication, content, and key-use failures terminally invalidate this
 pub fn record<'owner>(self: &'owner Self) -> Option<RecordView<'owner>>
 ```
 
-Borrows the complete current record, or returns `None` while more input is needed.
+Returns the ready record, or `None` if no record is complete.
 
 ::Anchor{id="TlsRecordReceiver.impl.readyContentType"}
 
@@ -690,7 +753,7 @@ Borrows the complete current record, or returns `None` while more input is neede
 pub fn readyContentType(self: &Self) -> Option<ContentType>
 ```
 
-Returns the ready record's authenticated content type without borrowing its content.
+Returns the content type of the ready record, or `None`.
 
 ::Anchor{id="TlsRecordReceiver.impl.readyLength"}
 
@@ -700,7 +763,7 @@ Returns the ready record's authenticated content type without borrowing its cont
 pub fn readyLength(self: &Self) -> usize
 ```
 
-Returns the ready record's authenticated content length, or zero when no record is ready.
+Returns the content length of the ready record, or 0 if none is ready.
 
 ::Anchor{id="TlsRecordReceiver.impl.consumeRecordInto"}
 
@@ -713,12 +776,12 @@ pub fn consumeRecordInto(
   ) -> Result<usize, RecordError>
 ```
 
-Copies and consumes one complete authenticated record without retaining an owner-tied view.
+Copies the content of the ready record into `destination`, consumes the record, and returns
+its length.
 
-#### Gotchas
-
-A destination smaller than the ready content returns `RecordOverflow` and leaves the record
-ready and unchanged. No ready record returns `InvalidState`.
+#### Errors
+- `RecordOverflow` if `destination` is too small. The record stays ready.
+- `InvalidState` if no record is ready.
 
 ::Anchor{id="TlsRecordReceiver.impl.consumeRecord"}
 
@@ -728,6 +791,9 @@ ready and unchanged. No ready record returns `InvalidState`.
 pub fn consumeRecord(self: &mut Self) -> Result<(), RecordError>
 ```
 
-Releases the current record and permits input for the next record.
+Releases the ready record, so that the receiver can take the next one.
+
+#### Errors
+- `InvalidState` if no record is ready.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

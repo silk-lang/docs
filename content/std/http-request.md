@@ -1,9 +1,111 @@
-Origin-bound HTTP request preparation with finite storage and explicit header policy.
+Check and write the head of an HTTP request before it is sent.
+
+## When to use
+Use [`fromUri`](#fromUri) or [`prepare`](#prepare) to make a [`PreparedRequest`](#PreparedRequest) for a direct connection to an
+origin. `silk.http_exchange` sends it. Use [`prepareForward`](#prepareForward) and [`prepareConnect`](#prepareConnect) for a route
+from `silk.http_proxy`. Most programs use `silk.http_client` or `silk.http_fetch`, which call
+this module.
 
 ## Details
-`prepare` owns the direct serialized head before an exchange can send bytes. The routed
-operations require a policy-selected proxy route. They derive the proxy peer and authentication
-from that route. All operations generate framing fields and reject conflicting caller fields.
+The [`HeaderPolicy`](#HeaderPolicy) adds `Host`, `User-Agent`, `Accept`, and `Authorization`. The [`BodyMode`](#BodyMode)
+adds `Content-Length` or `Transfer-Encoding`. You cannot also give these fields, or `Expect` and
+`Connection`, in `headers`. Your other fields keep their order. The prepared request owns a copy
+of all its bytes. Nothing is sent and nothing is resolved here.
+
+## Errors
+- [`RequestError`](#RequestError) tells which check failed. Nothing was sent.
+- `OutOfMemoryError` if the `Allocator` fails.
+
+## Gotchas
+By default, Basic credentials fail over plain HTTP with `InsecureBasic`. Set `basicSecurity` to
+`AllowInsecureBasic` only when you accept that the password is sent as plain text.
+
+## Examples
+### Prepare a GET request
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http { Header, Method, ValueError, Version }
+import silk.http_headers { Headers, Limits }
+import silk.http_request { BodyMode, HeaderPolicy, PreparedRequest, RequestError, fromUri }
+import silk.result { Result }
+import silk.uri { Uri }
+import silk.uri_reference { ParseError }
+import silk.usize
+
+fn limits() -> Limits {
+  return Limits {
+    maxMethodBytes: 64,
+    maxTargetBytes: 8192,
+    maxNameBytes: 256,
+    maxValueBytes: 8192,
+    maxFields: 32,
+    maxFieldBytes: 8192,
+    maxOwnedBytes: 16384,
+  }
+}
+
+fn check(actual: &[u8], expected: &[u8]) -> i32 {
+  let mut i = usize.ZERO
+  while i < actual.length && i < expected.length {
+    if actual[i] != expected[i] {
+      return 1
+    }
+    i = i + usize.ONE
+  }
+  if actual.length != expected.length {
+    return 1
+  }
+  return 0
+}
+
+effect fn program() -> i32
+  ! RequestError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let uri = match Uri.parse("http://example.com/a?b#frag") {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let entries: [Header<'static>; 0] = []
+  let headers = match Headers.make(&entries, limits()) {
+    Result<Headers, ValueError>.Success { value } => value
+    Result<Headers, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let policy = HeaderPolicy.defaults()
+  let prepared = run fromUri(
+    &uri,
+    Version.Http11,
+    Method.get(),
+    &headers,
+    &policy,
+    BodyMode.Empty,
+    false,
+    limits(),
+    4096,
+    256
+  )
+    |> Effect.provideMut<Allocator>(&mut allocator)
+
+  // The fragment is not sent, and the policy adds Host, User-Agent, and Accept.
+  return check(
+    PreparedRequest.bytes(&prepared),
+    b"GET /a?b HTTP/1.1\r\nHost: example.com\r\nUser-Agent: silk-http/1\r\nAccept: */*\r\n\r\n"
+  )
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
+```
 
 Import as `HttpRequest` with `import silk.http_request as HttpRequest`.
 
@@ -17,7 +119,7 @@ Public declarations: 11.
 pub union BodyMode
 ```
 
-The exact request payload delimiter.
+How the request body is framed.
 
 ::Anchor{id="BodyMode.Empty"}
 
@@ -27,7 +129,7 @@ The exact request payload delimiter.
 Empty
 ```
 
-Sends no request payload.
+There is no body. No framing field is sent.
 
 ::Anchor{id="BodyMode.KnownLength"}
 
@@ -37,7 +139,7 @@ Sends no request payload.
 KnownLength
 ```
 
-Sends exactly this many payload bytes.
+The body has a known length. `Content-Length` is sent.
 
 ::Anchor{id="BodyMode.KnownLength.length"}
 
@@ -47,7 +149,7 @@ Sends exactly this many payload bytes.
 pub length: u64
 ```
 
-The exact payload length.
+The length of the body, in bytes.
 
 ::Anchor{id="BodyMode.Chunked"}
 
@@ -57,7 +159,8 @@ The exact payload length.
 Chunked
 ```
 
-Sends HTTP/1.1 chunks and explicit trailers.
+The body is sent in chunks, with trailers. `Transfer-Encoding: chunked` is sent. Only for
+HTTP/1.1.
 
 ::Anchor{id="BodyMode.impl.Copy"}
 
@@ -75,7 +178,7 @@ impl Copy for BodyMode
 pub union HeaderControl<'value>
 ```
 
-A generated field policy that distinguishes omission from a default.
+What to do with a field that the policy makes.
 
 ::Anchor{id="HeaderControl.Default"}
 
@@ -85,7 +188,7 @@ A generated field policy that distinguishes omission from a default.
 Default
 ```
 
-Generates the documented default value.
+Send the default value. See [`HeaderPolicy`](#HeaderPolicy).
 
 ::Anchor{id="HeaderControl.Omit"}
 
@@ -95,7 +198,7 @@ Generates the documented default value.
 Omit
 ```
 
-Deliberately omits the field when the protocol permits it.
+Do not send the field. HTTP/1.1 cannot omit `Host`.
 
 ::Anchor{id="HeaderControl.Value"}
 
@@ -105,7 +208,7 @@ Deliberately omits the field when the protocol permits it.
 Value
 ```
 
-Uses one explicit validated value.
+Send this value.
 
 ::Anchor{id="HeaderControl.Value.value"}
 
@@ -115,7 +218,7 @@ Uses one explicit validated value.
 pub value: &'value [u8]
 ```
 
-The caller-owned semantic field bytes.
+The field value, without the spaces around it.
 
 ::Anchor{id="HeaderControl.impl.Copy"}
 
@@ -133,7 +236,7 @@ impl<'value> Copy for HeaderControl<'value>
 pub union Authorization<'value>
 ```
 
-One explicit authorization source.
+The `Authorization` field to send.
 
 ::Anchor{id="Authorization.Absent"}
 
@@ -143,7 +246,7 @@ One explicit authorization source.
 Absent
 ```
 
-Sends no generated authorization field.
+Send no `Authorization` field.
 
 ::Anchor{id="Authorization.Value"}
 
@@ -153,7 +256,7 @@ Sends no generated authorization field.
 Value
 ```
 
-Sends one explicit validated field value.
+Send this value, such as `Bearer abc`.
 
 ::Anchor{id="Authorization.Value.value"}
 
@@ -163,7 +266,7 @@ Sends one explicit validated field value.
 pub value: &'value [u8]
 ```
 
-The complete authorization field value.
+The whole field value.
 
 ::Anchor{id="Authorization.Basic"}
 
@@ -173,7 +276,7 @@ The complete authorization field value.
 Basic
 ```
 
-Encodes caller-selected username and password bytes.
+Send HTTP Basic credentials. See `silk.http_basic`.
 
 ::Anchor{id="Authorization.Basic.username"}
 
@@ -183,7 +286,7 @@ Encodes caller-selected username and password bytes.
 pub username: &'value [u8]
 ```
 
-Username bytes without colon or controls.
+The username. It cannot have a colon or a control byte.
 
 ::Anchor{id="Authorization.Basic.password"}
 
@@ -193,7 +296,7 @@ Username bytes without colon or controls.
 pub password: &'value [u8]
 ```
 
-Password bytes without controls.
+The password. It cannot have a control byte.
 
 ::Anchor{id="Authorization.impl.Copy"}
 
@@ -211,7 +314,7 @@ impl<'value> Copy for Authorization<'value>
 pub enum BasicSecurity
 ```
 
-Explicit permission to send Basic credentials without TLS.
+Whether Basic credentials can go over plain HTTP.
 
 ::Anchor{id="BasicSecurity.RequireTls"}
 
@@ -221,7 +324,7 @@ Explicit permission to send Basic credentials without TLS.
 RequireTls
 ```
 
-Rejects Basic credentials for a plaintext origin.
+Basic credentials need HTTPS. Over plain HTTP, the request fails with `InsecureBasic`.
 
 ::Anchor{id="BasicSecurity.AllowInsecureBasic"}
 
@@ -231,7 +334,7 @@ Rejects Basic credentials for a plaintext origin.
 AllowInsecureBasic
 ```
 
-Permits plaintext Basic without changing HTTPS authentication.
+Basic credentials can go over plain HTTP, where anyone on the path can read them.
 
 ::Anchor{id="HeaderPolicy"}
 
@@ -241,7 +344,7 @@ Permits plaintext Basic without changing HTTPS authentication.
 pub struct HeaderPolicy<'value>
 ```
 
-Policy for generated request fields and connection persistence.
+The fields that the request adds. Start from [`HeaderPolicy.defaults`](#HeaderPolicy.impl.defaults).
 
 ::Anchor{id="HeaderPolicy.host"}
 
@@ -251,7 +354,7 @@ Policy for generated request fields and connection persistence.
 pub host: HeaderControl<'value>
 ```
 
-Defaults to the normalized origin authority; HTTP/1.1 cannot omit it.
+The `Host` field. The default is the authority of the origin, such as `example.com:8080`.
 
 ::Anchor{id="HeaderPolicy.userAgent"}
 
@@ -261,7 +364,7 @@ Defaults to the normalized origin authority; HTTP/1.1 cannot omit it.
 pub userAgent: HeaderControl<'value>
 ```
 
-Defaults to `silk-http/1`.
+The `User-Agent` field. The default is `silk-http/1`.
 
 ::Anchor{id="HeaderPolicy.accept"}
 
@@ -271,7 +374,7 @@ Defaults to `silk-http/1`.
 pub accept: HeaderControl<'value>
 ```
 
-Defaults to `*/*`.
+The `Accept` field. The default is `*/*`.
 
 ::Anchor{id="HeaderPolicy.authorization"}
 
@@ -281,7 +384,7 @@ Defaults to `*/*`.
 pub authorization: Authorization<'value>
 ```
 
-One optional explicit authorization source.
+The `Authorization` field. The default is none.
 
 ::Anchor{id="HeaderPolicy.basicSecurity"}
 
@@ -291,7 +394,7 @@ One optional explicit authorization source.
 pub basicSecurity: BasicSecurity
 ```
 
-Requires TLS for Basic unless explicitly overridden.
+Whether Basic credentials can go over plain HTTP. The default is `RequireTls`.
 
 ::Anchor{id="HeaderPolicy.http10KeepAlive"}
 
@@ -301,7 +404,8 @@ Requires TLS for Basic unless explicitly overridden.
 pub http10KeepAlive: bool
 ```
 
-Permits HTTP/1.0 keep-alive; HTTP/1.1 uses normal persistence.
+When `true`, an HTTP/1.0 request sends `Connection: keep-alive`. HTTP/1.1 keeps the connection
+by default.
 
 ::Anchor{id="HeaderPolicy.impl.Copy"}
 
@@ -327,7 +431,8 @@ impl<'value> HeaderPolicy<'value>
 pub fn defaults() -> HeaderPolicy<'value>
 ```
 
-Returns generated defaults, absent authorization, and plaintext Basic rejection.
+Returns the default policy: default `Host`, `User-Agent`, and `Accept`, no `Authorization`,
+and `RequireTls`.
 
 ::Anchor{id="RequestError"}
 
@@ -337,7 +442,7 @@ Returns generated defaults, absent authorization, and plaintext Basic rejection.
 pub union RequestError
 ```
 
-A precise preflight failure with no network side effects.
+The reason that a request was not prepared. Nothing was sent.
 
 ::Anchor{id="RequestError.Value"}
 
@@ -347,7 +452,7 @@ A precise preflight failure with no network side effects.
 Value
 ```
 
-A shared HTTP value failed validation.
+A method, target, or field is not valid.
 
 ::Anchor{id="RequestError.Value.error"}
 
@@ -357,7 +462,7 @@ A shared HTTP value failed validation.
 pub error: ValueError
 ```
 
-The original value failure.
+The error from `silk.http`.
 
 ::Anchor{id="RequestError.Origin"}
 
@@ -367,7 +472,7 @@ The original value failure.
 Origin
 ```
 
-An origin could not be constructed or serialized.
+The origin is not valid, or its authority does not fit.
 
 ::Anchor{id="RequestError.Origin.error"}
 
@@ -377,7 +482,7 @@ An origin could not be constructed or serialized.
 pub error: OriginError
 ```
 
-The original origin failure.
+The error from `silk.http_origin`.
 
 ::Anchor{id="RequestError.Basic"}
 
@@ -387,7 +492,7 @@ The original origin failure.
 Basic
 ```
 
-Credentials failed strict Basic encoding.
+The Basic credentials are not valid.
 
 ::Anchor{id="RequestError.Basic.error"}
 
@@ -397,7 +502,7 @@ Credentials failed strict Basic encoding.
 pub error: BasicError
 ```
 
-The credential failure, without credential bytes.
+The error from `silk.http_basic`. It does not hold the credentials.
 
 ::Anchor{id="RequestError.ConflictingHeader"}
 
@@ -407,7 +512,8 @@ The credential failure, without credential bytes.
 ConflictingHeader
 ```
 
-A caller field conflicts with generated policy.
+`headers` has a field that the policy or the body mode makes, such as `Host` or
+`Content-Length`.
 
 ::Anchor{id="RequestError.ConflictingAuthority"}
 
@@ -417,7 +523,7 @@ A caller field conflicts with generated policy.
 ConflictingAuthority
 ```
 
-The explicit Host differs from the connection origin.
+The `Host` value in the policy names another origin.
 
 ::Anchor{id="RequestError.MissingHost"}
 
@@ -427,7 +533,7 @@ The explicit Host differs from the connection origin.
 MissingHost
 ```
 
-HTTP/1.1 cannot omit Host.
+The policy omits `Host` in an HTTP/1.1 request.
 
 ::Anchor{id="RequestError.InvalidBodyMode"}
 
@@ -437,7 +543,8 @@ HTTP/1.1 cannot omit Host.
 InvalidBodyMode
 ```
 
-The body or continue mode is unavailable for the selected version.
+The body mode or `require100` does not work with the version. For example, HTTP/1.0 cannot
+send chunks.
 
 ::Anchor{id="RequestError.MultipleAuthorization"}
 
@@ -447,7 +554,7 @@ The body or continue mode is unavailable for the selected version.
 MultipleAuthorization
 ```
 
-More than one authorization source was supplied.
+There is more than one source of credentials.
 
 ::Anchor{id="RequestError.InsecureBasic"}
 
@@ -457,7 +564,7 @@ More than one authorization source was supplied.
 InsecureBasic
 ```
 
-Plaintext Basic lacks explicit permission.
+Basic credentials would go over plain HTTP. See [`BasicSecurity`](#BasicSecurity).
 
 ::Anchor{id="RequestError.ProxyAuthorization"}
 
@@ -467,7 +574,7 @@ Plaintext Basic lacks explicit permission.
 ProxyAuthorization
 ```
 
-A direct request supplies proxy credentials.
+A direct request has a `Proxy-Authorization` field. Proxy credentials come only from a route.
 
 ::Anchor{id="RequestError.CredentialLimit"}
 
@@ -477,7 +584,7 @@ A direct request supplies proxy credentials.
 CredentialLimit
 ```
 
-Credential bytes exceed the finite budget.
+The credentials are longer than `maxCredentialBytes`.
 
 ::Anchor{id="RequestError.HeaderLimit"}
 
@@ -487,7 +594,7 @@ Credential bytes exceed the finite budget.
 HeaderLimit
 ```
 
-Generated or copied fields exceed the configured finite count.
+The request has more fields than the limits allow.
 
 ::Anchor{id="RequestError.InvalidTarget"}
 
@@ -497,7 +604,7 @@ Generated or copied fields exceed the configured finite count.
 InvalidTarget
 ```
 
-A direct request uses an absolute target for another origin.
+A direct request has an absolute target for another origin.
 
 ::Anchor{id="PreparedRequest"}
 
@@ -507,7 +614,7 @@ A direct request uses an absolute target for another origin.
 pub struct PreparedRequest
 ```
 
-One owned, origin-bound, preflighted head with unforgeable framing policy.
+A checked request head, written as bytes and ready to send. It owns its memory.
 
 ::Anchor{id="PreparedRequest.impl"}
 
@@ -525,7 +632,7 @@ impl PreparedRequest
 pub fn bytes<'a>(self: &'a Self) -> &'a [u8]
 ```
 
-Borrows the serialized request head until this owner is dropped.
+Returns the bytes of the head, ending with the empty line.
 
 ::Anchor{id="PreparedRequest.impl.origin"}
 
@@ -535,7 +642,7 @@ Borrows the serialized request head until this owner is dropped.
 pub fn origin(self: &Self) -> Origin
 ```
 
-Returns the logical request origin used for target, Host, and origin credentials.
+Returns the origin that the request is for.
 
 ::Anchor{id="PreparedRequest.impl.physicalPeer"}
 
@@ -545,7 +652,7 @@ Returns the logical request origin used for target, Host, and origin credentials
 pub fn physicalPeer(self: &Self) -> Origin
 ```
 
-Returns the physical peer on whose connection this request is admitted.
+Returns the server to connect to. It is the origin, or the proxy for a routed request.
 
 ::Anchor{id="PreparedRequest.impl.version"}
 
@@ -555,7 +662,7 @@ Returns the physical peer on whose connection this request is admitted.
 pub fn version(self: &Self) -> Version
 ```
 
-Returns the admitted HTTP version.
+Returns the HTTP version.
 
 ::Anchor{id="PreparedRequest.impl.bodyMode"}
 
@@ -565,7 +672,7 @@ Returns the admitted HTTP version.
 pub fn bodyMode(self: &Self) -> BodyMode
 ```
 
-Returns the exact selected body delimiter.
+Returns how the body is framed.
 
 ::Anchor{id="PreparedRequest.impl.require100"}
 
@@ -575,7 +682,7 @@ Returns the exact selected body delimiter.
 pub fn require100(self: &Self) -> bool
 ```
 
-Returns whether the head contains the generated 100-continue expectation.
+Returns `true` if the head has `Expect: 100-continue`.
 
 ::Anchor{id="prepare"}
 
@@ -597,12 +704,12 @@ pub effect fn prepare<'value>(
 ) -> PreparedRequest ! RequestError | OutOfMemoryError ? &mut Allocator
 ```
 
-Validates and serializes one request before any transport operation.
+Checks a request to `origin` and writes its head.
 
 ### Details
-Caller fields preserve order. Host, User-Agent, Accept, framing, Expect, and Connection belong
-to policy and cannot also occur in `headers`. Output owns all borrowed input bytes.
-`maxHeadBytes` and `maxCredentialBytes` bound owned head and credential storage.
+Your fields in `headers` keep their order. When `require100` is `true`, the head has `Expect:
+100-continue`, and the client waits for the server before it sends the body. `maxHeadBytes`
+limits the size of the head, and `maxCredentialBytes` the size of the credentials.
 
 ::Anchor{id="prepareForward"}
 
@@ -624,14 +731,12 @@ pub effect fn prepareForward<'configuration, 'value>(
 ) -> PreparedRequest ! ProxyError | RequestError | OutOfMemoryError ? &mut Allocator
 ```
 
-Prepares one Forward route as an origin-bound absolute-form request for its plain proxy peer.
+Prepares a request for a `Forward` route, which sends it to a plain HTTP proxy.
 
 ### Details
-
-The sealed route is the only source of the physical peer and `Proxy-Authorization`. The
-original URI spelling is preserved except that user information and fragments are excluded and
-an empty path becomes `/`. Forward preparation always generates the logical-origin Host,
-including for HTTP/1.0.
+The target is the full URI, without user information and fragment, and an empty path becomes
+`/`. The route gives the proxy and its `Proxy-Authorization`. `Host` is always sent, also for
+HTTP/1.0.
 
 ::Anchor{id="prepareConnect"}
 
@@ -646,13 +751,10 @@ pub effect fn prepareConnect<'configuration>(
 ) -> PreparedRequest ! ProxyError | RequestError | OutOfMemoryError ? &mut Allocator
 ```
 
-Prepares the one body-free HTTP/1.1 CONNECT head admitted by a Tunnel route.
+Prepares the HTTP/1.1 `CONNECT` request for a `Tunnel` route.
 
-### Details
-
-The authority-form target and Host are both derived from the route's normalized original
-origin and always include its effective port. Callers cannot supply fields, a body, a physical
-peer, or proxy credentials.
+The target and `Host` are `host:port` of the origin, always with the port. You cannot give
+fields, a body, or credentials. The route gives them.
 
 ::Anchor{id="fromUri"}
 
@@ -673,6 +775,7 @@ pub effect fn fromUri<'value>(
 ) -> PreparedRequest ! RequestError | OutOfMemoryError ? &mut Allocator
 ```
 
-Converts a validated URI to an origin-form request with query and no fragment.
+Prepares a direct request for `uri`, like [`prepare`](#prepare). The origin and the target come from
+`uri`. The fragment is not sent.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

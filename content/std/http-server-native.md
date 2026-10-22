@@ -1,10 +1,22 @@
-Serial native admission for one scoped HTTP server connection.
+Accepts native socket connections and serves each one with `silk.http_server`.
+
+## When to use
+Make a listener with `silk.native_socket`, then call [`serveNext`](#serveNext) in a loop. Each call accepts
+one connection and serves it with your `ConnectionHandler` until the handler returns.
 
 ## Details
+[`serveNext`](#serveNext) serves one connection at a time, on the calling task. This module has no queue,
+router, supervisor, or background task. To serve connections at the same time, start tasks
+yourself.
 
-`serveNext` accepts exactly one connection and lends the portable server actor inside the same
-accepted-owner scope. Applications repeat the operation explicitly; this module creates no
-background queue, router, supervisor, or detached task.
+## Errors
+- `NativeSocketError` if the accept fails or the deadline passes.
+- `ServerError`, `BufferError`, and `OutOfMemoryError` from `silk.http_server`.
+- The error of the handler.
+
+## Gotchas
+The whole module exists only on Darwin on aarch64, and on Linux with GNU libc on x86_64 or
+aarch64. On other targets, an import from it fails to compile.
 
 Import as `HttpServerNative` with `import silk.http_server_native { HttpServerNative }`.
 
@@ -18,7 +30,7 @@ Public declarations: 2.
 pub struct HttpServerNative
 ```
 
-Namespace anchor for native HTTP admission.
+An empty marker type for this module.
 
 ::Anchor{id="serveNext"}
 
@@ -43,6 +55,11 @@ pub effect<'env> fn serveNext<
   where HandlerRequirements in Without<HandlerRequirements, ByteDuplex>
 ```
 
-Accepts and serves exactly one connection inside the listener's accepted-owner scope.
+Accepts one connection from `listener`, and serves it with `handler`.
+
+### Details
+The accept waits until `acceptDeadline`, or with no limit if it is `None`. Then it calls
+`withConnection` of `silk.http_server` with `limits`. The socket is closed when the handler
+returns or fails.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

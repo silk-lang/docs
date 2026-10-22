@@ -21,6 +21,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec oxfmt --check .
+      - name: Sidebar matches content/
+        run: pnpm catalog && git diff --exit-code src/docs/written.ts
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test

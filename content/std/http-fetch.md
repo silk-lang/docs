@@ -1,17 +1,40 @@
-Bounded one-shot HTTP delivery over redirects, content decoding, routing, and pooling.
+Send one HTTP request, follow redirects, decode the content, and deliver the body to a
+destination that you choose.
 
 ## When to use
-
-Use the `toSink*` operations for sequential external delivery, `collect*` for bounded atomic
-in-memory results, and `discard*` for explicit bounded validation without retaining a body.
-Select the suffix matching the request body's replay authority.
+Use this module when you need more control than `silk.http_client`: a sink for a large body, a
+body that you stream, content decoding, a proxy, or a connection pool. Make a [`Fetch`](#Fetch) around a
+[`FetchClient`](#FetchClient), such as the `Context` of `silk.http_fetch_native`. Then call one function for
+each request.
 
 ## Details
+There are three destinations:
+- `toSink*` gives the body to a [`Sink`](#Sink) in chunks, in order.
+- `collect*` reads the whole body into memory, up to `maxBodyBytes`, and returns it only if it
+  is complete.
+- `discard*` reads and checks the body, and keeps nothing.
 
-Fetch owns no transport policy. A [`FetchClient`](#FetchClient) supplies routed or pooled attempts under one
-unchanged deadline, `silk.http_redirect` owns redirect and source authority, and
-`silk.http_exchange` owns response framing and content provenance. Every public destination is
-finite, and every completed result owns the metadata that outlives the live response.
+The suffix tells what the request body is:
+- `Empty`: no body.
+- `Bytes`: a byte slice. It is sent again after a redirect that keeps the body.
+- `OneShot`: a `BodyProducer` that can run only one time. A redirect that must send the body
+  again fails with `ReplayUnavailable`.
+- `Replay`: a factory that makes a new producer for each attempt.
+
+[`FetchOptions`](#FetchOptions) sets redirects, content decoding, the pool, the proxy, one deadline for the
+whole operation, and all limits. `silk.http_redirect` applies the redirect rules, and
+`silk.http_content` decodes the content.
+
+## Errors
+- [`FetchError`](#FetchError) tells the phase and the reason, with the status and the URI when they are
+  known, and how many body bytes the destination got.
+- `RedirectError`, `ExchangeError`, `ValueError`, and `BodyError` from the lower modules.
+- [`DestinationFailure`](#DestinationFailure) when your [`Sink`](#Sink) fails.
+- `OutOfMemoryError` if the `Allocator` fails.
+
+## Gotchas
+The deadline is not renewed between redirects or phases. The default [`FetchOptions`](#FetchOptions) do not
+follow redirects and do not decode content. Set `redirect` and `content` to change that.
 
 Import as `Fetch` with `import silk.http_fetch { Fetch }`.
 
@@ -25,7 +48,7 @@ Public declarations: 30.
 pub enum PoolMode
 ```
 
-Whether connection acquisition may use the compatible pool retained by the client context.
+Whether a connection can come from a pool.
 
 ::Anchor{id="PoolMode.UseContextPool"}
 
@@ -35,7 +58,7 @@ Whether connection acquisition may use the compatible pool retained by the clien
 UseContextPool
 ```
 
-Uses a compatible context pool when present and otherwise opens a fresh connection.
+Use the pool of the client when it has one. Otherwise open a new connection.
 
 ::Anchor{id="PoolMode.Fresh"}
 
@@ -45,7 +68,7 @@ Uses a compatible context pool when present and otherwise opens a fresh connecti
 Fresh
 ```
 
-Always opens a fresh connection and never checks out or publishes through a pool.
+Always open a new connection, and never put it in a pool.
 
 ::Anchor{id="ProxyMode"}
 
@@ -55,7 +78,7 @@ Always opens a fresh connection and never checks out or publishes through a pool
 pub enum ProxyMode
 ```
 
-Whether acquisition uses configured routing or bypasses it for this operation.
+Whether the request uses the proxy policy of the client.
 
 ::Anchor{id="ProxyMode.InheritContext"}
 
@@ -65,7 +88,7 @@ Whether acquisition uses configured routing or bypasses it for this operation.
 InheritContext
 ```
 
-Recomputes only the explicit client-context proxy policy for every redirect origin.
+Use the proxy policy of the client. The route is selected again for each redirect.
 
 ::Anchor{id="ProxyMode.Direct"}
 
@@ -75,7 +98,7 @@ Recomputes only the explicit client-context proxy policy for every redirect orig
 Direct
 ```
 
-Uses direct routing without environment lookup.
+Connect directly to the origin, without a proxy. Environment variables are not read.
 
 ::Anchor{id="FetchPhase"}
 
@@ -85,7 +108,7 @@ Uses direct routing without environment lookup.
 pub enum FetchPhase
 ```
 
-The one-shot operation phase associated with bounded fetch-owned context.
+The phase of a fetch in which an error occurred.
 
 ::Anchor{id="FetchPhase.Uri"}
 
@@ -95,7 +118,7 @@ The one-shot operation phase associated with bounded fetch-owned context.
 Uri
 ```
 
-Semantic URI admission or copying.
+Checking or copying the URI.
 
 ::Anchor{id="FetchPhase.Route"}
 
@@ -105,7 +128,7 @@ Semantic URI admission or copying.
 Route
 ```
 
-Per-origin route selection.
+Selecting the route for an origin.
 
 ::Anchor{id="FetchPhase.Connect"}
 
@@ -115,7 +138,7 @@ Per-origin route selection.
 Connect
 ```
 
-Pool checkout, resolution, connection, or TLS acquisition.
+Getting a connection: the pool, name lookup, the connect, or TLS.
 
 ::Anchor{id="FetchPhase.Request"}
 
@@ -125,7 +148,7 @@ Pool checkout, resolution, connection, or TLS acquisition.
 Request
 ```
 
-Request preparation or upload.
+Preparing or sending the request.
 
 ::Anchor{id="FetchPhase.Redirect"}
 
@@ -135,7 +158,7 @@ Request preparation or upload.
 Redirect
 ```
 
-Redirect policy and intermediate-response handling.
+Applying the redirect rules.
 
 ::Anchor{id="FetchPhase.Head"}
 
@@ -145,7 +168,7 @@ Redirect policy and intermediate-response handling.
 Head
 ```
 
-Final response-head selection or copying.
+Reading or copying the final response head.
 
 ::Anchor{id="FetchPhase.Decode"}
 
@@ -155,7 +178,7 @@ Final response-head selection or copying.
 Decode
 ```
 
-Content selection, decoding, framing, or trailer validation.
+Decoding the content, the framing, or the trailers.
 
 ::Anchor{id="FetchPhase.Destination"}
 
@@ -165,7 +188,7 @@ Content selection, decoding, framing, or trailer validation.
 Destination
 ```
 
-Sink, collection, or discard delivery.
+Giving the body to the sink, the collection, or the discard.
 
 ::Anchor{id="FetchPhase.Finish"}
 
@@ -175,7 +198,7 @@ Sink, collection, or discard delivery.
 Finish
 ```
 
-Explicit response completion and reuse decision.
+Completing the response and deciding if the connection can be used again.
 
 ::Anchor{id="FetchLimit"}
 
@@ -185,7 +208,7 @@ Explicit response completion and reuse decision.
 pub enum FetchLimit
 ```
 
-The independent finite fetch resource that rejected a value.
+The fetch limit that was exceeded. See [`FetchReason.LimitExceeded`](#FetchReason.LimitExceeded).
 
 ::Anchor{id="FetchLimit.EncodedBodyBytes"}
 
@@ -195,7 +218,7 @@ The independent finite fetch resource that rejected a value.
 EncodedBodyBytes
 ```
 
-Deframed representation input accepted by the content layer.
+`maxEncodedBodyBytes`: the body bytes before decoding.
 
 ::Anchor{id="FetchLimit.DeliveredBodyBytes"}
 
@@ -205,7 +228,7 @@ Deframed representation input accepted by the content layer.
 DeliveredBodyBytes
 ```
 
-Representation bytes successfully accepted by the destination.
+`maxDeliveredBodyBytes`: the body bytes given to the destination.
 
 ::Anchor{id="FetchLimit.OwnedMetadataBytes"}
 
@@ -215,7 +238,7 @@ Representation bytes successfully accepted by the destination.
 OwnedMetadataBytes
 ```
 
-URI, head, and trailer payload plus owned index storage.
+`maxOwnedMetadataBytes`: the copies of the URI, the head, and the trailers.
 
 ::Anchor{id="FetchLimit.BufferedBytes"}
 
@@ -225,7 +248,7 @@ URI, head, and trailer payload plus owned index storage.
 BufferedBytes
 ```
 
-The positive scratch buffer used for response delivery.
+`maxBufferedBytes`: the read buffer.
 
 ::Anchor{id="FetchLimit.CollectionBytes"}
 
@@ -235,7 +258,7 @@ The positive scratch buffer used for response delivery.
 CollectionBytes
 ```
 
-Bytes retained by a collection destination.
+The `maxBodyBytes` of a `collect*` function.
 
 ::Anchor{id="FetchLimit.DiscardBytes"}
 
@@ -245,7 +268,7 @@ Bytes retained by a collection destination.
 DiscardBytes
 ```
 
-Bytes validated by a discard destination.
+The `maxDiscardBytes` of a `discard*` function.
 
 ::Anchor{id="FetchContentReason"}
 
@@ -255,7 +278,8 @@ Bytes validated by a discard destination.
 pub union FetchContentReason
 ```
 
-An owned isomorphic form of a content failure whose unsupported token cannot borrow the head.
+The reason that content decoding failed. It is a copy of the `silk.http_content` error that does
+not borrow the response.
 
 ::Anchor{id="FetchContentReason.InvalidLimit"}
 
@@ -265,7 +289,7 @@ An owned isomorphic form of a content failure whose unsupported token cannot bor
 InvalidLimit
 ```
 
-A content configuration or byte count exceeds its admitted range.
+A content limit is not valid, or a byte count exceeded it.
 
 ::Anchor{id="FetchContentReason.InvalidLimit.limit"}
 
@@ -275,7 +299,7 @@ A content configuration or byte count exceeds its admitted range.
 pub limit: ContentLimitKind
 ```
 
-The rejected configuration or byte class.
+The limit.
 
 ::Anchor{id="FetchContentReason.InvalidLimit.allowed"}
 
@@ -285,7 +309,7 @@ The rejected configuration or byte class.
 pub allowed: u64
 ```
 
-The applicable maximum.
+The value of the limit.
 
 ::Anchor{id="FetchContentReason.InvalidLimit.attempted"}
 
@@ -295,7 +319,7 @@ The applicable maximum.
 pub attempted: u64
 ```
 
-The rejected value or count.
+The value that was found.
 
 ::Anchor{id="FetchContentReason.CodingSyntax"}
 
@@ -305,7 +329,7 @@ The rejected value or count.
 CodingSyntax
 ```
 
-A Content-Encoding element is empty or malformed.
+An item in `Content-Encoding` is empty or not valid.
 
 ::Anchor{id="FetchContentReason.CodingSyntax.position"}
 
@@ -315,7 +339,7 @@ A Content-Encoding element is empty or malformed.
 pub position: CodingPosition
 ```
 
-The exact location of the invalid token or byte.
+Where the item is.
 
 ::Anchor{id="FetchContentReason.UnsupportedCoding"}
 
@@ -325,7 +349,7 @@ The exact location of the invalid token or byte.
 UnsupportedCoding
 ```
 
-A valid coding name has no selected decoder; the exact token is independently owned.
+A content coding has no decoder, for example `br`.
 
 ::Anchor{id="FetchContentReason.UnsupportedCoding.position"}
 
@@ -335,7 +359,7 @@ A valid coding name has no selected decoder; the exact token is independently ow
 pub position: CodingPosition
 ```
 
-The token position in the original response.
+Where the coding is.
 
 ::Anchor{id="FetchContentReason.UnsupportedCoding.token"}
 
@@ -345,7 +369,7 @@ The token position in the original response.
 pub token: Bytes
 ```
 
-An owned copy of the exact unsupported token.
+A copy of the coding name.
 
 ::Anchor{id="FetchContentReason.PartialResponse"}
 
@@ -355,7 +379,7 @@ An owned copy of the exact unsupported token.
 PartialResponse
 ```
 
-A partial response selected a nonidentity decoder.
+A 206 partial response has a coding other than `identity`, which cannot be decoded.
 
 ::Anchor{id="FetchContentReason.PartialResponse.position"}
 
@@ -365,7 +389,7 @@ A partial response selected a nonidentity decoder.
 pub position: CodingPosition
 ```
 
-The first nonidentity coding in wire order.
+The first coding that is not `identity`.
 
 ::Anchor{id="FetchContentReason.Tunnel"}
 
@@ -375,7 +399,7 @@ The first nonidentity coding in wire order.
 Tunnel
 ```
 
-The response body is a protocol tunnel rather than a representation.
+The response body is a tunnel, not content.
 
 ::Anchor{id="FetchContentReason.Body"}
 
@@ -385,7 +409,7 @@ The response body is a protocol tunnel rather than a representation.
 Body
 ```
 
-HTTP framing rejected the response body.
+The body framing failed.
 
 ::Anchor{id="FetchContentReason.Body.error"}
 
@@ -395,7 +419,7 @@ HTTP framing rejected the response body.
 pub error: BodyError
 ```
 
-The original body error, including committed wire progress.
+The error from `silk.http_body`.
 
 ::Anchor{id="FetchContentReason.Buffer"}
 
@@ -405,7 +429,7 @@ The original body error, including committed wire progress.
 Buffer
 ```
 
-Buffered input or its transport failed.
+Reading from the transport failed.
 
 ::Anchor{id="FetchContentReason.Buffer.error"}
 
@@ -415,7 +439,7 @@ Buffered input or its transport failed.
 pub error: BufferError
 ```
 
-The original buffer error and its transport cause.
+The error, with its transport cause.
 
 ::Anchor{id="FetchContentReason.Inflate"}
 
@@ -435,7 +459,7 @@ Gzip or zlib decoding failed.
 pub stage: usize
 ```
 
-The zero-based reverse application stage.
+The decoding stage, from 0, counted from the last coding.
 
 ::Anchor{id="FetchContentReason.Inflate.wireIndex"}
 
@@ -445,7 +469,7 @@ The zero-based reverse application stage.
 pub wireIndex: usize
 ```
 
-The original coding position in wire order.
+The position of the coding in `Content-Encoding`, from 0.
 
 ::Anchor{id="FetchContentReason.Inflate.error"}
 
@@ -455,7 +479,7 @@ The original coding position in wire order.
 pub error: DecodeError
 ```
 
-The exact inflate failure and decoder-call progress.
+The error from `silk.inflate`.
 
 ::Anchor{id="FetchContentReason.Zstandard"}
 
@@ -475,7 +499,7 @@ Zstandard decoding failed.
 pub stage: usize
 ```
 
-The zero-based reverse application stage.
+The decoding stage, from 0, counted from the last coding.
 
 ::Anchor{id="FetchContentReason.Zstandard.wireIndex"}
 
@@ -485,7 +509,7 @@ The zero-based reverse application stage.
 pub wireIndex: usize
 ```
 
-The original coding position in wire order.
+The position of the coding in `Content-Encoding`, from 0.
 
 ::Anchor{id="FetchContentReason.Zstandard.error"}
 
@@ -495,7 +519,7 @@ The original coding position in wire order.
 pub error: ZstdError
 ```
 
-The exact Zstandard failure and decoder-call progress.
+The error from `silk.zstd`.
 
 ::Anchor{id="FetchContentReason.TrailingEncodedData"}
 
@@ -505,7 +529,7 @@ The exact Zstandard failure and decoder-call progress.
 TrailingEncodedData
 ```
 
-A finished coding stream had additional encoded bytes.
+There were more bytes after the end of a compressed stream.
 
 ::Anchor{id="FetchContentReason.TrailingEncodedData.stage"}
 
@@ -515,7 +539,7 @@ A finished coding stream had additional encoded bytes.
 pub stage: usize
 ```
 
-The zero-based reverse application stage.
+The decoding stage, from 0, counted from the last coding.
 
 ::Anchor{id="FetchContentReason.TrailingEncodedData.wireIndex"}
 
@@ -525,7 +549,7 @@ The zero-based reverse application stage.
 pub wireIndex: usize
 ```
 
-The original coding position in wire order.
+The position of the coding in `Content-Encoding`, from 0.
 
 ::Anchor{id="FetchContentReason.ArithmeticOverflow"}
 
@@ -535,7 +559,7 @@ The original coding position in wire order.
 ArithmeticOverflow
 ```
 
-Checked content accounting overflowed.
+A byte count overflowed.
 
 ::Anchor{id="FetchContentReason.InvalidState"}
 
@@ -545,7 +569,7 @@ Checked content accounting overflowed.
 InvalidState
 ```
 
-The content reader was already failed or abandoned.
+The content reader had already failed or stopped.
 
 ::Anchor{id="FetchContentError"}
 
@@ -555,7 +579,7 @@ The content reader was already failed or abandoned.
 pub struct FetchContentError
 ```
 
-Exact owned content-failure coordinates safe to return after the response head is released.
+A content decoding error, with byte counts. It owns its data.
 
 ::Anchor{id="FetchContentError.reason"}
 
@@ -565,7 +589,7 @@ Exact owned content-failure coordinates safe to return after the response head i
 pub reason: FetchContentReason
 ```
 
-The owned failure category and original lower-level cause.
+The reason.
 
 ::Anchor{id="FetchContentError.written"}
 
@@ -575,7 +599,7 @@ The owned failure category and original lower-level cause.
 pub written: usize
 ```
 
-Bytes written into the current provisional output chunk.
+The bytes written to the current output chunk.
 
 ::Anchor{id="FetchContentError.totalEncoded"}
 
@@ -585,7 +609,7 @@ Bytes written into the current provisional output chunk.
 pub totalEncoded: u64
 ```
 
-Cumulative deframed encoded bytes accepted.
+The total encoded bytes read.
 
 ::Anchor{id="FetchContentError.totalIntermediate"}
 
@@ -595,7 +619,7 @@ Cumulative deframed encoded bytes accepted.
 pub totalIntermediate: u64
 ```
 
-Cumulative nonfinal decoder-stage output.
+The total bytes from decoding stages before the last one.
 
 ::Anchor{id="FetchContentError.totalDecoded"}
 
@@ -605,7 +629,7 @@ Cumulative nonfinal decoder-stage output.
 pub totalDecoded: u64
 ```
 
-Cumulative selected-representation output.
+The total decoded bytes.
 
 ::Anchor{id="FetchReason"}
 
@@ -615,7 +639,7 @@ Cumulative selected-representation output.
 pub union FetchReason
 ```
 
-A fetch-owned admission, limit, or unsupported-response reason.
+The reason of a [`FetchError`](#FetchError).
 
 ::Anchor{id="FetchReason.InvalidOptions"}
 
@@ -625,7 +649,7 @@ A fetch-owned admission, limit, or unsupported-response reason.
 InvalidOptions
 ```
 
-One or more finite options are inconsistent or outside their admitted domain.
+The [`FetchOptions`](#FetchOptions) are not valid. See [`FetchOptions.validate`](#FetchOptions.impl.validate).
 
 ::Anchor{id="FetchReason.InvalidHttpOptions"}
 
@@ -635,7 +659,7 @@ One or more finite options are inconsistent or outside their admitted domain.
 InvalidHttpOptions
 ```
 
-The supplied HTTP connection limits failed their owning client's pre-contact admission.
+The client rejected the HTTP limits in the options.
 
 ::Anchor{id="FetchReason.InvalidHttpOptions.error"}
 
@@ -645,7 +669,7 @@ The supplied HTTP connection limits failed their owning client's pre-contact adm
 pub error: ExchangeError
 ```
 
-The client's original pre-contact admission failure.
+The error from the client.
 
 ::Anchor{id="FetchReason.HttpValue"}
 
@@ -655,7 +679,7 @@ The client's original pre-contact admission failure.
 HttpValue
 ```
 
-HTTP value copying failed while Fetch owned the final-head boundary.
+Copying an HTTP value failed.
 
 ::Anchor{id="FetchReason.HttpValue.error"}
 
@@ -665,7 +689,7 @@ HTTP value copying failed while Fetch owned the final-head boundary.
 pub error: ValueError
 ```
 
-The original HTTP value validation or copying failure.
+The error from `silk.http`.
 
 ::Anchor{id="FetchReason.HttpBody"}
 
@@ -675,7 +699,7 @@ The original HTTP value validation or copying failure.
 HttpBody
 ```
 
-HTTP body or trailer validation failed after final-response selection.
+The body or the trailers of the final response are not valid.
 
 ::Anchor{id="FetchReason.HttpBody.error"}
 
@@ -685,7 +709,7 @@ HTTP body or trailer validation failed after final-response selection.
 pub error: BodyError
 ```
 
-The original body or trailer validation failure.
+The error from `silk.http_body`.
 
 ::Anchor{id="FetchReason.HttpClient"}
 
@@ -695,7 +719,7 @@ The original body or trailer validation failure.
 HttpClient
 ```
 
-The streaming client failed inside Fetch's final-response delivery boundary.
+The exchange failed while the body of the final response was read.
 
 ::Anchor{id="FetchReason.HttpClient.error"}
 
@@ -705,7 +729,7 @@ The streaming client failed inside Fetch's final-response delivery boundary.
 pub error: ExchangeError
 ```
 
-The original final-response client failure.
+The error from `silk.http_exchange`.
 
 ::Anchor{id="FetchReason.SizeOverflow"}
 
@@ -715,7 +739,7 @@ The original final-response client failure.
 SizeOverflow
 ```
 
-Checked accounting cannot represent the required total.
+A byte count overflowed.
 
 ::Anchor{id="FetchReason.DestinationRejected"}
 
@@ -725,7 +749,7 @@ Checked accounting cannot represent the required total.
 DestinationRejected
 ```
 
-A caller-defined sink rejected the current offered chunk.
+Your sink rejected a chunk.
 
 ::Anchor{id="FetchReason.Content"}
 
@@ -735,7 +759,7 @@ A caller-defined sink rejected the current offered chunk.
 Content
 ```
 
-Content selection failed; borrowed coding tokens are copied into bounded owned storage.
+Content decoding failed.
 
 ::Anchor{id="FetchReason.Content.error"}
 
@@ -745,7 +769,7 @@ Content selection failed; borrowed coding tokens are copied into bounded owned s
 pub error: FetchContentError
 ```
 
-The owned content failure, including coding coordinates and byte totals.
+The content error.
 
 ::Anchor{id="FetchReason.LimitExceeded"}
 
@@ -755,7 +779,7 @@ The owned content failure, including coding coordinates and byte totals.
 LimitExceeded
 ```
 
-One independent finite resource would exceed its inclusive limit.
+A limit in [`FetchOptions`](#FetchOptions) or in the call was exceeded.
 
 ::Anchor{id="FetchReason.LimitExceeded.limit"}
 
@@ -765,7 +789,7 @@ One independent finite resource would exceed its inclusive limit.
 pub limit: FetchLimit
 ```
 
-The resource whose bound was reached.
+The limit.
 
 ::Anchor{id="FetchReason.LimitExceeded.allowed"}
 
@@ -775,7 +799,7 @@ The resource whose bound was reached.
 pub allowed: u64
 ```
 
-The inclusive admitted maximum.
+The value of the limit.
 
 ::Anchor{id="FetchReason.LimitExceeded.attempted"}
 
@@ -785,7 +809,7 @@ The inclusive admitted maximum.
 pub attempted: u64
 ```
 
-The rejected cumulative value.
+The value that was found.
 
 ::Anchor{id="FetchReason.UnsupportedSwitchingResponse"}
 
@@ -795,7 +819,8 @@ The rejected cumulative value.
 UnsupportedSwitchingResponse
 ```
 
-The final response would require transferring duplex protocol authority.
+The final response is 101 Switching Protocols, or a 2xx for `CONNECT`. Fetch cannot use the
+connection after such a response.
 
 ::Anchor{id="FetchReason.UnsupportedSwitchingResponse.status"}
 
@@ -805,7 +830,7 @@ The final response would require transferring duplex protocol authority.
 pub status: Status
 ```
 
-The final protocol-switching or successful CONNECT status.
+The status of the response.
 
 ::Anchor{id="FetchError"}
 
@@ -815,7 +840,7 @@ The final protocol-switching or successful CONNECT status.
 pub struct FetchError
 ```
 
-Safe independently owned failure context added by the one-shot boundary.
+The error from a fetch, with context. It owns its data.
 
 ::Anchor{id="FetchError.phase"}
 
@@ -825,7 +850,7 @@ Safe independently owned failure context added by the one-shot boundary.
 pub phase: FetchPhase
 ```
 
-The operation phase that rejected the value or observed the failure.
+The phase in which the error occurred.
 
 ::Anchor{id="FetchError.reason"}
 
@@ -835,7 +860,7 @@ The operation phase that rejected the value or observed the failure.
 pub reason: FetchReason
 ```
 
-The stable fetch-owned failure category.
+The reason.
 
 ::Anchor{id="FetchError.status"}
 
@@ -845,7 +870,7 @@ The stable fetch-owned failure category.
 pub status: Option<Status>
 ```
 
-Final status when it is known without retaining the response owner.
+The status of the final response, when it is known.
 
 ::Anchor{id="FetchError.uri"}
 
@@ -855,7 +880,7 @@ Final status when it is known without retaining the response owner.
 pub uri: Option<OwnedUri>
 ```
 
-Independently copied current URI when bounded context is available.
+A copy of the current URI, when it is known.
 
 ::Anchor{id="FetchError.deliveredBodyBytes"}
 
@@ -865,7 +890,7 @@ Independently copied current URI when bounded context is available.
 pub deliveredBodyBytes: u64
 ```
 
-Bytes accepted by the destination before the failing operation.
+The body bytes that the destination accepted before the error.
 
 ::Anchor{id="FetchError.offeredBodyBytes"}
 
@@ -875,7 +900,7 @@ Bytes accepted by the destination before the failing operation.
 pub offeredBodyBytes: usize
 ```
 
-Current chunk length offered to a failing destination, otherwise zero.
+The length of the chunk that the destination rejected, or 0.
 
 ::Anchor{id="DestinationFailure"}
 
@@ -885,7 +910,7 @@ Current chunk length offered to a failing destination, otherwise zero.
 pub struct DestinationFailure<E>
 ```
 
-A typed sink failure paired with only fetch-known delivery progress.
+The error from your [`Sink`](#Sink), with the context of the fetch.
 
 ::Anchor{id="DestinationFailure.error"}
 
@@ -895,7 +920,7 @@ A typed sink failure paired with only fetch-known delivery progress.
 pub error: E
 ```
 
-The original caller-defined sink failure.
+The error from your sink.
 
 ::Anchor{id="DestinationFailure.context"}
 
@@ -905,7 +930,7 @@ The original caller-defined sink failure.
 pub context: FetchError
 ```
 
-Bounded destination context excluding claims about partial external effects.
+The context: the phase, the status, the URI, and the bytes delivered before the error.
 
 ::Anchor{id="RepresentationMetadata"}
 
@@ -915,7 +940,7 @@ Bounded destination context excluding claims about partial external effects.
 pub struct RepresentationMetadata
 ```
 
-Representation policy selected from the final wire response.
+How the content of the response was decoded.
 
 ::Anchor{id="RepresentationMetadata.applied"}
 
@@ -925,7 +950,7 @@ Representation policy selected from the final wire response.
 pub applied: AppliedPlan
 ```
 
-The exact applied Raw or Decode plan and coding counts.
+The decoding plan that was used: raw, or which codings were decoded.
 
 ::Anchor{id="RepresentationMetadata.completed"}
 
@@ -935,7 +960,7 @@ The exact applied Raw or Decode plan and coding counts.
 pub completed: bool
 ```
 
-Whether framing and every selected content stage completed successfully.
+`true` when the framing and all decoding completed.
 
 ::Anchor{id="RepresentationMetadata.deliveredBytes"}
 
@@ -945,7 +970,7 @@ Whether framing and every selected content stage completed successfully.
 pub deliveredBytes: Option<u64>
 ```
 
-Final delivered representation bytes, available only after completion.
+The number of body bytes delivered, after completion.
 
 ::Anchor{id="ResponseMetadata"}
 
@@ -955,7 +980,8 @@ Final delivered representation bytes, available only after completion.
 pub struct ResponseMetadata
 ```
 
-Immutable owned header-only metadata lent before each body chunk.
+The head of the final response, and how its content is decoded. Your sink gets it with each
+chunk.
 
 ::Anchor{id="ResponseMetadata.finalUri"}
 
@@ -965,7 +991,7 @@ Immutable owned header-only metadata lent before each body chunk.
 pub finalUri: OwnedUri
 ```
 
-The independently owned final URI.
+The URI of the final response, after redirects.
 
 ::Anchor{id="ResponseMetadata.head"}
 
@@ -975,7 +1001,7 @@ The independently owned final URI.
 pub head: OwnedResponseHead
 ```
 
-The independently owned final status, reason, and ordered wire headers.
+The status, the reason, and the headers of the final response, as received.
 
 ::Anchor{id="ResponseMetadata.representation"}
 
@@ -985,7 +1011,7 @@ The independently owned final status, reason, and ordered wire headers.
 pub representation: RepresentationMetadata
 ```
 
-Content-plan provenance separate from unchanged wire headers.
+How the content is decoded. The headers are not changed by decoding.
 
 ::Anchor{id="ResponseMetadata.ownedBytes"}
 
@@ -995,7 +1021,7 @@ Content-plan provenance separate from unchanged wire headers.
 pub ownedBytes: usize
 ```
 
-Counted URI and head payload plus owned index storage.
+The memory of the URI and head copies, in bytes.
 
 ::Anchor{id="FetchResult"}
 
@@ -1005,7 +1031,7 @@ Counted URI and head payload plus owned index storage.
 pub struct FetchResult
 ```
 
-One verified completed response without retained body bytes.
+The result of a complete response, without the body.
 
 ::Anchor{id="FetchResult.metadata"}
 
@@ -1015,7 +1041,7 @@ One verified completed response without retained body bytes.
 pub metadata: ResponseMetadata
 ```
 
-Final owned header metadata.
+The final URI and head.
 
 ::Anchor{id="FetchResult.trailers"}
 
@@ -1025,7 +1051,7 @@ Final owned header metadata.
 pub trailers: Option<OwnedTrailers>
 ```
 
-Final ordered trailers copied only after content completion.
+The trailers of a chunked response, if any.
 
 ::Anchor{id="FetchResult.redirectCount"}
 
@@ -1035,7 +1061,7 @@ Final ordered trailers copied only after content completion.
 pub redirectCount: usize
 ```
 
-Number of redirects followed before this response.
+The number of redirects that were followed.
 
 ::Anchor{id="FetchResult.encodedBodyBytes"}
 
@@ -1045,7 +1071,7 @@ Number of redirects followed before this response.
 pub encodedBodyBytes: u64
 ```
 
-Deframed encoded representation bytes accepted by the content layer.
+The body bytes before decoding.
 
 ::Anchor{id="FetchResult.deliveredBodyBytes"}
 
@@ -1055,7 +1081,7 @@ Deframed encoded representation bytes accepted by the content layer.
 pub deliveredBodyBytes: u64
 ```
 
-Representation bytes successfully accepted by the destination.
+The body bytes that the destination accepted.
 
 ::Anchor{id="FetchResult.ownedMetadataBytes"}
 
@@ -1065,7 +1091,7 @@ Representation bytes successfully accepted by the destination.
 pub ownedMetadataBytes: usize
 ```
 
-URI, head, and trailer payload plus owned index storage.
+The memory of the URI, head, and trailer copies, in bytes.
 
 ::Anchor{id="CollectedResponse"}
 
@@ -1075,7 +1101,7 @@ URI, head, and trailer payload plus owned index storage.
 pub struct CollectedResponse
 ```
 
-One atomically published bounded in-memory response.
+The result of a `collect*` function: the response and its whole body.
 
 ::Anchor{id="CollectedResponse.result"}
 
@@ -1085,7 +1111,7 @@ One atomically published bounded in-memory response.
 pub result: FetchResult
 ```
 
-The verified completed response metadata and counters.
+The response without the body.
 
 ::Anchor{id="CollectedResponse.body"}
 
@@ -1095,7 +1121,7 @@ The verified completed response metadata and counters.
 pub body: Bytes
 ```
 
-The complete selected representation body.
+The whole body, decoded as selected in the options.
 
 ::Anchor{id="FetchRequest"}
 
@@ -1105,7 +1131,8 @@ The complete selected representation body.
 pub struct FetchRequest<'uri, 'method, 'headers, 'policy>
 ```
 
-A semantic request whose body authority is supplied by one source-specific operation.
+The method, URI, headers, and header policy of a request. The body comes from the function that
+you call.
 
 ::Anchor{id="FetchRequest.impl"}
 
@@ -1133,7 +1160,8 @@ pub fn make(
   ) -> Self
 ```
 
-Constructs a semantic request while preserving its explicit method and ordered headers.
+Returns a request. `continuePolicy` selects `Expect: 100-continue`. The limits apply to the
+head that is sent. See `prepare` in `silk.http_request`.
 
 ::Anchor{id="FetchRequest.impl.get"}
 
@@ -1143,7 +1171,8 @@ Constructs a semantic request while preserving its explicit method and ordered h
 pub fn get(uri: Uri<'uri>) -> Self
 ```
 
-Constructs GET with empty caller headers and the standard request policy and limits.
+Returns a GET request for `uri`, with no headers, the default header policy, and the default
+limits.
 
 ::Anchor{id="FetchOptions"}
 
@@ -1153,7 +1182,7 @@ Constructs GET with empty caller headers and the standard request policy and lim
 pub struct FetchOptions
 ```
 
-Finite one-shot policies admitted before route selection or transport contact.
+The settings of a fetch. Start from [`FetchOptions.defaults`](#FetchOptions.impl.defaults).
 
 ::Anchor{id="FetchOptions.redirect"}
 
@@ -1163,7 +1192,7 @@ Finite one-shot policies admitted before route selection or transport contact.
 pub redirect: RedirectPolicy
 ```
 
-Redirect policy, including Manual or Follow behavior and intermediate-response bounds.
+Whether and how to follow redirects. See `silk.http_redirect`.
 
 ::Anchor{id="FetchOptions.content"}
 
@@ -1173,7 +1202,7 @@ Redirect policy, including Manual or Follow behavior and intermediate-response b
 pub content: ContentMode
 ```
 
-Raw or decoded representation selection.
+Whether to give the body raw or decoded. See `silk.http_content`.
 
 ::Anchor{id="FetchOptions.pool"}
 
@@ -1183,7 +1212,7 @@ Raw or decoded representation selection.
 pub pool: PoolMode
 ```
 
-Compatible context-pool or forced-fresh acquisition.
+Whether a connection can come from a pool.
 
 ::Anchor{id="FetchOptions.proxy"}
 
@@ -1193,7 +1222,7 @@ Compatible context-pool or forced-fresh acquisition.
 pub proxy: ProxyMode
 ```
 
-Explicit client-context routing or forced direct routing.
+Whether to use the proxy policy of the client.
 
 ::Anchor{id="FetchOptions.deadline"}
 
@@ -1203,7 +1232,7 @@ Explicit client-context routing or forced direct routing.
 pub deadline: Option<Instant>
 ```
 
-One optional absolute operation deadline, never renewed between phases or hops.
+One deadline on the `MonotonicClock` for the whole operation, including all redirects.
 
 ::Anchor{id="FetchOptions.http"}
 
@@ -1213,7 +1242,7 @@ One optional absolute operation deadline, never renewed between phases or hops.
 pub http: ClientLimits
 ```
 
-Existing finite HTTP parser, framing, trailer, and transport-buffer limits.
+The limits for the HTTP exchange: heads, framing, trailers, and buffers.
 
 ::Anchor{id="FetchOptions.contentLimits"}
 
@@ -1223,7 +1252,7 @@ Existing finite HTTP parser, framing, trailer, and transport-buffer limits.
 pub contentLimits: ContentLimits
 ```
 
-Existing finite content planning and codec limits.
+The limits for content decoding.
 
 ::Anchor{id="FetchOptions.maxEncodedBodyBytes"}
 
@@ -1233,7 +1262,7 @@ Existing finite content planning and codec limits.
 pub maxEncodedBodyBytes: u64
 ```
 
-Additional inclusive encoded representation allowance.
+The maximum body bytes before decoding.
 
 ::Anchor{id="FetchOptions.maxDeliveredBodyBytes"}
 
@@ -1243,7 +1272,7 @@ Additional inclusive encoded representation allowance.
 pub maxDeliveredBodyBytes: u64
 ```
 
-Inclusive representation bytes accepted by any destination.
+The maximum body bytes that any destination gets.
 
 ::Anchor{id="FetchOptions.maxOwnedMetadataBytes"}
 
@@ -1253,7 +1282,7 @@ Inclusive representation bytes accepted by any destination.
 pub maxOwnedMetadataBytes: usize
 ```
 
-Inclusive owned URI, head, and trailer payload-plus-index allowance.
+The maximum memory for the copies of the URI, the head, and the trailers.
 
 ::Anchor{id="FetchOptions.maxBufferedBytes"}
 
@@ -1263,7 +1292,7 @@ Inclusive owned URI, head, and trailer payload-plus-index allowance.
 pub maxBufferedBytes: usize
 ```
 
-Positive per-read response delivery scratch capacity.
+The size of the read buffer for the body. It must not be 0.
 
 ::Anchor{id="FetchOptions.impl"}
 
@@ -1281,7 +1310,8 @@ impl FetchOptions
 pub fn defaults() -> FetchOptions
 ```
 
-Returns Manual, Raw, context-pool, inherited-route policy with finite standard limits.
+Returns options that do not follow redirects, do not decode content, use the pool and proxy
+policy of the client, have no deadline, and allow bodies of 16 MiB.
 
 ::Anchor{id="FetchOptions.impl.validate"}
 
@@ -1291,7 +1321,8 @@ Returns Manual, Raw, context-pool, inherited-route policy with finite standard l
 pub fn validate(self: &Self) -> Result<(), FetchError>
 ```
 
-Checks local capacities and content configuration without allocation or provider access.
+Checks that the options are consistent. It does not allocate or connect. Each fetch function
+calls it first.
 
 ::Anchor{id="Fetch"}
 
@@ -1301,7 +1332,8 @@ Checks local capacities and content configuration without allocation or provider
 pub struct Fetch<C>
 ```
 
-An owned target-neutral facade around one explicit acquisition context.
+A fetch client around a [`FetchClient`](#FetchClient). Make it with [`Fetch.make`](#Fetch.impl.make), and pass it to the fetch
+functions.
 
 ::Anchor{id="Fetch.impl"}
 
@@ -1319,7 +1351,7 @@ impl<C> Fetch<C>
 pub fn make(client: C) -> Fetch<C>
 ```
 
-Seals one caller-supplied client context into a fetch facade.
+Returns a fetch client that uses `client` to get connections.
 
 ::Anchor{id="Sink"}
 
@@ -1329,7 +1361,7 @@ Seals one caller-supplied client context into a fetch facade.
 pub interface Sink<E, ?R>
 ```
 
-A sequential effectful destination whose metadata and current chunk loans cannot escape.
+A destination for the body chunks of a `toSink*` function.
 
 ::Anchor{id="Sink.write"}
 
@@ -1344,12 +1376,12 @@ effect<'call> fn write<'call>(
   ) -> () ! E ? R
 ```
 
-Accepts the complete offered chunk under the unchanged operation deadline.
+Accepts one chunk of the body.
 
 #### Details
-
-`deadline` is the original absolute fetch deadline. `None` permits an unbounded wait. The
-callback must return before Fetch reads or offers another chunk.
+`metadata` is the final response head. `deadline` is the deadline of the whole fetch, or
+`None`. The fetch reads no more body until this call returns. The chunk and the metadata are
+only borrowed for this call.
 
 ::Anchor{id="FetchClient"}
 
@@ -1368,13 +1400,12 @@ pub interface FetchClient<
 >
 ```
 
-Target-neutral routed or pooled acquisition for one current redirect attempt.
+Gets a connection and runs one attempt of a request. A fetch calls it again for each redirect.
 
 ### Details
-
-Implementations admit options before contact, recompute routes for the current request URI, and
-lend exactly one scoped exchange. `deadline` is the unchanged operation deadline. `Fresh` never
-consults a pool, and `Direct` never consults configured or ambient proxy policy.
+An implementation checks the options before it connects, and selects the route for the current
+URI. With `Fresh`, it does not use a pool. With `Direct`, it does not use a proxy policy.
+`deadline` is the deadline of the whole fetch.
 
 ::Anchor{id="FetchClient.withAttempt"}
 
@@ -1393,7 +1424,7 @@ effect fn withAttempt(
     HandlerRequirements in Without<HandlerRequirements, HttpTransport>
 ```
 
-Rebuilds and drives one scoped request under the selected acquisition modes.
+Connects and runs one attempt of `request` with these limits and modes.
 
 ::Anchor{id="toSinkEmpty"}
 
@@ -1445,7 +1476,7 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a body-free request and sequentially offers the selected representation to `sink`.
+Sends a request with no body, and gives the body of the final response to `sink` in chunks.
 
 ::Anchor{id="collectEmpty"}
 
@@ -1491,7 +1522,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a body-free request and atomically publishes a bounded in-memory body.
+Sends a request with no body, and returns the body of the final response in memory. More than
+`maxBodyBytes` fails, and no partial body is returned.
 
 ::Anchor{id="discardEmpty"}
 
@@ -1537,7 +1569,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a body-free request and validates an explicitly bounded discarded representation.
+Sends a request with no body, and reads and checks the body of the final response without
+keeping it. More than `maxDiscardBytes` fails.
 
 ::Anchor{id="toSinkBytes"}
 
@@ -1591,7 +1624,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a repeatable byte-body request and sequentially offers the selected representation.
+Sends a request with the body `bytes`, and gives the body of the final response to `sink` in
+chunks.
 
 ::Anchor{id="collectBytes"}
 
@@ -1639,7 +1673,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a repeatable byte-body request and atomically publishes a bounded body.
+Sends a request with the body `bytes`, and returns the body of the final response in memory.
+More than `maxBodyBytes` fails, and no partial body is returned.
 
 ::Anchor{id="discardBytes"}
 
@@ -1687,7 +1722,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a repeatable byte-body request and validates bounded discarded content.
+Sends a request with the body `bytes`, and reads and checks the body of the final response
+without keeping it. More than `maxDiscardBytes` fails.
 
 ::Anchor{id="toSinkOneShot"}
 
@@ -1752,7 +1788,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes an affine producer request and sequentially offers the selected representation.
+Sends a request whose body comes from `producer` one time, and gives the body of the final
+response to `sink` in chunks.
 
 ::Anchor{id="collectOneShot"}
 
@@ -1805,7 +1842,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes an affine producer request and atomically publishes a bounded body.
+Sends a request whose body comes from `producer` one time, and returns the body of the final
+response in memory. More than `maxBodyBytes` fails, and no partial body is returned.
 
 ::Anchor{id="discardOneShot"}
 
@@ -1858,7 +1896,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes an affine producer request and validates bounded discarded content.
+Sends a request whose body comes from `producer` one time, and reads and checks the body of the
+final response without keeping it. More than `maxDiscardBytes` fails.
 
 ::Anchor{id="toSinkReplay"}
 
@@ -1928,7 +1967,8 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a replay-factory request and sequentially offers the selected representation.
+Sends a request whose body comes from a new producer from `factory` for each attempt, and gives
+the body of the final response to `sink` in chunks.
 
 ::Anchor{id="collectReplay"}
 
@@ -1986,7 +2026,9 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a replay-factory request and atomically publishes a bounded body.
+Sends a request whose body comes from a new producer from `factory` for each attempt, and
+returns the body of the final response in memory. More than `maxBodyBytes` fails, and no partial
+body is returned.
 
 ::Anchor{id="discardReplay"}
 
@@ -2044,6 +2086,7 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Executes a replay-factory request and validates bounded discarded content.
+Sends a request whose body comes from a new producer from `factory` for each attempt, and reads
+and checks the body of the final response without keeping it. More than `maxDiscardBytes` fails.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

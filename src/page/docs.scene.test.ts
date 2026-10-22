@@ -5,18 +5,21 @@ import { update, view } from '../main'
 import { AppRoute } from '../route'
 import { testModel } from '../testModel'
 
-const installRoute = AppRoute.DocPage({ directory: 'start', slug: 'install' })
+const installRoute = AppRoute.DocPage({
+  directory: 'get-started',
+  slug: 'install',
+})
 
 describe('docs sidebar', () => {
   test('a collapsed group opens when its header is clicked', () => {
     scene(
       { update, view },
       given(testModel(installRoute)),
-      expect(role('link', { name: 'Quick start' })).not.toExist(),
+      expect(role('link', { name: 'Your first program' })).not.toExist(),
       click(role('button', { name: /Get started/ })),
-      expect(role('link', { name: 'Quick start' })).toExist(),
+      expect(role('link', { name: 'Your first program' })).toExist(),
       click(role('button', { name: /Get started/ })),
-      expect(role('link', { name: 'Quick start' })).not.toExist(),
+      expect(role('link', { name: 'Your first program' })).not.toExist(),
     )
   })
 
@@ -25,8 +28,8 @@ describe('docs sidebar', () => {
       { update, view },
       given(testModel(installRoute)),
       type(role('searchbox', { name: 'Search docs' }), 'tour'),
-      expect(role('link', { name: 'A short tour' })).toExist(),
-      expect(role('link', { name: 'Quick start' })).not.toExist(),
+      expect(role('link', { name: 'A tour of Silk' })).toExist(),
+      expect(role('link', { name: 'Your first program' })).not.toExist(),
     )
   })
 

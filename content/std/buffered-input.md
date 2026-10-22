@@ -1,9 +1,114 @@
-Fixed-capacity retained byte input for incremental protocol parsing.
+A fixed-size input buffer for parsers that must look at bytes before they use them.
+
+## When to use
+Use [`BufferedInput`](#BufferedInput) to parse a protocol from a `ByteDuplex` transport or from `StandardInput`.
+For example, a parser can look for a line end with [`BufferedInput.peek`](#BufferedInput.impl.peek) and then remove only
+that line with [`BufferedInput.consume`](#BufferedInput.impl.consume). The bytes after the line stay in the buffer for the
+next step. In a scoped session that also writes, use `silk.buffered_duplex.BufferedDuplex`.
 
 ## Details
+[`BufferedInput.make`](#BufferedInput.impl.make) allocates the buffer one time. No other operation allocates.
+[`BufferedInput.fill`](#BufferedInput.impl.fill) reads from the transport until the buffer holds a minimum number of
+unread bytes or the transport ends. [`BufferedInput.peek`](#BufferedInput.impl.peek) returns the unread bytes and does not
+change the buffer. [`BufferedInput.consume`](#BufferedInput.impl.consume) removes bytes from the front.
 
-`BufferedInput` owns one reusable initialized allocation. `peek` borrows only the unread prefix;
-`consume` advances it explicitly, so bytes read beyond a protocol delimiter remain available.
+When the transport ends, the end is recorded, and later fills do not read again. The bytes that
+were read before the end stay available.
+
+## Errors
+- [`BufferError`](#BufferError) for each failure. A transport failure makes the buffer terminal, and each
+  later fill fails with `BufferError.Terminal`.
+
+## Gotchas
+A message that is longer than the capacity cannot be in the buffer at one time. Choose the
+capacity for the longest unit that the parser must see, such as the longest header line.
+
+## Examples
+### Read one line and keep the rest
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.buffered_input { BufferError, BufferedInput }
+import silk.byte_duplex { ByteDuplex }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.list { List }
+import silk.memory_byte_duplex { MemoryByteDuplex, MemoryReadEvent, MemoryWriteEvent }
+import silk.monotonic_clock { MonotonicClock }
+import silk.option { Option }
+import silk.system_clock { Instant, SystemClock }
+
+struct FixedClock {}
+
+impl MonotonicClock for FixedClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return 1
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    return ()
+  }
+}
+
+effect fn transport() -> MemoryByteDuplex
+  ! OutOfMemoryError
+  ? &mut Allocator {
+  let mut reads = List<MemoryReadEvent>.make()
+  let bytes = run Bytes.copy(&b"GET\nrest")
+  run List<MemoryReadEvent>.append(
+    &mut reads,
+    MemoryReadEvent.Data { readyAt: SystemClock.make(0, 0), bytes: move bytes }
+  )
+  run List<MemoryReadEvent>.append(
+    &mut reads,
+    MemoryReadEvent.End { readyAt: SystemClock.make(0, 0) }
+  )
+  return run MemoryByteDuplex.make(
+    move reads,
+    List<MemoryWriteEvent>.make(),
+    0,
+    8,
+    Option<i32>.none()
+  )
+}
+
+// Reads bytes up to the first newline and returns how many came before it.
+effect fn firstLineLength(input: &mut BufferedInput) -> usize
+  ! BufferError
+  ? &mut ByteDuplex | &mut MonotonicClock {
+  let filled = run BufferedInput.fill(&mut input, 4, Option<Instant>.none())
+  drop filled
+  let view = BufferedInput.peek(&input)
+  let mut length: usize = 0
+  while length < view.length && view[length] != 10 {
+    length = length + 1
+  }
+  drop view
+  run BufferedInput.consume(&mut input, length + 1)
+  return length
+}
+
+pub effect fn main() -> i32
+  ! BufferError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut clock = FixedClock {}
+  let mut duplex = run transport() |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut input = run BufferedInput.make(16) |> Effect.provideMut<Allocator>(&mut allocator)
+  let length = run firstLineLength(&mut input) |> Effect.provideMut<ByteDuplex>(&mut duplex)
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+  if length != 3 || BufferedInput.unread(&input) != 4 {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `BufferedInput` with `import silk.buffered_input { BufferedInput }`.
 
@@ -17,7 +122,7 @@ Public declarations: 5.
 pub const MAX_CAPACITY: usize
 ```
 
-The largest allocation accepted by one buffered direction.
+The largest capacity that a buffer can have: 1 MiB (1,048,576 bytes).
 
 ::Anchor{id="BufferError"}
 
@@ -27,7 +132,12 @@ The largest allocation accepted by one buffered direction.
 pub union BufferError
 ```
 
-A typed buffering, progress, or source-boundary failure.
+The error from a buffered input, output, or transfer operation.
+
+### Details
+
+The failures that report progress give the number of bytes that the operation completed before
+the failure. This tells a protocol exactly where the stream stopped.
 
 ::Anchor{id="BufferError.InvalidCapacity"}
 
@@ -37,7 +147,7 @@ A typed buffering, progress, or source-boundary failure.
 InvalidCapacity
 ```
 
-Construction rejected a zero or excessive capacity before allocation.
+The capacity was 0 or more than [`MAX_CAPACITY`](#MAX_CAPACITY). Nothing was allocated.
 
 ::Anchor{id="BufferError.InvalidCapacity.capacity"}
 
@@ -47,7 +157,7 @@ Construction rejected a zero or excessive capacity before allocation.
 pub capacity: usize
 ```
 
-The rejected allocation size in bytes.
+The capacity that was rejected, in bytes.
 
 ::Anchor{id="BufferError.BufferTooSmall"}
 
@@ -57,7 +167,7 @@ The rejected allocation size in bytes.
 BufferTooSmall
 ```
 
-A fill request cannot fit in the fixed allocation.
+A fill asked for more bytes than the buffer can hold.
 
 ::Anchor{id="BufferError.BufferTooSmall.requested"}
 
@@ -67,7 +177,7 @@ A fill request cannot fit in the fixed allocation.
 pub requested: usize
 ```
 
-The minimum retained byte count requested.
+The minimum byte count that was requested.
 
 ::Anchor{id="BufferError.BufferTooSmall.capacity"}
 
@@ -77,7 +187,7 @@ The minimum retained byte count requested.
 pub capacity: usize
 ```
 
-The fixed allocation size in bytes.
+The capacity of the buffer, in bytes.
 
 ::Anchor{id="BufferError.InvalidConsumption"}
 
@@ -87,7 +197,7 @@ The fixed allocation size in bytes.
 InvalidConsumption
 ```
 
-Consume would advance beyond the initialized unread prefix.
+A consume asked to remove more bytes than are unread. The buffer did not change.
 
 ::Anchor{id="BufferError.InvalidConsumption.requested"}
 
@@ -97,7 +207,7 @@ Consume would advance beyond the initialized unread prefix.
 pub requested: usize
 ```
 
-The byte count requested for consumption.
+The byte count that was requested.
 
 ::Anchor{id="BufferError.InvalidConsumption.available"}
 
@@ -107,7 +217,7 @@ The byte count requested for consumption.
 pub available: usize
 ```
 
-The initialized unread byte count.
+The number of unread bytes.
 
 ::Anchor{id="BufferError.InvalidReadCount"}
 
@@ -117,7 +227,8 @@ The initialized unread byte count.
 InvalidReadCount
 ```
 
-An input provider reported an impossible successful count.
+An input provider reported a byte count that is not possible: 0, or more than the space it was
+given.
 
 ::Anchor{id="BufferError.InvalidReadCount.count"}
 
@@ -127,7 +238,7 @@ An input provider reported an impossible successful count.
 pub count: usize
 ```
 
-The successful count reported by the provider.
+The count that the provider reported.
 
 ::Anchor{id="BufferError.InvalidReadCount.limit"}
 
@@ -137,7 +248,7 @@ The successful count reported by the provider.
 pub limit: usize
 ```
 
-The destination length offered to the provider.
+The space that the provider was given, in bytes.
 
 ::Anchor{id="BufferError.UnexpectedEnd"}
 
@@ -147,7 +258,7 @@ The destination length offered to the provider.
 UnexpectedEnd
 ```
 
-Underlying end arrived before an exact operation completed.
+The transport ended before an exact read, discard, or transfer completed.
 
 ::Anchor{id="BufferError.UnexpectedEnd.progress"}
 
@@ -157,7 +268,7 @@ Underlying end arrived before an exact operation completed.
 pub progress: usize
 ```
 
-The exact prefix copied or discarded before end.
+The number of bytes that the operation completed before the end.
 
 ::Anchor{id="BufferError.ReadFailed"}
 
@@ -167,7 +278,7 @@ The exact prefix copied or discarded before end.
 ReadFailed
 ```
 
-A ByteDuplex read failed after `progress` bytes had already been copied by this operation.
+A `ByteDuplex` read failed. The buffer becomes terminal.
 
 ::Anchor{id="BufferError.ReadFailed.progress"}
 
@@ -177,7 +288,7 @@ A ByteDuplex read failed after `progress` bytes had already been copied by this 
 pub progress: usize
 ```
 
-The exact prefix copied before the failed read.
+The number of bytes that the operation completed before the failure.
 
 ::Anchor{id="BufferError.ReadFailed.error"}
 
@@ -187,7 +298,7 @@ The exact prefix copied before the failed read.
 pub error: ByteIoError
 ```
 
-The underlying duplex read failure.
+The transport error.
 
 ::Anchor{id="BufferError.InputFailed"}
 
@@ -197,7 +308,7 @@ The underlying duplex read failure.
 InputFailed
 ```
 
-A StandardInput read failed after `progress` bytes had already been copied by this operation.
+A `StandardInput` read failed. The buffer becomes terminal.
 
 ::Anchor{id="BufferError.InputFailed.progress"}
 
@@ -207,7 +318,7 @@ A StandardInput read failed after `progress` bytes had already been copied by th
 pub progress: usize
 ```
 
-The exact prefix copied before the failed read.
+The number of bytes that the operation completed before the failure.
 
 ::Anchor{id="BufferError.InputFailed.error"}
 
@@ -217,7 +328,7 @@ The exact prefix copied before the failed read.
 pub error: StreamReadError
 ```
 
-The underlying standard-input failure.
+The standard input error.
 
 ::Anchor{id="BufferError.WriteFailed"}
 
@@ -227,7 +338,7 @@ The underlying standard-input failure.
 WriteFailed
 ```
 
-A ByteDuplex write or flush failed after accepting a caller prefix and draining pending bytes.
+A `ByteDuplex` write or flush failed. The output buffer becomes terminal.
 
 ::Anchor{id="BufferError.WriteFailed.accepted"}
 
@@ -237,7 +348,7 @@ A ByteDuplex write or flush failed after accepting a caller prefix and draining 
 pub accepted: usize
 ```
 
-The exact current caller-input prefix accepted into buffered ownership.
+The number of bytes of the current input that the buffer accepted before the failure.
 
 ::Anchor{id="BufferError.WriteFailed.drained"}
 
@@ -247,7 +358,7 @@ The exact current caller-input prefix accepted into buffered ownership.
 pub drained: usize
 ```
 
-The exact pending prefix acknowledged by the transport during the failing drain operation.
+The number of pending bytes that the transport received during the failed operation.
 
 ::Anchor{id="BufferError.WriteFailed.error"}
 
@@ -257,7 +368,7 @@ The exact pending prefix acknowledged by the transport during the failing drain 
 pub error: ByteIoError
 ```
 
-The underlying transport failure.
+The transport error.
 
 ::Anchor{id="BufferError.UnknownExternalTransfer"}
 
@@ -267,7 +378,7 @@ The underlying transport failure.
 UnknownExternalTransfer
 ```
 
-Writer failed an all-or-error call after earlier complete arguments were accepted.
+A `Writer` call failed. The `Writer` does not report how many bytes of that call it wrote.
 
 ::Anchor{id="BufferError.UnknownExternalTransfer.progress"}
 
@@ -277,7 +388,7 @@ Writer failed an all-or-error call after earlier complete arguments were accepte
 pub progress: usize
 ```
 
-The bytes accepted before the failed Writer call; the failed call has unknown external progress.
+The number of bytes from earlier calls that completed before the failed call.
 
 ::Anchor{id="BufferError.UnknownExternalTransfer.error"}
 
@@ -287,7 +398,7 @@ The bytes accepted before the failed Writer call; the failed call has unknown ex
 pub error: WriterError
 ```
 
-The underlying Writer failure.
+The `Writer` error.
 
 ::Anchor{id="BufferError.LengthOverflow"}
 
@@ -297,7 +408,7 @@ The underlying Writer failure.
 LengthOverflow
 ```
 
-Finite vector-length arithmetic overflowed before output.
+The total length of the input slices does not fit in `usize`. Nothing was written.
 
 ::Anchor{id="BufferError.Terminal"}
 
@@ -307,7 +418,7 @@ Finite vector-length arithmetic overflowed before output.
 Terminal
 ```
 
-A preceding external failure made the state unusable.
+An earlier transport failure or a close made the buffer unusable.
 
 ::Anchor{id="FillOutcome"}
 
@@ -317,7 +428,7 @@ A preceding external failure made the state unusable.
 pub union FillOutcome
 ```
 
-The observable result of satisfying a minimum retained prefix.
+The result of a fill.
 
 ::Anchor{id="FillOutcome.Available"}
 
@@ -327,7 +438,7 @@ The observable result of satisfying a minimum retained prefix.
 Available
 ```
 
-At least the requested minimum is available.
+The buffer holds at least the requested number of unread bytes.
 
 ::Anchor{id="FillOutcome.Available.count"}
 
@@ -337,7 +448,7 @@ At least the requested minimum is available.
 pub count: usize
 ```
 
-The initialized unread byte count.
+The number of unread bytes. It can be more than the requested minimum.
 
 ::Anchor{id="FillOutcome.End"}
 
@@ -347,7 +458,7 @@ The initialized unread byte count.
 End
 ```
 
-The source ended; `available` retained bytes can still be consumed.
+The transport ended. The buffer can hold fewer bytes than requested.
 
 ::Anchor{id="FillOutcome.End.available"}
 
@@ -357,7 +468,7 @@ The source ended; `available` retained bytes can still be consumed.
 pub available: usize
 ```
 
-The retained byte count still available after source end.
+The number of unread bytes that are still in the buffer.
 
 ::Anchor{id="DiscardOutcome"}
 
@@ -367,7 +478,7 @@ The retained byte count still available after source end.
 pub struct DiscardOutcome
 ```
 
-The result of a finite discard.
+The result of [`BufferedInput.discardAtMost`](#BufferedInput.impl.discardAtMost).
 
 ::Anchor{id="DiscardOutcome.count"}
 
@@ -377,7 +488,7 @@ The result of a finite discard.
 pub count: usize
 ```
 
-The exact consumed byte count.
+The number of bytes that were discarded.
 
 ::Anchor{id="DiscardOutcome.endObserved"}
 
@@ -387,7 +498,7 @@ The exact consumed byte count.
 pub endObserved: bool
 ```
 
-True only when the operation actually observed source end.
+`true` if the operation stopped because the transport ended. `false` if it reached the limit.
 
 ::Anchor{id="BufferedInput"}
 
@@ -397,7 +508,7 @@ True only when the operation actually observed source end.
 pub struct BufferedInput
 ```
 
-One fixed-capacity retained input buffer.
+A fixed-size input buffer. Make one with [`BufferedInput.make`](#BufferedInput.impl.make).
 
 ::Anchor{id="BufferedInput.impl"}
 
@@ -417,7 +528,13 @@ pub effect fn make(capacity: usize) -> BufferedInput
   ? &mut Allocator
 ```
 
-Allocates and initializes one fixed-capacity input buffer.
+Returns an empty buffer that holds at most `capacity` bytes.
+
+#### Errors
+
+- `BufferError.InvalidCapacity` if `capacity` is 0 or more than [`MAX_CAPACITY`](#MAX_CAPACITY). Nothing is
+  allocated.
+- `OutOfMemoryError` if the `Allocator` cannot supply `capacity` bytes.
 
 ::Anchor{id="BufferedInput.impl.capacity"}
 
@@ -427,7 +544,7 @@ Allocates and initializes one fixed-capacity input buffer.
 pub fn capacity(self: &Self) -> usize
 ```
 
-Returns the immutable fixed capacity.
+Returns the capacity in bytes. It does not change.
 
 ::Anchor{id="BufferedInput.impl.unread"}
 
@@ -437,7 +554,7 @@ Returns the immutable fixed capacity.
 pub fn unread(self: &Self) -> usize
 ```
 
-Returns the initialized unread count.
+Returns the number of bytes that were read from the transport and not yet consumed.
 
 ::Anchor{id="BufferedInput.impl.isEnded"}
 
@@ -447,7 +564,7 @@ Returns the initialized unread count.
 pub fn isEnded(self: &Self) -> bool
 ```
 
-Reports whether the source has reached sticky end.
+Returns `true` if the transport ended. Unread bytes can still be in the buffer.
 
 ::Anchor{id="BufferedInput.impl.isTerminal"}
 
@@ -457,7 +574,7 @@ Reports whether the source has reached sticky end.
 pub fn isTerminal(self: &Self) -> bool
 ```
 
-Reports whether an external failure made this input terminal.
+Returns `true` if a transport failure made the buffer unusable.
 
 ::Anchor{id="BufferedInput.impl.peek"}
 
@@ -467,7 +584,12 @@ Reports whether an external failure made this input terminal.
 pub fn peek<'a>(self: &'a Self) -> &'a [u8]
 ```
 
-Borrows exactly the initialized unread slice.
+Returns the unread bytes. It does not read from the transport and does not change the buffer.
+
+#### Details
+
+The slice borrows the buffer. Drop the slice before you call an operation that changes the
+buffer.
 
 ::Anchor{id="BufferedInput.impl.consume"}
 
@@ -477,7 +599,12 @@ Borrows exactly the initialized unread slice.
 pub effect fn consume(self: &mut Self, count: usize) -> () ! BufferError
 ```
 
-Advances by `count` initialized bytes, preserving state on overrun.
+Removes `count` unread bytes from the front of the buffer.
+
+#### Errors
+
+- `BufferError.InvalidConsumption` if `count` is more than [`BufferedInput.unread`](#BufferedInput.impl.unread). The
+  buffer does not change.
 
 ::Anchor{id="BufferedInput.impl.fill"}
 
@@ -493,7 +620,22 @@ pub effect fn fill(
   ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Retains at least `minimum` bytes or reports sticky source end.
+Reads from the `ByteDuplex` transport until the buffer holds at least `minimum` unread bytes,
+or until the transport ends.
+
+#### Details
+
+If the buffer already holds `minimum` bytes, it does not read. Each read asks for all free
+space, so the buffer can hold more than `minimum` bytes after the call. Unread bytes move to
+the front of the buffer when necessary. A `minimum` of 0 never reads. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.BufferTooSmall` if `minimum` is more than the capacity.
+- `BufferError.Terminal` if an earlier failure made the buffer unusable.
+- `BufferError.ReadFailed` if a read fails. The buffer becomes terminal. `progress` gives the
+  bytes that this call added.
 
 ::Anchor{id="BufferedInput.impl.fillStandard"}
 
@@ -505,7 +647,23 @@ pub effect fn fillStandard(self: &mut Self, minimum: usize) -> FillOutcome
   ? &mut StandardInput
 ```
 
-Retains through StandardInput without advertising a deadline.
+Reads from `StandardInput` until the buffer holds at least `minimum` unread bytes, or until
+the transport ends.
+
+#### Details
+
+If the buffer already holds `minimum` bytes, it does not read. Each read asks for all free
+space, so the buffer can hold more than `minimum` bytes after the call. Unread bytes move to
+the front of the buffer when necessary. A `minimum` of 0 never reads. There is no deadline.
+
+#### Errors
+
+- `BufferError.BufferTooSmall` if `minimum` is more than the capacity.
+- `BufferError.Terminal` if an earlier failure made the buffer unusable.
+- `BufferError.InputFailed` if a read fails. The buffer becomes terminal. `progress` gives the
+  bytes that this call added.
+- `BufferError.InvalidReadCount` if the provider reports a count that is not possible. The
+  buffer becomes terminal.
 
 ::Anchor{id="BufferedInput.impl.readSome"}
 
@@ -521,7 +679,19 @@ pub effect fn readSome(
   ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Copies one positive prefix or reports sticky end.
+Copies unread bytes into `output` and consumes them. Reads from the transport first if the
+buffer is empty.
+
+#### Details
+
+The result is `ReadTransfer.Data` with a count from 1 to `output.length`, or
+`ReadTransfer.End` if the transport ended and the buffer is empty. An empty `output` returns a
+count of 0 and does not read. `deadline` is an absolute time on the active `MonotonicClock`.
+`Option.none()` means no time limit.
+
+#### Errors
+
+- The errors of [`BufferedInput.fill`](#BufferedInput.impl.fill).
 
 ::Anchor{id="BufferedInput.impl.readSomeStandard"}
 
@@ -533,7 +703,18 @@ pub effect fn readSomeStandard(self: &mut Self, output: &mut [u8]) -> ReadTransf
   ? &mut StandardInput
 ```
 
-Copies one positive prefix through StandardInput or reports sticky end.
+Copies unread bytes into `output` and consumes them. Reads from `StandardInput` first if the
+buffer is empty.
+
+#### Details
+
+The result is `ReadTransfer.Data` with a count from 1 to `output.length`, or
+`ReadTransfer.End` if the transport ended and the buffer is empty. An empty `output` returns a
+count of 0 and does not read.
+
+#### Errors
+
+- The errors of [`BufferedInput.fillStandard`](#BufferedInput.impl.fillStandard).
 
 ::Anchor{id="BufferedInput.impl.readExact"}
 
@@ -549,7 +730,19 @@ pub effect fn readExact(
   ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Fills the complete destination or reports its precisely copied prefix.
+Fills all of `output` with the next bytes and consumes them.
+
+#### Details
+
+`deadline` is an absolute time on the active `MonotonicClock`. `Option.none()` means no time
+limit. It applies to each read.
+
+#### Errors
+
+- `BufferError.UnexpectedEnd` if the transport ends first. `progress` gives the number of
+  bytes that were copied into `output`.
+- The errors of [`BufferedInput.fill`](#BufferedInput.impl.fill). Their `progress` includes the bytes that this call
+  copied before the failure.
 
 ::Anchor{id="BufferedInput.impl.discardAtMost"}
 
@@ -565,7 +758,20 @@ pub effect fn discardAtMost(
   ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Discards no more than `limit` and reports whether end was actually observed.
+Consumes and drops up to `limit` bytes. It stops early if the transport ends.
+
+#### When to use
+
+Use it to skip a body or a field of a known maximum length.
+
+#### Details
+
+The result gives the number of discarded bytes and if the transport ended. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- The errors of [`BufferedInput.fill`](#BufferedInput.impl.fill).
 
 ::Anchor{id="BufferedInput.impl.discardExact"}
 
@@ -581,6 +787,12 @@ pub effect fn discardExact(
   ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Discards exactly `count` bytes or reports the consumed prefix at early end.
+Consumes and drops exactly `count` bytes.
+
+#### Errors
+
+- `BufferError.UnexpectedEnd` if the transport ends first. `progress` gives the number of
+  bytes that were discarded.
+- The errors of [`BufferedInput.fill`](#BufferedInput.impl.fill).
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

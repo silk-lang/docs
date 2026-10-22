@@ -1,11 +1,110 @@
-One scoped buffered session over an exclusive concrete ByteDuplex provider.
+A buffered session that reads and writes one `ByteDuplex` transport inside a callback.
+
+## When to use
+Use [`withBuffered`](#withBuffered) or [`withBufferedCapacity`](#withBufferedCapacity) to run a protocol over a connection: read
+requests, write responses, and close the connection at the end. Use [`withBufferedPairCapacity`](#withBufferedPairCapacity)
+to move data between two connections, for example in a proxy with `silk.buffered_transfer`.
 
 ## Details
+The `with...` functions allocate an input buffer and an output buffer, give the callback a
+[`BufferedDuplex`](#BufferedDuplex) session, and close the transport when the callback returns, fails, or is
+canceled. The session cannot escape the callback.
 
-`withBuffered` owns separate fixed input and output state for the callback and terminally closes
-the provider after success, typed failure, or structured cancellation/interruption. Fatal traps
-bypass finalizers and Drop. Release intentionally performs no implicit flush. [`close`](#BufferedDuplex.impl.close) permits
-an earlier terminal close and abandons all buffered bytes without a flush.
+The read operations work like `silk.buffered_input.BufferedInput`. The write operations work
+like `silk.buffered_output.BufferedOutput`. A transport failure makes the whole session
+terminal, and each later operation fails with `BufferError.Terminal`.
+
+## Gotchas
+The end of the scope does not flush. Bytes that are still pending are lost. Call
+[`BufferedDuplex.flush`](#BufferedDuplex.impl.flush) or [`BufferedDuplex.shutdownWrite`](#BufferedDuplex.impl.shutdownWrite) before the callback returns. If the
+program traps, the transport is not closed.
+
+## Examples
+### Read a request and write a response
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.buffered_duplex { BufferedDuplex, withBufferedCapacity }
+import silk.buffered_input { BufferError }
+import silk.byte_duplex { ByteDuplex }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.list { List }
+import silk.memory_byte_duplex {
+  MemoryByteDuplex,
+  MemoryReadEvent,
+  MemoryWriteAction,
+  MemoryWriteEvent
+}
+import silk.monotonic_clock { MonotonicClock }
+import silk.option { Option }
+import silk.system_clock { Instant, SystemClock }
+
+struct FixedClock {}
+
+impl MonotonicClock for FixedClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return 1
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    return ()
+  }
+}
+
+effect fn transport() -> MemoryByteDuplex
+  ! OutOfMemoryError
+  ? &mut Allocator {
+  let mut reads = List<MemoryReadEvent>.make()
+  let bytes = run Bytes.copy(&b"ping")
+  run List<MemoryReadEvent>.append(
+    &mut reads,
+    MemoryReadEvent.Data { readyAt: SystemClock.make(0, 0), bytes: move bytes }
+  )
+  let mut writes = List<MemoryWriteEvent>.make()
+  run List<MemoryWriteEvent>.append(
+    &mut writes,
+    MemoryWriteEvent {
+      readyAt: SystemClock.make(0, 0),
+      action: MemoryWriteAction.Accept { count: 4 }
+    }
+  )
+  return run MemoryByteDuplex.make(move reads, move writes, 4, 8, Option<i32>.none())
+}
+
+// Reads a 4-byte request and answers it.
+effect<'session> fn answer<'session, P>(session: &'session mut BufferedDuplex<'session, P>) -> ()
+  ! BufferError
+  ? &mut MonotonicClock where
+  &'session mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock {
+  let mut request: [u8; 4] = [0, 0, 0, 0]
+  run BufferedDuplex.readExact(&mut session.*, &mut request, Option<Instant>.none())
+  run BufferedDuplex.writeAll(&mut session.*, b"pong", Option<Instant>.none())
+  return run BufferedDuplex.flush(&mut session.*, Option<Instant>.none())
+}
+
+pub effect fn main() -> i32
+  ! BufferError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut clock = FixedClock {}
+  let mut duplex = run transport() |> Effect.provideMut<Allocator>(&mut allocator)
+  run withBufferedCapacity<(), BufferError>(&mut duplex, 16, 16, answer)
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let sent = MemoryByteDuplex.outbound(&duplex)
+  if sent.length != 4 || sent[0] != 112 || sent[1] != 111 {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `BufferedDuplex` with `import silk.buffered_duplex { BufferedDuplex }`.
 
@@ -19,7 +118,7 @@ Public declarations: 7.
 pub const DEFAULT_CAPACITY: usize
 ```
 
-The default fixed capacity for each duplex direction.
+The capacity of each buffer in [`withBuffered`](#withBuffered): 8 KiB (8,192 bytes).
 
 ::Anchor{id="BufferedDuplex"}
 
@@ -29,7 +128,13 @@ The default fixed capacity for each duplex direction.
 pub struct BufferedDuplex<'transport, P>
 ```
 
-One callback-scoped buffered session owning direction states and borrowing a private provider.
+A buffered session over one transport of type `P`. The `with...` functions make it and pass it
+to the callback.
+
+### Details
+
+The session has an input buffer and an output buffer. It borrows the transport for the duration
+of the callback.
 
 ::Anchor{id="BufferedContext"}
 
@@ -39,13 +144,17 @@ One callback-scoped buffered session owning direction states and borrowing a pri
 pub interface BufferedContext<P, A, E, ?R>
 ```
 
-Compile-time adapter from one owned context to a higher-ranked buffered session use.
+A value that can use a buffered session, as an alternative to a callback.
+
+### When to use
+
+Implement it for a type that owns state that can be used only one time, and pass the value to
+[`withBufferedCapacityContext`](#withBufferedCapacityContext). Use a callback with [`withBufferedCapacity`](#withBufferedCapacity) in other cases.
 
 ### Details
 
-Implement this interface when a scoped callback owns affine or once-callable state. The
-selected operation consumes that context and receives the temporary session independently;
-interface selection adds no runtime service or requirement-row member.
+`use` consumes the context and receives the session. The session cannot escape through the
+context or the result.
 
 ::Anchor{id="BufferedContext.use"}
 
@@ -59,7 +168,7 @@ effect<'session> fn use<'session, 'transport: 'session>(
   where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Consumes one owned context while using a temporary buffered session.
+Consumes `context` and uses `session`.
 
 ::Anchor{id="BufferedDuplex.impl"}
 
@@ -77,7 +186,7 @@ impl<'transport, P> BufferedDuplex<'transport, P>
 pub fn peek<'a>(self: &'a Self) -> &'a [u8]
 ```
 
-Borrows the initialized unread prefix, or an empty slice after terminal close.
+Returns the unread input bytes. Returns an empty slice after [`BufferedDuplex.close`](#BufferedDuplex.impl.close).
 
 ::Anchor{id="BufferedDuplex.impl.unread"}
 
@@ -87,7 +196,7 @@ Borrows the initialized unread prefix, or an empty slice after terminal close.
 pub fn unread(self: &Self) -> usize
 ```
 
-Returns the unread input count, or zero after terminal close.
+Returns the number of unread input bytes. Returns 0 after [`BufferedDuplex.close`](#BufferedDuplex.impl.close).
 
 ::Anchor{id="BufferedDuplex.impl.pending"}
 
@@ -97,7 +206,8 @@ Returns the unread input count, or zero after terminal close.
 pub fn pending(self: &Self) -> usize
 ```
 
-Returns the pending output count, or zero after terminal close.
+Returns the number of output bytes that the transport has not received. Returns 0 after
+[`BufferedDuplex.close`](#BufferedDuplex.impl.close).
 
 ::Anchor{id="BufferedDuplex.impl.consume"}
 
@@ -107,7 +217,12 @@ Returns the pending output count, or zero after terminal close.
 pub effect fn consume(self: &mut Self, count: usize) -> () ! BufferError
 ```
 
-Consumes exactly an initialized unread prefix.
+Removes `count` unread input bytes from the front of the input buffer.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure or a close made the session unusable.
+- `BufferError.InvalidConsumption` if `count` is more than [`BufferedDuplex.unread`](#BufferedDuplex.impl.unread).
 
 ::Anchor{id="BufferedDuplex.impl.fill"}
 
@@ -124,7 +239,18 @@ pub effect fn fill(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Retains at least `minimum` input bytes or reports sticky source end.
+Reads until the input buffer holds at least `minimum` unread bytes, or until the transport
+ends.
+
+#### Details
+
+It works like `BufferedInput.fill` on the input buffer of the session. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure or a close made the session unusable.
+- The errors of `BufferedInput.fill`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.readSome"}
 
@@ -141,7 +267,17 @@ pub effect fn readSome(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Copies one retained or newly read prefix.
+Copies unread bytes into `output` and consumes them. Reads first if the input buffer is empty.
+
+#### Details
+
+It works like `BufferedInput.readSome` on the input buffer of the session. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure or a close made the session unusable.
+- The errors of `BufferedInput.readSome`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.readExact"}
 
@@ -158,7 +294,17 @@ pub effect fn readExact(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Fills the complete destination or reports its exact copied prefix.
+Fills all of `output` with the next input bytes and consumes them.
+
+#### Details
+
+It works like `BufferedInput.readExact` on the input buffer of the session. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure or a close made the session unusable.
+- The errors of `BufferedInput.readExact`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.discardAtMost"}
 
@@ -175,7 +321,17 @@ pub effect fn discardAtMost(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Discards no more than one finite limit.
+Consumes and drops up to `limit` input bytes. It stops early if the transport ends.
+
+#### Details
+
+It works like `BufferedInput.discardAtMost` on the input buffer of the session. `deadline` is
+an absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure or a close made the session unusable.
+- The errors of `BufferedInput.discardAtMost`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.discardExact"}
 
@@ -192,7 +348,17 @@ pub effect fn discardExact(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Discards exactly one finite count.
+Consumes and drops exactly `count` input bytes.
+
+#### Details
+
+It works like `BufferedInput.discardExact` on the input buffer of the session. `deadline` is
+an absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure or a close made the session unusable.
+- The errors of `BufferedInput.discardExact`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.writeSome"}
 
@@ -209,7 +375,19 @@ pub effect fn writeSome(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Accepts one positive input prefix into owned pending storage.
+Copies a prefix of `input` into the output buffer and returns its length. Sends pending bytes
+first if the buffer is full.
+
+#### Details
+
+It works like `BufferedOutput.writeSome` on the output buffer of the session. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure, a close, or [`BufferedDuplex.shutdownWrite`](#BufferedDuplex.impl.shutdownWrite)
+  made output unusable.
+- The errors of `BufferedOutput.writeSome`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.writeAll"}
 
@@ -226,7 +404,18 @@ pub effect fn writeAll(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Accepts one complete finite input in order.
+Copies all of `input` into the output buffer, and sends pending bytes as the buffer fills.
+
+#### Details
+
+It works like `BufferedOutput.writeAll` on the output buffer of the session. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure, a close, or [`BufferedDuplex.shutdownWrite`](#BufferedDuplex.impl.shutdownWrite)
+  made output unusable.
+- The errors of `BufferedOutput.writeAll`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.writeVecAll"}
 
@@ -243,7 +432,18 @@ pub effect fn writeVecAll(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Accepts borrowed byte vectors in order after checking aggregate length arithmetic.
+Copies each slice in `inputs` into the output buffer, in order.
+
+#### Details
+
+It works like `BufferedOutput.writeVecAll` on the output buffer of the session. `deadline` is
+an absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure, a close, or [`BufferedDuplex.shutdownWrite`](#BufferedDuplex.impl.shutdownWrite)
+  made output unusable.
+- The errors of `BufferedOutput.writeVecAll`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.flush"}
 
@@ -259,7 +459,18 @@ pub effect fn flush(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Writes pending bytes exactly once and then flushes the provider boundary.
+Sends all pending bytes to the transport and then flushes the transport.
+
+#### Details
+
+It works like `BufferedOutput.flush` on the output buffer of the session. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure, a close, or [`BufferedDuplex.shutdownWrite`](#BufferedDuplex.impl.shutdownWrite)
+  made output unusable.
+- The errors of `BufferedOutput.flush`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.finish"}
 
@@ -275,7 +486,18 @@ pub effect fn finish(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Explicitly finishes pending output.
+Sends all pending bytes and flushes the transport. It is the same as [`BufferedDuplex.flush`](#BufferedDuplex.impl.flush).
+
+#### Details
+
+It works like `BufferedOutput.finish` on the output buffer of the session. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure, a close, or [`BufferedDuplex.shutdownWrite`](#BufferedDuplex.impl.shutdownWrite)
+  made output unusable.
+- The errors of `BufferedOutput.finish`. A transport failure makes the session terminal.
 
 ::Anchor{id="BufferedDuplex.impl.shutdownWrite"}
 
@@ -291,13 +513,23 @@ pub effect fn shutdownWrite(
   where &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Flushes pending output and then closes only the provider's write direction.
+Sends all pending bytes, flushes the transport, and then closes the write direction of the
+transport.
+
+#### When to use
+
+Use it to tell the peer that no more data comes, while you still read its answer.
 
 #### Details
 
-A successful shutdown keeps input available but rejects later output operations. Any typed
-transport failure terminalizes the complete session. Structured cancellation is handled by
-the enclosing buffered scope, which terminally closes the retained provider.
+After it succeeds, reads still work, and writes fail with `BufferError.Terminal`. A second
+call does nothing. `deadline` is an absolute time on the active `MonotonicClock`.
+`Option.none()` means no time limit.
+
+#### Errors
+
+- `BufferError.Terminal` if an earlier failure or a close made the session unusable.
+- `BufferError.WriteFailed` if the flush or the shutdown fails. The session becomes terminal.
 
 ::Anchor{id="BufferedDuplex.impl.close"}
 
@@ -308,13 +540,18 @@ pub effect fn close(self: &mut Self) -> () ! ByteIoError
   where &mut P provides &ByteDuplex from &mut ByteDuplex
 ```
 
-Terminally closes the provider once and abandons all buffered bytes without a flush.
+Closes the transport now and drops all buffered bytes. It does not flush.
 
 #### Details
 
-The operation marks the complete session terminal before it calls the provider. `peek`,
-`unread`, and `pending` report no buffered bytes after the call starts. Repeated calls succeed
-without another provider close, including after the first call returns `ByteIoError`.
+The session becomes terminal before the transport closes. After the call starts,
+[`BufferedDuplex.peek`](#BufferedDuplex.impl.peek), [`BufferedDuplex.unread`](#BufferedDuplex.impl.unread), and [`BufferedDuplex.pending`](#BufferedDuplex.impl.pending) report no
+bytes. A later call does nothing and succeeds, also if the first call failed. The scope does
+not close the transport again.
+
+#### Errors
+
+- `ByteIoError` if the transport reports a failure when it closes.
 
 ::Anchor{id="withBuffered"}
 
@@ -334,7 +571,24 @@ where &'env mut P provides &ByteDuplex from &mut ByteDuplex,
   CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Runs one callback with default 8,192-byte input and output buffers.
+Runs `callback` with a buffered session over `transport`, with [`DEFAULT_CAPACITY`](#DEFAULT_CAPACITY) for each
+buffer, and closes the transport at the end.
+
+### Details
+
+The transport is closed one time, after the callback returns, fails, or is canceled. A failure
+of that close is ignored.
+
+### Errors
+
+- `BufferError.InvalidCapacity` if a capacity is 0 or more than `MAX_CAPACITY`. Nothing is
+  allocated and the transport is not used.
+- `OutOfMemoryError` if the `Allocator` cannot supply the buffers.
+- The errors of the callback.
+
+### Gotchas
+
+The scope closes the transport at the end but does not flush. Flush in the callback.
 
 ::Anchor{id="withBufferedCapacity"}
 
@@ -356,7 +610,24 @@ where &'env mut P provides &ByteDuplex from &mut ByteDuplex,
   CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Runs one callback with explicitly bounded direction capacities.
+Runs `callback` with a buffered session over `transport`, with the given buffer capacities, and
+closes the transport at the end.
+
+### Details
+
+The capacities are checked before anything is allocated. The transport is closed one time, after
+the callback returns, fails, or is canceled. A failure of that close is ignored.
+
+### Errors
+
+- `BufferError.InvalidCapacity` if a capacity is 0 or more than `MAX_CAPACITY`. Nothing is
+  allocated and the transport is not used.
+- `OutOfMemoryError` if the `Allocator` cannot supply the buffers.
+- The errors of the callback.
+
+### Gotchas
+
+The scope closes the transport at the end but does not flush. Flush in the callback.
 
 ::Anchor{id="withBufferedCapacityContext"}
 
@@ -383,13 +654,24 @@ where &'env mut P provides &ByteDuplex from &mut ByteDuplex,
   CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Runs one compile-time-selected context adapter with explicit direction capacities.
+Runs `context.use` with a buffered session over `transport`, with the given buffer capacities,
+and closes the transport at the end.
 
-### Details
+### When to use
 
-The context is consumed by value and may own affine or once-callable state. The selected `use`
-operation on [`BufferedContext`](#BufferedContext) receives an independently higher-ranked temporary session,
-which cannot escape through the context or result.
+Use it instead of [`withBufferedCapacity`](#withBufferedCapacity) when the code that uses the session owns a value that
+can be used only one time. See [`BufferedContext`](#BufferedContext).
+
+### Errors
+
+- `BufferError.InvalidCapacity` if a capacity is 0 or more than `MAX_CAPACITY`. Nothing is
+  allocated and the transport is not used.
+- `OutOfMemoryError` if the `Allocator` cannot supply the buffers.
+- The errors of the callback.
+
+### Gotchas
+
+The scope closes the transport at the end but does not flush. Flush in the callback.
 
 ::Anchor{id="withBufferedPairCapacity"}
 
@@ -424,13 +706,28 @@ where &'env mut SP provides &ByteDuplex from &mut ByteDuplex,
   CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Runs one callback with two explicitly bounded buffered sessions.
+Runs `callback` with two buffered sessions, one over `source` and one over `destination`, and
+closes both transports at the end.
+
+### When to use
+
+Use it with `silk.buffered_transfer.BufferedTransfer` to copy data from one connection to
+another.
 
 ### Details
 
-All four capacities are validated before allocation or lease acquisition. Both transports are
-terminally closed exactly once after success, typed failure, or structured
-cancellation/interruption; fatal traps bypass finalizers and Drop. Neither pending output is
-implicitly flushed.
+All four capacities are checked before anything is allocated. Each transport is closed one time,
+after the callback returns, fails, or is canceled.
+
+### Errors
+
+- `BufferError.InvalidCapacity` if a capacity is 0 or more than `MAX_CAPACITY`. Nothing is
+  allocated and the transport is not used.
+- `OutOfMemoryError` if the `Allocator` cannot supply the buffers.
+- The errors of the callback.
+
+### Gotchas
+
+The scope closes the transport at the end but does not flush. Flush in the callback.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

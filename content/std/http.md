@@ -1,31 +1,93 @@
-Validated, byte-preserving HTTP/1.x scalar values, fields, and message heads.
+HTTP/1.0 and HTTP/1.1 values: versions, methods, statuses, header fields, and message heads.
 
 ## When to use
-
-Use these values to share HTTP semantics between parsers, clients, and servers. Parsing and
-validation borrow caller storage; use the owned head copies when values must outlive that input.
+Use these types to make or inspect an HTTP message head. `silk.http_head` parses and writes
+them, and the client and server modules take them. Each `make` and `parse` function checks the
+value. The values borrow their text. Call `copy` on a head to keep it after its input is gone.
 
 ## Details
+A [`Method`](#Method) is any valid token, and keeps its spelling, so `get` and `GET` are different. A
+[`Status`](#Status) is any code from 100 to 599. A [`Header`](#Header) keeps the exact bytes of its name and
+value. [`RequestHead.make`](#RequestHead.impl.make) checks that the target form fits the method, and that an HTTP/1.1
+request has one `Host` field. This module does not read or write bodies.
 
-Methods remain open case-sensitive tokens, fields retain exact octets, and statuses retain every
-code from 100 through 599. This module applies no framing, transport, or connection policy.
+## Errors
+- [`ValueError`](#ValueError) tells which rule failed in [`ValueError.reason`](#ValueError.reason), in which part in
+  [`ValueError.component`](#ValueError.component), and where, in [`ValueError.fieldIndex`](#ValueError.fieldIndex) and [`ValueError.offset`](#ValueError.offset).
 
 ## Gotchas
-
-`Header.make` receives semantic field values after wire OWS has been removed. It rejects CR,
-LF, NUL, DEL, other forbidden controls, and leading or trailing OWS.
+[`Header.make`](#Header.impl.make) takes the value without the spaces around it on the wire. It rejects CR, LF,
+NUL, DEL, other control bytes, and leading or trailing spaces or tabs.
 
 ## Examples
-### Preserve protocol spelling
+### Make a response head
 ```silk
-import silk.http { Method, Version }
+import silk.http { Header, ResponseHead, Status, StatusClass, ValueError, Version }
+import silk.http_headers { Headers, Limits }
+import silk.option { Option }
+import silk.result { Result }
+
+fn limits() -> Limits {
+  return Limits {
+    maxMethodBytes: 64,
+    maxTargetBytes: 8192,
+    maxNameBytes: 256,
+    maxValueBytes: 8192,
+    maxFields: 128,
+    maxFieldBytes: 65536,
+    maxOwnedBytes: 131072,
+  }
+}
 
 pub fn main() -> i32 {
-  let version = Version.Http11
-  let method = Method.patch()
-  if Version.format(&version) != "HTTP/1.1" { return 1 }
-  if Method.format(&method) != "PATCH" { return 2 }
-  return 42
+  let status = match Status.fromCode(404) {
+    Result<Status, ValueError>.Success { value } => value
+    Result<Status, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if Status.class(&status) != StatusClass.ClientError {
+    return 1
+  }
+  let header = match Header.make("Content-Type", b"text/plain", limits()) {
+    Result<Header, ValueError>.Success { value } => value
+    Result<Header, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let entries = [header]
+  let headers = match Headers.make(&entries, limits()) {
+    Result<Headers, ValueError>.Success { value } => value
+    Result<Headers, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let reason = b"Not Found"
+  let head = match ResponseHead.make(
+    Version.Http11,
+    status,
+    Option<&[u8]>.some(&reason),
+    headers,
+    limits(),
+  ) {
+    Result<ResponseHead, ValueError>.Success { value } => move value
+    Result<ResponseHead, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if Status.code(&ResponseHead.status(&head)) != 404 {
+    return 1
+  }
+
+  // A value with a line break fails.
+  let bad = match Header.make("X-Note", b"a\r\nb", limits()) {
+    Result<Header, ValueError>.Success { value: _ } => false
+    Result<Header, ValueError>.Failure { error } => error.offset == 1
+  }
+  if !bad {
+    return 1
+  }
+  return 0
 }
 ```
 
@@ -41,7 +103,7 @@ Public declarations: 13.
 pub enum ValueComponent
 ```
 
-The component of an HTTP value that failed validation.
+The part of an HTTP value that failed a check. See [`ValueError.component`](#ValueError.component).
 
 ::Anchor{id="ValueComponent.Version"}
 
@@ -111,7 +173,7 @@ An optional response reason phrase.
 Headers
 ```
 
-An ordered field collection.
+A list of header fields.
 
 ::Anchor{id="ValueComponent.Target"}
 
@@ -141,7 +203,7 @@ An HTTP authority.
 Host
 ```
 
-A Host field.
+The `Host` field of a request.
 
 ::Anchor{id="ValueComponent.Metadata"}
 
@@ -151,7 +213,7 @@ A Host field.
 Metadata
 ```
 
-A structured metadata field value.
+A list in a field such as `Connection`, `Content-Encoding`, or `Transfer-Encoding`.
 
 ::Anchor{id="LimitKind"}
 
@@ -161,7 +223,7 @@ A structured metadata field value.
 pub enum LimitKind
 ```
 
-The finite limit whose allowed count was exceeded.
+The limit in [`Limits`](/docs/std/http-headers#Limits) that a value exceeded. See [`ValueReason.LimitExceeded`](#ValueReason.LimitExceeded).
 
 ::Anchor{id="LimitKind.MethodBytes"}
 
@@ -171,7 +233,7 @@ The finite limit whose allowed count was exceeded.
 MethodBytes
 ```
 
-Maximum method bytes.
+`maxMethodBytes`: the length of a method.
 
 ::Anchor{id="LimitKind.TargetBytes"}
 
@@ -181,7 +243,7 @@ Maximum method bytes.
 TargetBytes
 ```
 
-Maximum request-target bytes.
+`maxTargetBytes`: the length of a request target.
 
 ::Anchor{id="LimitKind.NameBytes"}
 
@@ -191,7 +253,7 @@ Maximum request-target bytes.
 NameBytes
 ```
 
-Maximum field-name bytes.
+`maxNameBytes`: the length of a field name.
 
 ::Anchor{id="LimitKind.ValueBytes"}
 
@@ -201,7 +263,7 @@ Maximum field-name bytes.
 ValueBytes
 ```
 
-Maximum field-value or reason bytes.
+`maxValueBytes`: the length of a field value or a reason phrase.
 
 ::Anchor{id="LimitKind.Fields"}
 
@@ -211,7 +273,7 @@ Maximum field-value or reason bytes.
 Fields
 ```
 
-Maximum field count.
+`maxFields`: the number of fields.
 
 ::Anchor{id="LimitKind.FieldBytes"}
 
@@ -221,7 +283,7 @@ Maximum field count.
 FieldBytes
 ```
 
-Maximum aggregate name-plus-value bytes.
+`maxFieldBytes`: the total length of all names and values.
 
 ::Anchor{id="LimitKind.OwnedBytes"}
 
@@ -231,7 +293,7 @@ Maximum aggregate name-plus-value bytes.
 OwnedBytes
 ```
 
-Maximum owned payload and index bytes.
+`maxOwnedBytes`: the memory for a copy.
 
 ::Anchor{id="LimitKind.UniqueField"}
 
@@ -241,7 +303,7 @@ Maximum owned payload and index bytes.
 UniqueField
 ```
 
-At most one matching field was required.
+A field must occur at most one time, but it occurred more times.
 
 ::Anchor{id="ValueReason"}
 
@@ -251,7 +313,7 @@ At most one matching field was required.
 pub union ValueReason
 ```
 
-A closed semantic HTTP value failure reason.
+The rule that failed. See [`ValueError.reason`](#ValueError.reason).
 
 ::Anchor{id="ValueReason.InvalidToken"}
 
@@ -261,7 +323,8 @@ A closed semantic HTTP value failure reason.
 InvalidToken
 ```
 
-A token is empty or contains a byte outside `tchar`.
+A token, such as a method or a field name, is empty or has a byte that is not allowed in a
+token.
 
 ::Anchor{id="ValueReason.InvalidValueByte"}
 
@@ -271,7 +334,7 @@ A token is empty or contains a byte outside `tchar`.
 InvalidValueByte
 ```
 
-A value contains a forbidden byte.
+A value has a byte that is not allowed, such as CR, LF, or NUL.
 
 ::Anchor{id="ValueReason.UnsupportedVersion"}
 
@@ -331,7 +394,8 @@ A port is absent, empty, nonnumeric, or outside its accepted range.
 MethodTargetMismatch
 ```
 
-The request method cannot use the supplied target form.
+The target form does not fit the method. For example, `CONNECT` needs `host:port`, and only
+`OPTIONS` can use `*`.
 
 ::Anchor{id="ValueReason.MissingHost"}
 
@@ -361,7 +425,7 @@ More than one Host field is present.
 LimitExceeded
 ```
 
-One explicit finite limit was exceeded.
+A value exceeded a limit in [`Limits`](/docs/std/http-headers#Limits).
 
 ::Anchor{id="ValueReason.LimitExceeded.limit"}
 
@@ -371,7 +435,7 @@ One explicit finite limit was exceeded.
 pub limit: LimitKind
 ```
 
-The rejected limit.
+The limit that was exceeded.
 
 ::Anchor{id="ValueReason.LimitExceeded.allowed"}
 
@@ -381,7 +445,7 @@ The rejected limit.
 pub allowed: usize
 ```
 
-The configured maximum.
+The value of the limit.
 
 ::Anchor{id="ValueReason.LimitExceeded.attempted"}
 
@@ -391,7 +455,7 @@ The configured maximum.
 pub attempted: usize
 ```
 
-The attempted count.
+The size that was found.
 
 ::Anchor{id="ValueReason.SizeOverflow"}
 
@@ -401,7 +465,7 @@ The attempted count.
 SizeOverflow
 ```
 
-Checked size arithmetic overflowed `usize`.
+A size calculation overflowed `usize`.
 
 ::Anchor{id="ValueReason.OutputTooSmall"}
 
@@ -411,7 +475,7 @@ Checked size arithmetic overflowed `usize`.
 OutputTooSmall
 ```
 
-Caller-owned output cannot hold the complete serialization.
+The output buffer is too small. Nothing was written.
 
 ::Anchor{id="ValueReason.OutputTooSmall.required"}
 
@@ -421,7 +485,7 @@ Caller-owned output cannot hold the complete serialization.
 pub required: usize
 ```
 
-Complete required output bytes.
+The number of bytes that the output needs.
 
 ::Anchor{id="ValueReason.OutputTooSmall.available"}
 
@@ -431,7 +495,7 @@ Complete required output bytes.
 pub available: usize
 ```
 
-Available caller output bytes.
+The length of the buffer that you gave.
 
 ::Anchor{id="ValueReason.impl.Copy"}
 
@@ -449,7 +513,7 @@ impl Copy for ValueReason
 pub struct ValueError
 ```
 
-A semantic HTTP value failure with source location information.
+The error from checking an HTTP value. It tells which rule failed, and where.
 
 ::Anchor{id="ValueError.reason"}
 
@@ -459,7 +523,7 @@ A semantic HTTP value failure with source location information.
 pub reason: ValueReason
 ```
 
-The recovery-oriented failure category.
+The rule that failed.
 
 ::Anchor{id="ValueError.component"}
 
@@ -469,7 +533,7 @@ The recovery-oriented failure category.
 pub component: ValueComponent
 ```
 
-The value component being validated.
+The part that failed.
 
 ::Anchor{id="ValueError.fieldIndex"}
 
@@ -479,7 +543,7 @@ The value component being validated.
 pub fieldIndex: Option<usize>
 ```
 
-The source field ordinal when the error came from a collection.
+The position of the field in its list, from 0, when the error is in a field.
 
 ::Anchor{id="ValueError.offset"}
 
@@ -489,7 +553,7 @@ The source field ordinal when the error came from a collection.
 pub offset: usize
 ```
 
-The zero-based component byte offset.
+The byte offset in the part where the rule failed.
 
 ::Anchor{id="Version"}
 
@@ -499,7 +563,7 @@ The zero-based component byte offset.
 pub enum Version
 ```
 
-One supported HTTP protocol version.
+An HTTP version that this module supports.
 
 ::Anchor{id="Version.Http10"}
 
@@ -547,7 +611,7 @@ Parses exactly `HTTP/1.0` or `HTTP/1.1`.
 pub fn format(self: &Self) -> string<'static>
 ```
 
-Formats one supported version as its exact protocol token.
+Returns `HTTP/1.0` or `HTTP/1.1`.
 
 ::Anchor{id="Method"}
 
@@ -557,7 +621,7 @@ Formats one supported version as its exact protocol token.
 pub struct Method<'text>
 ```
 
-A borrowed open HTTP method token with preserved spelling.
+An HTTP method, such as `GET`. It keeps its exact spelling, and is compared with case.
 
 ::Anchor{id="Method.impl.Copy"}
 
@@ -583,7 +647,7 @@ impl<'text> Method<'text>
 pub fn parse(text: string<'text>, maxBytes: usize) -> Result<Method<'text>, ValueError>
 ```
 
-Validates a nonempty `tchar` token within `maxBytes` and borrows it unchanged.
+Checks that `text` is a token of at most `maxBytes` bytes, and returns it as a method.
 
 ::Anchor{id="Method.impl.format"}
 
@@ -593,7 +657,7 @@ Validates a nonempty `tchar` token within `maxBytes` and borrows it unchanged.
 pub fn format(self: &Self) -> string<'text>
 ```
 
-Borrows the original method spelling.
+Returns the method text, spelled as given.
 
 ::Anchor{id="Method.impl.equals"}
 
@@ -603,7 +667,7 @@ Borrows the original method spelling.
 pub fn equals(self: &Self, other: &Method) -> bool
 ```
 
-Compares method spelling case-sensitively.
+Returns `true` if the two methods have the same spelling. Case matters.
 
 ::Anchor{id="Method.impl.get"}
 
@@ -703,7 +767,7 @@ Returns the standard PATCH method value.
 pub enum StatusClass
 ```
 
-The protocol class of a response status.
+The class of a status code, from its first digit.
 
 ::Anchor{id="StatusClass.Informational"}
 
@@ -763,7 +827,7 @@ ServerError
 pub struct Status
 ```
 
-A response status retaining registered and unregistered valid codes.
+An HTTP status code from 100 to 599. Codes without a name, such as 299, are kept.
 
 ::Anchor{id="Status.impl.Copy"}
 
@@ -789,7 +853,7 @@ impl Status
 pub fn fromCode(code: u16) -> Result<Status, ValueError>
 ```
 
-Constructs a status from any code in the inclusive 100 through 599 range.
+Returns the status for `code`, or `InvalidStatus` if `code` is not from 100 to 599.
 
 ::Anchor{id="Status.impl.code"}
 
@@ -799,7 +863,7 @@ Constructs a status from any code in the inclusive 100 through 599 range.
 pub fn code(self: &Self) -> u16
 ```
 
-Returns the preserved numeric status code.
+Returns the code, such as 404.
 
 ::Anchor{id="Status.impl.class"}
 
@@ -809,7 +873,7 @@ Returns the preserved numeric status code.
 pub fn class(self: &Self) -> StatusClass
 ```
 
-Returns the status class derived from the hundreds digit.
+Returns the class, from the first digit of the code.
 
 ::Anchor{id="Header"}
 
@@ -819,7 +883,7 @@ Returns the status class derived from the hundreds digit.
 pub struct Header<'value>
 ```
 
-A validated header field borrowing its exact name spelling and raw value octets.
+An HTTP header field. It borrows its name and value, and keeps their exact bytes.
 
 ::Anchor{id="Header.impl.Copy"}
 
@@ -849,7 +913,14 @@ pub fn make(
   ) -> Result<Header<'value>, ValueError>
 ```
 
-Validates one semantic field after wire OWS removal and borrows it unchanged.
+Checks a field and returns it.
+
+`name` must be a token. `value` is the value without the spaces around it on the wire.
+
+#### Errors
+- `InvalidToken` if `name` is not valid.
+- `InvalidValueByte` if `value` has a control byte, or starts or ends with a space or a tab.
+- `LimitExceeded` if `name` or `value` is too long for `limits`.
 
 ::Anchor{id="Header.impl.name"}
 
@@ -859,7 +930,7 @@ Validates one semantic field after wire OWS removal and borrows it unchanged.
 pub fn name(self: &Self) -> string<'value>
 ```
 
-Borrows the original field-name spelling.
+Returns the field name, spelled as given.
 
 ::Anchor{id="Header.impl.value-2"}
 
@@ -869,7 +940,7 @@ Borrows the original field-name spelling.
 pub fn value(self: &Self) -> &'value [u8]
 ```
 
-Borrows the exact validated field-value octets.
+Returns the field value bytes.
 
 ::Anchor{id="RequestHead"}
 
@@ -879,7 +950,7 @@ Borrows the exact validated field-value octets.
 pub struct RequestHead<'value>
 ```
 
-A validated request head without body, framing, connection, or exchange state.
+A checked request line and header fields, without a body. It borrows its parts.
 
 ::Anchor{id="RequestHead.impl.Copy"}
 
@@ -910,7 +981,12 @@ pub fn make(
   ) -> Result<RequestHead<'value>, ValueError>
 ```
 
-Combines validated request components and enforces the HTTP/1.1 Host requirement.
+Checks the parts of a request head and returns it.
+
+#### Errors
+- `MethodTargetMismatch` if the target form does not fit the method.
+- `MissingHost` or `DuplicateHost` if an HTTP/1.1 request has no `Host` field, or more than
+  one.
 
 ::Anchor{id="RequestHead.impl.version"}
 
@@ -930,7 +1006,7 @@ Returns the request version.
 pub fn method(self: &Self) -> Method<'value>
 ```
 
-Returns the borrowed request method.
+Returns the method.
 
 ::Anchor{id="RequestHead.impl.target"}
 
@@ -940,7 +1016,7 @@ Returns the borrowed request method.
 pub fn target(self: &Self) -> RequestTarget<'value>
 ```
 
-Returns the borrowed request target.
+Returns the request target.
 
 ::Anchor{id="RequestHead.impl.headers"}
 
@@ -950,7 +1026,7 @@ Returns the borrowed request target.
 pub fn headers(self: &Self) -> Headers<'value>
 ```
 
-Returns the borrowed ordered fields.
+Returns the header fields, in order.
 
 ::Anchor{id="RequestHead.impl.copy"}
 
@@ -963,7 +1039,11 @@ pub effect fn copy(
   ) -> Result<OwnedRequestHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies the complete request head into independent bounded storage.
+Copies the head into new memory, so that it does not borrow its input.
+
+#### Errors
+- `LimitExceeded` if the head exceeds `limits`. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="OwnedRequestHead"}
 
@@ -973,7 +1053,8 @@ Copies the complete request head into independent bounded storage.
 pub struct OwnedRequestHead
 ```
 
-An independently owned request head whose views borrow only this value.
+A request head that owns its memory. Get a [`RequestHead`](#RequestHead) from it with
+[`OwnedRequestHead.view`](#OwnedRequestHead.impl.view).
 
 ::Anchor{id="OwnedRequestHead.impl"}
 
@@ -991,7 +1072,7 @@ impl OwnedRequestHead
 pub fn view<'value>(self: &'value Self) -> RequestHead<'value>
 ```
 
-Reconstructs a validated request view tied to this owner without allocation.
+Returns the head as a [`RequestHead`](#RequestHead) that borrows this value.
 
 ::Anchor{id="ResponseHead"}
 
@@ -1001,7 +1082,7 @@ Reconstructs a validated request view tied to this owner without allocation.
 pub struct ResponseHead<'value>
 ```
 
-A validated response head without body, framing, connection, or exchange state.
+A checked status line and header fields, without a body. It borrows its parts.
 
 ::Anchor{id="ResponseHead.impl"}
 
@@ -1025,7 +1106,13 @@ pub fn make(
   ) -> Result<ResponseHead<'value>, ValueError>
 ```
 
-Validates an optional reason phrase and combines response metadata.
+Checks the parts of a response head and returns it.
+
+`reason` is the optional text after the status code, such as `Not Found`.
+
+#### Errors
+- `InvalidValueByte` if `reason` has a control byte.
+- `LimitExceeded` if `reason` is longer than `maxValueBytes`.
 
 ::Anchor{id="ResponseHead.impl.version"}
 
@@ -1045,7 +1132,7 @@ Returns the response version.
 pub fn status(self: &Self) -> Status
 ```
 
-Returns the response status.
+Returns the status.
 
 ::Anchor{id="ResponseHead.impl.reason"}
 
@@ -1055,7 +1142,7 @@ Returns the response status.
 pub fn reason(self: &Self) -> Option<&'value [u8]>
 ```
 
-Returns the exact optional reason-phrase bytes.
+Returns the reason phrase, if there is one.
 
 ::Anchor{id="ResponseHead.impl.headers"}
 
@@ -1065,7 +1152,7 @@ Returns the exact optional reason-phrase bytes.
 pub fn headers(self: &Self) -> Headers<'value>
 ```
 
-Returns the borrowed ordered fields.
+Returns the header fields, in order.
 
 ::Anchor{id="ResponseHead.impl.copy"}
 
@@ -1078,7 +1165,11 @@ pub effect fn copy(
   ) -> Result<OwnedResponseHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies the complete response head into independent bounded storage.
+Copies the head into new memory, so that it does not borrow its input.
+
+#### Errors
+- `LimitExceeded` if the head exceeds `limits`. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="ResponseHead.impl.copyMatchingHeaders"}
 
@@ -1092,12 +1183,11 @@ pub effect fn copyMatchingHeaders(
   ) -> Result<OwnedResponseHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies the response status, reason, and only matching fields into independent storage.
+Copies the status, the reason, and only the fields named `name`, into new memory.
 
 #### Details
-
-Matching is ASCII case-insensitive. Duplicate matches remain distinct and preserve wire order.
-The total-owned limit covers copied reason bytes, field payload, and field records.
+Names are compared without case. Repeated fields stay separate, in their order. `limits`
+applies to the copied parts only.
 
 ::Anchor{id="OwnedResponseHead"}
 
@@ -1107,7 +1197,8 @@ The total-owned limit covers copied reason bytes, field payload, and field recor
 pub struct OwnedResponseHead
 ```
 
-An independently owned response head whose views borrow only this value.
+A response head that owns its memory. Get a [`ResponseHead`](#ResponseHead) from it with
+[`OwnedResponseHead.view`](#OwnedResponseHead.impl.view).
 
 ::Anchor{id="OwnedResponseHead.impl"}
 
@@ -1125,6 +1216,6 @@ impl OwnedResponseHead
 pub fn view<'value>(self: &'value Self) -> ResponseHead<'value>
 ```
 
-Reconstructs a validated response view tied to this owner without allocation.
+Returns the head as a [`ResponseHead`](#ResponseHead) that borrows this value.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

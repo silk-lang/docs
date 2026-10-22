@@ -1,36 +1,59 @@
-Strict, allocation-free JSON tokens from complete slices or successive byte chunks.
+Read JSON as a sequence of tokens, without building a tree and without allocating.
 
 ## When to use
-Use [`JsonScanner`](#JsonScanner) to inspect one complete JSON document without building a value tree.
-Use [`JsonScanState`](#JsonScanState) when bytes arrive in chunks and retain token fragments yourself.
+Use [`JsonScanner`](#JsonScanner) to read a complete document that is in one slice, token by token. It is the
+input of `Deserialize` implementations. Use [`JsonScanState`](#JsonScanState) when the bytes arrive in pieces
+and you keep the parts of each token yourself. To read from a `BufferedInput`, use
+`silk.json_reader.JsonReader`. To get a tree, use `silk.json_value.Json.parse`.
 
 ## Details
-`JsonScanState.step` consumes at most one token per call. Spans and errors use absolute byte
-offsets; a step also reports the part of the current lexeme in its supplied chunk. Strings
-retain their source spelling and report whether they contain escapes. No operation allocates.
+The scanner checks the full JSON grammar (RFC 8259) as it reads, including UTF-8 in strings and
+the nesting of arrays and objects. A string or number token gives a [`JsonSpan`](#JsonSpan) in the source.
+Strings keep their source spelling. The token says if the string has escapes, so you can decode
+it with `silk.json_text.JsonText.decode` only when needed. All offsets are byte offsets from the
+start of the document.
+
+## Errors
+- [`JsonError`](#JsonError) with a [`JsonReason`](#JsonReason) and the offset of the problem. After an error, the state
+  cannot continue. Make a new one.
 
 ## Gotchas
-A number at a nonfinal chunk boundary needs another step to establish its delimiter. The
-delimiter remains unconsumed. After any error the state is terminal; create a new state.
-Nesting is limited to [`MAX_DEPTH`](#MAX_DEPTH). The scanner validates syntax, not duplicate key equality.
+Nesting is limited to [`MAX_DEPTH`](#MAX_DEPTH) (64) levels. The scanner does not check for duplicate keys.
+`silk.json_value.Json.parse` does.
 
 ## Examples
-### Scan a complete number
-
+### Read the tokens of an array
 ```silk
-import silk.json_scanner {JsonScanner, JsonToken, JsonError}
-import silk.result {Result}
+import silk.json_scanner { JsonError, JsonScanner, JsonToken }
+import silk.result { Result }
 
-pub fn main() -> i32 {
-  let mut scanner = JsonScanner.make(b"42")
-  let token = JsonScanner.next(&mut scanner)
-  return match move token {
-    Result<JsonToken, JsonError>.Failure {error} => 1
-    Result<JsonToken, JsonError>.Success {value} => match move value {
-      JsonToken.Number {span: _} => 0
-      _ => 1
+fn countNumbers(input: &[u8]) -> i32 {
+  let mut scanner = JsonScanner.make(input)
+  let mut count = 0
+  while true {
+    match move JsonScanner.next(&mut scanner) {
+      Result<JsonToken, JsonError>.Failure { error } => {
+        return -1
+      }
+      Result<JsonToken, JsonError>.Success { value } => match move value {
+        JsonToken.Number { span } => {
+          count = count + 1
+        }
+        JsonToken.EndOfInput => {
+          return count
+        }
+        _ => {}
+      }
     }
   }
+  return count
+}
+
+pub fn main() -> i32 {
+  if countNumbers(b"[1, 2.5, -3e2]") != 3 || countNumbers(b"[1,]") != -1 {
+    return 1
+  }
+  return 0
 }
 ```
 
@@ -46,7 +69,7 @@ Public declarations: 9.
 pub const MAX_DEPTH: usize
 ```
 
-The maximum number of simultaneously open JSON arrays and objects.
+The largest number of arrays and objects that can be open at one time: 64.
 
 ::Anchor{id="JsonSpan"}
 
@@ -56,7 +79,7 @@ The maximum number of simultaneously open JSON arrays and objects.
 pub struct JsonSpan
 ```
 
-A half-open byte range in the complete JSON source.
+A range of bytes in the document.
 
 ::Anchor{id="JsonSpan.offset"}
 
@@ -66,7 +89,7 @@ A half-open byte range in the complete JSON source.
 pub offset: usize
 ```
 
-The absolute offset of the first byte.
+The offset of the first byte from the start of the document.
 
 ::Anchor{id="JsonSpan.length"}
 
@@ -76,7 +99,7 @@ The absolute offset of the first byte.
 pub length: usize
 ```
 
-The number of bytes in the range.
+The number of bytes.
 
 ::Anchor{id="JsonSpan.impl.Copy"}
 
@@ -94,7 +117,7 @@ impl Copy for JsonSpan
 pub enum JsonReason
 ```
 
-A stable category for a JSON scanner failure.
+Why JSON reading or writing failed.
 
 ::Anchor{id="JsonReason.UnexpectedByte"}
 
@@ -104,7 +127,7 @@ A stable category for a JSON scanner failure.
 UnexpectedByte
 ```
 
-A byte cannot begin or continue the expected JSON construct.
+A byte that is not allowed at this position.
 
 ::Anchor{id="JsonReason.UnterminatedString"}
 
@@ -114,7 +137,7 @@ A byte cannot begin or continue the expected JSON construct.
 UnterminatedString
 ```
 
-A quoted string ended without a closing quote.
+A string has no closing quote.
 
 ::Anchor{id="JsonReason.InvalidEscape"}
 
@@ -124,7 +147,7 @@ A quoted string ended without a closing quote.
 InvalidEscape
 ```
 
-A backslash escape or surrogate pair is invalid.
+A backslash escape is not valid, or a `\u` surrogate pair is incomplete.
 
 ::Anchor{id="JsonReason.InvalidUtf8"}
 
@@ -134,7 +157,7 @@ A backslash escape or surrogate pair is invalid.
 InvalidUtf8
 ```
 
-A string contains malformed UTF-8.
+A string contains bytes that are not valid UTF-8.
 
 ::Anchor{id="JsonReason.InvalidNumber"}
 
@@ -144,7 +167,7 @@ A string contains malformed UTF-8.
 InvalidNumber
 ```
 
-A number does not satisfy the JSON number grammar.
+A number does not follow the JSON number grammar, such as `01` or `1.`.
 
 ::Anchor{id="JsonReason.DuplicateKey"}
 
@@ -154,7 +177,7 @@ A number does not satisfy the JSON number grammar.
 DuplicateKey
 ```
 
-An object repeats a decoded member name.
+An object has the same key two times.
 
 ::Anchor{id="JsonReason.InvalidValue"}
 
@@ -164,7 +187,7 @@ An object repeats a decoded member name.
 InvalidValue
 ```
 
-A constructed value contains a child of the wrong container kind.
+A value in a tree has a child of the wrong kind.
 
 ::Anchor{id="JsonReason.TypeMismatch"}
 
@@ -174,7 +197,7 @@ A constructed value contains a child of the wrong container kind.
 TypeMismatch
 ```
 
-A valid JSON value does not have the requested type.
+The JSON is valid, but the value does not have the type that the reader asked for.
 
 ::Anchor{id="JsonReason.NumberOutOfRange"}
 
@@ -184,7 +207,7 @@ A valid JSON value does not have the requested type.
 NumberOutOfRange
 ```
 
-A JSON number cannot fit the requested numeric type.
+A number does not fit in the requested numeric type.
 
 ::Anchor{id="JsonReason.MissingField"}
 
@@ -194,7 +217,7 @@ A JSON number cannot fit the requested numeric type.
 MissingField
 ```
 
-A required object member is absent.
+An object does not have a member that the reader needs.
 
 ::Anchor{id="JsonReason.UnknownField"}
 
@@ -204,7 +227,7 @@ A required object member is absent.
 UnknownField
 ```
 
-An object member is not part of the requested type.
+An object has a member that the requested type does not have.
 
 ::Anchor{id="JsonReason.UnexpectedEnd"}
 
@@ -214,7 +237,7 @@ An object member is not part of the requested type.
 UnexpectedEnd
 ```
 
-The final input ended before the single root value was complete.
+The input ended before the value was complete.
 
 ::Anchor{id="JsonReason.DepthExceeded"}
 
@@ -224,7 +247,7 @@ The final input ended before the single root value was complete.
 DepthExceeded
 ```
 
-The fixed nesting stack is full.
+The nesting is deeper than the limit.
 
 ::Anchor{id="JsonReason.TrailingContent"}
 
@@ -234,7 +257,7 @@ The fixed nesting stack is full.
 TrailingContent
 ```
 
-A second root value follows the first.
+More content follows the value.
 
 ::Anchor{id="JsonReason.OffsetOverflow"}
 
@@ -244,7 +267,7 @@ A second root value follows the first.
 OffsetOverflow
 ```
 
-An absolute byte offset cannot be represented as `usize`.
+A byte offset does not fit in `usize`.
 
 ::Anchor{id="JsonReason.TokenTooLarge"}
 
@@ -254,7 +277,7 @@ An absolute byte offset cannot be represented as `usize`.
 TokenTooLarge
 ```
 
-A streaming consumer's caller-owned token buffer is too small.
+A token does not fit in the buffer that the caller gave for it.
 
 ::Anchor{id="JsonError"}
 
@@ -264,7 +287,7 @@ A streaming consumer's caller-owned token buffer is too small.
 pub struct JsonError
 ```
 
-A deterministic JSON failure with absolute input position and optional capacity details.
+The error from a JSON operation: the reason and, when known, the position and buffer sizes.
 
 ::Anchor{id="JsonError.reason"}
 
@@ -274,7 +297,7 @@ A deterministic JSON failure with absolute input position and optional capacity 
 pub reason: JsonReason
 ```
 
-The stable failure category.
+Why the operation failed.
 
 ::Anchor{id="JsonError.offset"}
 
@@ -284,7 +307,7 @@ The stable failure category.
 pub offset: Option<usize>
 ```
 
-The offending byte or end position, when available.
+The byte offset of the problem, or of the end of the input. Absent for some output errors.
 
 ::Anchor{id="JsonError.required"}
 
@@ -294,7 +317,7 @@ The offending byte or end position, when available.
 pub required: Option<usize>
 ```
 
-Capacity required by a future consumer, if applicable.
+For `TokenTooLarge`, the buffer size that the token needs, if known.
 
 ::Anchor{id="JsonError.available"}
 
@@ -304,7 +327,7 @@ Capacity required by a future consumer, if applicable.
 pub available: Option<usize>
 ```
 
-Capacity available to a future consumer, if applicable.
+For `TokenTooLarge`, the buffer size that was available.
 
 ::Anchor{id="JsonError.impl"}
 
@@ -322,7 +345,7 @@ impl JsonError
 pub fn at(reason: JsonReason, offset: usize) -> JsonError
 ```
 
-Creates an input failure at an absolute byte offset.
+Returns an error with `reason` at byte `offset`. `Deserialize` implementations use it.
 
 ::Anchor{id="JsonToken"}
 
@@ -332,7 +355,7 @@ Creates an input failure at an absolute byte offset.
 pub union JsonToken
 ```
 
-One validated JSON token. String and number spans retain the raw source spelling.
+One JSON token. String and number tokens give the range of their source text.
 
 ::Anchor{id="JsonToken.ObjectBegin"}
 
@@ -342,7 +365,7 @@ One validated JSON token. String and number spans retain the raw source spelling
 ObjectBegin
 ```
 
-An opening object brace.
+`{`
 
 ::Anchor{id="JsonToken.ObjectEnd"}
 
@@ -352,7 +375,7 @@ An opening object brace.
 ObjectEnd
 ```
 
-A closing object brace.
+`}`
 
 ::Anchor{id="JsonToken.ArrayBegin"}
 
@@ -362,7 +385,7 @@ A closing object brace.
 ArrayBegin
 ```
 
-An opening array bracket.
+`[`
 
 ::Anchor{id="JsonToken.ArrayEnd"}
 
@@ -372,7 +395,7 @@ An opening array bracket.
 ArrayEnd
 ```
 
-A closing array bracket.
+`]`
 
 ::Anchor{id="JsonToken.KeySeparator"}
 
@@ -382,7 +405,7 @@ A closing array bracket.
 KeySeparator
 ```
 
-A colon between an object key and value.
+`:` between a key and its value.
 
 ::Anchor{id="JsonToken.ValueSeparator"}
 
@@ -392,7 +415,7 @@ A colon between an object key and value.
 ValueSeparator
 ```
 
-A comma between array elements or object members.
+`,` between elements or members.
 
 ::Anchor{id="JsonToken.String"}
 
@@ -402,7 +425,7 @@ A comma between array elements or object members.
 String
 ```
 
-A quoted, UTF-8-valid string, including its source quotes in `span`.
+A string. Its UTF-8 and escapes are checked.
 
 ::Anchor{id="JsonToken.String.span"}
 
@@ -412,7 +435,7 @@ A quoted, UTF-8-valid string, including its source quotes in `span`.
 pub span: JsonSpan
 ```
 
-The raw quoted source range.
+The source range, including the quotes.
 
 ::Anchor{id="JsonToken.String.escaped"}
 
@@ -422,7 +445,7 @@ The raw quoted source range.
 pub escaped: bool
 ```
 
-Whether a backslash escape occurred.
+`true` if the string has at least one backslash escape.
 
 ::Anchor{id="JsonToken.Number"}
 
@@ -432,7 +455,7 @@ Whether a backslash escape occurred.
 Number
 ```
 
-A valid number lexeme, without numeric conversion.
+A number. It is not converted. Use `silk.format.Format` to read its text.
 
 ::Anchor{id="JsonToken.Number.span"}
 
@@ -442,7 +465,7 @@ A valid number lexeme, without numeric conversion.
 pub span: JsonSpan
 ```
 
-The raw source range.
+The source range.
 
 ::Anchor{id="JsonToken.True"}
 
@@ -452,7 +475,7 @@ The raw source range.
 True
 ```
 
-The literal `true`.
+`true`
 
 ::Anchor{id="JsonToken.False"}
 
@@ -462,7 +485,7 @@ The literal `true`.
 False
 ```
 
-The literal `false`.
+`false`
 
 ::Anchor{id="JsonToken.Null"}
 
@@ -472,7 +495,7 @@ The literal `false`.
 Null
 ```
 
-The literal `null`.
+`null`
 
 ::Anchor{id="JsonToken.EndOfInput"}
 
@@ -482,7 +505,7 @@ The literal `null`.
 EndOfInput
 ```
 
-The complete root value and trailing whitespace have ended.
+The value and any whitespace after it are complete. Later reads also return it.
 
 ::Anchor{id="JsonToken.impl.Copy"}
 
@@ -500,7 +523,7 @@ impl Copy for JsonToken
 pub union JsonScanEvent
 ```
 
-The outcome of one resumable scan step.
+What one step of [`JsonScanState.step`](#JsonScanState.impl.step) found.
 
 ::Anchor{id="JsonScanEvent.Token"}
 
@@ -510,7 +533,7 @@ The outcome of one resumable scan step.
 Token
 ```
 
-A complete token was emitted.
+A complete token.
 
 ::Anchor{id="JsonScanEvent.Token.token"}
 
@@ -520,7 +543,7 @@ A complete token was emitted.
 pub token: JsonToken
 ```
 
-The token, whose source offsets are absolute.
+The token. Its offsets are from the start of the document.
 
 ::Anchor{id="JsonScanEvent.NeedMore"}
 
@@ -530,7 +553,7 @@ The token, whose source offsets are absolute.
 NeedMore
 ```
 
-All supplied bytes were consumed; another chunk is needed.
+The step used all bytes of the piece. Give it the next piece.
 
 ::Anchor{id="JsonScanEvent.EndOfInput"}
 
@@ -540,7 +563,7 @@ All supplied bytes were consumed; another chunk is needed.
 EndOfInput
 ```
 
-The complete document has ended.
+The document is complete.
 
 ::Anchor{id="JsonScanStep"}
 
@@ -550,7 +573,7 @@ The complete document has ended.
 pub struct JsonScanStep
 ```
 
-One step's byte accounting and event.
+The result of one step of [`JsonScanState.step`](#JsonScanState.impl.step).
 
 ::Anchor{id="JsonScanStep.consumed"}
 
@@ -560,7 +583,7 @@ One step's byte accounting and event.
 pub consumed: usize
 ```
 
-Number of bytes consumed from this call's chunk.
+The number of bytes of this piece that the step used.
 
 ::Anchor{id="JsonScanStep.fragment"}
 
@@ -570,7 +593,8 @@ Number of bytes consumed from this call's chunk.
 pub fragment: JsonSpan
 ```
 
-Range of this lexeme's bytes within this call's chunk, possibly empty.
+The bytes of the current token inside this piece. It can be empty. Keep them if the token
+continues in the next piece.
 
 ::Anchor{id="JsonScanStep.event"}
 
@@ -580,7 +604,7 @@ Range of this lexeme's bytes within this call's chunk, possibly empty.
 pub event: JsonScanEvent
 ```
 
-The token, need-more request, or final end event.
+A token, a request for more input, or the end of the document.
 
 ::Anchor{id="JsonScanState"}
 
@@ -590,11 +614,13 @@ The token, need-more request, or final end event.
 pub struct JsonScanState
 ```
 
-Owned lexical and container state shared by slice and streaming scanners.
+The state of a JSON scan that reads its input in pieces.
 
 ### Details
-It retains no chunk view. Feed each unconsumed suffix back into `step` until it reports
-`NeedMore` or `EndOfInput`; after `NeedMore`, supply the next chunk.
+
+It does not keep a reference to the input. Call [`JsonScanState.step`](#JsonScanState.impl.step) with the rest of the
+current piece until it returns `NeedMore` or `EndOfInput`. After `NeedMore`, give it the next
+piece.
 
 ::Anchor{id="JsonScanner"}
 
@@ -604,7 +630,7 @@ It retains no chunk view. Feed each unconsumed suffix back into `step` until it 
 pub struct JsonScanner<'input>
 ```
 
-A slice-backed convenience adapter over the resumable scanner.
+A JSON scanner over a complete document in one slice. Make one with [`JsonScanner.make`](#JsonScanner.impl.make).
 
 ::Anchor{id="JsonScanState.impl"}
 
@@ -622,7 +648,7 @@ impl JsonScanState
 pub fn make() -> JsonScanState
 ```
 
-Creates an empty, allocation-free state for exactly one root JSON value.
+Returns the state for the start of one JSON document. It does not allocate.
 
 ::Anchor{id="JsonScanState.impl.step"}
 
@@ -632,15 +658,23 @@ Creates an empty, allocation-free state for exactly one root JSON value.
 pub fn step(self: &mut JsonScanState, chunk: &[u8], final: bool) -> Result<JsonScanStep, JsonError>
 ```
 
-Consumes a chunk up to one token, need-more boundary, or document end.
+Reads from `chunk` up to the end of one token, the end of the chunk, or the end of the
+document.
 
 #### Details
-Reuse the unconsumed suffix after `Token`. `final` remains true for every suffix of the
-final chunk, including an empty one. No input slice survives this call.
+
+After a `Token` event, call `step` again with the bytes after `consumed`. Set `final` to
+`true` for the last piece and for all of its rest, also when the rest is empty.
+
+#### Errors
+
+- [`JsonError`](#JsonError) if the input is not valid JSON. After an error, the state cannot continue.
 
 #### Gotchas
-`NeedMore` consumes the entire chunk. A number at a nonfinal boundary remains pending;
-its lookahead delimiter is left for the following call. Errors make this state terminal.
+
+`NeedMore` uses all of the piece. A number at the end of a piece that is not final is not
+complete yet, because the next byte could be a digit. The byte after the number stays for the
+next call.
 
 ::Anchor{id="JsonScanner.impl"}
 
@@ -658,7 +692,7 @@ impl<'input> JsonScanner<'input>
 pub fn make(input: &'input [u8]) -> JsonScanner<'input>
 ```
 
-Borrows a complete input slice and starts a single-document scan.
+Returns a scanner at the start of `input`. `input` must be one complete document.
 
 ::Anchor{id="JsonScanner.impl.next"}
 
@@ -668,7 +702,12 @@ Borrows a complete input slice and starts a single-document scan.
 pub fn next(self: &mut JsonScanner<'input>) -> Result<JsonToken, JsonError>
 ```
 
-Returns the next token or sticky `EndOfInput` after trailing whitespace.
+Returns the next token, or `EndOfInput` when the document and the whitespace after it are
+complete.
+
+#### Errors
+
+- [`JsonError`](#JsonError) if the input is not valid JSON, or `UnexpectedEnd` if it ends early.
 
 ::Anchor{id="JsonScanner.impl.peek"}
 
@@ -678,7 +717,7 @@ Returns the next token or sticky `EndOfInput` after trailing whitespace.
 pub fn peek(self: &mut JsonScanner<'input>) -> Result<JsonToken, JsonError>
 ```
 
-Returns the next token without consuming it.
+Returns the next token without consuming it. The next call to `next` returns the same token.
 
 ::Anchor{id="JsonScanner.impl.offset"}
 
@@ -688,7 +727,7 @@ Returns the next token without consuming it.
 pub fn offset(self: &JsonScanner<'input>) -> usize
 ```
 
-Returns the absolute byte offset of the last token returned by `next` or `peek`.
+Returns the byte offset of the last token that `next` or `peek` returned. Use it for errors.
 
 ::Anchor{id="JsonScanner.impl.length"}
 
@@ -698,7 +737,7 @@ Returns the absolute byte offset of the last token returned by `next` or `peek`.
 pub fn length(self: &JsonScanner<'input>) -> usize
 ```
 
-Returns the length of the complete input slice.
+Returns the length of the input in bytes.
 
 ::Anchor{id="JsonScanner.impl.slice"}
 
@@ -708,6 +747,6 @@ Returns the length of the complete input slice.
 pub fn slice(self: &JsonScanner<'input>, span: JsonSpan) -> &'input [u8]
 ```
 
-Borrows the raw bytes denoted by a token span from this scanner's complete input.
+Returns the source bytes of `span`, such as the text of a string or number token.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

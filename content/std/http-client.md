@@ -1,26 +1,77 @@
-A short request/response HTTP client behind a replaceable service.
+A simple HTTP client: send a request, and get the whole response in memory.
 
 ## When to use
-
-Use [`Http`](#Http) to send a request and read the whole response into memory. Code that needs a
-client requires `? &mut Http`; the program supplies a provider once, such as
-`silk.http_client_native.NativeHttp`, and tests supply a fake. Use `silk.http_exchange` for
-streaming bodies, custom framing, or connection-level control.
+Use [`Http`](#Http) to call web APIs. Code that sends requests requires `? &mut Http`. The program
+gives a provider one time, near `main`: `NativeHttp` from `silk.http_client_native` for real
+requests, or a fake in tests. Use `silk.http_exchange` to stream bodies or to control the
+connection.
 
 ## Details
+Build a [`Request`](#Request) with chained calls, such as `Request.get("/repos").query("page",
+"2").bearer(token)`. Building never allocates and never fails. [`Http.send`](#Http.send) checks the request.
+A response with any status, also 4xx and 5xx, is a [`Response`](#Response). Call [`Response.expectOk`](#Response.impl.expectOk) to
+make a status outside 200 to 299 an error.
 
-[`Request`](#Request) is a plain value: building one allocates nothing and never fails. Invalid URLs,
-header names, and capacity overflows are reported by [`Http.send`](#Http.send). A response with any status,
-including 4xx and 5xx, is a successful [`Response`](#Response); call [`Response.expectOk`](#Response.impl.expectOk) to turn a
-non-2xx status into an [`HttpError`](#HttpError). Every failure is one [`HttpError`](#HttpError) whose `kind` says what
-went wrong and whose `cause` keeps the lower-level error.
+## Errors
+- [`HttpError`](#HttpError) for all failures. Its `kind` tells what failed, `status` has the response status
+  if one arrived, and `cause` keeps the error from the lower module.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ## Gotchas
+A request holds at most 8 path segments, 16 query parameters, and 32 headers. More fail at send
+time with `InvalidRequest`. [`Request.json`](#Request.impl.json) writes only the fields that are visible from your
+module. Fields that are private to another module are not written.
 
-A request holds at most 8 path segments, 16 query parameters, and 32 headers. Building past
-those limits is reported at send time as an `InvalidRequest` error. [`Request.json`](#Request.impl.json) serializes
-the visible fields of a named or anonymous struct; fields that are private to another module
-are omitted.
+## Examples
+### Test code that uses Http with a fake provider
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http_client { Http, HttpError, Request, Response }
+import silk.string { String }
+
+struct FakeHttp {
+  calls: i32
+}
+
+impl Http for FakeHttp {
+  effect fn send(self: &mut Self, request: Request) -> Response
+    ! HttpError | OutOfMemoryError
+    ? &mut Allocator {
+    self.calls = self.calls + 1
+    let url = run request.resolveUrl("https://api.example.com")
+    if String.view(&url) == "https://api.example.com/search?q=a%20b" {
+      return run Response.make(200, b"found")
+    }
+    return run Response.make(404, b"")
+  }
+}
+
+// This function works with any provider.
+effect fn search() -> i32
+  ! HttpError | OutOfMemoryError
+  ? &mut Http | &mut Allocator {
+  let response = run Http.send(Request.get("/search").query("q", "a b"))
+  let checked = run response.expectOk()
+  let text = run checked.text()
+  if text != "found" {
+    return 1
+  }
+  return 0
+}
+
+pub effect fn main() -> i32
+  ! HttpError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut fake = FakeHttp { calls: 0 }
+  let code = run search() |> Effect.provideMut<Http>(&mut fake)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  if fake.calls != 1 {
+    return 1
+  }
+  return code
+}
+```
 
 Import as `HttpClient` with `import silk.http_client as HttpClient`.
 
@@ -34,7 +85,7 @@ Public declarations: 11.
 pub const MAX_PATH_SEGMENTS: usize
 ```
 
-The maximum number of path segments one request holds.
+The maximum number of path segments in a request.
 
 ::Anchor{id="MAX_QUERY_PARAMETERS"}
 
@@ -44,7 +95,7 @@ The maximum number of path segments one request holds.
 pub const MAX_QUERY_PARAMETERS: usize
 ```
 
-The maximum number of query parameters one request holds.
+The maximum number of query parameters in a request.
 
 ::Anchor{id="MAX_HEADERS"}
 
@@ -54,7 +105,7 @@ The maximum number of query parameters one request holds.
 pub const MAX_HEADERS: usize
 ```
 
-The maximum number of caller headers one request holds.
+The maximum number of headers that you add to a request.
 
 ::Anchor{id="HttpErrorKind"}
 
@@ -74,7 +125,7 @@ What kind of failure an [`HttpError`](#HttpError) reports.
 InvalidUrl
 ```
 
-The URL could not be parsed, or uses an unsupported scheme or credentials.
+The URL is not valid, has user information, or its scheme is not `http` or `https`.
 
 ::Anchor{id="HttpErrorKind.InvalidRequest"}
 
@@ -84,7 +135,7 @@ The URL could not be parsed, or uses an unsupported scheme or credentials.
 InvalidRequest
 ```
 
-A header, method, or request capacity was invalid.
+A method or a header is not valid, or the request has too many parts.
 
 ::Anchor{id="HttpErrorKind.Encode"}
 
@@ -134,7 +185,7 @@ The request deadline passed.
 Protocol
 ```
 
-The server's response broke HTTP framing or a protocol limit.
+The response broke the HTTP rules or a limit.
 
 ::Anchor{id="HttpErrorKind.TooLarge"}
 
@@ -154,7 +205,7 @@ The response body exceeded the configured limit.
 Redirect
 ```
 
-A redirect was invalid, unsafe, or exceeded the hop limit.
+A redirect is not valid, is not safe, or there were too many redirects.
 
 ::Anchor{id="HttpErrorKind.Status"}
 
@@ -164,7 +215,7 @@ A redirect was invalid, unsafe, or exceeded the hop limit.
 Status
 ```
 
-[`Response.expectOk`](#Response.impl.expectOk) or a status policy rejected a non-2xx response.
+The status is not from 200 to 299, and [`Response.expectOk`](#Response.impl.expectOk) or the provider rejects it.
 
 ::Anchor{id="HttpErrorKind.Decode"}
 
@@ -600,7 +651,8 @@ The `Content-Type` value.
 pub struct Request<'a>
 ```
 
-An HTTP request built by chaining methods; nothing is checked or sent until [`Http.send`](#Http.send).
+An HTTP request that you build with chained calls. Nothing is checked or sent until
+[`Http.send`](#Http.send).
 
 ::Anchor{id="Request.impl"}
 
@@ -698,7 +750,7 @@ Starts an OPTIONS request.
 pub fn path(self: Self, segment: string<'a>) -> Request<'a>
 ```
 
-Appends text to the URL path as given, such as `"/repos"`.
+Adds `segment` to the end of the URL path, as given, such as `"/repos"`.
 
 ::Anchor{id="Request.impl.query"}
 
@@ -708,7 +760,7 @@ Appends text to the URL path as given, such as `"/repos"`.
 pub fn query(self: Self, name: string<'a>, value: string<'a>) -> Request<'a>
 ```
 
-Adds a query parameter; the name and value are percent-encoded when the request is sent.
+Adds a query parameter. The name and the value are percent-encoded when the request is sent.
 
 ::Anchor{id="Request.impl.header"}
 
@@ -718,7 +770,7 @@ Adds a query parameter; the name and value are percent-encoded when the request 
 pub fn header(self: Self, name: string<'a>, value: string<'a>) -> Request<'a>
 ```
 
-Adds a header; the name and value are validated when the request is sent.
+Adds a header. The name and value are validated when the request is sent.
 
 #### Details
 
@@ -781,7 +833,7 @@ from the ambient allocator.
 pub fn timeoutSeconds(self: Self, seconds: u64) -> Request<'a>
 ```
 
-Sets the deadline for this request, replacing the provider's default.
+Sets the deadline of this request, in place of the default of the provider.
 
 ::Anchor{id="Request.impl.maxBodyBytes"}
 
@@ -791,7 +843,7 @@ Sets the deadline for this request, replacing the provider's default.
 pub fn maxBodyBytes(self: Self, limit: usize) -> Request<'a>
 ```
 
-Sets the largest response body this request accepts, replacing the provider's default.
+Sets the maximum size of the response body, in place of the default of the provider.
 
 ::Anchor{id="Request.impl.maxRedirects"}
 
@@ -801,7 +853,8 @@ Sets the largest response body this request accepts, replacing the provider's de
 pub fn maxRedirects(self: Self, hops: usize) -> Request<'a>
 ```
 
-Sets how many redirects this request follows; zero returns redirect responses as they are.
+Sets the maximum number of redirects to follow. With 0, a redirect response is returned as it
+is.
 
 ::Anchor{id="Request.impl.method"}
 
@@ -891,7 +944,8 @@ Returns whether the request has a body.
 pub fn overflowed(self: &Self) -> bool
 ```
 
-Returns whether a capacity limit was exceeded while building.
+Returns `true` if the request has more parts than it can hold. [`Http.send`](#Http.send) then fails with
+`InvalidRequest`.
 
 ::Anchor{id="Request.impl.timeout"}
 
@@ -941,8 +995,8 @@ Returns the per-request redirect limit, when set.
 pub effect fn resolveUrl(self: &Self, base: string) -> String ! OutOfMemoryError ? &mut Allocator
 ```
 
-Writes the complete URL: `base` (when the request URL has no scheme), the URL, path
-segments, then percent-encoded query parameters.
+Returns the full URL: `base` if the URL has no scheme, then the URL, the path segments, and
+the percent-encoded query parameters.
 
 ::Anchor{id="Response"}
 
@@ -970,7 +1024,7 @@ impl Response
 pub fn fromParts(head: OwnedResponseHead, body: Bytes, url: String) -> Response
 ```
 
-Makes a response from an owned head, body, and final URL; providers use this.
+Makes a response from a head, a body, and the final URL. Providers use it.
 
 ::Anchor{id="Response.impl.make"}
 
@@ -1014,7 +1068,7 @@ Returns the status code, such as 200 or 404.
 pub fn ok(self: &Self) -> bool
 ```
 
-Returns whether the status is in 200..=299.
+Returns `true` if the status is from 200 to 299.
 
 ::Anchor{id="Response.impl.header"}
 
@@ -1024,7 +1078,7 @@ Returns whether the status is in 200..=299.
 pub fn header<'r>(self: &'r Self, name: string) -> Option<&'r [u8]>
 ```
 
-Returns the first header with this name, compared ASCII case-insensitively.
+Returns the value of the first header with this name, compared without case.
 
 ::Anchor{id="Response.impl.head"}
 
@@ -1064,7 +1118,8 @@ Moves the body out of the response.
 pub fn url(self: &Self) -> string
 ```
 
-Returns the URL that produced this response, after redirects; empty for a made response.
+Returns the URL of the response, after redirects. It is empty for a response from
+[`Response.make`](#Response.impl.make).
 
 ::Anchor{id="Response.impl.text"}
 
@@ -1074,7 +1129,7 @@ Returns the URL that produced this response, after redirects; empty for a made r
 pub effect fn text(self: &Self) -> string ! HttpError
 ```
 
-Returns the body as UTF-8 text.
+Returns the body as text. Fails with `Decode` if the body is not valid UTF-8.
 
 ::Anchor{id="Response.impl.json"}
 
@@ -1084,7 +1139,7 @@ Returns the body as UTF-8 text.
 pub effect fn json(self: &Self) -> Value ! HttpError | OutOfMemoryError ? &mut Allocator
 ```
 
-Parses the body as one JSON document.
+Parses the body as one JSON document. Fails with `Decode` if it is not valid JSON.
 
 ::Anchor{id="Response.impl.decode"}
 
@@ -1094,7 +1149,7 @@ Parses the body as one JSON document.
 pub effect fn decode<T: Deserialize>(self: &Self) -> T ! HttpError | OutOfMemoryError ? &mut Allocator
 ```
 
-Decodes the body as one JSON document of type `T`.
+Decodes the body as one JSON document of type `T`. Fails with `Decode` if it does not match.
 
 ::Anchor{id="Response.impl.expectOk"}
 
@@ -1104,7 +1159,8 @@ Decodes the body as one JSON document of type `T`.
 pub effect fn expectOk(self: Self) -> Response ! HttpError
 ```
 
-Returns the response when its status is in 200..=299, and fails with a `Status` error otherwise.
+Returns the response if its status is from 200 to 299. Otherwise fails with a `Status` error
+that has the status.
 
 ::Anchor{id="Http"}
 
@@ -1114,13 +1170,13 @@ Returns the response when its status is in 200..=299, and fails with a `Status` 
 pub service Http
 ```
 
-A replaceable HTTP client.
+The service that sends HTTP requests.
 
 ### Details
-
-Providers decide how requests travel: `silk.http_client_native.NativeHttp` uses native
-sockets and TLS, and tests can return fixed responses. A provider can also wrap another one
-to add headers, logging, or retries, then forward with `Effect.provideMut<Http>`.
+The provider decides how requests travel. `NativeHttp` in `silk.http_client_native` uses sockets
+and TLS, and a test provider can return fixed responses. A provider can also wrap another
+provider, for example to add headers, logs, or retries, and forward with
+`Effect.provideMut<Http>`.
 
 ::Anchor{id="Http.send"}
 

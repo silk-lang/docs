@@ -1,21 +1,324 @@
-Bounded server WebSocket messages over one validated upgraded HTTP channel.
+WebSocket messages on the server side, over a channel from an accepted handshake.
 
 ## When to use
-
-Use [`withServer`](#withServer) after `silk.websocket_upgrade.withUpgrade` accepts a request and lends its
-exact buffered channel.
+After `withUpgrade` of `silk.websocket_upgrade` accepts a handshake, it lends you the channel.
+Call [`withServer`](#withServer) with it. In the callback, call [`readEvent`](#readEvent) in a loop, and answer with
+[`writeText`](#writeText) or [`writeBinary`](#writeBinary).
 
 ## Details
+Each [`readEvent`](#readEvent) reads one complete frame and checks it before it returns:
+- `Text` and `Binary` write the payload to your buffer. Text is valid UTF-8.
+- `Ping` is answered with a `Pong` before [`readEvent`](#readEvent) returns.
+- `PeerClose` means that the client sent Close. The server answered with Close and closed the
+  channel.
 
-The actor accepts final, unfragmented client frames with mandatory masking. It validates one
-complete event at a time and writes final unmasked server frames. The scoped session owns all
-frame ordering and closes the upgraded channel when its callback ends.
+To close from the server, call [`sendClose`](#sendClose), then [`finishClose`](#finishClose) to wait for the Close of the
+client. Client frames must be masked. Server frames are not masked. The channel is closed when
+the callback of [`withServer`](#withServer) ends.
+
+When a client frame breaks a rule, the session fails, and later calls fail with
+`PreviousFailure`. If there is a deadline that has not passed, the server first sends Close with
+a code: 1002 for a protocol error, 1003 for fragmentation, 1007 for bad UTF-8, and 1009 for a
+message that is too large.
+
+## Errors
+[`WebSocketError`](#WebSocketError) tells the rule, limit, state, or transport error.
 
 ## Gotchas
+- Fragmented messages, extensions, and compression are not supported. A fragmented message fails
+  the session.
+- With no deadline, a failure closes the channel without a Close frame.
+- If a message is larger than your buffer, the session fails with `BufferTooSmall`. Give a
+  buffer of `maxMessageBytes`.
 
-This actor does not implement continuation frames, extensions, compression, a listener, or TLS
-server acquisition. Unsupported fragmentation closes with code `1003` when a finite deadline
-permits that response.
+## Examples
+### Answer one message
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.buffered_duplex { BufferedDuplex }
+import silk.buffered_input { BufferError }
+import silk.byte_duplex { ByteDuplex }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.http_body { Limits as BodyLimits }
+import silk.http_head { Limits as HeadLimits }
+import silk.http_headers { Headers, Limits as ValueLimits }
+import silk.http_server {
+  Connection,
+  ConnectionHandler,
+  Limits as ServerLimits,
+  Request,
+  ServerError,
+  withConnection,
+  withRequest
+}
+import silk.list { List }
+import silk.memory_byte_duplex {
+  MemoryByteDuplex,
+  MemoryReadEvent,
+  MemoryWriteAction,
+  MemoryWriteEvent
+}
+import silk.monotonic_clock { MonotonicClock }
+import silk.option { Option }
+import silk.result { Result }
+import silk.system_clock { Instant, SystemClock }
+import silk.u64
+import silk.usize
+import silk.websocket_server as WebSocketServer {
+  Event,
+  Limits as SocketLimits,
+  ServerWebSocket,
+  WebSocketError
+}
+import silk.websocket_upgrade {
+  Decision,
+  DecisionHandler,
+  Limits,
+  Offer,
+  Outcome,
+  UpgradeError,
+  withUpgrade
+}
+
+struct FixedClock {}
+
+impl MonotonicClock for FixedClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return u64.toU64(1)
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    drop when
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, duration: u64) -> () {
+    drop duration
+    return ()
+  }
+}
+
+fn valueLimits() -> ValueLimits {
+  return ValueLimits {
+    maxMethodBytes: 32,
+    maxTargetBytes: 128,
+    maxNameBytes: 64,
+    maxValueBytes: 256,
+    maxFields: 12,
+    maxFieldBytes: 512,
+    maxOwnedBytes: 2048,
+  }
+}
+
+fn serverLimits() -> ServerLimits {
+  return ServerLimits {
+    head: HeadLimits {
+      maxHeadBytes: 1024,
+      maxStartLineBytes: 256,
+      maxFieldLineBytes: 256,
+      maxOwnedBytes: 2048,
+      values: valueLimits(),
+    },
+    body: BodyLimits {
+      maxWireBytes: 1024,
+      maxPayloadBytes: 512,
+      maxChunkBytes: 64,
+      maxChunks: 8,
+      maxChunkLineBytes: 64,
+      maxExtensionBytes: 128,
+      maxTrailerBytes: 256,
+      maxTrailerFields: 4,
+      maxOwnedBytes: 2048,
+      trailerValues: valueLimits(),
+    },
+    values: valueLimits(),
+    readCapacity: 256,
+    writeCapacity: 256,
+    maxRequestsPerConnection: 1,
+    maxInformationalResponses: 2,
+    maxDiscardWireBytes: u64.toU64(256),
+    shutdownDrainBytes: 16,
+  }
+}
+
+// Accepts each handshake, with no subprotocol.
+struct AcceptAll {}
+
+impl DecisionHandler<UpgradeError ? &mut MonotonicClock> for AcceptAll {
+  effect<'call> fn decide<'call, 'head: 'call>(
+    handler: &'call Self,
+    offer: &'call Offer<'head>
+  ) -> Decision<'call>
+    ! UpgradeError
+    ? &mut MonotonicClock {
+    return Decision.Accept {
+      protocol: Option<string<'call>>.none(),
+      headers: Option<Headers<'call>>.none(),
+      extensions: false,
+    }
+  }
+}
+
+// Reads one text message, answers it, then reads the close of the client.
+effect<'call> fn chat<'call, 'channel: 'call, 'transport: 'channel>(
+  socket: &'call mut ServerWebSocket<'channel, 'transport, MemoryByteDuplex>,
+) -> i32
+  ! WebSocketError
+  ? &mut MonotonicClock {
+  let mut message: [u8; 64] = [0; 64]
+  match move run WebSocketServer.readEvent(&mut socket.*, &mut message, Option<Instant>.none()) {
+    Event.Text { count } => {
+      if count != 2 || message[0] != 72 {
+        return 1
+      }
+    }
+    _ => {
+      return 1
+    }
+  }
+  run WebSocketServer.writeText(&mut socket.*, "Hello", Option<Instant>.none())
+
+  // `PeerClose` means that the reply Close was sent and the channel is closed.
+  return match move run WebSocketServer.readEvent(
+    &mut socket.*,
+    &mut message,
+    Option<Instant>.none()
+  ) {
+    Event.PeerClose { data: _ } => 0
+    _ => 1
+  }
+}
+
+effect<'call> fn useChannel<'call, 'transport: 'call>(
+  channel: &'call mut BufferedDuplex<'transport, MemoryByteDuplex>,
+) -> i32
+  ! WebSocketError
+  ? &mut MonotonicClock {
+  return run WebSocketServer.withServer(move channel, SocketLimits.defaults(), chat)
+}
+
+effect<'call> fn handleRequest<
+  'call,
+  'request: 'call,
+  'connection: 'request,
+  'transport: 'connection
+>(request: &'call mut Request<'request, 'connection, 'transport, MemoryByteDuplex>) -> i32
+  ! UpgradeError | WebSocketError | ServerError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock {
+  let outcome = run withUpgrade<i32, UpgradeError, WebSocketError>(
+    move request,
+    Limits.default(),
+    Option<Instant>.none(),
+    AcceptAll {},
+    useChannel,
+  )
+  return match move outcome {
+    Outcome.Upgraded { value } => value
+    Outcome.Rejected { status: _ } => 1
+  }
+}
+
+struct Handler {}
+
+impl ConnectionHandler<
+  MemoryByteDuplex,
+  i32,
+  UpgradeError | WebSocketError | ServerError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock
+> for Handler {
+  effect<'call> fn handle<'call, 'connection: 'call, 'transport: 'connection>(
+    handler: Self,
+    connection: &'call mut Connection<'connection, 'transport, MemoryByteDuplex>,
+  ) -> i32
+    ! UpgradeError | WebSocketError | ServerError | OutOfMemoryError
+    ? &mut Allocator | &mut MonotonicClock where
+    &'transport mut MemoryByteDuplex provides &ByteDuplex from &mut ByteDuplex
+      | &mut MonotonicClock {
+    drop handler
+    return match run withRequest(&mut connection.*, Option<Instant>.none(), handleRequest) {
+      Option.Some { value } => value
+      Option.None => 1
+    }
+  }
+}
+
+effect fn program() -> i32
+  ! UpgradeError | WebSocketError | ServerError | BufferError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock {
+  let handshake = run Bytes.copy(
+    b"GET /chat HTTP/1.1\r\nHost: example.test\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+  )
+
+  // A masked text frame "Hi" and a masked Close with code 1000. The mask is zero.
+  let frames: [u8; 16] = [129, 130, 0, 0, 0, 0, 72, 105, 136, 130, 0, 0, 0, 0, 3, 232]
+  let client = run Bytes.copy(&frames)
+  let mut reads = List<MemoryReadEvent>.make()
+  run List.append(
+    &mut reads,
+    MemoryReadEvent.Data { readyAt: SystemClock.make(0, 0), bytes: move handshake }
+  )
+  run List.append(
+    &mut reads,
+    MemoryReadEvent.Data { readyAt: SystemClock.make(0, 0), bytes: move client }
+  )
+  let mut writes = List<MemoryWriteEvent>.make()
+  let mut index = usize.ZERO
+  while index < 4 {
+    run List.append(
+      &mut writes,
+      MemoryWriteEvent {
+        readyAt: SystemClock.make(0, 0),
+        action: MemoryWriteAction.Accept { count: 512 }
+      },
+    )
+    index = index + usize.ONE
+  }
+  let mut transport = run MemoryByteDuplex.make(
+    move reads,
+    move writes,
+    512,
+    64,
+    Option<i32>.none()
+  )
+  let code = run withConnection(&mut transport, serverLimits(), Handler {})
+  if code != 0 {
+    return code
+  }
+
+  // The output ends with the text frame "Hello" and the reply Close.
+  let expected: [u8; 11] = [129, 5, 72, 101, 108, 108, 111, 136, 2, 3, 232]
+  let sent = transport.outbound()
+  if sent.length < 11 {
+    return 1
+  }
+  let start = sent.length - 11
+  let mut at = usize.ZERO
+  while at < 11 {
+    if sent[start + at] != expected[at] {
+      return 1
+    }
+    at = at + usize.ONE
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut clock = FixedClock {}
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<MonotonicClock>(&mut clock)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
 
 Import as `WebSocketServer` with `import silk.websocket_server as WebSocketServer`.
 
@@ -29,7 +332,7 @@ Public declarations: 25.
 pub struct Limits
 ```
 
-Finite message and close-handshake limits for one server session.
+The limits of a session. All are more than zero.
 
 ::Anchor{id="Limits.maxMessageBytes"}
 
@@ -39,7 +342,7 @@ Finite message and close-handshake limits for one server session.
 pub maxMessageBytes: usize
 ```
 
-The maximum payload bytes in one Text or Binary frame.
+The maximum payload of one Text or Binary message.
 
 ::Anchor{id="Limits.maxCloseFrames"}
 
@@ -49,7 +352,7 @@ The maximum payload bytes in one Text or Binary frame.
 pub maxCloseFrames: usize
 ```
 
-The maximum peer frames accepted by one [`finishClose`](#finishClose) call.
+The maximum number of client frames that one [`finishClose`](#finishClose) call reads.
 
 ::Anchor{id="Limits.maxCloseBytes"}
 
@@ -59,7 +362,7 @@ The maximum peer frames accepted by one [`finishClose`](#finishClose) call.
 pub maxCloseBytes: usize
 ```
 
-The maximum aggregate peer frame bytes accepted by one [`finishClose`](#finishClose) call.
+The maximum number of client bytes, with frame headers, that one [`finishClose`](#finishClose) call reads.
 
 ::Anchor{id="Limits.impl.Copy"}
 
@@ -85,7 +388,7 @@ impl Limits
 pub fn defaults() -> Limits
 ```
 
-Returns limits for 65,536-byte messages, 32 close frames, and 65,536 close bytes.
+Returns the default limits: 65536-byte messages, 32 close frames, and 65536 close bytes.
 
 ::Anchor{id="Limits.impl.make"}
 
@@ -99,7 +402,10 @@ pub fn make(
   ) -> Result<Limits, WebSocketError>
 ```
 
-Validates and returns finite positive session limits.
+Returns limits with these values.
+
+#### Errors
+`InvalidLimits` if a value is zero.
 
 ::Anchor{id="LimitKind"}
 
@@ -109,7 +415,7 @@ Validates and returns finite positive session limits.
 pub enum LimitKind
 ```
 
-The finite limit or arithmetic rule that rejected session construction.
+The limit that is not valid.
 
 ::Anchor{id="LimitKind.MessageBytes"}
 
@@ -119,7 +425,7 @@ The finite limit or arithmetic rule that rejected session construction.
 MessageBytes
 ```
 
-The message-byte limit is zero.
+`maxMessageBytes` is zero.
 
 ::Anchor{id="LimitKind.CloseFrames"}
 
@@ -129,7 +435,7 @@ The message-byte limit is zero.
 CloseFrames
 ```
 
-The close-frame limit is zero.
+`maxCloseFrames` is zero.
 
 ::Anchor{id="LimitKind.CloseBytes"}
 
@@ -139,7 +445,7 @@ The close-frame limit is zero.
 CloseBytes
 ```
 
-The close-byte limit is zero.
+`maxCloseBytes` is zero.
 
 ::Anchor{id="LimitKind.Arithmetic"}
 
@@ -149,7 +455,7 @@ The close-byte limit is zero.
 Arithmetic
 ```
 
-Checked size arithmetic cannot represent a required value.
+A size does not fit in its type.
 
 ::Anchor{id="State"}
 
@@ -159,7 +465,7 @@ Checked size arithmetic cannot represent a required value.
 pub enum State
 ```
 
-The externally visible lifecycle state of one session.
+The state of a session.
 
 ::Anchor{id="State.Open"}
 
@@ -169,7 +475,7 @@ The externally visible lifecycle state of one session.
 Open
 ```
 
-The session accepts message, control, and peer Close events.
+Messages can be read and written.
 
 ::Anchor{id="State.CloseSent"}
 
@@ -179,7 +485,7 @@ The session accepts message, control, and peer Close events.
 CloseSent
 ```
 
-The server sent one Close and waits for the peer Close.
+The server sent Close, and waits for the Close of the client. See [`finishClose`](#finishClose).
 
 ::Anchor{id="State.Closed"}
 
@@ -189,7 +495,7 @@ The server sent one Close and waits for the peer Close.
 Closed
 ```
 
-The close handshake and terminal transport close completed.
+Both sides sent Close, and the channel is closed.
 
 ::Anchor{id="State.Failed"}
 
@@ -199,7 +505,7 @@ The close handshake and terminal transport close completed.
 Failed
 ```
 
-A preceding failure made all later frame operations unavailable.
+An error ended the session. All later frame operations fail.
 
 ::Anchor{id="Operation"}
 
@@ -209,7 +515,7 @@ A preceding failure made all later frame operations unavailable.
 pub enum Operation
 ```
 
-The public operation associated with a state or transport failure.
+The operation that failed.
 
 ::Anchor{id="Operation.ReadEvent"}
 
@@ -219,7 +525,7 @@ The public operation associated with a state or transport failure.
 ReadEvent
 ```
 
-Read one peer event.
+[`readEvent`](#readEvent).
 
 ::Anchor{id="Operation.WriteText"}
 
@@ -229,7 +535,7 @@ Read one peer event.
 WriteText
 ```
 
-Write one Text frame.
+[`writeText`](#writeText).
 
 ::Anchor{id="Operation.WriteBinary"}
 
@@ -239,7 +545,7 @@ Write one Text frame.
 WriteBinary
 ```
 
-Write one Binary frame.
+[`writeBinary`](#writeBinary).
 
 ::Anchor{id="Operation.WritePing"}
 
@@ -249,7 +555,7 @@ Write one Binary frame.
 WritePing
 ```
 
-Write one Ping frame.
+[`writePing`](#writePing).
 
 ::Anchor{id="Operation.WritePong"}
 
@@ -259,7 +565,7 @@ Write one Ping frame.
 WritePong
 ```
 
-Write one Pong frame.
+[`writePong`](#writePong).
 
 ::Anchor{id="Operation.SendClose"}
 
@@ -269,7 +575,7 @@ Write one Pong frame.
 SendClose
 ```
 
-Send the local Close frame.
+[`sendClose`](#sendClose).
 
 ::Anchor{id="Operation.FinishClose"}
 
@@ -279,7 +585,7 @@ Send the local Close frame.
 FinishClose
 ```
 
-Pump peer frames until the close handshake completes.
+[`finishClose`](#finishClose).
 
 ::Anchor{id="ProtocolReason"}
 
@@ -289,7 +595,7 @@ Pump peer frames until the close handshake completes.
 pub enum ProtocolReason
 ```
 
-The peer frame rule that selected protocol Close code `1002`.
+The frame rule that failed. The server sends Close with code 1002.
 
 ::Anchor{id="ProtocolReason.MaskRequired"}
 
@@ -299,7 +605,7 @@ The peer frame rule that selected protocol Close code `1002`.
 MaskRequired
 ```
 
-A client frame does not contain the required mask.
+A client frame is not masked.
 
 ::Anchor{id="ProtocolReason.Rsv"}
 
@@ -309,7 +615,7 @@ A client frame does not contain the required mask.
 Rsv
 ```
 
-One or more reserved bits are set.
+A reserved bit is set.
 
 ::Anchor{id="ProtocolReason.ReservedOpcode"}
 
@@ -319,7 +625,7 @@ One or more reserved bits are set.
 ReservedOpcode
 ```
 
-The opcode is reserved by the selected profile.
+The opcode is reserved.
 
 ::Anchor{id="ProtocolReason.NonMinimalLength"}
 
@@ -329,7 +635,7 @@ The opcode is reserved by the selected profile.
 NonMinimalLength
 ```
 
-An extended length uses a longer than necessary encoding.
+The length uses more bytes than necessary.
 
 ::Anchor{id="ProtocolReason.LengthHighBit"}
 
@@ -339,7 +645,7 @@ An extended length uses a longer than necessary encoding.
 LengthHighBit
 ```
 
-A 64-bit payload length has its most significant bit set.
+The highest bit of a 64-bit length is set.
 
 ::Anchor{id="ProtocolReason.ControlTooLarge"}
 
@@ -349,7 +655,7 @@ A 64-bit payload length has its most significant bit set.
 ControlTooLarge
 ```
 
-A control frame payload exceeds 125 bytes.
+A control frame has more than 125 bytes.
 
 ::Anchor{id="ProtocolReason.ControlFragmented"}
 
@@ -359,7 +665,7 @@ A control frame payload exceeds 125 bytes.
 ControlFragmented
 ```
 
-A control frame clears FIN and therefore attempts illegal fragmentation.
+A control frame is not final.
 
 ::Anchor{id="ProtocolReason.ClosePayloadLength"}
 
@@ -369,7 +675,7 @@ A control frame clears FIN and therefore attempts illegal fragmentation.
 ClosePayloadLength
 ```
 
-A Close frame payload has exactly one byte.
+A Close frame has a payload of exactly one byte.
 
 ::Anchor{id="ProtocolReason.CloseCode"}
 
@@ -379,7 +685,7 @@ A Close frame payload has exactly one byte.
 CloseCode
 ```
 
-A peer Close frame contains a disallowed status code.
+A Close frame has a code that is not allowed.
 
 ::Anchor{id="Utf8Component"}
 
@@ -389,7 +695,7 @@ A peer Close frame contains a disallowed status code.
 pub enum Utf8Component
 ```
 
-The text value that failed complete UTF-8 validation.
+The text that is not valid UTF-8.
 
 ::Anchor{id="Utf8Component.Text"}
 
@@ -399,7 +705,7 @@ The text value that failed complete UTF-8 validation.
 Text
 ```
 
-A Text message payload.
+A Text message.
 
 ::Anchor{id="Utf8Component.CloseReason"}
 
@@ -409,7 +715,7 @@ A Text message payload.
 CloseReason
 ```
 
-A Close status reason.
+The reason of a Close frame.
 
 ::Anchor{id="CloseDataReason"}
 
@@ -419,7 +725,7 @@ A Close status reason.
 pub enum CloseDataReason
 ```
 
-The caller Close value rule that rejected construction.
+The rule of [`CloseData.make`](#CloseData.impl.make) that failed.
 
 ::Anchor{id="CloseDataReason.Code"}
 
@@ -429,7 +735,7 @@ The caller Close value rule that rejected construction.
 Code
 ```
 
-The status code is not permitted for a server Close frame.
+The code is not allowed in a server Close.
 
 ::Anchor{id="CloseDataReason.ReasonTooLarge"}
 
@@ -439,7 +745,7 @@ The status code is not permitted for a server Close frame.
 ReasonTooLarge
 ```
 
-The UTF-8 reason contains more than 123 bytes.
+The reason has more than 123 bytes.
 
 ::Anchor{id="CloseLimitKind"}
 
@@ -449,7 +755,7 @@ The UTF-8 reason contains more than 123 bytes.
 pub enum CloseLimitKind
 ```
 
-The aggregate close-handshake budget that was exhausted.
+The [`finishClose`](#finishClose) limit that was exceeded.
 
 ::Anchor{id="CloseLimitKind.Frames"}
 
@@ -459,7 +765,7 @@ The aggregate close-handshake budget that was exhausted.
 Frames
 ```
 
-The peer frame-count budget.
+`maxCloseFrames`.
 
 ::Anchor{id="CloseLimitKind.Bytes"}
 
@@ -469,7 +775,7 @@ The peer frame-count budget.
 Bytes
 ```
 
-The aggregate peer wire-byte budget.
+`maxCloseBytes`.
 
 ::Anchor{id="Failure"}
 
@@ -479,7 +785,7 @@ The aggregate peer wire-byte budget.
 pub enum Failure
 ```
 
-A copyable classification retained after the first terminal failure.
+The kind of the first error of a failed session. Later calls return it in `PreviousFailure`.
 
 ::Anchor{id="Failure.Protocol"}
 
@@ -489,7 +795,7 @@ A copyable classification retained after the first terminal failure.
 Protocol
 ```
 
-Peer frame syntax violated the protocol.
+A client frame broke a protocol rule.
 
 ::Anchor{id="Failure.Fragmentation"}
 
@@ -499,7 +805,7 @@ Peer frame syntax violated the protocol.
 Fragmentation
 ```
 
-A continuation or nonfinal frame requested unsupported fragmentation.
+The client sent a fragmented message.
 
 ::Anchor{id="Failure.Utf8"}
 
@@ -509,7 +815,7 @@ A continuation or nonfinal frame requested unsupported fragmentation.
 Utf8
 ```
 
-Text or a Close reason was not UTF-8.
+Text or a Close reason was not valid UTF-8.
 
 ::Anchor{id="Failure.MessageLimit"}
 
@@ -519,7 +825,7 @@ Text or a Close reason was not UTF-8.
 MessageLimit
 ```
 
-A data payload exceeded the message policy.
+A message was larger than `maxMessageBytes`.
 
 ::Anchor{id="Failure.BufferCapacity"}
 
@@ -529,7 +835,7 @@ A data payload exceeded the message policy.
 BufferCapacity
 ```
 
-A legal data payload exceeded caller storage.
+A message was larger than the buffer of the caller.
 
 ::Anchor{id="Failure.CloseLimit"}
 
@@ -539,7 +845,7 @@ A legal data payload exceeded caller storage.
 CloseLimit
 ```
 
-A close-handshake aggregate budget was exhausted.
+A [`finishClose`](#finishClose) limit was exceeded.
 
 ::Anchor{id="Failure.Truncated"}
 
@@ -549,7 +855,7 @@ A close-handshake aggregate budget was exhausted.
 Truncated
 ```
 
-The byte stream ended before a complete required frame.
+The input ended in the middle of a frame.
 
 ::Anchor{id="Failure.Transport"}
 
@@ -559,7 +865,7 @@ The byte stream ended before a complete required frame.
 Transport
 ```
 
-Buffered or terminal transport I/O failed.
+A read, write, or close failed.
 
 ::Anchor{id="WebSocketError"}
 
@@ -569,7 +875,7 @@ Buffered or terminal transport I/O failed.
 pub union WebSocketError
 ```
 
-A typed WebSocket admission, frame, lifecycle, or transport failure.
+The error of a WebSocket operation.
 
 ::Anchor{id="WebSocketError.InvalidLimits"}
 
@@ -579,7 +885,7 @@ A typed WebSocket admission, frame, lifecycle, or transport failure.
 InvalidLimits
 ```
 
-Session construction rejected a zero finite limit.
+A limit is zero.
 
 ::Anchor{id="WebSocketError.InvalidLimits.kind"}
 
@@ -589,7 +895,7 @@ Session construction rejected a zero finite limit.
 pub kind: LimitKind
 ```
 
-The invalid public limit.
+The limit.
 
 ::Anchor{id="WebSocketError.InvalidState"}
 
@@ -599,7 +905,7 @@ The invalid public limit.
 InvalidState
 ```
 
-The operation is not available in the current lifecycle state.
+The operation is not allowed in the current state.
 
 ::Anchor{id="WebSocketError.InvalidState.operation"}
 
@@ -609,7 +915,7 @@ The operation is not available in the current lifecycle state.
 pub operation: Operation
 ```
 
-The rejected operation.
+The operation.
 
 ::Anchor{id="WebSocketError.InvalidState.state"}
 
@@ -619,7 +925,7 @@ The rejected operation.
 pub state: State
 ```
 
-The state that rejected the operation.
+The current state.
 
 ::Anchor{id="WebSocketError.PreviousFailure"}
 
@@ -629,7 +935,7 @@ The state that rejected the operation.
 PreviousFailure
 ```
 
-A preceding terminal failure prevents more frame I/O.
+An earlier error ended the session.
 
 ::Anchor{id="WebSocketError.PreviousFailure.failure"}
 
@@ -639,7 +945,7 @@ A preceding terminal failure prevents more frame I/O.
 pub failure: Failure
 ```
 
-The retained copyable classification of the first failure.
+The kind of the earlier error.
 
 ::Anchor{id="WebSocketError.BufferTooSmall"}
 
@@ -649,7 +955,7 @@ The retained copyable classification of the first failure.
 BufferTooSmall
 ```
 
-Caller storage cannot hold one otherwise legal complete data payload.
+A valid message does not fit in the buffer. The message is not read, and the session fails.
 
 ::Anchor{id="WebSocketError.BufferTooSmall.required"}
 
@@ -659,7 +965,7 @@ Caller storage cannot hold one otherwise legal complete data payload.
 pub required: usize
 ```
 
-The complete required payload capacity.
+The size of the message.
 
 ::Anchor{id="WebSocketError.BufferTooSmall.capacity"}
 
@@ -669,7 +975,7 @@ The complete required payload capacity.
 pub capacity: usize
 ```
 
-The supplied output capacity.
+The size of the buffer.
 
 ::Anchor{id="WebSocketError.MessageTooLarge"}
 
@@ -679,7 +985,7 @@ The supplied output capacity.
 MessageTooLarge
 ```
 
-A peer or caller data payload exceeds the message policy.
+A message is larger than `maxMessageBytes`.
 
 ::Anchor{id="WebSocketError.MessageTooLarge.length"}
 
@@ -689,7 +995,7 @@ A peer or caller data payload exceeds the message policy.
 pub length: u64
 ```
 
-The rejected payload length before narrowing.
+The length of the message.
 
 ::Anchor{id="WebSocketError.MessageTooLarge.allowed"}
 
@@ -699,7 +1005,7 @@ The rejected payload length before narrowing.
 pub allowed: usize
 ```
 
-The configured message-byte limit.
+The value of `maxMessageBytes`.
 
 ::Anchor{id="WebSocketError.UnsupportedFragmentation"}
 
@@ -709,7 +1015,7 @@ The configured message-byte limit.
 UnsupportedFragmentation
 ```
 
-The frame requests continuation or fragmentation outside this profile.
+The client sent a fragmented message, which is not supported.
 
 ::Anchor{id="WebSocketError.ProtocolError"}
 
@@ -719,7 +1025,7 @@ The frame requests continuation or fragmentation outside this profile.
 ProtocolError
 ```
 
-Peer framing violates one exact RFC 6455 protocol rule.
+A client frame broke a rule of RFC 6455.
 
 ::Anchor{id="WebSocketError.ProtocolError.reason"}
 
@@ -729,7 +1035,7 @@ Peer framing violates one exact RFC 6455 protocol rule.
 pub reason: ProtocolReason
 ```
 
-The rule that rejected the frame.
+The rule.
 
 ::Anchor{id="WebSocketError.InvalidCloseData"}
 
@@ -739,7 +1045,7 @@ The rule that rejected the frame.
 InvalidCloseData
 ```
 
-Caller-supplied Close metadata is not valid for server output.
+The Close data is not valid for a server.
 
 ::Anchor{id="WebSocketError.InvalidCloseData.reason"}
 
@@ -749,7 +1055,7 @@ Caller-supplied Close metadata is not valid for server output.
 pub reason: CloseDataReason
 ```
 
-The rejected caller-data rule.
+The rule.
 
 ::Anchor{id="WebSocketError.InvalidUtf8"}
 
@@ -759,7 +1065,7 @@ The rejected caller-data rule.
 InvalidUtf8
 ```
 
-A complete peer or caller text value is not UTF-8.
+Text is not valid UTF-8.
 
 ::Anchor{id="WebSocketError.InvalidUtf8.component"}
 
@@ -769,7 +1075,7 @@ A complete peer or caller text value is not UTF-8.
 pub component: Utf8Component
 ```
 
-The text value that failed validation.
+The text that failed.
 
 ::Anchor{id="WebSocketError.CloseLimitExceeded"}
 
@@ -779,7 +1085,7 @@ The text value that failed validation.
 CloseLimitExceeded
 ```
 
-One aggregate close-handshake budget is exhausted.
+A [`finishClose`](#finishClose) limit was exceeded.
 
 ::Anchor{id="WebSocketError.CloseLimitExceeded.kind"}
 
@@ -789,7 +1095,7 @@ One aggregate close-handshake budget is exhausted.
 pub kind: CloseLimitKind
 ```
 
-The exhausted budget.
+The limit.
 
 ::Anchor{id="WebSocketError.CloseLimitExceeded.allowed"}
 
@@ -799,7 +1105,7 @@ The exhausted budget.
 pub allowed: usize
 ```
 
-The configured inclusive maximum.
+The value of the limit.
 
 ::Anchor{id="WebSocketError.Truncated"}
 
@@ -809,7 +1115,7 @@ The configured inclusive maximum.
 Truncated
 ```
 
-The byte stream ended before a complete required frame.
+The input ended in the middle of a frame.
 
 ::Anchor{id="WebSocketError.Buffer"}
 
@@ -819,7 +1125,7 @@ The byte stream ended before a complete required frame.
 Buffer
 ```
 
-Buffered frame I/O failed with exact accepted-prefix coordinates.
+A buffered read, write, or flush failed.
 
 ::Anchor{id="WebSocketError.Buffer.operation"}
 
@@ -829,7 +1135,7 @@ Buffered frame I/O failed with exact accepted-prefix coordinates.
 pub operation: Operation
 ```
 
-The frame operation that failed.
+The operation.
 
 ::Anchor{id="WebSocketError.Buffer.frameAccepted"}
 
@@ -839,7 +1145,7 @@ The frame operation that failed.
 pub frameAccepted: usize
 ```
 
-Bytes accepted from the complete frame before this buffered failure.
+The bytes of the frame that were accepted before the error.
 
 ::Anchor{id="WebSocketError.Buffer.error"}
 
@@ -849,7 +1155,7 @@ Bytes accepted from the complete frame before this buffered failure.
 pub error: BufferError
 ```
 
-The original buffered failure.
+The buffer error.
 
 ::Anchor{id="WebSocketError.Transport"}
 
@@ -859,7 +1165,7 @@ The original buffered failure.
 Transport
 ```
 
-Terminal channel close failed after one frame operation.
+Closing the channel failed.
 
 ::Anchor{id="WebSocketError.Transport.operation"}
 
@@ -869,7 +1175,7 @@ Terminal channel close failed after one frame operation.
 pub operation: Operation
 ```
 
-The frame operation that required terminal close.
+The operation.
 
 ::Anchor{id="WebSocketError.Transport.error"}
 
@@ -879,7 +1185,7 @@ The frame operation that required terminal close.
 pub error: ByteIoError
 ```
 
-The original byte-I/O failure.
+The transport error.
 
 ::Anchor{id="ControlPayload"}
 
@@ -889,7 +1195,7 @@ The original byte-I/O failure.
 pub struct ControlPayload
 ```
 
-An owned Ping or Pong payload with at most 125 bytes.
+The payload of a Ping or Pong, at most 125 bytes.
 
 ::Anchor{id="ControlPayload.impl"}
 
@@ -907,7 +1213,7 @@ impl ControlPayload
 pub fn asSlice<'payload>(self: &'payload Self) -> &'payload [u8]
 ```
 
-Borrows the complete copied control payload.
+Returns the payload bytes.
 
 ::Anchor{id="CloseReason"}
 
@@ -917,7 +1223,7 @@ Borrows the complete copied control payload.
 pub struct CloseReason
 ```
 
-An owned validated Close reason with at most 123 UTF-8 bytes.
+The reason of a Close frame: valid UTF-8, at most 123 bytes.
 
 ::Anchor{id="CloseReason.impl"}
 
@@ -935,7 +1241,7 @@ impl CloseReason
 pub fn asSlice<'reason>(self: &'reason Self) -> &'reason [u8]
 ```
 
-Borrows the complete copied UTF-8 reason bytes.
+Returns the reason bytes.
 
 ::Anchor{id="CloseData"}
 
@@ -945,7 +1251,7 @@ Borrows the complete copied UTF-8 reason bytes.
 pub struct CloseData
 ```
 
-Owned validated status and reason data for one server Close frame.
+The code and reason of a server Close frame. Make it with [`CloseData.make`](#CloseData.impl.make).
 
 ::Anchor{id="CloseData.impl"}
 
@@ -963,12 +1269,13 @@ impl CloseData
 pub fn make(code: u16, reason: &[u8]) -> Result<CloseData, WebSocketError>
 ```
 
-Validates and copies one server Close status and UTF-8 reason.
+Returns Close data with `code` and a copy of `reason`.
 
-#### Details
-
-The operation rejects client-only code `1010`, other disallowed codes, reasons above 123
-bytes, and invalid UTF-8 before it publishes owned data.
+#### Errors
+- `InvalidCloseData` with `Code` if `code` is not allowed. Allowed codes are 1000 through
+  1003, 1007 through 1014 except 1010, and 3000 through 4999.
+- `InvalidCloseData` with `ReasonTooLarge` if `reason` has more than 123 bytes.
+- `InvalidUtf8` if `reason` is not valid UTF-8.
 
 ::Anchor{id="CloseData.impl.code"}
 
@@ -978,7 +1285,7 @@ bytes, and invalid UTF-8 before it publishes owned data.
 pub fn code(self: &Self) -> u16
 ```
 
-Returns the validated status code.
+Returns the code.
 
 ::Anchor{id="CloseData.impl.reason"}
 
@@ -988,7 +1295,7 @@ Returns the validated status code.
 pub fn reason<'data>(self: &'data Self) -> &'data CloseReason
 ```
 
-Borrows the owned validated reason.
+Returns the reason.
 
 ::Anchor{id="PeerCloseData"}
 
@@ -998,7 +1305,7 @@ Borrows the owned validated reason.
 pub union PeerCloseData
 ```
 
-Owned peer Close metadata without a synthetic no-status code.
+The code and reason in the Close of the client.
 
 ::Anchor{id="PeerCloseData.Absent"}
 
@@ -1008,7 +1315,7 @@ Owned peer Close metadata without a synthetic no-status code.
 Absent
 ```
 
-The peer sent an empty Close payload.
+The Close had no payload.
 
 ::Anchor{id="PeerCloseData.Present"}
 
@@ -1018,7 +1325,7 @@ The peer sent an empty Close payload.
 Present
 ```
 
-The peer sent one validated status and reason.
+The Close had a code and a reason.
 
 ::Anchor{id="PeerCloseData.Present.code"}
 
@@ -1028,7 +1335,7 @@ The peer sent one validated status and reason.
 pub code: u16
 ```
 
-The exact peer status code.
+The code.
 
 ::Anchor{id="PeerCloseData.Present.reason"}
 
@@ -1038,7 +1345,7 @@ The exact peer status code.
 pub reason: CloseReason
 ```
 
-The copied validated peer reason.
+The reason. It can be empty.
 
 ::Anchor{id="Event"}
 
@@ -1048,7 +1355,7 @@ The copied validated peer reason.
 pub union Event
 ```
 
-One completely validated peer frame event.
+A frame from the client, from [`readEvent`](#readEvent).
 
 ::Anchor{id="Event.Text"}
 
@@ -1058,7 +1365,7 @@ One completely validated peer frame event.
 Text
 ```
 
-The caller output prefix contains one valid UTF-8 Text payload.
+A Text message. The first `count` bytes of the buffer hold it, and they are valid UTF-8.
 
 ::Anchor{id="Event.Text.count"}
 
@@ -1068,7 +1375,7 @@ The caller output prefix contains one valid UTF-8 Text payload.
 pub count: usize
 ```
 
-The initialized payload prefix length.
+The length of the message.
 
 ::Anchor{id="Event.Binary"}
 
@@ -1078,7 +1385,7 @@ The initialized payload prefix length.
 Binary
 ```
 
-The caller output prefix contains one Binary payload.
+A Binary message. The first `count` bytes of the buffer hold it.
 
 ::Anchor{id="Event.Binary.count"}
 
@@ -1088,7 +1395,7 @@ The caller output prefix contains one Binary payload.
 pub count: usize
 ```
 
-The initialized payload prefix length.
+The length of the message.
 
 ::Anchor{id="Event.Ping"}
 
@@ -1098,7 +1405,7 @@ The initialized payload prefix length.
 Ping
 ```
 
-One Ping payload was copied after its automatic Pong flushed.
+A Ping. The `Pong` answer was already sent.
 
 ::Anchor{id="Event.Ping.payload"}
 
@@ -1108,7 +1415,7 @@ One Ping payload was copied after its automatic Pong flushed.
 pub payload: ControlPayload
 ```
 
-The copied Ping payload.
+The payload.
 
 ::Anchor{id="Event.Pong"}
 
@@ -1118,7 +1425,7 @@ The copied Ping payload.
 Pong
 ```
 
-One Pong payload was copied without a hidden follow-up read.
+A Pong.
 
 ::Anchor{id="Event.Pong.payload"}
 
@@ -1128,7 +1435,7 @@ One Pong payload was copied without a hidden follow-up read.
 pub payload: ControlPayload
 ```
 
-The copied Pong payload.
+The payload.
 
 ::Anchor{id="Event.PeerClose"}
 
@@ -1138,7 +1445,7 @@ The copied Pong payload.
 PeerClose
 ```
 
-The peer Close reply and terminal channel close completed.
+The client sent Close. The server answered with Close, and the channel is closed.
 
 ::Anchor{id="Event.PeerClose.data"}
 
@@ -1148,7 +1455,7 @@ The peer Close reply and terminal channel close completed.
 pub data: PeerCloseData
 ```
 
-The exact copied peer Close metadata.
+The code and reason of the client.
 
 ::Anchor{id="ServerWebSocket"}
 
@@ -1158,12 +1465,7 @@ The exact copied peer Close metadata.
 pub struct ServerWebSocket<'channel, 'transport, P>
 ```
 
-One callback-scoped affine server WebSocket over the upgraded buffered channel.
-
-### Details
-
-Callers receive this value only through [`withServer`](#withServer). A returned event never retains a
-mutable borrow into this value.
+A WebSocket session. [`withServer`](#withServer) lends it to a callback, and it cannot escape the callback.
 
 ::Anchor{id="state"}
 
@@ -1175,7 +1477,7 @@ pub fn state<'channel, 'transport, P>(
 ) -> State
 ```
 
-Returns the current public lifecycle state without performing I/O.
+Returns the state of the session. It does no I/O.
 
 ::Anchor{id="readEvent"}
 
@@ -1193,18 +1495,18 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Reads and validates exactly one peer event.
+Reads one frame from the client, and returns it as an [`Event`](#Event).
 
 ### Details
+Text and Binary payloads are written to the start of `output`. If the call fails after it wrote
+part of `output`, those bytes are not valid. A Ping is answered with a Pong before the call
+returns. A Close is answered with a Close, and the channel is closed.
 
-Text and Binary bytes are written directly into `output`. If this operation fails after it
-modifies a prefix, that prefix is unusable. Ping is published only after its identical Pong
-response flushes. Pong is returned without a hidden follow-up read.
-
-### Gotchas
-
-A legal data payload that exceeds `output` closes the session and returns `BufferTooSmall`
-without reading the payload. Fragmented messages are not supported.
+### Errors
+- `BufferTooSmall` if a message does not fit in `output`. The message is not read.
+- `MessageTooLarge`, `ProtocolError`, `UnsupportedFragmentation`, or `InvalidUtf8` for a bad
+  frame.
+- `InvalidState` if the session is not open. All of these fail the session.
 
 ::Anchor{id="writeText"}
 
@@ -1222,7 +1524,7 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Writes and flushes one final unmasked Text frame.
+Sends `message` as one Text frame, and flushes it.
 
 ::Anchor{id="writeBinary"}
 
@@ -1240,7 +1542,7 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Writes and flushes one final unmasked Binary frame.
+Sends `message` as one Binary frame, and flushes it.
 
 ::Anchor{id="writePing"}
 
@@ -1258,7 +1560,7 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Writes and flushes one final unmasked Ping frame with at most 125 payload bytes.
+Sends a Ping with `message`, and flushes it. `message` has at most 125 bytes.
 
 ::Anchor{id="writePong"}
 
@@ -1276,7 +1578,7 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Writes and flushes one final unmasked Pong frame with at most 125 payload bytes.
+Sends a Pong with `message`, and flushes it. `message` has at most 125 bytes.
 
 ::Anchor{id="sendClose"}
 
@@ -1294,13 +1596,11 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Sends and flushes the local Close frame once.
+Sends a Close frame, and flushes it. The state becomes `CloseSent`.
 
 ### Details
-
-`Open` sends the supplied validated status and reason, or an empty payload for `None`, then
-enters `CloseSent`. Repeated calls in `CloseSent` or `Closed` succeed locally without inspecting
-`data` or writing another byte.
+`data` gives the code and reason. With `None`, the Close has no payload. If the state is already
+`CloseSent` or `Closed`, it does nothing.
 
 ::Anchor{id="finishClose"}
 
@@ -1317,19 +1617,16 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Pumps a bounded peer close handshake until a valid peer Close arrives.
+Reads frames from the client until its Close arrives, then closes the channel.
 
 ### Details
+Call it after [`sendClose`](#sendClose). Data frames are checked and dropped. A Ping is still answered.
+`deadline` applies to all reads and writes. The reads are limited by `maxCloseFrames` and
+`maxCloseBytes`, with frame headers.
 
-The caller supplies one absolute deadline. The same mark is passed unchanged to every partial
-read, automatic Pong write, and flush and is checked before the first frame and between frames.
-Data frames are validated and discarded without publication; controls remain observable only
-through their required protocol effects.
-
-### Gotchas
-
-This operation is available only after [`sendClose`](#sendClose). Both configured aggregate limits include
-complete inbound wire bytes: header, extended length, mask, and payload.
+### Errors
+- `InvalidState` if the state is `Open`.
+- `CloseLimitExceeded` if a limit is reached before the Close of the client.
 
 ::Anchor{id="withServer"}
 
@@ -1358,12 +1655,14 @@ where &'transport mut P provides &ByteDuplex from &mut ByteDuplex,
   R in Without<R, ByteDuplex>
 ```
 
-Lends one affine server WebSocket over the exact upgraded buffered channel.
+Starts a session on `channel`, and lends it to `use`.
 
 ### Details
+`channel` comes from `silk.websocket_upgrade`. The limits are checked before any I/O. The
+channel is closed when `use` returns, fails, or is cancelled.
 
-Positive limits are validated before the session performs I/O. The higher-ranked callback
-cannot retain the session or a channel view. Terminal release runs after callback success,
-typed failure, or structured cancellation and never replaces the protected outcome.
+### Errors
+- `InvalidLimits` if a limit is zero.
+- The error of `use`.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

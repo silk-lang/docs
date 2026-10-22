@@ -1,51 +1,86 @@
-Owned TOML documents with ordered tables and distinct scalar kinds.
+Parse a TOML document into an owned tree of values, and read fields from it.
 
 ## When to use
-Use [`Toml.parse`](#Toml.impl.parse) to validate and own a complete TOML document, then borrow fields from
-its root table. Every allocation uses the ambient Allocator and partial trees drop on failure.
+Use [`Toml.parse`](#Toml.impl.parse) to read a configuration file or any other complete TOML document. Read
+members with [`Toml.field`](#Toml.impl.field) and [`Toml.fieldAt`](#Toml.impl.fieldAt), array elements with [`Toml.item`](#Toml.impl.item), and text
+with [`Toml.asString`](#Toml.impl.asString). Use `silk.toml_codec` to convert a value to a number, a boolean, or an
+owned string, and `silk.toml_output` to write a tree back as TOML.
 
 ## Details
-Tables keep key order. Numeric and date/time values keep their validated source text.
-String values contain decoded UTF-8 text.
+The parser follows TOML 1.1.0. Tables keep the order of the source. Integers, floats, dates, and
+times keep their validated source text, so no precision is lost. Strings are decoded to UTF-8
+text when the document is parsed. The root of a parsed document is always a [`Value.Table`](#Value.Table). If
+parsing fails, everything that was built is released.
+
+## Errors
+- `TomlError` if the input is not valid TOML, defines a key two times, defines a table that
+  conflicts with an earlier value, or nests more than `MAX_DEPTH` (64) arrays or inline tables.
+  `offset` gives the byte position of the problem.
+- `OutOfMemoryError` if the `Allocator` cannot supply the tree.
 
 ## Gotchas
-A borrowed field cannot outlive its document. Use `silk.toml_output` to write the owned tree.
+A borrowed field or string cannot live longer than the [`Value`](#Value) that owns it. The read
+functions return `None` for a missing key and for a value of a different kind. They do not tell
+you which case occurred.
 
 ## Examples
-### Read a nested string
+### Read a nested string and an array element
 ```silk
-import silk.allocator as Allocators {Allocator, OutOfMemoryError}
-import silk.effect as Effects {Effect}
-import silk.option as Options {Option}
-import silk.toml_scanner as Scanners {TomlError}
-import silk.toml_value as Values {Toml}
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.option { Option }
+import silk.toml_scanner { TomlError }
+import silk.toml_value { Toml, Value }
 
-effect fn read() -> i32 ! TomlError | OutOfMemoryError {
+pub effect fn main() -> i32
+  ! TomlError | OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
-  let document = run Toml.parse(b"[owner]\nname = \"Ada\"\n")
+  let source = b"tags = [\"fast\", \"small\"]\n\n[owner]\nname = \"Ada\"\n"
+  let document = run Toml.parse(source) |> Effect.provideMut<Allocator>(&mut allocator)
+  let name = Toml.field(&document, "owner") |> Toml.fieldAt("name") |> Toml.asString
+    |> Option<string>.unwrapOr("")
+  let tags = Toml.field(&document, "tags")
+  let second = match move tags {
+    Option<&Value>.Some { value } => Toml.item(value, 1) |> Toml.asString
+      |> Option<string>.unwrapOr("")
+    Option<&Value>.None => ""
+  }
+  if name != "Ada" || second != "small" {
+    return 1
+  }
+  return 0
+}
+```
+
+### Report the position of a syntax error
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.toml_scanner { TomlError, TomlReason }
+import silk.toml_value { Toml }
+
+effect fn load() -> usize
+  ! TomlError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let document = run Toml.parse(b"name = \"Ada\"\nname = \"Grace\"\n")
     |> Effect.provideMut<Allocator>(&mut allocator)
-  let owner = Toml.field(&document, "owner")
-  let name = Toml.fieldAt(move owner, "name")
-    |> Toml.asString
-  return match move name {
-    Option<string>.Some {value} => {
-      if value == "Ada" {
-        return 0
-      }
-      return 1
-    }
-    Option<string>.None => {
-      return 2
-    }
+  return 0
+}
+
+effect fn offsetOf(error: TomlError | OutOfMemoryError) -> usize {
+  return match move error {
+    TomlError { reason: TomlReason.DuplicateKey, offset } => offset
+    _ => 0
   }
 }
 
-effect fn recover(error: TomlError | OutOfMemoryError) -> i32 {
-  return 3
-}
-
 pub fn main() -> i32 {
-  return run Effect.catchAll(read(), recover)
+  // The second `name` starts at byte 13.
+  let offset = run Effect.catchAll(load(), offsetOf)
+  if offset != 13 {
+    return 1
+  }
+  return 0
 }
 ```
 
@@ -61,7 +96,8 @@ Public declarations: 5.
 pub enum TableKind
 ```
 
-How a table was first defined. An inline table is closed to later document definitions.
+How a table got its first definition. The parser uses it to reject a later definition that TOML
+does not allow.
 
 ::Anchor{id="TableKind.Implicit"}
 
@@ -71,7 +107,8 @@ How a table was first defined. An inline table is closed to later document defin
 Implicit
 ```
 
-A table created by a later header path.
+A table that exists only because a header named a table inside it, such as `a` for `[a.b]`. A
+later `[a]` header can still define it.
 
 ::Anchor{id="TableKind.Dotted"}
 
@@ -81,7 +118,7 @@ A table created by a later header path.
 Dotted
 ```
 
-A table created by a dotted key.
+A table that a dotted key made, such as `a` for `a.b = 1`.
 
 ::Anchor{id="TableKind.Explicit"}
 
@@ -91,7 +128,7 @@ A table created by a dotted key.
 Explicit
 ```
 
-A table defined by a header.
+A table that a `[header]` defined. The root table also has this kind.
 
 ::Anchor{id="TableKind.Inline"}
 
@@ -101,7 +138,8 @@ A table defined by a header.
 Inline
 ```
 
-A table defined inside braces and closed to later definitions.
+A table written inside braces, such as `{ x = 1 }`. It is closed: no later line can add
+members to it.
 
 ::Anchor{id="TomlEntry"}
 
@@ -111,7 +149,7 @@ A table defined inside braces and closed to later definitions.
 pub struct TomlEntry
 ```
 
-One ordered table member.
+One member of a table: a key and its value.
 
 ::Anchor{id="TomlEntry.key"}
 
@@ -121,7 +159,7 @@ One ordered table member.
 pub key: String
 ```
 
-The decoded member key.
+The decoded key. Quotes and escapes are removed.
 
 ::Anchor{id="TomlEntry.value"}
 
@@ -131,7 +169,7 @@ The decoded member key.
 pub value: Value
 ```
 
-The owned member value.
+The value of the member.
 
 ::Anchor{id="TomlChild"}
 
@@ -141,7 +179,8 @@ The owned member value.
 pub union TomlChild
 ```
 
-Recursive storage shared by tables and arrays.
+One element of the child list of an array or a table. Arrays hold [`TomlChild.Item`](#TomlChild.Item) and tables
+hold [`TomlChild.Member`](#TomlChild.Member).
 
 ::Anchor{id="TomlChild.Item"}
 
@@ -151,7 +190,7 @@ Recursive storage shared by tables and arrays.
 Item
 ```
 
-An array element without a key.
+An array element. It has no key.
 
 ::Anchor{id="TomlChild.Item.value"}
 
@@ -161,7 +200,7 @@ An array element without a key.
 pub value: Value
 ```
 
-The owned element value.
+The element.
 
 ::Anchor{id="TomlChild.Member"}
 
@@ -171,7 +210,7 @@ The owned element value.
 Member
 ```
 
-A table member with its key.
+A table member.
 
 ::Anchor{id="TomlChild.Member.entry"}
 
@@ -181,7 +220,7 @@ A table member with its key.
 pub entry: TomlEntry
 ```
 
-The owned key and value.
+The key and value of the member.
 
 ::Anchor{id="Value"}
 
@@ -191,7 +230,10 @@ The owned key and value.
 pub union Value
 ```
 
-An owned TOML value. Numeric and temporal spellings retain their validated source precision.
+An owned TOML value.
+
+Integers, floats, dates, and times hold their source text, which the parser validated. Convert
+them with `silk.toml_codec`, or copy the text to keep the full precision.
 
 ::Anchor{id="Value.Integer"}
 
@@ -201,7 +243,7 @@ An owned TOML value. Numeric and temporal spellings retain their validated sourc
 Integer
 ```
 
-A validated integer in its source spelling.
+An integer, such as `42`, `-17`, `1_000`, or `0xff`.
 
 ::Anchor{id="Value.Integer.text"}
 
@@ -211,7 +253,7 @@ A validated integer in its source spelling.
 pub text: String
 ```
 
-The validated integer text.
+The source text of the integer, with signs, prefixes, and underscores.
 
 ::Anchor{id="Value.Float"}
 
@@ -221,7 +263,7 @@ The validated integer text.
 Float
 ```
 
-A validated float in its source spelling.
+A float, such as `3.14`, `6e-3`, `inf`, or `nan`.
 
 ::Anchor{id="Value.Float.text"}
 
@@ -231,7 +273,7 @@ A validated float in its source spelling.
 pub text: String
 ```
 
-The validated float text.
+The source text of the float.
 
 ::Anchor{id="Value.Boolean"}
 
@@ -241,7 +283,7 @@ The validated float text.
 Boolean
 ```
 
-A TOML boolean.
+`true` or `false`.
 
 ::Anchor{id="Value.Boolean.value"}
 
@@ -251,7 +293,7 @@ A TOML boolean.
 pub value: bool
 ```
 
-The boolean value.
+The boolean.
 
 ::Anchor{id="Value.OffsetDateTime"}
 
@@ -261,7 +303,7 @@ The boolean value.
 OffsetDateTime
 ```
 
-A date and time with an explicit offset and retained precision.
+A date and time with a UTC offset, such as `1979-05-27T07:32:00Z`.
 
 ::Anchor{id="Value.OffsetDateTime.text"}
 
@@ -271,7 +313,7 @@ A date and time with an explicit offset and retained precision.
 pub text: String
 ```
 
-The validated source text.
+The source text, with all fractional seconds.
 
 ::Anchor{id="Value.LocalDateTime"}
 
@@ -281,7 +323,7 @@ The validated source text.
 LocalDateTime
 ```
 
-A date and time without an offset and with retained precision.
+A date and time without an offset, such as `1979-05-27T07:32:00`.
 
 ::Anchor{id="Value.LocalDateTime.text"}
 
@@ -291,7 +333,7 @@ A date and time without an offset and with retained precision.
 pub text: String
 ```
 
-The validated source text.
+The source text, with all fractional seconds.
 
 ::Anchor{id="Value.LocalDate"}
 
@@ -301,7 +343,7 @@ The validated source text.
 LocalDate
 ```
 
-A calendar date without a time.
+A calendar date, such as `1979-05-27`.
 
 ::Anchor{id="Value.LocalDate.text"}
 
@@ -311,7 +353,7 @@ A calendar date without a time.
 pub text: String
 ```
 
-The validated source text.
+The source text.
 
 ::Anchor{id="Value.LocalTime"}
 
@@ -321,7 +363,7 @@ The validated source text.
 LocalTime
 ```
 
-A clock time without a date and with retained precision.
+A time of day without a date, such as `07:32:00`.
 
 ::Anchor{id="Value.LocalTime.text"}
 
@@ -331,7 +373,7 @@ A clock time without a date and with retained precision.
 pub text: String
 ```
 
-The validated source text.
+The source text, with all fractional seconds.
 
 ::Anchor{id="Value.String"}
 
@@ -341,7 +383,7 @@ The validated source text.
 String
 ```
 
-Decoded UTF-8 text.
+A string. Escapes are decoded and the delimiters are removed.
 
 ::Anchor{id="Value.String.text"}
 
@@ -351,7 +393,7 @@ Decoded UTF-8 text.
 pub text: String
 ```
 
-The decoded text.
+The decoded UTF-8 text.
 
 ::Anchor{id="Value.Array"}
 
@@ -361,7 +403,7 @@ The decoded text.
 Array
 ```
 
-Ordered values or an array of tables.
+An array of values, or an array of tables that `[[header]]` lines made.
 
 ::Anchor{id="Value.Array.values"}
 
@@ -371,7 +413,7 @@ Ordered values or an array of tables.
 pub values: Box<List<TomlChild>>
 ```
 
-The owned elements in source order.
+The elements in source order. Each one is a [`TomlChild.Item`](#TomlChild.Item).
 
 ::Anchor{id="Value.Array.tables"}
 
@@ -381,7 +423,8 @@ The owned elements in source order.
 pub tables: bool
 ```
 
-Whether the array came from `[[table]]` headers.
+`true` if `[[header]]` lines made the array. Such an array holds only tables, and a later
+`key = [...]` cannot replace it.
 
 ::Anchor{id="Value.Table"}
 
@@ -391,7 +434,7 @@ Whether the array came from `[[table]]` headers.
 Table
 ```
 
-Ordered key/value members.
+A table of key and value members.
 
 ::Anchor{id="Value.Table.entries"}
 
@@ -401,7 +444,7 @@ Ordered key/value members.
 pub entries: Box<List<TomlChild>>
 ```
 
-The owned members in source order.
+The members in source order. Each one is a [`TomlChild.Member`](#TomlChild.Member).
 
 ::Anchor{id="Value.Table.kind"}
 
@@ -411,7 +454,7 @@ The owned members in source order.
 pub kind: TableKind
 ```
 
-How the table was defined.
+How the table got its first definition.
 
 ::Anchor{id="Toml"}
 
@@ -421,7 +464,7 @@ How the table was defined.
 pub struct Toml
 ```
 
-Operations on complete owned TOML documents.
+Functions that parse and read TOML documents.
 
 ::Anchor{id="Toml.impl"}
 
@@ -439,11 +482,16 @@ impl Toml
 pub effect fn parse(bytes: &[u8]) -> Value ! TomlError | OutOfMemoryError ? &mut Allocator
 ```
 
-Parses one complete UTF-8 document into an owned root table.
+Parses a complete UTF-8 TOML document and returns its root table.
 
-#### Details
-All allocations use the ambient allocator. Syntax errors include a reason and byte offset.
-If parsing fails, the partial tree is released.
+The parser first validates the full input with `TomlScanner.validate`, and then builds the
+tree.
+
+#### Errors
+- `TomlError` if the input is not valid TOML 1.1.0, or if a key or table is defined in a way
+  that TOML does not allow. `offset` is the byte position of the problem.
+- `OutOfMemoryError` if the `Allocator` cannot supply the tree. Everything that was built is
+  released.
 
 ::Anchor{id="Toml.impl.field"}
 
@@ -453,7 +501,10 @@ If parsing fails, the partial tree is released.
 pub fn field<'a>(self: &'a Value, name: string) -> Option<&'a Value>
 ```
 
-Borrows a table member by decoded key, or returns `None` for absence or another value kind.
+Returns the member `name` of the table `self`.
+
+Returns `None` if the table has no member with that key, or if `self` is not a table. `name`
+is the decoded key, without quotes.
 
 ::Anchor{id="Toml.impl.fieldAt"}
 
@@ -463,7 +514,9 @@ Borrows a table member by decoded key, or returns `None` for absence or another 
 pub fn fieldAt<'a>(self: Option<&'a Value>, name: string) -> Option<&'a Value>
 ```
 
-Borrows a nested table member through an optional value, or returns `None`.
+Returns the member `name` of an optional table. Use it to chain lookups with `|>`.
+
+Returns `None` if `self` is `None`, or for the same cases as [`Toml.field`](#Toml.impl.field).
 
 ::Anchor{id="Toml.impl.item"}
 
@@ -473,7 +526,10 @@ Borrows a nested table member through an optional value, or returns `None`.
 pub fn item<'a>(self: &'a Value, index: usize) -> Option<&'a Value>
 ```
 
-Borrows an array element, or returns None for an absent index or another value kind.
+Returns the element at `index` of the array `self`. The first element has index 0.
+
+Returns `None` if `index` is out of range, or if `self` is not an array. In an array of
+tables, each element is a [`Value.Table`](#Value.Table).
 
 ::Anchor{id="Toml.impl.asString"}
 
@@ -483,6 +539,9 @@ Borrows an array element, or returns None for an absent index or another value k
 pub fn asString<'a>(self: Option<&'a Value>) -> Option<string<'a>>
 ```
 
-Borrows decoded UTF-8 string text, or returns `None` for another value kind.
+Returns the decoded text of an optional string value.
+
+Returns `None` if `self` is `None` or is not a [`Value.String`](#Value.String). The text borrows from the
+value.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

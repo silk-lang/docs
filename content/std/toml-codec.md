@@ -1,9 +1,62 @@
-Static contracts for converting common Silk values to and from TOML values.
+Convert TOML values to Silk values, and write Silk values as TOML.
 
 ## When to use
-Use [`TomlCodec.writeOne`](#TomlCodec.impl.writeOne) to write a typed value after a key and separator. Use
-[`TomlCodec.decodeOne`](#TomlCodec.impl.decodeOne) on a parsed value for allocation-free types, or
-[`TomlCodec.deserializeOne`](#TomlCodec.impl.deserializeOne) for an owned string.
+After `silk.toml_value` parses a document, use [`TomlCodec.decodeOne`](#TomlCodec.impl.decodeOne) to read a `bool`, `i32`,
+or `i64`, and [`TomlCodec.deserializeOne`](#TomlCodec.impl.deserializeOne) to read an `f64` or an owned `String`. Use
+[`TomlCodec.writeOne`](#TomlCodec.impl.writeOne) to write a value after a key when you write TOML by hand.
+
+## Details
+| Type | Write | Read | |------|-------|------| | `bool` | [`Serialize`](#Serialize) | [`Decode`](#Decode) from
+`Boolean` | | `i32`, `i64` | [`Serialize`](#Serialize) | [`Decode`](#Decode) from `Integer`, with `0x`, `0o`, `0b`
+and `_` | | `f64` | [`Serialize`](#Serialize) | [`Deserialize`](#Deserialize) from `Float`, with `inf` and `nan` | |
+`string`, `String` | [`Serialize`](#Serialize) | [`Deserialize`](#Deserialize) from `String` (only `String`) |
+
+To support your own type, implement the interfaces for it.
+
+## Errors
+- `TomlError` with `TypeMismatch` if the value has a different kind, or with `NumberOutOfRange`
+  if the number does not fit the type. An `Integer` is not converted to `f64`. All codec errors
+  have `offset` 0, because the value is not tied to a position in the source.
+- `WriterError` if the `Writer` fails.
+- `OutOfMemoryError` if the `Allocator` cannot supply the output of `deserializeOne`.
+
+## Examples
+### Read typed settings
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.option { Option }
+import silk.result { Result }
+import silk.toml_codec { TomlCodec }
+import silk.toml_scanner { TomlError }
+import silk.toml_value { Toml, Value }
+
+fn port(document: &Value) -> i32 {
+  return match Toml.field(document, "port") {
+    Option<&Value>.Some { value } => match TomlCodec.decodeOne<i32>(value) {
+      Result<i32, TomlError>.Success { value: number } => number
+      Result<i32, TomlError>.Failure { error: _ } => 0
+    }
+    Option<&Value>.None => 0
+  }
+}
+
+pub effect fn main() -> i32
+  ! TomlError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let document = run Toml.parse(b"port = 8_080\nratio = 0.5\n")
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let ratio = match Toml.field(&document, "ratio") {
+    Option<&Value>.Some { value } => run TomlCodec.deserializeOne<f64>(value)
+      |> Effect.provideMut<Allocator>(&mut allocator)
+    Option<&Value>.None => 0.0
+  }
+  if port(&document) != 8080 || ratio != 0.5 {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `TomlCodec` with `import silk.toml_codec { TomlCodec }`.
 
@@ -17,7 +70,7 @@ Public declarations: 4.
 pub interface Serialize
 ```
 
-A type that writes one TOML value through the ambient Writer.
+A type that can write itself as one TOML value.
 
 ::Anchor{id="Serialize.serialize"}
 
@@ -27,7 +80,12 @@ A type that writes one TOML value through the ambient Writer.
 effect fn serialize(self: &Self) -> () ! TomlError | WriterError ? &mut Writer
 ```
 
-Writes one value in TOML syntax through the ambient Writer.
+Writes `self` as a TOML value through the ambient `Writer`. It does not write a key or a
+newline.
+
+#### Errors
+- `WriterError` if the `Writer` fails.
+- `TomlError` if the value has no TOML form.
 
 ::Anchor{id="Decode"}
 
@@ -37,7 +95,7 @@ Writes one value in TOML syntax through the ambient Writer.
 pub interface Decode
 ```
 
-A type decoded from an owned TOML value without allocation.
+A type that can read itself from a TOML value without allocation.
 
 ::Anchor{id="Decode.decode"}
 
@@ -47,7 +105,8 @@ A type decoded from an owned TOML value without allocation.
 fn decode(value: &Value) -> Result<Self, TomlError>
 ```
 
-Converts one owned TOML value without allocation or returns a typed failure.
+Returns the value that `value` holds, or a `TomlError` if it is of a different kind or out of
+range.
 
 ::Anchor{id="Deserialize"}
 
@@ -57,7 +116,7 @@ Converts one owned TOML value without allocation or returns a typed failure.
 pub interface Deserialize
 ```
 
-A type decoded from an owned TOML value with allocation.
+A type that can read itself from a TOML value and allocate.
 
 ::Anchor{id="Deserialize.deserialize"}
 
@@ -67,7 +126,11 @@ A type decoded from an owned TOML value with allocation.
 effect fn deserialize(value: &Value) -> Self ! TomlError | OutOfMemoryError ? &mut Allocator
 ```
 
-Converts one owned TOML value with the ambient allocator.
+Returns the value that `value` holds.
+
+#### Errors
+- `TomlError` if `value` is of a different kind or out of range.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="TomlCodec"}
 
@@ -77,7 +140,7 @@ Converts one owned TOML value with the ambient allocator.
 pub struct TomlCodec
 ```
 
-Selects static TOML conversion witnesses.
+Functions that select the conversion for a type.
 
 ::Anchor{id="TomlCodec.impl"}
 
@@ -95,10 +158,17 @@ impl TomlCodec
 pub effect fn writeOne<T: Serialize>(value: &T) -> () ! TomlError | WriterError ? &mut Writer
 ```
 
-Writes a typed value in value position through the ambient Writer.
+Writes `value` as a TOML value through the ambient `Writer`.
+
+An `f64` without a fraction gets `.0`, so it reads back as a float. NaN is written as `nan`
+and infinity as `inf` or `-inf`. Strings are written as basic strings with escapes.
+
+#### Errors
+- `WriterError` if the `Writer` fails.
+- `TomlError` if the type rejects the value.
 
 #### Gotchas
-Write the key and ` = ` before this call when writing a document.
+It writes only the value. Write the key and ` = ` before it, and a newline after it.
 
 ::Anchor{id="TomlCodec.impl.decodeOne"}
 
@@ -108,7 +178,10 @@ Write the key and ` = ` before this call when writing a document.
 pub fn decodeOne<T: Decode>(value: &Value) -> Result<T, TomlError>
 ```
 
-Decodes an allocation-free type from one owned value, or returns a typed failure.
+Returns `value` converted to `T` without allocation.
+
+Returns a `Failure` with `TypeMismatch` if `value` has a different kind, or with
+`NumberOutOfRange` if the number does not fit `T`.
 
 ::Anchor{id="TomlCodec.impl.deserializeOne"}
 
@@ -119,7 +192,12 @@ pub effect fn deserializeOne<T: Deserialize>(value: &Value)
     -> T ! TomlError | OutOfMemoryError ? &mut Allocator
 ```
 
-Deserializes an allocating type from one owned value with the ambient allocator.
+Returns `value` converted to `T`, with memory from the ambient `Allocator`.
+
+#### Errors
+- `TomlError` with `TypeMismatch` if `value` has a different kind, or with `NumberOutOfRange`
+  if the number does not fit `T`.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="bool.impl.Serialize"}
 

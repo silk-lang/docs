@@ -1,55 +1,41 @@
-Explicit Unicode canonical normalization backed by the pinned Unicode 17.0.0 data set.
+Unicode canonical normalization (NFC and NFD), with data from Unicode 17.0.0.
 
 ## When to use
-Normalize text at a boundary where canonically equivalent spellings must compare alike. Use
-[`normalizeNfc`](#Unicode.impl.normalizeNfc) for ordinary storage and comparison, or [`normalizeNfd`](#Unicode.impl.normalizeNfd) when a decomposed,
-canonically ordered sequence is the desired representation.
+Use normalization where text with different encodings of the same characters must compare equal,
+such as user names or file names from different systems. Use [`Unicode.normalizeNfc`](#Unicode.impl.normalizeNfc) for
+storage and comparison. Use [`Unicode.normalizeNfd`](#Unicode.impl.normalizeNfd) when a consumer needs the decomposed form.
 
 ## Details
-Normalization is opt-in: `string` equality continues to compare exact UTF-8 bytes. Both forms
-allocate a fresh owned [`String`](/docs/std/string#String), handle Hangul composition algorithmically, and use the same
-generated tables on every target. [`dataVersion`](#Unicode.impl.dataVersion) reports which Unicode database defines those
-results.
+Normalization is explicit. `string` equality compares the exact UTF-8 bytes and does not
+normalize. Each normalization function returns a new [`String`](/docs/std/string#String) and needs an `Allocator`. The
+results are the same on each target. [`Unicode.dataVersion`](#Unicode.impl.dataVersion) gives the Unicode version of the
+data.
 
 ## Gotchas
-This module implements canonical NFC and NFD, not compatibility normalization (NFKC or NFKD),
-locale-sensitive comparison, grapheme segmentation, or case folding.
+This module implements canonical normalization only. It does not implement compatibility
+normalization (NFKC or NFKD), locale-sensitive comparison, grapheme segmentation, or case
+folding.
 
 ## Examples
-### Make canonically equivalent text compare equal
+### Make two encodings of the same text compare equal
 ```silk
 import silk.allocator { Allocator, OutOfMemoryError }
-
 import silk.effect { Effect }
-
 import silk.string { String }
-
 import silk.unicode { Unicode }
 
-effect fn normalize() -> i32
-! OutOfMemoryError {
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
-  let mut composing = Unicode.normalizeNfc("e\u{301}")
-    |> Effect.provideMut<Allocator>(&mut allocator)
-  let composed = run composing
-  let mut decomposing = Unicode.normalizeNfd("é")
-    |> Effect.provideMut<Allocator>(&mut allocator)
-  let decomposed = run decomposing
-  if String.view(&composed) != "é" {
-    return 0
-  }
-  if String.view(&decomposed) != "e\u{301}" {
-    return 0
-  }
-  return 42
-}
 
-effect fn recover(error: OutOfMemoryError) -> i32 {
+  // "e" followed by a combining acute accent, and the precomposed "é".
+  let composed = run Unicode.normalizeNfc("e\u{301}")
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let decomposed = run Unicode.normalizeNfd("é") |> Effect.provideMut<Allocator>(&mut allocator)
+  if String.view(&composed) != "é" || String.view(&decomposed) != "e\u{301}" {
+    return 1
+  }
   return 0
-}
-
-pub fn main() -> i32 {
-  return run Effect.catchAll(normalize(), recover)
 }
 ```
 
@@ -65,12 +51,7 @@ Public declarations: 1.
 pub struct Unicode
 ```
 
-The owner of the normalization and Unicode-data operations.
-
-### Details
-
-This struct carries no data and is never constructed by the library. Every operation is an
-inherent member declared in `impl Unicode`, reached through `import silk.unicode { Unicode }`.
+The owner type of the normalization operations. It has no fields and is never constructed.
 
 ::Anchor{id="Unicode.impl"}
 
@@ -88,12 +69,11 @@ impl Unicode
 pub fn dataVersion() -> string<'static>
 ```
 
-Returns the Unicode version that defines this module's normalization results.
+Returns the Unicode version of the normalization data, such as `"17.0.0"`.
 
 #### Details
 
-The version is data, not identity: a later database changes what this returns and what the
-tables contain, and changes neither a compiler type nor a target ABI.
+A later version of the data can change normalization results for new characters.
 
 ::Anchor{id="Unicode.impl.longestDecomposition"}
 
@@ -103,7 +83,7 @@ tables contain, and changes neither a compiler type nor a target ABI.
 pub fn longestDecomposition() -> usize
 ```
 
-Returns the longest full canonical decomposition of one scalar in the active Unicode data.
+Returns the maximum number of scalars in the full canonical decomposition of one scalar.
 
 ::Anchor{id="Unicode.impl.canonicalCombiningClass"}
 
@@ -116,7 +96,8 @@ pub fn canonicalCombiningClass(
   ) -> u32
 ```
 
-Returns a Unicode scalar's canonical combining class, or zero for a starter or unknown value.
+Returns the canonical combining class of a code point. Returns 0 for a starter or an
+unassigned code point.
 
 ::Anchor{id="Unicode.impl.canonicalCombiningClass.scalar"}
 
@@ -136,17 +117,21 @@ Unicode scalar value represented as its unsigned code point.
 pub effect fn normalizeNfd(value: string) -> String ! OutOfMemoryError ? &mut Allocator
 ```
 
-Returns the Normalization Form D of text: fully decomposed, in canonical order.
+Returns the Normalization Form D (NFD) of `value`: each character fully decomposed, with marks
+in canonical order.
 
 #### When to use
 
-Use this function when consumers require decomposed scalars in canonical combining-class order.
-Use [`normalizeNfc`](#Unicode.impl.normalizeNfc) for ordinary normalized storage and comparison.
+Use `normalizeNfd` when a consumer needs base characters and marks as separate scalars. Use
+[`Unicode.normalizeNfc`](#Unicode.impl.normalizeNfc) for storage and comparison.
 
 #### Details
 
-The function does not change `value`. It returns freshly owned UTF-8 text and can allocate.
-Canonically equivalent inputs produce equal NFD text under the same Unicode data version.
+The function does not change `value`. Two canonically equivalent inputs give equal output.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage for the result.
 
 ::Anchor{id="Unicode.impl.normalizeNfc"}
 
@@ -156,16 +141,20 @@ Canonically equivalent inputs produce equal NFD text under the same Unicode data
 pub effect fn normalizeNfc(value: string) -> String ! OutOfMemoryError ? &mut Allocator
 ```
 
-Returns the Normalization Form C of text: decomposed, canonically ordered, then recomposed.
+Returns the Normalization Form C (NFC) of `value`: decomposed, put in canonical order, and
+then composed again.
 
 #### When to use
 
-Use this function for ordinary normalized storage and canonical-equivalence comparison. Use
-[`normalizeNfd`](#Unicode.impl.normalizeNfd) when a consumer requires decomposed scalars.
+Use `normalizeNfc` before you store or compare text that can come in different encodings. Most
+text from keyboards and the web is already NFC.
 
 #### Details
 
-The function does not change `value`. It returns freshly owned UTF-8 text and can allocate.
-Canonically equivalent inputs produce equal NFC text under the same Unicode data version.
+The function does not change `value`. Two canonically equivalent inputs give equal output.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage for the result.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

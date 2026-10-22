@@ -1,10 +1,13 @@
 import { Array, Option, pipe } from 'effect'
 
 import { generatedGroups } from './generated'
+import { writtenGroups } from './written'
 
 // Every documentation page lives at /docs/<directory>/<slug> and is backed by
-// content/<directory>/<slug>.md. Groups only decide where a page appears in
-// the sidebar, so a page can move between groups without changing its URL.
+// content/<directory>/<slug>.md, or content/<directory>/<NN>-<slug>.md for the
+// hand-written sections, whose file names carry their sidebar position. Groups
+// only decide where a page appears in the sidebar, so a page can move between
+// groups without changing its URL.
 
 export type DocPage = Readonly<{
   directory: string
@@ -20,29 +23,10 @@ export type DocGroup = Readonly<{
   pages: ReadonlyArray<DocPage>
 }>
 
-const startPage = (slug: string, title: string): DocPage => ({
-  directory: 'start',
-  slug,
-  title,
-  maybeSourceUrl: Option.none(),
-})
-
-export const introduction = startPage('introduction', 'Introduction')
-
-const startGroup: DocGroup = {
-  key: 'start',
-  title: 'Get started',
-  showCount: true,
-  pages: [
-    introduction,
-    startPage('install', 'Install'),
-    startPage('quick-start', 'Quick start'),
-    startPage('tour', 'A short tour'),
-    startPage('tools', 'Tools'),
-  ],
-}
-
-export const groups: ReadonlyArray<DocGroup> = [startGroup, ...generatedGroups]
+export const groups: ReadonlyArray<DocGroup> = [
+  ...writtenGroups,
+  ...generatedGroups,
+]
 
 export const allPages: ReadonlyArray<DocPage> = Array.flatMap(
   groups,

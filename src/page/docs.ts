@@ -137,7 +137,11 @@ const sidebar = (
   return h.nav(
     [h.AriaLabel('Documentation'), h.Class('flex flex-col gap-5')],
     [
-      searchBox(query, h),
+      // The sidebar scrolls on its own; the search stays at its top.
+      h.div(
+        [h.Class('bg-paper md:sticky md:top-0 md:z-10 md:pb-1')],
+        [searchBox(query, h)],
+      ),
       Array.match(visibleGroups, {
         onEmpty: () =>
           h.p(
@@ -453,7 +457,7 @@ export const indexView = (model: Model, h: HtmlBuilder<Message>): Html =>
             h.p(
               [h.Class('text-lg leading-prose text-muted')],
               [
-                'Start with the introduction and the short tour, then go deeper with the language reference and the standard library.',
+                'New to Silk? Install it and take the tour, then read the book. The language reference, the guides and the standard library are here when you need the details.',
               ],
             ),
           ],

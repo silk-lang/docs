@@ -1,10 +1,63 @@
-Owned checked HTTP origins, separate from request paths and explicit Host fields.
+The origin of an HTTP request: the scheme, host, and port that a connection goes to.
+
+## When to use
+Use [`Origin.fromUri`](#Origin.impl.fromUri) to get the origin of a URL. The client connects to the host and port of
+the origin, and for HTTPS checks the server certificate against the host. Use
+[`Origin.authorityInto`](#Origin.impl.authorityInto) to write the `Host` value.
 
 ## Details
+An `Origin` has no path, and does not allocate. A missing port becomes 80 for `http` and 443 for
+`https`. [`Origin.authorityInto`](#Origin.impl.authorityInto) writes a lowercase domain, the canonical IP text, and the port
+only when it is not the default. A `Host` field that you give never changes the host that TLS
+checks.
 
-An origin retains the checked host, effective port, and transport scheme without allocation.
-Authority output uses lowercase domain bytes, canonical numeric addresses, and nondefault ports.
-An explicit Host field never changes the origin used for TLS authentication.
+## Errors
+- [`OriginError`](#OriginError) if the scheme is not `http` or `https`, the URI has user information, or the
+  host or port is not valid.
+
+## Examples
+### Get the origin of a URL
+```silk
+import silk.http_origin { Origin, OriginError }
+import silk.network_address { Port }
+import silk.result { Result }
+import silk.uri { Uri }
+import silk.uri_reference { ParseError }
+
+pub fn main() -> i32 {
+  let uri = match Uri.parse("https://Example.COM/docs?page=2") {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let origin = match Origin.fromUri(&uri) {
+    Result<Origin, OriginError>.Success { value } => value
+    Result<Origin, OriginError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if !Origin.secure(&origin) || Port.value(&Origin.port(&origin)) != 443 {
+    return 1
+  }
+
+  // The default port is not written, and the domain is lowercase.
+  let mut output: [u8; 64] = [0; 64]
+  let length = match Origin.authorityInto(&origin, &mut output) {
+    Result<usize, OriginError>.Success { value } => value
+    Result<usize, OriginError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if length != 11 || output[0] != 101 {
+    return 1
+  }
+  if !Origin.matchesAuthority(&origin, "example.com:443") {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `Origin` with `import silk.http_origin { Origin }`.
 
@@ -18,7 +71,7 @@ Public declarations: 2.
 pub enum OriginError
 ```
 
-A rejected HTTP origin or insufficient authority output buffer.
+The reason that an origin is not valid, or that its text does not fit.
 
 ::Anchor{id="OriginError.InvalidScheme"}
 
@@ -28,7 +81,7 @@ A rejected HTTP origin or insufficient authority output buffer.
 InvalidScheme
 ```
 
-The URI scheme is neither HTTP nor HTTPS.
+The scheme is not `http` or `https`.
 
 ::Anchor{id="OriginError.UserInfo"}
 
@@ -38,7 +91,7 @@ The URI scheme is neither HTTP nor HTTPS.
 UserInfo
 ```
 
-User information is forbidden in an HTTP origin.
+The URI has user information, as in `user@host`.
 
 ::Anchor{id="OriginError.MissingHost"}
 
@@ -58,7 +111,7 @@ The URI has no host.
 InvalidHost
 ```
 
-The host fails the checked network identity rules.
+The host is not a valid domain name or IP address. See `Host.parse` in `silk.network_address`.
 
 ::Anchor{id="OriginError.InvalidPort"}
 
@@ -68,7 +121,7 @@ The host fails the checked network identity rules.
 InvalidPort
 ```
 
-The port is empty, nondecimal, or outside 1 through 65535.
+The port is empty, not a number, or not from 1 to 65535.
 
 ::Anchor{id="OriginError.OutputTooSmall"}
 
@@ -78,7 +131,7 @@ The port is empty, nondecimal, or outside 1 through 65535.
 OutputTooSmall
 ```
 
-Output cannot hold the complete authority.
+The output buffer is too small. Nothing was written.
 
 ::Anchor{id="Origin"}
 
@@ -88,7 +141,8 @@ Output cannot hold the complete authority.
 pub struct Origin
 ```
 
-An owned HTTP authority and secure-transport selection.
+The scheme, host, and port of an HTTP server. Make it with [`Origin.fromUri`](#Origin.impl.fromUri) or
+[`Origin.make`](#Origin.impl.make).
 
 ::Anchor{id="Origin.impl.Copy"}
 
@@ -114,7 +168,8 @@ impl Origin
 pub fn make(host: Host, port: Port, secure: bool) -> Result<Origin, OriginError>
 ```
 
-Checks a host, a nonzero port, and an explicit transport-security selection.
+Returns the origin for `host` and `port`. `secure` selects HTTPS. Port 0 returns
+`InvalidPort`.
 
 ::Anchor{id="Origin.impl.fromUri"}
 
@@ -124,12 +179,11 @@ Checks a host, a nonzero port, and an explicit transport-security selection.
 pub fn fromUri(uri: &Uri) -> Result<Origin, OriginError>
 ```
 
-Checks an HTTP or HTTPS URI and copies its host and effective port without allocation.
+Returns the origin of an `http` or `https` URI.
 
 #### Details
-
-User information is rejected. Absent ports become 80 for HTTP and 443 for HTTPS.
-The path, query, and fragment do not contribute to this origin.
+A missing port becomes 80 for `http` and 443 for `https`. The path, query, and fragment are
+ignored. User information returns `UserInfo`.
 
 ::Anchor{id="Origin.impl.host"}
 
@@ -139,7 +193,7 @@ The path, query, and fragment do not contribute to this origin.
 pub fn host(self: &Self) -> Host
 ```
 
-Returns the owned checked identity used for resolution and TLS authentication.
+Returns the host. The client resolves it, and TLS checks the certificate against it.
 
 ::Anchor{id="Origin.impl.port"}
 
@@ -149,7 +203,7 @@ Returns the owned checked identity used for resolution and TLS authentication.
 pub fn port(self: &Self) -> Port
 ```
 
-Returns the effective checked port, including a scheme default.
+Returns the port, with the default port if the URI had none.
 
 ::Anchor{id="Origin.impl.secure"}
 
@@ -159,7 +213,7 @@ Returns the effective checked port, including a scheme default.
 pub fn secure(self: &Self) -> bool
 ```
 
-Returns whether this origin requires authenticated TLS.
+Returns `true` for HTTPS.
 
 ::Anchor{id="Origin.impl.equals"}
 
@@ -169,7 +223,8 @@ Returns whether this origin requires authenticated TLS.
 pub fn equals(self: &Self, other: &Self) -> bool
 ```
 
-Compares transport scheme, effective port, and case-insensitive checked host identity.
+Returns `true` if the scheme, the port, and the host are equal. Domains are compared without
+case.
 
 ::Anchor{id="Origin.impl.authorityInto"}
 
@@ -179,7 +234,8 @@ Compares transport scheme, effective port, and case-insensitive checked host ide
 pub fn authorityInto(self: &Self, output: &mut [u8]) -> Result<usize, OriginError>
 ```
 
-Writes the normalized authority and leaves output unchanged when capacity is insufficient.
+Writes `host` or `host:port` to the start of `output`, and returns the length. The port is
+written only when it is not the default. If `output` is too small, it writes nothing.
 
 ::Anchor{id="Origin.impl.authorityWithPortInto"}
 
@@ -189,11 +245,8 @@ Writes the normalized authority and leaves output unchanged when capacity is ins
 pub fn authorityWithPortInto(self: &Self, output: &mut [u8]) -> Result<usize, OriginError>
 ```
 
-Writes the normalized authority with its effective port, including a default port.
-
-#### Details
-
-A capacity failure leaves `output` unchanged.
+Writes `host:port` to the start of `output`, and returns the length. The port is always
+written. If `output` is too small, it writes nothing.
 
 ::Anchor{id="Origin.impl.matchesAuthority"}
 
@@ -203,11 +256,10 @@ A capacity failure leaves `output` unchanged.
 pub fn matchesAuthority(self: &Self, text: string) -> bool
 ```
 
-Checks an explicit authority against this origin, allowing an explicit default port.
+Returns `true` if `text` names this origin.
 
 #### Details
-
-The authority must contain only a checked host and optional decimal port.
-Case-insensitive domains and equivalent numeric addresses compare equal.
+`text` is a host with an optional port. The default port can be written or not. Domains are
+compared without case, and equal IP addresses match in any spelling.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

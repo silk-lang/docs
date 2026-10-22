@@ -1,4 +1,19 @@
-Bounded byte transfer coupled to retained input and exact-prefix buffered output.
+Copy bytes from one buffered session to another, and consume only what the destination accepts.
+
+## When to use
+Use [`BufferedTransfer.transferAtMost`](#BufferedTransfer.impl.transferAtMost) or [`BufferedTransfer.transferExact`](#BufferedTransfer.impl.transferExact) inside
+`silk.buffered_duplex.withBufferedPairCapacity` to forward a body or a stream, for example in a
+proxy.
+
+## Details
+The transfer reads into the input buffer of the source and offers those bytes to the output
+buffer of the destination. It consumes from the source only the bytes that the destination
+accepted. If a write fails, the bytes that were not accepted stay unread in the source. No
+operation allocates.
+
+## Gotchas
+The destination output buffer can still hold bytes after the transfer. Flush the destination
+when the transfer is complete.
 
 Import as `BufferedTransfer` with `import silk.buffered_transfer { BufferedTransfer }`.
 
@@ -12,7 +27,7 @@ Public declarations: 2.
 pub struct TransferOutcome
 ```
 
-One finite transfer result.
+The result of [`BufferedTransfer.transferAtMost`](#BufferedTransfer.impl.transferAtMost).
 
 ::Anchor{id="TransferOutcome.count"}
 
@@ -22,7 +37,7 @@ One finite transfer result.
 pub count: usize
 ```
 
-The exact destination-accepted and source-consumed count.
+The number of bytes that the destination accepted and the source consumed.
 
 ::Anchor{id="TransferOutcome.endObserved"}
 
@@ -32,7 +47,7 @@ The exact destination-accepted and source-consumed count.
 pub endObserved: bool
 ```
 
-True only when the operation actually observed source end.
+`true` if the transfer stopped because the source ended. `false` if it reached the limit.
 
 ::Anchor{id="BufferedTransfer"}
 
@@ -42,7 +57,7 @@ True only when the operation actually observed source end.
 pub struct BufferedTransfer
 ```
 
-The owner of bounded exact-prefix transfer operations.
+The owner type of the transfer operations. It has no fields and is never constructed.
 
 ::Anchor{id="BufferedTransfer.impl"}
 
@@ -69,7 +84,17 @@ where &mut SP provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock,
   &mut DP provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Transfers no more than `limit`, consuming only destination-accepted bytes.
+Copies up to `limit` bytes from `source` to `destination`. It stops early if the source ends.
+
+#### Details
+
+`deadline` is an absolute time on the active `MonotonicClock`. `Option.none()` means no time
+limit. It applies to each read and write.
+
+#### Errors
+
+- The read errors of `source` and the write errors of `destination`. `progress` and `accepted`
+  include the bytes that this call already transferred.
 
 ::Anchor{id="BufferedTransfer.impl.transferExact"}
 
@@ -88,6 +113,12 @@ where &mut SP provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock,
   &mut DP provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Transfers exactly `count` bytes or reports early end with the transferred prefix.
+Copies exactly `count` bytes from `source` to `destination`.
+
+#### Errors
+
+- `BufferError.UnexpectedEnd` if the source ends first. `progress` gives the number of bytes
+  that were transferred.
+- The errors of [`BufferedTransfer.transferAtMost`](#BufferedTransfer.impl.transferAtMost).
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

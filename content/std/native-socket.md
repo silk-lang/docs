@@ -1,25 +1,139 @@
-Scoped nonblocking TCP and pathname-Unix connections and listeners over ByteDuplex.
+TCP and Unix socket connections and listeners, as `ByteDuplex` providers.
 
 ## When to use
+- To connect, call [`connectResolved`](#connectResolved) with endpoints from `silk.resolver`, or [`connectUnix`](#connectUnix)
+  with a socket path. The connection is lent to a callback and closed after it. Use
+  [`connectResolvedOwned`](#connectResolvedOwned) or [`connectUnixOwned`](#connectUnixOwned) to keep the [`Connection`](#Connection) yourself.
+- To serve, call [`listen`](#listen) or [`listenUnix`](#listenUnix), then [`accept`](#accept) for each client. Use
+  [`withAccepted`](#withAccepted) to get the connection and the peer address, and close them after.
 
-Use connectResolvedOwned or connectUnixOwned when the caller must retain an outbound connection.
-The shorter connectResolved and connectUnix operations consume the same owner into a protected
-callback scope. Use listen or listenUnix for one affine listener, then accept one independently
-owned Connection at a time.
+A [`Connection`](#Connection) provides `ByteDuplex`, so `silk.http_exchange`, `silk.http_server`, and
+`silk.buffered_duplex` can use it.
 
 ## Details
+All sockets are nonblocking. When a socket is not ready, the operation waits for the poll
+interval with `MonotonicClock`, then tries again. So an idle wait costs about one check for each
+interval. One deadline covers all attempts of one connect or accept.
 
-Every native syscall is nonblocking. Temporary unavailability uses zero-time poll followed by a
-positive MonotonicClock wait. One acquisition deadline is shared by every sequential candidate
-or accept retry. Socket flush means kernel acceptance, not delivery to the peer.
+A connect tries the endpoints in their order, until one connects or the attempt limit is
+reached. A flush means that the kernel accepted the bytes, not that the peer got them.
+
+## Errors
+[`NativeSocketError`](#NativeSocketError) tells the rule, the system error, or the deadline. When all endpoints
+fail, `AttemptsExhausted` has the error of the last attempt.
 
 ## Gotchas
+- With a deadline of `None`, a connect or accept can wait forever.
+- Closing a Unix listener does not remove its socket file. Remove it yourself.
+- Scoped functions close the socket on return, error, and cancellation. A trap does not.
+- On Darwin, socket setup is not safe against a `fork` in another thread.
+- A call fails to compile on targets other than Darwin on aarch64, and Linux with GNU libc on
+  x86_64 or aarch64. The option types still compile.
 
-Timer polling trades readiness latency for a bounded idle poll rate. A None deadline may wait
-indefinitely. Listener close never unlinks a pathname. Structured Effect exits close once;
-fatal traps carry no cleanup guarantee. Darwin setup is single-threaded and does not promise
-cross-thread fork safety. On unsupported targets or no-libc profiles, reached native operations
-produce a compile-time error. Unused imports and portable option metadata remain available.
+## Examples
+### Connect to a local listener
+```silk
+import silk.byte_duplex { ByteDuplex, ByteIoError, ReadTransfer }
+import silk.effect { Effect }
+import silk.monotonic_clock { MonotonicClock }
+import silk.native_socket {
+  AcceptedView,
+  BoundAddress,
+  ConnectOptions,
+  Connection,
+  ListenOptions,
+  Listener,
+  NativeSocketError,
+  accept,
+  connectResolvedOwned,
+  listen,
+  withAccepted,
+}
+import silk.network_address { Endpoint, IpAddress, Ipv4Address, Port }
+import silk.option { Option }
+import silk.os_monotonic_clock { OsMonotonicClock }
+import silk.system_clock { Instant }
+
+// Reads one byte from the client and answers with one byte.
+effect fn answer<'call>(view: &'call mut AcceptedView<'call>) -> i32
+  ! ByteIoError
+  ? &mut MonotonicClock {
+  let mut input: [u8; 1] = [0]
+  match move run ByteDuplex.readSome(&mut input, Option<Instant>.none())
+    |> Effect.provideMut<ByteDuplex>(&mut view.connection.*) {
+    ReadTransfer.Data { count } => {
+      if count != 1 || input[0] != 120 {
+        return 1
+      }
+    }
+    ReadTransfer.End => {
+      return 1
+    }
+  }
+
+  // One byte is always written at once, or the call fails.
+  let written = run ByteDuplex.writeSome(b"y", Option<Instant>.none())
+    |> Effect.provideMut<ByteDuplex>(&mut view.connection.*)
+  if written != 1 {
+    return 1
+  }
+  return 0
+}
+
+effect fn program() -> i32
+  ! NativeSocketError | ByteIoError
+  ? &mut MonotonicClock {
+  // Port 0 asks the system for a free port.
+  let local = Endpoint.make(
+    IpAddress.V4 { value: Ipv4Address.fromOctets([127, 0, 0, 1]) },
+    Port.fromU16(0)
+  )
+  let mut listener = run listen(local, ListenOptions.defaults())
+  let bound = match Listener.boundAddress(&listener) {
+    BoundAddress.Tcp { endpoint } => endpoint
+    _ => {
+      return 1
+    }
+  }
+  let targets = [bound]
+  let mut client = run connectResolvedOwned(
+    &targets,
+    ConnectOptions.defaults(),
+    Option<Instant>.none()
+  )
+  let sent = run ByteDuplex.writeSome(b"x", Option<Instant>.none())
+    |> Effect.provideMut<ByteDuplex>(&mut client)
+  if sent != 1 {
+    return 1
+  }
+  let accepted = run accept(&mut listener, Option<Instant>.none())
+  run Listener.close(&mut listener)
+  let served = run withAccepted<i32, ByteIoError>(move accepted, answer)
+  let mut reply: [u8; 1] = [0]
+  let read = run ByteDuplex.readSome(&mut reply, Option<Instant>.none())
+    |> Effect.provideMut<ByteDuplex>(&mut client)
+  run Connection.close(&mut client)
+  return match move read {
+    ReadTransfer.Data { count } => {
+      if served != 0 || count != 1 || reply[0] != 121 {
+        return 1
+      }
+      return 0
+    }
+    ReadTransfer.End => 1
+  }
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut clock = OsMonotonicClock.make()
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<MonotonicClock>(&mut clock)
+}
+```
 
 Import as `NativeSocket` with `import silk.native_socket { NativeSocket }`.
 
@@ -33,7 +147,7 @@ Public declarations: 33.
 pub enum ConnectionPhase
 ```
 
-The visible directional lifetime of one native connection.
+The state of a [`Connection`](#Connection).
 
 ::Anchor{id="ConnectionPhase.Connecting"}
 
@@ -43,7 +157,7 @@ The visible directional lifetime of one native connection.
 Connecting
 ```
 
-Native connection establishment has not completed.
+The connect has not finished.
 
 ::Anchor{id="ConnectionPhase.Open"}
 
@@ -53,7 +167,7 @@ Native connection establishment has not completed.
 Open
 ```
 
-The descriptor is available for its permitted operations.
+Reads and writes are allowed.
 
 ::Anchor{id="ConnectionPhase.WriteClosed"}
 
@@ -63,7 +177,7 @@ The descriptor is available for its permitted operations.
 WriteClosed
 ```
 
-The local write direction is closed; reads remain available.
+The write side is shut down. Reads are still allowed.
 
 ::Anchor{id="ConnectionPhase.Closed"}
 
@@ -73,7 +187,7 @@ The local write direction is closed; reads remain available.
 Closed
 ```
 
-The descriptor is terminally closed.
+The socket is closed.
 
 ::Anchor{id="NativeSocketOperation"}
 
@@ -83,7 +197,7 @@ The descriptor is terminally closed.
 pub enum NativeSocketOperation
 ```
 
-The native boundary that produced a socket failure.
+The system call that failed.
 
 ::Anchor{id="NativeSocketOperation.Socket"}
 
@@ -93,7 +207,7 @@ The native boundary that produced a socket failure.
 Socket
 ```
 
-Native socket creation.
+`socket`: create the socket.
 
 ::Anchor{id="NativeSocketOperation.Configure"}
 
@@ -103,7 +217,7 @@ Native socket creation.
 Configure
 ```
 
-Native descriptor or socket-option setup.
+Set descriptor flags or socket options.
 
 ::Anchor{id="NativeSocketOperation.Connect"}
 
@@ -113,7 +227,7 @@ Native descriptor or socket-option setup.
 Connect
 ```
 
-Native outbound connection establishment.
+`connect`.
 
 ::Anchor{id="NativeSocketOperation.Bind"}
 
@@ -123,7 +237,7 @@ Native outbound connection establishment.
 Bind
 ```
 
-Native local-address binding.
+`bind`.
 
 ::Anchor{id="NativeSocketOperation.Listen"}
 
@@ -133,7 +247,7 @@ Native local-address binding.
 Listen
 ```
 
-Native listener activation.
+`listen`.
 
 ::Anchor{id="NativeSocketOperation.GetSocketName"}
 
@@ -143,7 +257,7 @@ Native listener activation.
 GetSocketName
 ```
 
-Native bound-address inspection.
+`getsockname`: read the bound address.
 
 ::Anchor{id="NativeSocketOperation.Accept"}
 
@@ -153,7 +267,7 @@ Native bound-address inspection.
 Accept
 ```
 
-Native incoming connection acceptance.
+`accept`.
 
 ::Anchor{id="NativeSocketOperation.ConvertAddress"}
 
@@ -163,7 +277,7 @@ Native incoming connection acceptance.
 ConvertAddress
 ```
 
-Conversion of a returned native address.
+Convert an address that the system returned.
 
 ::Anchor{id="NativeSocketOperation.Poll"}
 
@@ -173,7 +287,7 @@ Conversion of a returned native address.
 Poll
 ```
 
-Native zero-time readiness inspection.
+`poll`: check if the socket is ready.
 
 ::Anchor{id="NativeSocketOperation.GetSocketOption"}
 
@@ -183,7 +297,7 @@ Native zero-time readiness inspection.
 GetSocketOption
 ```
 
-Native socket error inspection.
+`getsockopt`: read the error of the socket.
 
 ::Anchor{id="NativeSocketOperation.Read"}
 
@@ -193,7 +307,7 @@ Native socket error inspection.
 Read
 ```
 
-Native input transfer.
+`read`.
 
 ::Anchor{id="NativeSocketOperation.Write"}
 
@@ -203,7 +317,7 @@ Native input transfer.
 Write
 ```
 
-Native output transfer.
+`write`.
 
 ::Anchor{id="NativeSocketOperation.ShutdownWrite"}
 
@@ -213,7 +327,7 @@ Native output transfer.
 ShutdownWrite
 ```
 
-Native write-direction shutdown.
+`shutdown` of the write side.
 
 ::Anchor{id="NativeSocketOperation.Close"}
 
@@ -223,7 +337,7 @@ Native write-direction shutdown.
 Close
 ```
 
-Native terminal descriptor release.
+`close`.
 
 ::Anchor{id="ListenerPhase"}
 
@@ -233,7 +347,7 @@ Native terminal descriptor release.
 pub enum ListenerPhase
 ```
 
-The visible lifetime of one native listener.
+The state of a [`Listener`](#Listener).
 
 ::Anchor{id="ListenerPhase.Open"}
 
@@ -243,7 +357,7 @@ The visible lifetime of one native listener.
 Open
 ```
 
-The descriptor is available for its permitted operations.
+The listener accepts clients.
 
 ::Anchor{id="ListenerPhase.Closed"}
 
@@ -253,7 +367,7 @@ The descriptor is available for its permitted operations.
 Closed
 ```
 
-The descriptor is terminally closed.
+The listener is closed.
 
 ::Anchor{id="ListenOptionsReason"}
 
@@ -263,7 +377,7 @@ The descriptor is terminally closed.
 pub enum ListenOptionsReason
 ```
 
-The rejected ListenOptions field.
+The [`ListenOptions`](#ListenOptions) value that is not valid.
 
 ::Anchor{id="ListenOptionsReason.KernelBacklog"}
 
@@ -273,7 +387,7 @@ The rejected ListenOptions field.
 KernelBacklog
 ```
 
-The kernel backlog is outside 1..65535.
+The backlog is not 1 through 65535.
 
 ::Anchor{id="ListenOptionsReason.PollInterval"}
 
@@ -283,7 +397,7 @@ The kernel backlog is outside 1..65535.
 PollInterval
 ```
 
-The polling interval is outside 1..1,000,000,000 nanoseconds.
+The poll interval is not 1 nanosecond through 1 second.
 
 ::Anchor{id="ListenOptionsError"}
 
@@ -293,7 +407,7 @@ The polling interval is outside 1..1,000,000,000 nanoseconds.
 pub struct ListenOptionsError
 ```
 
-A typed ListenOptions admission failure.
+The error of [`ListenOptions.make`](#ListenOptions.impl.make).
 
 ::Anchor{id="ListenOptionsError.reason"}
 
@@ -303,7 +417,7 @@ A typed ListenOptions admission failure.
 pub reason: ListenOptionsReason
 ```
 
-The input admission rule that failed.
+The value that is not valid.
 
 ::Anchor{id="ListenOptionsError.value"}
 
@@ -313,7 +427,7 @@ The input admission rule that failed.
 pub value: u64
 ```
 
-The rejected option value.
+The value that you gave.
 
 ::Anchor{id="InvalidBindReason"}
 
@@ -323,7 +437,7 @@ The rejected option value.
 pub enum InvalidBindReason
 ```
 
-The rejected local pathname condition.
+Why a Unix socket path for [`listenUnix`](#listenUnix) is not valid.
 
 ::Anchor{id="InvalidBindReason.EmptyPath"}
 
@@ -333,7 +447,7 @@ The rejected local pathname condition.
 EmptyPath
 ```
 
-The pathname contains no bytes.
+The path is empty.
 
 ::Anchor{id="InvalidBindReason.RelativePath"}
 
@@ -343,7 +457,7 @@ The pathname contains no bytes.
 RelativePath
 ```
 
-The pathname does not start with a slash.
+The path does not start with `/`.
 
 ::Anchor{id="InvalidBindReason.NulPath"}
 
@@ -353,7 +467,7 @@ The pathname does not start with a slash.
 NulPath
 ```
 
-The pathname contains a NUL byte.
+The path has a NUL byte.
 
 ::Anchor{id="InvalidBindReason.AbstractPath"}
 
@@ -363,7 +477,7 @@ The pathname contains a NUL byte.
 AbstractPath
 ```
 
-The pathname requests an unsupported abstract address.
+The path is an abstract socket address, which is not supported.
 
 ::Anchor{id="ConnectOptionsReason"}
 
@@ -373,7 +487,7 @@ The pathname requests an unsupported abstract address.
 pub enum ConnectOptionsReason
 ```
 
-The rejected ConnectOptions field.
+The [`ConnectOptions`](#ConnectOptions) value that is not valid.
 
 ::Anchor{id="ConnectOptionsReason.PollInterval"}
 
@@ -383,7 +497,7 @@ The rejected ConnectOptions field.
 PollInterval
 ```
 
-The polling interval is outside 1..1,000,000,000 nanoseconds.
+The poll interval is not 1 nanosecond through 1 second.
 
 ::Anchor{id="ConnectOptionsReason.MaxAttempts"}
 
@@ -393,7 +507,7 @@ The polling interval is outside 1..1,000,000,000 nanoseconds.
 MaxAttempts
 ```
 
-The connection attempt limit is outside 1..1024.
+The attempt limit is not 1 through 1024.
 
 ::Anchor{id="ConnectOptionsError"}
 
@@ -403,7 +517,7 @@ The connection attempt limit is outside 1..1024.
 pub struct ConnectOptionsError
 ```
 
-A typed ConnectOptions admission failure.
+The error of [`ConnectOptions.make`](#ConnectOptions.impl.make).
 
 ::Anchor{id="ConnectOptionsError.reason"}
 
@@ -413,7 +527,7 @@ A typed ConnectOptions admission failure.
 pub reason: ConnectOptionsReason
 ```
 
-The input admission rule that failed.
+The value that is not valid.
 
 ::Anchor{id="ConnectOptionsError.value"}
 
@@ -423,7 +537,7 @@ The input admission rule that failed.
 pub value: u64
 ```
 
-The rejected option value.
+The value that you gave.
 
 ::Anchor{id="InvalidEndpointReason"}
 
@@ -433,7 +547,7 @@ The rejected option value.
 pub enum InvalidEndpointReason
 ```
 
-The rejected endpoint or pathname condition.
+Why the endpoints or the Unix socket path of a connect are not valid.
 
 ::Anchor{id="InvalidEndpointReason.EmptyEndpoints"}
 
@@ -453,7 +567,7 @@ The endpoint list is empty.
 TooManyEndpoints
 ```
 
-The endpoint count exceeds the attempt limit.
+There are more endpoints than the attempt limit.
 
 ::Anchor{id="InvalidEndpointReason.EmptyPath"}
 
@@ -463,7 +577,7 @@ The endpoint count exceeds the attempt limit.
 EmptyPath
 ```
 
-The pathname contains no bytes.
+The path is empty.
 
 ::Anchor{id="InvalidEndpointReason.RelativePath"}
 
@@ -473,7 +587,7 @@ The pathname contains no bytes.
 RelativePath
 ```
 
-The pathname does not start with a slash.
+The path does not start with `/`.
 
 ::Anchor{id="InvalidEndpointReason.NulPath"}
 
@@ -483,7 +597,7 @@ The pathname does not start with a slash.
 NulPath
 ```
 
-The pathname contains a NUL byte.
+The path has a NUL byte.
 
 ::Anchor{id="InvalidEndpointReason.PathTooLong"}
 
@@ -493,7 +607,7 @@ The pathname contains a NUL byte.
 PathTooLong
 ```
 
-The pathname and its terminator exceed native address capacity.
+The path is too long for a socket address.
 
 ::Anchor{id="InvalidEndpointReason.AbstractPath"}
 
@@ -503,7 +617,7 @@ The pathname and its terminator exceed native address capacity.
 AbstractPath
 ```
 
-The pathname requests an unsupported abstract address.
+The path is an abstract socket address, which is not supported.
 
 ::Anchor{id="AttemptFailure"}
 
@@ -513,7 +627,7 @@ The pathname requests an unsupported abstract address.
 pub union AttemptFailure
 ```
 
-One nonrecursive failure retained when the attempt budget is exhausted.
+The error of the last connect attempt, in `AttemptsExhausted`.
 
 ::Anchor{id="AttemptFailure.ConnectionRefused"}
 
@@ -533,7 +647,7 @@ The peer refused the connection.
 NetworkUnreachable
 ```
 
-The destination network is unreachable.
+The network cannot be reached.
 
 ::Anchor{id="AttemptFailure.AddressUnavailable"}
 
@@ -543,7 +657,7 @@ The destination network is unreachable.
 AddressUnavailable
 ```
 
-The requested address is unavailable.
+The address is not available.
 
 ::Anchor{id="AttemptFailure.NativeFailure"}
 
@@ -553,7 +667,7 @@ The requested address is unavailable.
 NativeFailure
 ```
 
-A native boundary failed with the retained operation and error number.
+Another system error.
 
 ::Anchor{id="AttemptFailure.NativeFailure.operation"}
 
@@ -563,7 +677,7 @@ A native boundary failed with the retained operation and error number.
 pub operation: NativeSocketOperation
 ```
 
-The native or byte-I/O operation that failed.
+The system call that failed.
 
 ::Anchor{id="AttemptFailure.NativeFailure.errno"}
 
@@ -573,7 +687,7 @@ The native or byte-I/O operation that failed.
 pub errno: i32
 ```
 
-The native error number reported by the selected platform.
+The `errno` value.
 
 ::Anchor{id="NativeSocketError"}
 
@@ -583,7 +697,7 @@ The native error number reported by the selected platform.
 pub union NativeSocketError
 ```
 
-A native socket acquisition or explicit lifecycle failure.
+The error of a socket operation.
 
 ::Anchor{id="NativeSocketError.AttemptsExhausted"}
 
@@ -593,7 +707,7 @@ A native socket acquisition or explicit lifecycle failure.
 AttemptsExhausted
 ```
 
-The admitted connection attempt budget is exhausted.
+All connect attempts failed.
 
 ::Anchor{id="NativeSocketError.AttemptsExhausted.attempted"}
 
@@ -603,7 +717,7 @@ The admitted connection attempt budget is exhausted.
 pub attempted: usize
 ```
 
-The number of native connect attempts already made.
+The number of attempts.
 
 ::Anchor{id="NativeSocketError.AttemptsExhausted.last"}
 
@@ -613,7 +727,7 @@ The number of native connect attempts already made.
 pub last: AttemptFailure
 ```
 
-The failure from the final attempted candidate.
+The error of the last attempt.
 
 ::Anchor{id="NativeSocketError.TimeRangeError"}
 
@@ -623,7 +737,7 @@ The failure from the final attempted candidate.
 TimeRangeError
 ```
 
-The next positive wake time is not representable.
+The time of the next check does not fit in an `Instant`.
 
 ::Anchor{id="NativeSocketError.InvalidEndpoint"}
 
@@ -633,7 +747,7 @@ The next positive wake time is not representable.
 InvalidEndpoint
 ```
 
-An endpoint list or Unix pathname failed admission.
+The endpoints or the socket path of a connect are not valid.
 
 ::Anchor{id="NativeSocketError.InvalidEndpoint.reason"}
 
@@ -643,7 +757,7 @@ An endpoint list or Unix pathname failed admission.
 pub reason: InvalidEndpointReason
 ```
 
-The input admission rule that failed.
+The rule that failed.
 
 ::Anchor{id="NativeSocketError.InvalidEndpoint.offset"}
 
@@ -653,7 +767,7 @@ The input admission rule that failed.
 pub offset: usize
 ```
 
-The zero-based byte offset of the rejected pathname input.
+The byte position of the problem in the path.
 
 ::Anchor{id="NativeSocketError.InvalidEndpoint.limit"}
 
@@ -663,7 +777,7 @@ The zero-based byte offset of the rejected pathname input.
 pub limit: usize
 ```
 
-The admitted maximum for this input or transfer.
+The largest allowed value.
 
 ::Anchor{id="NativeSocketError.InvalidBindAddress"}
 
@@ -673,7 +787,7 @@ The admitted maximum for this input or transfer.
 InvalidBindAddress
 ```
 
-A Unix bind pathname failed admission.
+The socket path of [`listenUnix`](#listenUnix) is not valid.
 
 ::Anchor{id="NativeSocketError.InvalidBindAddress.reason"}
 
@@ -683,7 +797,7 @@ A Unix bind pathname failed admission.
 pub reason: InvalidBindReason
 ```
 
-The input admission rule that failed.
+The rule that failed.
 
 ::Anchor{id="NativeSocketError.InvalidBindAddress.offset"}
 
@@ -693,7 +807,7 @@ The input admission rule that failed.
 pub offset: usize
 ```
 
-The zero-based byte offset of the rejected pathname input.
+The byte position of the problem in the path.
 
 ::Anchor{id="NativeSocketError.PathTooLong"}
 
@@ -703,7 +817,7 @@ The zero-based byte offset of the rejected pathname input.
 PathTooLong
 ```
 
-The pathname and its terminator exceed native address capacity.
+The socket path is too long for a socket address.
 
 ::Anchor{id="NativeSocketError.PathTooLong.length"}
 
@@ -713,7 +827,7 @@ The pathname and its terminator exceed native address capacity.
 pub length: usize
 ```
 
-The pathname or returned native address length in bytes.
+The length of the path.
 
 ::Anchor{id="NativeSocketError.PathTooLong.limit"}
 
@@ -723,7 +837,7 @@ The pathname or returned native address length in bytes.
 pub limit: usize
 ```
 
-The admitted maximum for this input or transfer.
+The largest allowed length.
 
 ::Anchor{id="NativeSocketError.AddressInUse"}
 
@@ -733,7 +847,7 @@ The admitted maximum for this input or transfer.
 AddressInUse
 ```
 
-The requested local address is already in use.
+The local address is in use.
 
 ::Anchor{id="NativeSocketError.InvalidNativeAddress"}
 
@@ -743,7 +857,7 @@ The requested local address is already in use.
 InvalidNativeAddress
 ```
 
-The returned native address has an invalid family or length.
+The system returned an address with a wrong family or length.
 
 ::Anchor{id="NativeSocketError.InvalidNativeAddress.family"}
 
@@ -753,7 +867,7 @@ The returned native address has an invalid family or length.
 pub family: i32
 ```
 
-The native address family, or -1 when the header is too short.
+The address family, or -1 if the address is too short.
 
 ::Anchor{id="NativeSocketError.InvalidNativeAddress.length"}
 
@@ -763,7 +877,7 @@ The native address family, or -1 when the header is too short.
 pub length: usize
 ```
 
-The pathname or returned native address length in bytes.
+The length of the address.
 
 ::Anchor{id="NativeSocketError.UnsupportedPeerAddress"}
 
@@ -773,7 +887,7 @@ The pathname or returned native address length in bytes.
 UnsupportedPeerAddress
 ```
 
-The returned peer uses an unsupported address form.
+The peer has an address form that is not supported.
 
 ::Anchor{id="NativeSocketError.UnsupportedPeerAddress.family"}
 
@@ -783,7 +897,7 @@ The returned peer uses an unsupported address form.
 pub family: i32
 ```
 
-The native address family, or -1 when the header is too short.
+The address family, or -1 if the address is too short.
 
 ::Anchor{id="NativeSocketError.UnsupportedPeerAddress.length"}
 
@@ -793,7 +907,7 @@ The native address family, or -1 when the header is too short.
 pub length: usize
 ```
 
-The pathname or returned native address length in bytes.
+The length of the address.
 
 ::Anchor{id="NativeSocketError.FamilyUnsupported"}
 
@@ -803,7 +917,7 @@ The pathname or returned native address length in bytes.
 FamilyUnsupported
 ```
 
-The requested address family is unsupported.
+The system does not support the address family.
 
 ::Anchor{id="NativeSocketError.PermissionDenied"}
 
@@ -813,7 +927,7 @@ The requested address family is unsupported.
 PermissionDenied
 ```
 
-The operating system denied the operation.
+The system denied the operation.
 
 ::Anchor{id="NativeSocketError.ConnectionRefused"}
 
@@ -833,7 +947,7 @@ The peer refused the connection.
 NetworkUnreachable
 ```
 
-The destination network is unreachable.
+The network cannot be reached.
 
 ::Anchor{id="NativeSocketError.AddressUnavailable"}
 
@@ -843,7 +957,7 @@ The destination network is unreachable.
 AddressUnavailable
 ```
 
-The requested address is unavailable.
+The address is not available.
 
 ::Anchor{id="NativeSocketError.SystemResources"}
 
@@ -853,7 +967,7 @@ The requested address is unavailable.
 SystemResources
 ```
 
-The operating system cannot supply the required resources.
+The system does not have the resources, such as descriptors.
 
 ::Anchor{id="NativeSocketError.Timeout"}
 
@@ -863,7 +977,7 @@ The operating system cannot supply the required resources.
 Timeout
 ```
 
-The supplied absolute deadline has been reached.
+The deadline passed.
 
 ::Anchor{id="NativeSocketError.Closed"}
 
@@ -873,7 +987,7 @@ The supplied absolute deadline has been reached.
 Closed
 ```
 
-The descriptor is terminally closed.
+The socket is closed.
 
 ::Anchor{id="NativeSocketError.WriteClosed"}
 
@@ -883,7 +997,7 @@ The descriptor is terminally closed.
 WriteClosed
 ```
 
-The local write direction is closed; reads remain available.
+The write side is shut down.
 
 ::Anchor{id="NativeSocketError.InvalidTransferCount"}
 
@@ -893,7 +1007,7 @@ The local write direction is closed; reads remain available.
 InvalidTransferCount
 ```
 
-A native success reported an impossible transfer count.
+The system returned a transfer count that is not valid.
 
 ::Anchor{id="NativeSocketError.InvalidTransferCount.operation"}
 
@@ -903,7 +1017,7 @@ A native success reported an impossible transfer count.
 pub operation: ByteIoOperation
 ```
 
-The native or byte-I/O operation that failed.
+The operation.
 
 ::Anchor{id="NativeSocketError.InvalidTransferCount.count"}
 
@@ -913,7 +1027,7 @@ The native or byte-I/O operation that failed.
 pub count: usize
 ```
 
-The invalid successful transfer count reported by the native operation.
+The count that the system returned.
 
 ::Anchor{id="NativeSocketError.InvalidTransferCount.limit"}
 
@@ -923,7 +1037,7 @@ The invalid successful transfer count reported by the native operation.
 pub limit: usize
 ```
 
-The admitted maximum for this input or transfer.
+The largest valid count.
 
 ::Anchor{id="NativeSocketError.NativeFailure"}
 
@@ -933,7 +1047,7 @@ The admitted maximum for this input or transfer.
 NativeFailure
 ```
 
-A native boundary failed with the retained operation and error number.
+Another system error.
 
 ::Anchor{id="NativeSocketError.NativeFailure.operation"}
 
@@ -943,7 +1057,7 @@ A native boundary failed with the retained operation and error number.
 pub operation: NativeSocketOperation
 ```
 
-The native or byte-I/O operation that failed.
+The system call that failed.
 
 ::Anchor{id="NativeSocketError.NativeFailure.errno"}
 
@@ -953,7 +1067,7 @@ The native or byte-I/O operation that failed.
 pub errno: i32
 ```
 
-The native error number reported by the selected platform.
+The `errno` value.
 
 ::Anchor{id="NativeSocket"}
 
@@ -963,7 +1077,7 @@ The native error number reported by the selected platform.
 pub struct NativeSocket
 ```
 
-Namespace anchor for the selected native socket actor.
+An empty marker type for this module.
 
 ::Anchor{id="ConnectOptions"}
 
@@ -973,7 +1087,7 @@ Namespace anchor for the selected native socket actor.
 pub struct ConnectOptions
 ```
 
-Finite readiness and attempt policy copied into one connection.
+The settings of a connect: Nagle, the poll interval, and the attempt limit.
 
 ::Anchor{id="ListenOptions"}
 
@@ -983,7 +1097,7 @@ Finite readiness and attempt policy copied into one connection.
 pub struct ListenOptions
 ```
 
-Finite kernel admission and cooperative accept policy.
+The settings of a listener: the backlog, address reuse, and the poll interval of accept.
 
 ::Anchor{id="UnixSocketPath"}
 
@@ -993,7 +1107,7 @@ Finite kernel admission and cooperative accept policy.
 pub struct UnixSocketPath
 ```
 
-One owned pathname spelling used by listener metadata.
+A copy of a Unix socket path, at most 108 bytes.
 
 ::Anchor{id="BoundAddress"}
 
@@ -1003,7 +1117,7 @@ One owned pathname spelling used by listener metadata.
 pub union BoundAddress
 ```
 
-The actual local address owned by a published listener.
+The local address of a [`Listener`](#Listener).
 
 ::Anchor{id="BoundAddress.Tcp"}
 
@@ -1013,7 +1127,7 @@ The actual local address owned by a published listener.
 Tcp
 ```
 
-An owned numeric TCP endpoint.
+A TCP listener.
 
 ::Anchor{id="BoundAddress.Tcp.endpoint"}
 
@@ -1023,7 +1137,7 @@ An owned numeric TCP endpoint.
 pub endpoint: Endpoint
 ```
 
-The owned numeric address and port.
+The address and port. With port 0 in [`listen`](#listen), this is the port that the system chose.
 
 ::Anchor{id="BoundAddress.Unix"}
 
@@ -1033,7 +1147,7 @@ The owned numeric address and port.
 Unix
 ```
 
-An owned Unix-domain address.
+A Unix socket listener.
 
 ::Anchor{id="BoundAddress.Unix.path"}
 
@@ -1043,7 +1157,7 @@ An owned Unix-domain address.
 pub path: UnixSocketPath
 ```
 
-The owned Unix pathname spelling.
+The socket path.
 
 ::Anchor{id="UnixPeerAddress"}
 
@@ -1053,7 +1167,7 @@ The owned Unix pathname spelling.
 pub union UnixPeerAddress
 ```
 
-The peer identity returned for one accepted Unix connection.
+The address of a Unix socket client.
 
 ::Anchor{id="UnixPeerAddress.Unnamed"}
 
@@ -1063,7 +1177,7 @@ The peer identity returned for one accepted Unix connection.
 Unnamed
 ```
 
-The peer has no bound pathname.
+The client socket has no path. This is normal for a client.
 
 ::Anchor{id="UnixPeerAddress.Pathname"}
 
@@ -1073,7 +1187,7 @@ The peer has no bound pathname.
 Pathname
 ```
 
-The peer has an owned pathname spelling.
+The client socket has a path.
 
 ::Anchor{id="UnixPeerAddress.Pathname.path"}
 
@@ -1083,7 +1197,7 @@ The peer has an owned pathname spelling.
 pub path: UnixSocketPath
 ```
 
-The owned Unix pathname spelling.
+The path.
 
 ::Anchor{id="PeerAddress"}
 
@@ -1093,7 +1207,7 @@ The owned Unix pathname spelling.
 pub union PeerAddress
 ```
 
-The owned peer identity returned with one accepted connection.
+The address of an accepted client.
 
 ::Anchor{id="PeerAddress.Tcp"}
 
@@ -1103,7 +1217,7 @@ The owned peer identity returned with one accepted connection.
 Tcp
 ```
 
-An owned numeric TCP endpoint.
+A TCP client.
 
 ::Anchor{id="PeerAddress.Tcp.endpoint"}
 
@@ -1113,7 +1227,7 @@ An owned numeric TCP endpoint.
 pub endpoint: Endpoint
 ```
 
-The owned numeric address and port.
+The address and port of the client.
 
 ::Anchor{id="PeerAddress.Unix"}
 
@@ -1123,7 +1237,7 @@ The owned numeric address and port.
 Unix
 ```
 
-An owned Unix-domain address.
+A Unix socket client.
 
 ::Anchor{id="PeerAddress.Unix.peer"}
 
@@ -1133,7 +1247,7 @@ An owned Unix-domain address.
 pub peer: UnixPeerAddress
 ```
 
-The accepted peer identity.
+The address of the client.
 
 ::Anchor{id="ConnectOptionsError.impl.Copy"}
 
@@ -1235,7 +1349,11 @@ pub fn make(
   ) -> Result<ConnectOptions, ConnectOptionsError>
 ```
 
-Admits a 1..1,000,000,000ns interval and 1..1024 native attempts.
+Returns connect options.
+
+#### Errors
+`ConnectOptionsError` if `pollIntervalNanoseconds` is not 1 through 1000000000, or
+`maxAttempts` is not 1 through 1024.
 
 ::Anchor{id="ConnectOptions.impl.defaults"}
 
@@ -1245,7 +1363,7 @@ Admits a 1..1,000,000,000ns interval and 1..1024 native attempts.
 pub fn defaults() -> ConnectOptions
 ```
 
-Selects Nagle, a one-millisecond readiness interval, and 64 attempts.
+Returns the default connect options: Nagle on, a 1 ms poll interval, and 64 attempts.
 
 ::Anchor{id="ConnectOptions.impl.noDelay"}
 
@@ -1255,7 +1373,7 @@ Selects Nagle, a one-millisecond readiness interval, and 64 attempts.
 pub fn noDelay(self: &Self) -> bool
 ```
 
-Reports whether outbound TCP disables Nagle buffering.
+Returns whether Nagle is off (`TCP_NODELAY`).
 
 ::Anchor{id="ConnectOptions.impl.pollInterval"}
 
@@ -1265,7 +1383,7 @@ Reports whether outbound TCP disables Nagle buffering.
 pub fn pollInterval(self: &Self) -> u64
 ```
 
-Returns the positive polling interval in nanoseconds.
+Returns the poll interval, in nanoseconds.
 
 ::Anchor{id="ConnectOptions.impl.maxAttempts"}
 
@@ -1275,7 +1393,7 @@ Returns the positive polling interval in nanoseconds.
 pub fn maxAttempts(self: &Self) -> usize
 ```
 
-Returns the maximum number of native connection attempts.
+Returns the attempt limit.
 
 ::Anchor{id="ListenOptions.impl"}
 
@@ -1297,7 +1415,11 @@ pub fn make(
   ) -> Result<ListenOptions, ListenOptionsError>
 ```
 
-Admits backlog 1..65535 and a 1..1,000,000,000ns polling interval.
+Returns listen options.
+
+#### Errors
+`ListenOptionsError` if `kernelBacklog` is not 1 through 65535, or `pollIntervalNanoseconds`
+is not 1 through 1000000000.
 
 ::Anchor{id="ListenOptions.impl.defaults"}
 
@@ -1307,7 +1429,8 @@ Admits backlog 1..65535 and a 1..1,000,000,000ns polling interval.
 pub fn defaults() -> ListenOptions
 ```
 
-Selects backlog 128, no address reuse, and a one-millisecond polling interval.
+Returns the default listen options: a backlog of 128, no address reuse, and a 1 ms poll
+interval.
 
 ::Anchor{id="ListenOptions.impl.kernelBacklog"}
 
@@ -1317,7 +1440,7 @@ Selects backlog 128, no address reuse, and a one-millisecond polling interval.
 pub fn kernelBacklog(self: &Self) -> usize
 ```
 
-Returns the requested kernel backlog limit.
+Returns the backlog of the kernel.
 
 ::Anchor{id="ListenOptions.impl.reuseAddress"}
 
@@ -1327,7 +1450,7 @@ Returns the requested kernel backlog limit.
 pub fn reuseAddress(self: &Self) -> bool
 ```
 
-Reports whether listener creation enables SO_REUSEADDR.
+Returns whether the listener sets `SO_REUSEADDR`.
 
 ::Anchor{id="ListenOptions.impl.pollInterval"}
 
@@ -1337,7 +1460,7 @@ Reports whether listener creation enables SO_REUSEADDR.
 pub fn pollInterval(self: &Self) -> u64
 ```
 
-Returns the positive polling interval in nanoseconds.
+Returns the poll interval of accept, in nanoseconds.
 
 ::Anchor{id="UnixSocketPath.impl"}
 
@@ -1355,7 +1478,7 @@ impl UnixSocketPath
 pub fn bytes(self: &Self) -> &[u8]
 ```
 
-Borrows the exact owned pathname spelling.
+Returns the path bytes.
 
 ::Anchor{id="Connection"}
 
@@ -1365,7 +1488,7 @@ Borrows the exact owned pathname spelling.
 pub struct Connection
 ```
 
-One affine native descriptor lent only inside a connection callback.
+An open socket connection. It provides `ByteDuplex`.
 
 ::Anchor{id="Listener"}
 
@@ -1375,7 +1498,7 @@ One affine native descriptor lent only inside a connection callback.
 pub struct Listener
 ```
 
-One affine native listening descriptor and its validated local identity.
+A listening socket and its local address.
 
 ::Anchor{id="Accepted"}
 
@@ -1385,7 +1508,7 @@ One affine native listening descriptor and its validated local identity.
 pub struct Accepted
 ```
 
-One independently owned accepted connection and peer identity.
+A connection from [`accept`](#accept), with the address of the client. Use it with [`withAccepted`](#withAccepted).
 
 ::Anchor{id="AcceptedView"}
 
@@ -1395,7 +1518,7 @@ One independently owned accepted connection and peer identity.
 pub struct AcceptedView<'a>
 ```
 
-The higher-ranked loans available only inside one accepted-result scope.
+The connection and the client address that [`withAccepted`](#withAccepted) lends to its callback.
 
 ::Anchor{id="AcceptedView.connection"}
 
@@ -1405,7 +1528,7 @@ The higher-ranked loans available only inside one accepted-result scope.
 pub connection: &'a mut Connection
 ```
 
-The exclusive connection loan valid only within this accepted-result scope.
+The connection. It is valid only in the callback.
 
 ::Anchor{id="AcceptedView.peer"}
 
@@ -1415,7 +1538,7 @@ The exclusive connection loan valid only within this accepted-result scope.
 pub peer: &'a PeerAddress
 ```
 
-The accepted peer identity.
+The address of the client.
 
 ::Anchor{id="AcceptedContext"}
 
@@ -1425,14 +1548,11 @@ The accepted peer identity.
 pub interface AcceptedContext<A, E, ?CallbackRequirements, ?ContextRequirements>
 ```
 
-Compile-time adapter from one owned context to an accepted-connection use.
+A value that serves one accepted connection. See [`withAcceptedContext`](#withAcceptedContext).
 
 ### Details
-
-Implement this interface when the scoped use owns affine or once-callable state. The first row
-preserves caller-selected requirements and the second records requirements introduced by the
-concrete context. Selection adds no runtime service or requirement-row member: `context` is
-consumed once and the accepted loans remain independently higher-ranked.
+Implement it when the code that serves the connection owns state that is moved in, such as a
+handler. `use` gets the value one time.
 
 ::Anchor{id="AcceptedContext.use"}
 
@@ -1445,7 +1565,7 @@ effect<'call> fn use<'call>(
   ) -> A ! E ? CallbackRequirements | ContextRequirements
 ```
 
-Consumes one owned context while using temporary accepted-connection loans.
+Serves the connection in `view`, with `context`.
 
 ::Anchor{id="Connection.impl"}
 
@@ -1463,7 +1583,7 @@ impl Connection
 pub fn phase(self: &Self) -> ConnectionPhase
 ```
 
-Returns the current descriptor lifecycle phase.
+Returns the state of the connection.
 
 ::Anchor{id="Connection.impl.close"}
 
@@ -1473,11 +1593,9 @@ Returns the current descriptor lifecycle phase.
 pub effect fn close(self: &mut Self) -> () ! NativeSocketError
 ```
 
-Explicitly closes this connection once. Scoped cleanup recovers this error.
+Closes the connection. A second call does nothing.
 
-#### Gotchas
-
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+The scoped functions close the connection too, and ignore a close error.
 
 ::Anchor{id="Listener.impl"}
 
@@ -1495,7 +1613,7 @@ impl Listener
 pub fn phase(self: &Self) -> ListenerPhase
 ```
 
-Returns the current descriptor lifecycle phase.
+Returns the state of the listener.
 
 ::Anchor{id="Listener.impl.boundAddress"}
 
@@ -1505,7 +1623,7 @@ Returns the current descriptor lifecycle phase.
 pub fn boundAddress(self: &Self) -> BoundAddress
 ```
 
-Returns a copy of the actual local address recorded after listener creation.
+Returns the local address of the listener.
 
 ::Anchor{id="Listener.impl.close"}
 
@@ -1515,11 +1633,7 @@ Returns a copy of the actual local address recorded after listener creation.
 pub effect fn close(self: &mut Self) -> () ! NativeSocketError
 ```
 
-Explicitly closes this listener once without unlinking a Unix pathname.
-
-#### Gotchas
-
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+Closes the listener. A second call does nothing. It does not remove a Unix socket file.
 
 ::Anchor{id="Accepted.impl"}
 
@@ -1537,7 +1651,7 @@ impl Accepted
 pub fn peer(self: &Self) -> PeerAddress
 ```
 
-Returns a copy of the independently owned accepted peer identity.
+Returns the address of the client.
 
 ::Anchor{id="Accepted.impl.connectionPhase"}
 
@@ -1547,7 +1661,7 @@ Returns a copy of the independently owned accepted peer identity.
 pub fn connectionPhase(self: &Self) -> ConnectionPhase
 ```
 
-Returns the accepted connection lifecycle phase.
+Returns the state of the connection.
 
 ::Anchor{id="listen"}
 
@@ -1557,11 +1671,12 @@ Returns the accepted connection lifecycle phase.
 pub effect fn listen(endpoint: Endpoint, options: ListenOptions) -> Listener ! NativeSocketError
 ```
 
-Creates one IPv4 or IPv6 listener and publishes its actual bound endpoint.
+Makes a TCP listener on `endpoint`, IPv4 or IPv6.
 
-### Gotchas
+With port 0, the system chooses a free port. [`Listener.boundAddress`](#Listener.impl.boundAddress) returns it.
 
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+### Errors
+`AddressInUse`, `PermissionDenied`, `SystemResources`, or another `NativeSocketError`.
 
 ::Anchor{id="listenUnix"}
 
@@ -1571,11 +1686,12 @@ On unsupported targets or no-libc profiles, a reached call produces a compile-ti
 pub effect fn listenUnix(path: &[u8], options: ListenOptions) -> Listener ! NativeSocketError
 ```
 
-Creates one pathname-Unix listener without unlinking before bind or after close.
+Makes a Unix socket listener at `path`.
 
-### Gotchas
+It does not remove an old file at `path` before, or the file after close.
 
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+### Errors
+`InvalidBindAddress` or `PathTooLong` if `path` is not valid. `AddressInUse` if a file exists.
 
 ::Anchor{id="accept"}
 
@@ -1588,11 +1704,12 @@ pub effect fn accept(
 ) -> Accepted ! NativeSocketError ? &mut MonotonicClock
 ```
 
-Accepts one independently owned connection under an unchanged absolute deadline.
+Waits for the next client, and returns its connection.
 
-### Gotchas
+The listener stays open. `deadline` is absolute, and covers all checks of this call.
 
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+### Errors
+`Timeout` if the deadline passes. `Closed` if the listener is closed.
 
 ::Anchor{id="withListener"}
 
@@ -1607,7 +1724,7 @@ pub effect fn withListener<'env, A, E, ?CallbackRequirements>(
 ) -> A ! E ? CallbackRequirements
 ```
 
-Consumes one listener and lends it through a nonparking structured finalizer.
+Lends `listener` to `callback`, and closes it after, also on error or cancellation.
 
 ::Anchor{id="withAccepted"}
 
@@ -1623,7 +1740,8 @@ pub effect fn withAccepted<'env, A, E, ?CallbackRequirements>(
 where CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Consumes one accepted owner and lends its connection plus borrowed peer metadata.
+Lends the connection and the client address of `accepted` to `callback`, and closes the
+connection after, also on error or cancellation.
 
 ::Anchor{id="withAcceptedContext"}
 
@@ -1645,13 +1763,11 @@ where CallbackRequirements in Without<CallbackRequirements, ByteDuplex>,
   ContextRequirements in Without<ContextRequirements, ByteDuplex>
 ```
 
-Consumes one compile-time-selected context with temporary accepted-connection loans.
+Serves `accepted` with `context`, and closes the connection after.
 
 ### Details
-
-The context is captured by the once-callable protected use and consumed exactly once. Structured
-success, typed failure, and cancellation close the connection once; close failure never
-replaces the protected outcome.
+`context` is used one time. The connection is closed on success, error, and cancellation. A
+close error never replaces the result.
 
 ::Anchor{id="connectResolvedOwned"}
 
@@ -1665,11 +1781,12 @@ pub effect fn connectResolvedOwned(
 ) -> Connection ! NativeSocketError ? &mut MonotonicClock
 ```
 
-Connects an ordered nonempty numeric endpoint slice and returns one affine provider owner.
+Connects to the first of `endpoints` that accepts, and returns the connection.
 
-### Gotchas
-
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+### Errors
+- `InvalidEndpoint` if `endpoints` is empty or longer than the attempt limit.
+- `AttemptsExhausted` if no endpoint accepts.
+- `Timeout` if `deadline` passes.
 
 ::Anchor{id="connectUnixOwned"}
 
@@ -1683,11 +1800,10 @@ pub effect fn connectUnixOwned(
 ) -> Connection ! NativeSocketError ? &mut MonotonicClock
 ```
 
-Connects one absolute pathname Unix socket and returns one affine provider owner.
+Connects to the Unix socket at `path`, and returns the connection.
 
-### Gotchas
-
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+### Errors
+`InvalidEndpoint` if `path` is not valid. `Timeout` if `deadline` passes.
 
 ::Anchor{id="connectResolved"}
 
@@ -1705,11 +1821,7 @@ pub effect fn connectResolved<'env, A, E, ?CallbackRequirements>(
 where CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Connects an ordered nonempty numeric endpoint slice and lends the owned provider in one scope.
-
-### Gotchas
-
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+Connects as [`connectResolvedOwned`](#connectResolvedOwned), lends the connection to `callback`, and closes it after.
 
 ::Anchor{id="connectUnix"}
 
@@ -1727,11 +1839,7 @@ pub effect fn connectUnix<'env, A, E, ?CallbackRequirements>(
 where CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Connects one absolute pathname Unix socket and lends the owned provider in one scope.
-
-### Gotchas
-
-On unsupported targets or no-libc profiles, a reached call produces a compile-time error.
+Connects as [`connectUnixOwned`](#connectUnixOwned), lends the connection to `callback`, and closes it after.
 
 ::Anchor{id="Connection.impl-2"}
 

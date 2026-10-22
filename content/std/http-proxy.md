@@ -1,10 +1,130 @@
-Bounded HTTP proxy policy, pure route selection, and owned CONNECT rejection metadata.
+Proxy settings for HTTP clients, and the choice of a route for each origin.
+
+## When to use
+Make a [`ProxyConfig`](#ProxyConfig) with [`ProxyConfig.fromUri`](#ProxyConfig.impl.fromUri) or [`ProxyConfig.make`](#ProxyConfig.impl.make). Then call
+[`selectRoute`](#selectRoute) for each origin. `silk.http_request` and `silk.http_exchange` use the [`Route`](#Route)
+to prepare and send the request.
 
 ## Details
+[`selectRoute`](#selectRoute) does not allocate or use the network. It returns:
+- `Direct` for an origin in the [`BypassPolicy`](#BypassPolicy).
+- `Tunnel` for an HTTPS origin. The client sends `CONNECT` to the proxy, then does TLS with the
+  origin through the tunnel.
+- `Forward` for a plain HTTP origin. The client sends the request to the proxy with the full URI
+  as target.
 
-Proxy policy owns its prepared authentication token and exact-origin bypass entries. Selection
-does not allocate or use the network. A selected route supplies its configured authentication
-only through bounded output. CONNECT rejection copies have fixed field and owned-byte limits.
+The configuration owns its Basic token. A route writes the `Proxy-Authorization` value only into
+a buffer that you give. [`classifyConnect`](#classifyConnect) reads the response of the proxy to `CONNECT`.
+
+## Errors
+- [`ProxyError`](#ProxyError) with a [`ProxyAdmissionError`](#ProxyAdmissionError) if a setting is not valid. It holds no
+  credentials.
+- [`ProxyError`](#ProxyError) with the response head if the proxy rejects `CONNECT`.
+
+## Gotchas
+Only plain `http` proxies are supported. An `https` proxy URI fails with
+`UnsupportedProxyTransport`. Environment variables such as `HTTPS_PROXY` are not read.
+
+## Examples
+### Select routes
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http_origin { Origin, OriginError }
+import silk.http_proxy {
+  BypassPolicy,
+  ProxyAuth,
+  ProxyAuthContextId,
+  ProxyConfig,
+  ProxyConfigId,
+  ProxyError,
+  Route,
+  RouteMode,
+  selectRoute
+}
+import silk.option { Option }
+import silk.result { Result }
+import silk.uri { Uri }
+import silk.uri_reference { ParseError }
+
+fn origin(text: string<'static>) -> Origin {
+  let uri = match Uri.parse(text) {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      let invalid = 1 / 0
+      return origin(text)
+    }
+  }
+  return match Origin.fromUri(&uri) {
+    Result<Origin, OriginError>.Success { value } => value
+    Result<Origin, OriginError>.Failure { error: _ } => {
+      let invalid = 1 / 0
+      return origin(text)
+    }
+  }
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError
+  ? &mut Allocator {
+  // The token is the Base64 of "user:pass".
+  let auth = match run ProxyAuth.preparedBasic(ProxyAuthContextId.make(1), b"dXNlcjpwYXNz") {
+    Result<ProxyAuth, ProxyError>.Success { value } => move value
+    Result<ProxyAuth, ProxyError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let local = [origin("http://localhost:8080")]
+  let bypass = match run BypassPolicy.copy(&local) {
+    Result<BypassPolicy, ProxyError>.Success { value } => move value
+    Result<BypassPolicy, ProxyError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let config = match ProxyConfig.fromUri(
+    ProxyConfigId.make(1),
+    "http://proxy.example:3128",
+    move auth,
+    move bypass,
+    4096,
+  ) {
+    Result<ProxyConfig, ProxyError>.Success { value } => move value
+    Result<ProxyConfig, ProxyError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // HTTPS goes through a CONNECT tunnel, plain HTTP is forwarded, and the bypass origin is direct.
+  let secure = selectRoute(&config, origin("https://example.com/"))
+  let plain = selectRoute(&config, origin("http://example.com/"))
+  let direct = selectRoute(&config, origin("http://localhost:8080/"))
+  if Route.mode(&secure) != RouteMode.Tunnel || Route.mode(&plain) != RouteMode.Forward
+    || Route.mode(&direct) != RouteMode.Direct {
+    return 1
+  }
+  let mut header: [u8; 64] = [0; 64]
+  let length = match Route.writeProxyAuthorizationInto(&plain, &mut header) {
+    Option<usize>.Some { value } => value
+    Option<usize>.None => 0
+  }
+
+  // "Basic dXNlcjpwYXNz"
+  if length != 18 || header[0] != 66 {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
 
 Import as `ProxyConfig` with `import silk.http_proxy { ProxyConfig }`.
 
@@ -18,7 +138,7 @@ Public declarations: 15.
 pub enum ProxyComponent
 ```
 
-The proxy value rejected during admission.
+The setting that is not valid.
 
 ::Anchor{id="ProxyComponent.ProxyUri"}
 
@@ -28,7 +148,7 @@ The proxy value rejected during admission.
 ProxyUri
 ```
 
-The proxy URI text.
+The proxy URI.
 
 ::Anchor{id="ProxyComponent.ProxyEndpoint"}
 
@@ -38,7 +158,7 @@ The proxy URI text.
 ProxyEndpoint
 ```
 
-The programmatic proxy endpoint.
+The proxy host and port.
 
 ::Anchor{id="ProxyComponent.Authentication"}
 
@@ -48,7 +168,7 @@ The programmatic proxy endpoint.
 Authentication
 ```
 
-The prepared authentication token.
+The Basic token.
 
 ::Anchor{id="ProxyComponent.Bypass"}
 
@@ -58,7 +178,7 @@ The prepared authentication token.
 Bypass
 ```
 
-The exact-origin bypass policy.
+The bypass list.
 
 ::Anchor{id="ProxyComponent.Configuration"}
 
@@ -68,7 +188,7 @@ The exact-origin bypass policy.
 Configuration
 ```
 
-The complete proxy configuration.
+The configuration as a whole.
 
 ::Anchor{id="ProxyComponent.Route"}
 
@@ -78,7 +198,7 @@ The complete proxy configuration.
 Route
 ```
 
-A selected route used by the wrong operation or with a different origin.
+A route that was used for the wrong operation, or for another origin.
 
 ::Anchor{id="ProxyLimit"}
 
@@ -88,7 +208,7 @@ A selected route used by the wrong operation or with a different origin.
 pub enum ProxyLimit
 ```
 
-A bounded proxy configuration resource.
+A limit of a proxy configuration.
 
 ::Anchor{id="ProxyLimit.AuthenticationBytes"}
 
@@ -98,7 +218,7 @@ A bounded proxy configuration resource.
 AuthenticationBytes
 ```
 
-The maximum encoded authentication-token byte count.
+The maximum length of the Basic token.
 
 ::Anchor{id="ProxyLimit.BypassOrigins"}
 
@@ -108,7 +228,7 @@ The maximum encoded authentication-token byte count.
 BypassOrigins
 ```
 
-The maximum exact-origin bypass-entry count.
+The maximum number of bypass origins, 64.
 
 ::Anchor{id="ProxyLimit.OwnedConfigurationBytes"}
 
@@ -118,7 +238,7 @@ The maximum exact-origin bypass-entry count.
 OwnedConfigurationBytes
 ```
 
-The maximum total owned configuration byte count.
+The `maxOwnedConfigBytes` of the configuration.
 
 ::Anchor{id="ProxyReason"}
 
@@ -128,7 +248,7 @@ The maximum total owned configuration byte count.
 pub union ProxyReason
 ```
 
-The reason proxy policy admission failed.
+The rule that failed.
 
 ::Anchor{id="ProxyReason.InvalidProxyUri"}
 
@@ -138,7 +258,8 @@ The reason proxy policy admission failed.
 InvalidProxyUri
 ```
 
-The proxy URI has invalid syntax or a prohibited URI component.
+The proxy URI is not valid, or has a part that is not allowed, such as a path or user
+information.
 
 ::Anchor{id="ProxyReason.InvalidProxyPort"}
 
@@ -148,7 +269,7 @@ The proxy URI has invalid syntax or a prohibited URI component.
 InvalidProxyPort
 ```
 
-The programmatic proxy endpoint has port zero.
+The proxy port is 0.
 
 ::Anchor{id="ProxyReason.InvalidAuthentication"}
 
@@ -158,7 +279,7 @@ The programmatic proxy endpoint has port zero.
 InvalidAuthentication
 ```
 
-The prepared Basic token is empty or is not canonical strict Base64.
+The Basic token is empty, or is not canonical Base64.
 
 ::Anchor{id="ProxyReason.SizeOverflow"}
 
@@ -168,7 +289,7 @@ The prepared Basic token is empty or is not canonical strict Base64.
 SizeOverflow
 ```
 
-The required owned byte count does not fit in `usize`.
+A size does not fit in `usize`.
 
 ::Anchor{id="ProxyReason.LimitExceeded"}
 
@@ -178,7 +299,7 @@ The required owned byte count does not fit in `usize`.
 LimitExceeded
 ```
 
-A resource exceeds its admitted maximum.
+A value exceeded a limit.
 
 ::Anchor{id="ProxyReason.LimitExceeded.limit"}
 
@@ -188,7 +309,7 @@ A resource exceeds its admitted maximum.
 pub limit: ProxyLimit
 ```
 
-The resource that exceeds its limit.
+The limit.
 
 ::Anchor{id="ProxyReason.LimitExceeded.allowed"}
 
@@ -198,7 +319,7 @@ The resource that exceeds its limit.
 pub allowed: usize
 ```
 
-The inclusive admitted maximum.
+The value of the limit.
 
 ::Anchor{id="ProxyReason.LimitExceeded.attempted"}
 
@@ -208,7 +329,7 @@ The inclusive admitted maximum.
 pub attempted: usize
 ```
 
-The rejected resource value.
+The value that was found.
 
 ::Anchor{id="ProxyReason.UnsupportedProxyTransport"}
 
@@ -218,7 +339,7 @@ The rejected resource value.
 UnsupportedProxyTransport
 ```
 
-The proxy URI uses the unsupported `https` scheme.
+The proxy URI uses `https`, which is not supported.
 
 ::Anchor{id="ProxyReason.InvalidRoute"}
 
@@ -228,7 +349,7 @@ The proxy URI uses the unsupported `https` scheme.
 InvalidRoute
 ```
 
-The selected route mode or original origin is incompatible with the requested operation.
+The route mode or its origin does not fit the operation.
 
 ::Anchor{id="ProxyAdmissionError"}
 
@@ -238,7 +359,7 @@ The selected route mode or original origin is incompatible with the requested op
 pub struct ProxyAdmissionError
 ```
 
-A copyable proxy-policy admission failure containing no identity or credential bytes.
+The error for a setting that is not valid. It holds no credentials.
 
 ::Anchor{id="ProxyAdmissionError.component"}
 
@@ -248,7 +369,7 @@ A copyable proxy-policy admission failure containing no identity or credential b
 pub component: ProxyComponent
 ```
 
-The proxy value that failed admission.
+The setting.
 
 ::Anchor{id="ProxyAdmissionError.reason"}
 
@@ -258,7 +379,7 @@ The proxy value that failed admission.
 pub reason: ProxyReason
 ```
 
-The admission rule that failed.
+The rule that failed.
 
 ::Anchor{id="ProxyError"}
 
@@ -268,7 +389,7 @@ The admission rule that failed.
 pub union ProxyError
 ```
 
-A typed proxy failure whose response variants own only bounded, nonsecret metadata.
+The error from proxy settings or from a `CONNECT` response.
 
 ::Anchor{id="ProxyError.Admission"}
 
@@ -278,7 +399,7 @@ A typed proxy failure whose response variants own only bounded, nonsecret metada
 Admission
 ```
 
-Configuration, route, or credential admission failed without retaining input bytes.
+A setting or a route is not valid.
 
 ::Anchor{id="ProxyError.Admission.error"}
 
@@ -288,7 +409,7 @@ Configuration, route, or credential admission failed without retaining input byt
 pub error: ProxyAdmissionError
 ```
 
-The structured copyable admission failure.
+The error.
 
 ::Anchor{id="ProxyError.ProxyMetadataLimit"}
 
@@ -298,7 +419,7 @@ The structured copyable admission failure.
 ProxyMetadataLimit
 ```
 
-A complete CONNECT response exceeded the fixed owned-metadata budget.
+The `CONNECT` response head is too large to copy.
 
 ::Anchor{id="ProxyError.ProxyAuthenticationRequired"}
 
@@ -308,7 +429,8 @@ A complete CONNECT response exceeded the fixed owned-metadata budget.
 ProxyAuthenticationRequired
 ```
 
-A 407 response retaining status, reason, and ordered `Proxy-Authenticate` fields only.
+The proxy answered 407. The copy keeps only the status, the reason, and the
+`Proxy-Authenticate` fields.
 
 ::Anchor{id="ProxyError.ProxyAuthenticationRequired.response"}
 
@@ -318,7 +440,7 @@ A 407 response retaining status, reason, and ordered `Proxy-Authenticate` fields
 pub response: OwnedResponseHead
 ```
 
-The bounded independently owned response metadata.
+The copy of the response head.
 
 ::Anchor{id="ProxyError.ProxyRejected"}
 
@@ -328,7 +450,7 @@ The bounded independently owned response metadata.
 ProxyRejected
 ```
 
-Another final non-2xx response retaining status, reason, and all ordered fields.
+The proxy answered with another status that is not 2xx. The copy keeps all fields.
 
 ::Anchor{id="ProxyError.ProxyRejected.response"}
 
@@ -338,7 +460,7 @@ Another final non-2xx response retaining status, reason, and all ordered fields.
 pub response: OwnedResponseHead
 ```
 
-The bounded independently owned response metadata.
+The copy of the response head.
 
 ::Anchor{id="ProxyError.InvalidConnectResponse"}
 
@@ -348,7 +470,7 @@ The bounded independently owned response metadata.
 InvalidConnectResponse
 ```
 
-Response classification was attempted before a final CONNECT response existed.
+[`classifyConnect`](#classifyConnect) was called before a final response.
 
 ::Anchor{id="ProxyConfigId"}
 
@@ -358,7 +480,8 @@ Response classification was attempted before a final CONNECT response existed.
 pub struct ProxyConfigId
 ```
 
-An opaque configuration identity made from a caller-supplied nonsecret `u64`.
+A number that you choose to identify a configuration, for example in a pool key. It is not
+secret.
 
 ::Anchor{id="ProxyAuthContextId"}
 
@@ -368,7 +491,8 @@ An opaque configuration identity made from a caller-supplied nonsecret `u64`.
 pub struct ProxyAuthContextId
 ```
 
-An opaque authentication-context identity made from a caller-supplied nonsecret `u64`.
+A number that you choose to identify a set of credentials, for example in a pool key. It is not
+secret.
 
 ::Anchor{id="ProxyAuth"}
 
@@ -378,7 +502,7 @@ An opaque authentication-context identity made from a caller-supplied nonsecret 
 pub union ProxyAuth
 ```
 
-Prepared proxy authentication owned by a proxy configuration.
+The credentials for the proxy.
 
 ::Anchor{id="ProxyAuth.None"}
 
@@ -388,7 +512,7 @@ Prepared proxy authentication owned by a proxy configuration.
 None
 ```
 
-An authentication context that has no credential token.
+No credentials.
 
 ::Anchor{id="ProxyAuth.Basic"}
 
@@ -398,7 +522,7 @@ An authentication context that has no credential token.
 Basic
 ```
 
-An authentication context that owns a prepared Basic token.
+A Basic token.
 
 ::Anchor{id="BypassPolicy"}
 
@@ -408,7 +532,8 @@ An authentication context that owns a prepared Basic token.
 pub struct BypassPolicy
 ```
 
-A bounded list of exact normalized origins that bypass the proxy.
+The origins that do not use the proxy. An origin matches only with the same scheme, host, and
+port.
 
 ::Anchor{id="ProxyConfig"}
 
@@ -418,7 +543,7 @@ A bounded list of exact normalized origins that bypass the proxy.
 pub struct ProxyConfig
 ```
 
-Immutable owned proxy configuration.
+The settings of a proxy: its host and port, its credentials, and the bypass list.
 
 ::Anchor{id="RouteMode"}
 
@@ -428,7 +553,7 @@ Immutable owned proxy configuration.
 pub enum RouteMode
 ```
 
-The route mode selected for one origin.
+How a request goes to an origin.
 
 ::Anchor{id="RouteMode.Direct"}
 
@@ -438,7 +563,7 @@ The route mode selected for one origin.
 Direct
 ```
 
-Contact the origin directly.
+Directly to the origin.
 
 ::Anchor{id="RouteMode.Forward"}
 
@@ -448,7 +573,7 @@ Contact the origin directly.
 Forward
 ```
 
-Contact the proxy and use an absolute-form HTTP request.
+To the proxy, with the full URI as target.
 
 ::Anchor{id="RouteMode.Tunnel"}
 
@@ -458,7 +583,7 @@ Contact the proxy and use an absolute-form HTTP request.
 Tunnel
 ```
 
-Contact the proxy and use CONNECT before origin TLS.
+Through a `CONNECT` tunnel at the proxy, then TLS with the origin.
 
 ::Anchor{id="Route"}
 
@@ -468,7 +593,7 @@ Contact the proxy and use CONNECT before origin TLS.
 pub union Route<'configuration>
 ```
 
-The pure route selected for one original HTTP origin.
+The route for one origin, from [`selectRoute`](#selectRoute).
 
 ::Anchor{id="Route.Direct"}
 
@@ -478,7 +603,7 @@ The pure route selected for one original HTTP origin.
 Direct
 ```
 
-A route that contacts an exact bypass origin directly.
+Go directly to an origin in the bypass list.
 
 ::Anchor{id="Route.Direct.origin"}
 
@@ -488,7 +613,7 @@ A route that contacts an exact bypass origin directly.
 pub origin: Origin
 ```
 
-The original origin that matched bypass policy.
+The origin.
 
 ::Anchor{id="Route.Forward"}
 
@@ -498,7 +623,7 @@ The original origin that matched bypass policy.
 Forward
 ```
 
-A route that sends plaintext HTTP through the proxy.
+Send plain HTTP through the proxy.
 
 ::Anchor{id="Route.Forward.origin"}
 
@@ -508,7 +633,7 @@ A route that sends plaintext HTTP through the proxy.
 pub origin: Origin
 ```
 
-The original plaintext HTTP origin.
+The plain HTTP origin.
 
 ::Anchor{id="Route.Tunnel"}
 
@@ -518,7 +643,7 @@ The original plaintext HTTP origin.
 Tunnel
 ```
 
-A route that establishes a proxy tunnel for origin TLS.
+Open a tunnel through the proxy for TLS with the origin.
 
 ::Anchor{id="Route.Tunnel.origin"}
 
@@ -528,7 +653,7 @@ A route that establishes a proxy tunnel for origin TLS.
 pub origin: Origin
 ```
 
-The original HTTPS origin for TLS authentication.
+The HTTPS origin. TLS checks its certificate.
 
 ::Anchor{id="RouteKey"}
 
@@ -538,7 +663,7 @@ The original HTTPS origin for TLS authentication.
 pub struct RouteKey
 ```
 
-Stable route identity for later pooling and redirect recomputation.
+A key that identifies a route, for example for a connection pool. It has no credentials.
 
 ::Anchor{id="ProxyReason.impl.Copy"}
 
@@ -604,7 +729,7 @@ impl ProxyError
 pub fn invalidRoute() -> ProxyError
 ```
 
-Returns the credential-free failure for an incompatible sealed route.
+Returns the `InvalidRoute` error.
 
 ::Anchor{id="ProxyConfigId.impl"}
 
@@ -622,7 +747,7 @@ impl ProxyConfigId
 pub fn make(value: u64) -> ProxyConfigId
 ```
 
-Preserves a caller-supplied nonsecret identity payload opaquely.
+Returns the identity for `value`.
 
 ::Anchor{id="ProxyConfigId.impl.equals"}
 
@@ -632,7 +757,7 @@ Preserves a caller-supplied nonsecret identity payload opaquely.
 pub fn equals(self: &Self, other: &Self) -> bool
 ```
 
-Reports exact caller-payload equality without exposing the payload.
+Returns `true` if the two identities have the same value.
 
 ::Anchor{id="ProxyAuthContextId.impl"}
 
@@ -650,7 +775,7 @@ impl ProxyAuthContextId
 pub fn make(value: u64) -> ProxyAuthContextId
 ```
 
-Preserves a caller-supplied nonsecret identity payload opaquely.
+Returns the identity for `value`.
 
 ::Anchor{id="ProxyAuthContextId.impl.equals"}
 
@@ -660,7 +785,7 @@ Preserves a caller-supplied nonsecret identity payload opaquely.
 pub fn equals(self: &Self, other: &Self) -> bool
 ```
 
-Reports exact caller-payload equality without exposing the payload.
+Returns `true` if the two identities have the same value.
 
 ::Anchor{id="ProxyAuth.impl"}
 
@@ -678,7 +803,7 @@ impl ProxyAuth
 pub fn none(contextId: ProxyAuthContextId) -> ProxyAuth
 ```
 
-Creates an authentication context with no credential bytes.
+Returns credentials with no token.
 
 ::Anchor{id="ProxyAuth.impl.preparedBasic"}
 
@@ -691,7 +816,8 @@ pub effect fn preparedBasic(
   ) -> Result<ProxyAuth, ProxyError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Strictly validates and copies one nonempty prepared Basic token.
+Checks and copies `token`, the Base64 of `user:password`. It must be canonical Base64, and at
+most 4096 bytes.
 
 ::Anchor{id="ProxyAuth.impl.contextId"}
 
@@ -701,7 +827,7 @@ Strictly validates and copies one nonempty prepared Basic token.
 pub fn contextId(self: &Self) -> ProxyAuthContextId
 ```
 
-Returns the caller-supplied authentication-context identity.
+Returns the identity of the credentials.
 
 ::Anchor{id="ProxyAuth.impl.ownedBytes"}
 
@@ -711,7 +837,7 @@ Returns the caller-supplied authentication-context identity.
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns retained credential bytes without exposing them.
+Returns the length of the token, or 0.
 
 ::Anchor{id="BypassPolicy.impl"}
 
@@ -731,7 +857,7 @@ pub effect fn copy(origins: &[Origin]) -> Result<BypassPolicy, ProxyError>
   ? &mut Allocator
 ```
 
-Copies at most 64 exact normalized HTTP origins into immutable owned policy.
+Copies up to 64 origins into a bypass list.
 
 ::Anchor{id="BypassPolicy.impl.contains"}
 
@@ -741,7 +867,7 @@ Copies at most 64 exact normalized HTTP origins into immutable owned policy.
 pub fn contains(self: &Self, origin: &Origin) -> bool
 ```
 
-Reports exact scheme, normalized-host, and effective-port membership.
+Returns `true` if `origin` has the same scheme, host, and port as an origin in the list.
 
 ::Anchor{id="BypassPolicy.impl.ownedBytes"}
 
@@ -751,7 +877,7 @@ Reports exact scheme, normalized-host, and effective-port membership.
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns copied bypass-entry storage size.
+Returns the memory of the list, in bytes.
 
 ::Anchor{id="ProxyConfig.impl"}
 
@@ -776,7 +902,8 @@ pub fn make(
   ) -> Result<ProxyConfig, ProxyError>
 ```
 
-Admits a plain programmatic proxy endpoint under a total owned-byte budget.
+Returns a configuration for a proxy at `proxyHost` and `proxyPort`. The port cannot be 0.
+`maxOwnedConfigBytes` limits the memory of the host, the token, and the bypass list.
 
 ::Anchor{id="ProxyConfig.impl.fromUri"}
 
@@ -792,7 +919,8 @@ pub fn fromUri<'text>(
   ) -> Result<ProxyConfig, ProxyError>
 ```
 
-Parses only a plain `http` authority with no userinfo, path, query, or fragment.
+Returns a configuration for the proxy in `text`, such as `http://proxy:3128`. The URI can have
+only the `http` scheme, a host, and a port.
 
 ::Anchor{id="ProxyConfig.impl.id"}
 
@@ -802,7 +930,7 @@ Parses only a plain `http` authority with no userinfo, path, query, or fragment.
 pub fn id(self: &Self) -> ProxyConfigId
 ```
 
-Returns the caller-supplied configuration identity.
+Returns the identity of the configuration.
 
 ::Anchor{id="ProxyConfig.impl.authContextId"}
 
@@ -812,7 +940,7 @@ Returns the caller-supplied configuration identity.
 pub fn authContextId(self: &Self) -> ProxyAuthContextId
 ```
 
-Returns the caller-supplied authentication-context identity.
+Returns the identity of the credentials.
 
 ::Anchor{id="ProxyConfig.impl.proxyHost"}
 
@@ -822,7 +950,7 @@ Returns the caller-supplied authentication-context identity.
 pub fn proxyHost(self: &Self) -> Host
 ```
 
-Returns the checked proxy host.
+Returns the proxy host.
 
 ::Anchor{id="ProxyConfig.impl.proxyPort"}
 
@@ -832,7 +960,7 @@ Returns the checked proxy host.
 pub fn proxyPort(self: &Self) -> Port
 ```
 
-Returns the checked nonzero proxy port.
+Returns the proxy port.
 
 ::Anchor{id="ProxyConfig.impl.ownedBytes"}
 
@@ -842,7 +970,7 @@ Returns the checked nonzero proxy port.
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns the copied host, token, and bypass-entry byte count.
+Returns the memory of the configuration, in bytes.
 
 ::Anchor{id="selectRoute"}
 
@@ -855,7 +983,8 @@ pub fn selectRoute<'configuration>(
 ) -> Route<'configuration>
 ```
 
-Purely selects Direct, Forward, or Tunnel for one original origin.
+Returns the route for `origin`: `Direct` for a bypass origin, `Tunnel` for HTTPS, and `Forward`
+for plain HTTP. It does not allocate or use the network.
 
 ::Anchor{id="classifyConnect"}
 
@@ -867,14 +996,12 @@ pub effect fn classifyConnect(
 ) -> () ! ProxyError | OutOfMemoryError ? &mut Allocator
 ```
 
-Classifies a complete final CONNECT response into success or bounded rejection metadata.
+Reads the final response of the proxy to `CONNECT`.
 
 ### Details
-
-Any 2xx response is accepted. A 407 retains status, reason, and ordered duplicate
-`Proxy-Authenticate` fields only; other final non-2xx responses retain all ordered fields.
-Complete-head copy failures map to `ProxyMetadataLimit`, while allocation failure remains
-`OutOfMemoryError`. Call this only after the shared client's parser has returned a final head.
+A 2xx status succeeds. A 407 fails with `ProxyAuthenticationRequired`, and other statuses with
+`ProxyRejected`, with a copy of the head. If the head is too large to copy, it fails with
+`ProxyMetadataLimit`. Call it only after a final response head.
 
 ::Anchor{id="Route.impl"}
 
@@ -892,7 +1019,7 @@ impl<'configuration> Route<'configuration>
 pub fn mode(self: &Self) -> RouteMode
 ```
 
-Returns the selected route mode.
+Returns the mode of the route.
 
 ::Anchor{id="Route.impl.originalOrigin"}
 
@@ -902,7 +1029,7 @@ Returns the selected route mode.
 pub fn originalOrigin(self: &Self) -> Origin
 ```
 
-Returns the original origin that policy evaluated.
+Returns the origin that the route is for.
 
 ::Anchor{id="Route.impl.proxyHost"}
 
@@ -912,7 +1039,7 @@ Returns the original origin that policy evaluated.
 pub fn proxyHost(self: &Self) -> Host
 ```
 
-Returns the proxy host retained when policy selected the route.
+Returns the proxy host.
 
 ::Anchor{id="Route.impl.proxyPort"}
 
@@ -922,7 +1049,7 @@ Returns the proxy host retained when policy selected the route.
 pub fn proxyPort(self: &Self) -> Port
 ```
 
-Returns the proxy port retained when policy selected the route.
+Returns the proxy port.
 
 ::Anchor{id="Route.impl.physicalPeer"}
 
@@ -932,7 +1059,7 @@ Returns the proxy port retained when policy selected the route.
 pub fn physicalPeer(self: &Self) -> Result<Origin, OriginError>
 ```
 
-Returns the plaintext proxy peer retained by the sealed route.
+Returns the proxy as a plain HTTP origin, the server to connect to.
 
 ::Anchor{id="Route.impl.proxyAuthorizationLength"}
 
@@ -942,12 +1069,7 @@ Returns the plaintext proxy peer retained by the sealed route.
 pub fn proxyAuthorizationLength(self: &Self) -> usize
 ```
 
-Returns the complete configured `Proxy-Authorization` value length, or zero when absent.
-
-#### Details
-
-The prepared token remains private; possessing a policy-selected route is the capability to
-request its bounded wire representation.
+Returns the length of the `Proxy-Authorization` value, or 0 if there are no credentials.
 
 ::Anchor{id="Route.impl.writeProxyAuthorizationInto"}
 
@@ -957,8 +1079,8 @@ request its bounded wire representation.
 pub fn writeProxyAuthorizationInto(self: &Self, output: &mut [u8]) -> Option<usize>
 ```
 
-Writes the complete configured `Proxy-Authorization` value without exposing token storage.
-Returns `None` without changing `output` when it is too small.
+Writes the `Proxy-Authorization` value, such as `Basic dXNlcjpwYXNz`, to the start of
+`output`, and returns its length. Returns `None` and writes nothing if `output` is too small.
 
 ::Anchor{id="Route.impl.configId"}
 
@@ -968,7 +1090,7 @@ Returns `None` without changing `output` when it is too small.
 pub fn configId(self: &Self) -> ProxyConfigId
 ```
 
-Returns the configuration identity retained when policy selected the route.
+Returns the identity of the configuration.
 
 ::Anchor{id="Route.impl.authContextId"}
 
@@ -978,7 +1100,7 @@ Returns the configuration identity retained when policy selected the route.
 pub fn authContextId(self: &Self) -> ProxyAuthContextId
 ```
 
-Returns the authentication-context identity retained when policy selected the route.
+Returns the identity of the credentials.
 
 ::Anchor{id="Route.impl.key"}
 
@@ -988,7 +1110,7 @@ Returns the authentication-context identity retained when policy selected the ro
 pub fn key(self: &Self) -> RouteKey
 ```
 
-Returns a stable key without reading or formatting authentication bytes.
+Returns the key of the route. It does not read the credentials.
 
 ::Anchor{id="Route.impl.recompute"}
 
@@ -998,7 +1120,8 @@ Returns a stable key without reading or formatting authentication bytes.
 pub fn recompute(self: &Self, origin: Origin) -> Route<'configuration>
 ```
 
-Recomputes policy for a new origin under the current immutable configuration.
+Returns the route for another origin, with the same configuration, for example after a
+redirect.
 
 ::Anchor{id="RouteKey.impl"}
 
@@ -1016,7 +1139,7 @@ impl RouteKey
 pub fn originalOrigin(self: &Self) -> Origin
 ```
 
-Returns the normalized original origin retained by this sealed route identity.
+Returns the origin of the route.
 
 ::Anchor{id="RouteKey.impl.mode"}
 
@@ -1026,7 +1149,7 @@ Returns the normalized original origin retained by this sealed route identity.
 pub fn mode(self: &Self) -> RouteMode
 ```
 
-Returns the selected route mode without exposing proxy configuration or credential bytes.
+Returns the mode of the route.
 
 ::Anchor{id="RouteKey.impl.equals"}
 
@@ -1036,6 +1159,6 @@ Returns the selected route mode without exposing proxy configuration or credenti
 pub fn equals(self: &Self, other: &Self) -> bool
 ```
 
-Compares route mode, original origin, proxy endpoint, and both opaque identities.
+Returns `true` if the mode, the origin, the proxy, and the two identities are equal.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

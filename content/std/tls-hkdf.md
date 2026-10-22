@@ -1,17 +1,58 @@
-TLS 1.3 key expansion and transcript-bound secret derivation.
+The TLS 1.3 key schedule functions `HKDF-Expand-Label` and `Derive-Secret` (RFC 8446, section
+7.1).
 
 ## When to use
-Use [`TlsHkdfSha256`](#TlsHkdfSha256) or [`TlsHkdfSha384`](#TlsHkdfSha384) for TLS labels under RFC 8446 section 7.1.
-Use `silk.hkdf` for generic HKDF with caller-defined context bytes.
+Use [`TlsHkdfSha256`](#TlsHkdfSha256) or [`TlsHkdfSha384`](#TlsHkdfSha384) to derive TLS 1.3 secrets, keys, and IVs, or keys for
+a protocol that reuses the TLS key schedule, such as QUIC. For other uses, use `silk.hkdf`.
 
 ## Details
-Operations borrow secrets and inputs without retaining them. Expansion fills caller-owned output.
-Label bytes are preserved exactly and receive the fixed `tls13 ` prefix.
-These operations require no allocator or provider.
+[`TlsHkdfSha256.expandLabel`](#TlsHkdfSha256.impl.expandLabel) adds the prefix `tls13 ` to the label and fills the output.
+[`TlsHkdfSha256.deriveSecret`](#TlsHkdfSha256.impl.deriveSecret) hashes the handshake messages and expands with that hash.
+[`TlsHkdfSha256.deriveSecretFromHash`](#TlsHkdfSha256.impl.deriveSecretFromHash) takes a transcript hash that you already have. Nothing
+allocates.
+
+## Errors
+- [`LabelError`](#LabelError) if the label is not 1 to 249 bytes, the context is longer than 255 bytes, the
+  output is too long, or the messages are too long. The output does not change.
 
 ## Gotchas
-These operations do not select protocol labels, serialize transcripts, authenticate peers, or implement TLS.
-Secret copies are not guaranteed to be erased. Functional correctness does not establish constant-time execution.
+Give the label without `tls13 `, because it is always added. You choose the labels and build the
+transcript. Secrets are not erased.
+
+## Examples
+### Derive a secret from messages or from their hash
+```silk
+import silk.result { Result }
+import silk.sha2 { Sha256 }
+import silk.tls_hkdf { LabelError, TlsHkdfSha256 }
+
+pub fn main() -> i32 {
+  let secret: [u8; 32] = [7; 32]
+  let fromMessages = match TlsHkdfSha256.deriveSecret(&secret, b"derived", b"") {
+    Result<[u8; 32], LabelError>.Success { value } => value
+    Result<[u8; 32], LabelError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // An empty transcript is the hash of no bytes, not 32 zero bytes.
+  let emptyHash = Sha256.hash(b"")
+  let fromHash = match TlsHkdfSha256.deriveSecretFromHash(&secret, b"derived", &emptyHash) {
+    Result<[u8; 32], LabelError>.Success { value } => value
+    Result<[u8; 32], LabelError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let mut index: usize = 0
+  while index < 32 {
+    if fromMessages[index] != fromHash[index] {
+      return 1
+    }
+    index = index + 1
+  }
+  return 0
+}
+```
 
 Import as `TlsHkdfSha256` with `import silk.tls_hkdf { TlsHkdfSha256 }`.
 
@@ -25,7 +66,7 @@ Public declarations: 3.
 pub union LabelError
 ```
 
-A rejected public length; no variant contains secret or transcript bytes.
+A length that the key schedule does not accept. It holds no secret bytes.
 
 ::Anchor{id="LabelError.LabelLength"}
 
@@ -35,7 +76,7 @@ A rejected public length; no variant contains secret or transcript bytes.
 LabelLength
 ```
 
-A raw label outside the inclusive range 1 through 249 bytes.
+The label is empty or longer than 249 bytes.
 
 ::Anchor{id="LabelError.LabelLength.requested"}
 
@@ -65,7 +106,7 @@ The largest accepted length in bytes.
 ContextLength
 ```
 
-A context longer than 255 bytes.
+The context is longer than 255 bytes.
 
 ::Anchor{id="LabelError.ContextLength.requested"}
 
@@ -95,7 +136,7 @@ The largest accepted length in bytes.
 OutputLength
 ```
 
-An output longer than 255 digest blocks.
+The output is longer than 255 hash blocks.
 
 ::Anchor{id="LabelError.OutputLength.requested"}
 
@@ -125,7 +166,7 @@ The largest accepted length in bytes.
 MessageTooLong
 ```
 
-A message longer than the SHA-256 byte-aligned input domain.
+The messages are longer than SHA-256 allows.
 
 ::Anchor{id="LabelError.MessageTooLong.requested"}
 
@@ -155,7 +196,7 @@ The largest accepted length in bytes.
 pub struct TlsHkdfSha256
 ```
 
-TLS label operations with SHA-256 and 32-byte secrets and transcript hashes.
+The TLS 1.3 key schedule with SHA-256. Secrets and transcript hashes are 32 bytes.
 
 ::Anchor{id="TlsHkdfSha256.impl"}
 
@@ -176,19 +217,14 @@ pub fn expandLabel(secret: &([u8; 32]), label: &[u8], context: &[u8], output: &m
   >
 ```
 
-Writes TLS-labeled key material, or returns a length error without changing output.
+Fills `output` with `HKDF-Expand-Label(secret, label, context, output.length)`.
 
-#### Details
+The prefix `tls13 ` is added to `label`. All lengths are checked before the first write.
 
-Borrows a 32-byte secret, raw label, and context without retaining them.
-The raw label must contain 1 through 249 bytes. The context admits 0 through 255 bytes.
-Output admits 0 through 8160 bytes. All lengths are checked before output writes, including for empty output.
-LabelLength, ContextLength, and OutputLength identify rejected lengths in that order.
-
-#### Gotchas
-
-The fixed `tls13 ` prefix is always added, even when the raw label already starts with those bytes.
-No normalization or zero-byte termination occurs. The caller must select the correct protocol label and a strong secret.
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `ContextLength` if `context` is longer than 255 bytes.
+- `OutputLength` if `output` is longer than 8160 bytes.
 
 ::Anchor{id="TlsHkdfSha256.impl.deriveSecret"}
 
@@ -201,19 +237,18 @@ pub fn deriveSecret(secret: &([u8; 32]), label: &[u8], messages: &[u8]) -> Resul
   >
 ```
 
-Returns a 32-byte TLS secret bound to the SHA-256 hash of the supplied message bytes.
+Returns `Derive-Secret(secret, label, messages)`: the 32-byte expansion with the SHA-256 hash
+of `messages` as the context.
 
-#### Details
+Give the handshake messages as they are on the wire, in order.
 
-Borrows the secret, raw label, and messages without retaining them or allocating transcript storage.
-The raw label must contain 1 through 249 bytes; otherwise LabelLength is returned before hashing.
-Empty messages use SHA-256 of the empty byte sequence, not an empty context.
-A message longer than 2^61 minus 1 bytes returns MessageTooLong before hashing.
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `MessageTooLong` if `messages` is too long.
 
 #### Gotchas
-
-The caller supplies the exact serialized handshake messages. This operation does not apply transcript rewriting.
-Use `deriveSecretFromHash` for a previously computed transcript hash; this operation would hash those bytes again.
+If you already have the transcript hash, use [`TlsHkdfSha256.deriveSecretFromHash`](#TlsHkdfSha256.impl.deriveSecretFromHash). This
+function hashes its input again.
 
 ::Anchor{id="TlsHkdfSha256.impl.deriveSecretFromHash"}
 
@@ -226,17 +261,14 @@ pub fn deriveSecretFromHash(secret: &([u8; 32]), label: &[u8], transcriptHash: &
   >
 ```
 
-Returns a 32-byte TLS secret bound to an existing SHA-256 transcript hash without hashing it again.
+Returns `Derive-Secret` with a SHA-256 transcript hash that you already computed.
 
-#### Details
-
-Borrows the fixed-width secret and transcript hash without retaining them.
-The raw label must contain 1 through 249 bytes; otherwise this operation returns LabelLength.
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
 
 #### Gotchas
-
-For an empty transcript, supply SHA-256 of the empty byte sequence. A zero-filled hash is a different context.
-The caller selects the label and owns transcript serialization and rewriting.
+For an empty transcript, give the hash of no bytes. A hash of all zeros gives a different
+secret.
 
 ::Anchor{id="TlsHkdfSha384"}
 
@@ -246,7 +278,7 @@ The caller selects the label and owns transcript serialization and rewriting.
 pub struct TlsHkdfSha384
 ```
 
-TLS label operations with SHA-384 and 48-byte secrets and transcript hashes.
+The TLS 1.3 key schedule with SHA-384. Secrets and transcript hashes are 48 bytes.
 
 ::Anchor{id="TlsHkdfSha384.impl"}
 
@@ -267,19 +299,14 @@ pub fn expandLabel(secret: &([u8; 48]), label: &[u8], context: &[u8], output: &m
   >
 ```
 
-Writes TLS-labeled key material, or returns a length error without changing output.
+Fills `output` with `HKDF-Expand-Label(secret, label, context, output.length)`.
 
-#### Details
+The prefix `tls13 ` is added to `label`. All lengths are checked before the first write.
 
-Borrows a 48-byte secret, raw label, and context without retaining them.
-The raw label must contain 1 through 249 bytes. The context admits 0 through 255 bytes.
-Output admits 0 through 12240 bytes. All lengths are checked before output writes, including for empty output.
-LabelLength, ContextLength, and OutputLength identify rejected lengths in that order.
-
-#### Gotchas
-
-The fixed `tls13 ` prefix is always added, even when the raw label already starts with those bytes.
-No normalization or zero-byte termination occurs. The caller must select the correct protocol label and a strong secret.
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `ContextLength` if `context` is longer than 255 bytes.
+- `OutputLength` if `output` is longer than 12240 bytes.
 
 ::Anchor{id="TlsHkdfSha384.impl.deriveSecret"}
 
@@ -292,18 +319,18 @@ pub fn deriveSecret(secret: &([u8; 48]), label: &[u8], messages: &[u8]) -> Resul
   >
 ```
 
-Returns a 48-byte TLS secret bound to the SHA-384 hash of the supplied message bytes.
+Returns `Derive-Secret(secret, label, messages)`: the 48-byte expansion with the SHA-384 hash
+of `messages` as the context.
 
-#### Details
+Give the handshake messages as they are on the wire, in order.
 
-Borrows the secret, raw label, and messages without retaining them or allocating transcript storage.
-The raw label must contain 1 through 249 bytes; otherwise LabelLength is returned before hashing.
-Empty messages use SHA-384 of the empty byte sequence, not an empty context.
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
+- `MessageTooLong` if `messages` is too long.
 
 #### Gotchas
-
-The caller supplies the exact serialized handshake messages. This operation does not apply transcript rewriting.
-Use `deriveSecretFromHash` for a previously computed transcript hash; this operation would hash those bytes again.
+If you already have the transcript hash, use [`TlsHkdfSha384.deriveSecretFromHash`](#TlsHkdfSha384.impl.deriveSecretFromHash). This
+function hashes its input again.
 
 ::Anchor{id="TlsHkdfSha384.impl.deriveSecretFromHash"}
 
@@ -316,16 +343,13 @@ pub fn deriveSecretFromHash(secret: &([u8; 48]), label: &[u8], transcriptHash: &
   >
 ```
 
-Returns a 48-byte TLS secret bound to an existing SHA-384 transcript hash without hashing it again.
+Returns `Derive-Secret` with a SHA-384 transcript hash that you already computed.
 
-#### Details
-
-Borrows the fixed-width secret and transcript hash without retaining them.
-The raw label must contain 1 through 249 bytes; otherwise this operation returns LabelLength.
+#### Errors
+- `LabelLength` if `label` is not 1 to 249 bytes.
 
 #### Gotchas
-
-For an empty transcript, supply SHA-384 of the empty byte sequence. A zero-filled hash is a different context.
-The caller selects the label and owns transcript serialization and rewriting.
+For an empty transcript, give the hash of no bytes. A hash of all zeros gives a different
+secret.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

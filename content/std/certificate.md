@@ -1,19 +1,53 @@
-Owned X.509 certificates decoded from bounded DER or strict PEM input.
+Decode one X.509 certificate from DER or PEM, and read its fields.
 
 ## When to use
-
-Use `Certificate.decodeDer` for one binary certificate or `Certificate.decodePem` for one CERTIFICATE block.
-Use `silk.certificate_bundle.CertificateBundle` for multiple PEM certificates.
+Use [`Certificate.decodePem`](#Certificate.impl.decodePem) for a `.pem` or `.crt` file with one `CERTIFICATE` block, and
+[`Certificate.decodeDer`](#Certificate.impl.decodeDer) for binary DER, such as a certificate from a TLS handshake. For a file
+with more than one certificate, use `silk.certificate_bundle`.
 
 ## Details
+A [`Certificate`](#Certificate) owns a copy of its DER bytes. The accessors return slices of that DER, such as
+[`Certificate.subjectDer`](#Certificate.impl.subjectDer) or [`Certificate.tbsDer`](#Certificate.impl.tbsDer), and decoded values, such as
+[`Certificate.notAfter`](#Certificate.impl.notAfter). Nothing is normalized: names, algorithms, and extensions keep their
+original bytes, and unknown or duplicate extensions stay available. [`DecodeLimits`](#DecodeLimits) bound the
+work for input that you do not control.
 
-Results own their bytes. Accessors borrow the owner and preserve original signed bytes and all extensions.
-Input is borrowed during execution. Allocation refusal uses `OutOfMemoryError`; other failures return `DecodeError`.
+## Errors
+- [`DecodeError`](#DecodeError) if the input is not a valid certificate or goes over a limit. `reason` gives
+  the rule, and `offset` with `offsetSpace` gives the position.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ## Gotchas
+Decoding checks only the structure. It does not verify the signature, the chain, the names, or
+the dates. Use `silk.certificate_path` for that. The PEM decoder is strict: text outside the
+block, other labels, and non-canonical Base64 are errors.
 
-Decoding checks structure only. It does not verify signatures, trust, identities, or certificate validity.
-PEM rejects explanatory text, unrelated blocks, VT/FF whitespace, and noncanonical base64.
+## Examples
+### Report where a PEM certificate is broken
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.certificate { Certificate, DecodeError, DecodeLimits, DecodeReason }
+import silk.effect { Effect }
+import silk.result { Result }
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let pem = b"-----BEGIN CERTIFICATE-----\n!!!!\n-----END CERTIFICATE-----\n"
+  let decoded = run Certificate.decodePem(pem, DecodeLimits.defaults())
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  return match move decoded {
+    Result<Certificate, DecodeError>.Failure { error } => {
+      // `!` is not a Base64 character.
+      if error.reason != DecodeReason.Base64 {
+        return 1
+      }
+      return 0
+    }
+    Result<Certificate, DecodeError>.Success { value: _ } => 1
+  }
+}
+```
 
 Import as `Certificate` with `import silk.certificate { Certificate }`.
 
@@ -27,7 +61,8 @@ Public declarations: 12.
 pub struct DecodeLimits
 ```
 
-Inclusive resource limits for one decode call. Zero permits no corresponding resource.
+The resource limits for one decode call. Each limit is inclusive, and 0 allows nothing.
+[`DecodeLimits.defaults`](#DecodeLimits.impl.defaults) gives safe values.
 
 ::Anchor{id="DecodeLimits.inputBytes"}
 
@@ -37,7 +72,7 @@ Inclusive resource limits for one decode call. Zero permits no corresponding res
 pub inputBytes: usize
 ```
 
-Maximum complete input length, including PEM whitespace.
+The maximum input length, with PEM whitespace.
 
 ::Anchor{id="DecodeLimits.certificateBytes"}
 
@@ -47,7 +82,7 @@ Maximum complete input length, including PEM whitespace.
 pub certificateBytes: usize
 ```
 
-Maximum DER length of one certificate, including its tag and length.
+The maximum DER length of one certificate.
 
 ::Anchor{id="DecodeLimits.totalDerBytes"}
 
@@ -57,7 +92,7 @@ Maximum DER length of one certificate, including its tag and length.
 pub totalDerBytes: usize
 ```
 
-Maximum sum of certificate DER lengths in one call.
+The maximum DER length of all certificates together.
 
 ::Anchor{id="DecodeLimits.certificates"}
 
@@ -67,7 +102,7 @@ Maximum sum of certificate DER lengths in one call.
 pub certificates: usize
 ```
 
-Maximum certificate count, including duplicates.
+The maximum number of certificates, with duplicates.
 
 ::Anchor{id="DecodeLimits.fieldBytes"}
 
@@ -77,7 +112,7 @@ Maximum certificate count, including duplicates.
 pub fieldBytes: usize
 ```
 
-Maximum content length of each primitive or open field, including the BIT STRING count octet.
+The maximum content length of one field.
 
 ::Anchor{id="DecodeLimits.extensions"}
 
@@ -87,7 +122,7 @@ Maximum content length of each primitive or open field, including the BIT STRING
 pub extensions: usize
 ```
 
-Maximum extension count per certificate, including duplicates.
+The maximum number of extensions in one certificate.
 
 ::Anchor{id="DecodeLimits.depth"}
 
@@ -97,7 +132,7 @@ Maximum extension count per certificate, including duplicates.
 pub depth: usize
 ```
 
-Maximum traversed TLV depth; the certificate root has depth one.
+The maximum nesting depth of DER values. The certificate itself has depth 1.
 
 ::Anchor{id="DecodeLimits.nodes"}
 
@@ -107,7 +142,7 @@ Maximum traversed TLV depth; the certificate root has depth one.
 pub nodes: usize
 ```
 
-Maximum traversed TLV count per certificate; opaque payloads do not add nodes.
+The maximum number of DER values in one certificate.
 
 ::Anchor{id="DecodeLimits.impl.Copy"}
 
@@ -133,11 +168,9 @@ impl DecodeLimits
 pub fn defaults() -> DecodeLimits
 ```
 
-Returns finite default limits: 16 MiB input, 1 MiB certificates, 8 MiB total DER, and 1024 certificates.
-
-#### Details
-
-Fields are limited to 256 KiB, extensions to 256, depth to 32, and nodes to 65536 per certificate.
+Returns the default limits: 16 MiB of input, 1 MiB for each certificate, 8 MiB of DER in
+total, 1024 certificates, 256 KiB for each field, 256 extensions, a depth of 32, and 65536 DER
+values for each certificate.
 
 ::Anchor{id="DecodeClass"}
 
@@ -147,7 +180,7 @@ Fields are limited to 256 KiB, extensions to 256, depth to 32, and nodes to 6553
 pub enum DecodeClass
 ```
 
-The category of a decoding failure.
+The kind of a [`DecodeError`](#DecodeError).
 
 ::Anchor{id="DecodeClass.Malformed"}
 
@@ -157,7 +190,7 @@ The category of a decoding failure.
 Malformed
 ```
 
-The input violates the accepted encoding or schema.
+The input breaks a rule of PEM, DER, or the X.509 structure.
 
 ::Anchor{id="DecodeClass.Unsupported"}
 
@@ -167,7 +200,7 @@ The input violates the accepted encoding or schema.
 Unsupported
 ```
 
-The version or PEM label is outside the selected format.
+The input is valid, but its version or PEM label is not supported.
 
 ::Anchor{id="DecodeClass.ResourceLimit"}
 
@@ -177,7 +210,7 @@ The version or PEM label is outside the selected format.
 ResourceLimit
 ```
 
-A configured limit or machine size bound is exceeded.
+The input goes over a [`DecodeLimits`](#DecodeLimits) value or a size that the target can hold.
 
 ::Anchor{id="DecodeReason"}
 
@@ -187,7 +220,7 @@ A configured limit or machine size bound is exceeded.
 pub enum DecodeReason
 ```
 
-The specific failed decoding rule.
+The rule that a [`DecodeError`](#DecodeError) broke.
 
 ::Anchor{id="DecodeReason.EmptyInput"}
 
@@ -197,7 +230,7 @@ The specific failed decoding rule.
 EmptyInput
 ```
 
-The input contains no certificate.
+The input has no certificate.
 
 ::Anchor{id="DecodeReason.PemSyntax"}
 
@@ -207,7 +240,7 @@ The input contains no certificate.
 PemSyntax
 ```
 
-A PEM marker or document byte is invalid.
+A PEM marker or a byte between the markers is not valid.
 
 ::Anchor{id="DecodeReason.Base64"}
 
@@ -217,7 +250,7 @@ A PEM marker or document byte is invalid.
 Base64
 ```
 
-Base64 alphabet, padding, or pad bits are invalid.
+The Base64 has a character, padding, or unused bits that are not valid.
 
 ::Anchor{id="DecodeReason.TrailingData"}
 
@@ -227,7 +260,7 @@ Base64 alphabet, padding, or pad bits are invalid.
 TrailingData
 ```
 
-Data follows the required single certificate.
+There are bytes after the one certificate that the function reads.
 
 ::Anchor{id="DecodeReason.Truncated"}
 
@@ -237,7 +270,7 @@ Data follows the required single certificate.
 Truncated
 ```
 
-Required input ends before its declared boundary.
+The input ends before a value is complete.
 
 ::Anchor{id="DecodeReason.Tag"}
 
@@ -247,7 +280,7 @@ Required input ends before its declared boundary.
 Tag
 ```
 
-A tag encoding or primitive/constructed bit is invalid.
+A DER tag is not valid.
 
 ::Anchor{id="DecodeReason.Length"}
 
@@ -257,7 +290,7 @@ A tag encoding or primitive/constructed bit is invalid.
 Length
 ```
 
-A DER length encoding is not canonical.
+A DER length is not in its shortest form.
 
 ::Anchor{id="DecodeReason.Integer"}
 
@@ -267,7 +300,7 @@ A DER length encoding is not canonical.
 Integer
 ```
 
-An INTEGER is empty or is not minimally encoded.
+An INTEGER is empty or not in its shortest form.
 
 ::Anchor{id="DecodeReason.Boolean"}
 
@@ -277,7 +310,7 @@ An INTEGER is empty or is not minimally encoded.
 Boolean
 ```
 
-A BOOLEAN is not one canonical octet.
+A BOOLEAN is not one byte of `0x00` or `0xff`.
 
 ::Anchor{id="DecodeReason.BitString"}
 
@@ -287,7 +320,7 @@ A BOOLEAN is not one canonical octet.
 BitString
 ```
 
-A BIT STRING count or unused tail bits are invalid.
+The unused-bit count of a BIT STRING, or its unused bits, are not valid.
 
 ::Anchor{id="DecodeReason.Oid"}
 
@@ -297,7 +330,7 @@ A BIT STRING count or unused tail bits are invalid.
 Oid
 ```
 
-An OID subidentifier is empty, unfinished, or nonminimal.
+An object identifier is not valid.
 
 ::Anchor{id="DecodeReason.SetOrder"}
 
@@ -307,7 +340,7 @@ An OID subidentifier is empty, unfinished, or nonminimal.
 SetOrder
 ```
 
-An RDN SET OF is not in DER order.
+The values of a SET OF in a name are not in DER order.
 
 ::Anchor{id="DecodeReason.DefaultValue"}
 
@@ -317,7 +350,7 @@ An RDN SET OF is not in DER order.
 DefaultValue
 ```
 
-A default value is explicitly encoded.
+A field that has its default value is encoded. DER does not allow it.
 
 ::Anchor{id="DecodeReason.Time"}
 
@@ -327,7 +360,7 @@ A default value is explicitly encoded.
 Time
 ```
 
-A certificate time or calendar date is invalid.
+A time or date is not valid.
 
 ::Anchor{id="DecodeReason.Schema"}
 
@@ -337,7 +370,7 @@ A certificate time or calendar date is invalid.
 Schema
 ```
 
-The certificate fields violate the selected schema.
+The fields do not have the structure of an X.509 certificate.
 
 ::Anchor{id="DecodeReason.StringEncoding"}
 
@@ -347,7 +380,7 @@ The certificate fields violate the selected schema.
 StringEncoding
 ```
 
-An ASN.1 string encoding is invalid.
+A text field does not follow its string type.
 
 ::Anchor{id="DecodeReason.Version"}
 
@@ -357,7 +390,7 @@ An ASN.1 string encoding is invalid.
 Version
 ```
 
-The certificate version is not v1, v2, or v3.
+The version is not v1, v2, or v3.
 
 ::Anchor{id="DecodeReason.PemLabel"}
 
@@ -367,7 +400,7 @@ The certificate version is not v1, v2, or v3.
 PemLabel
 ```
 
-The PEM label is not CERTIFICATE.
+The PEM label is not `CERTIFICATE`.
 
 ::Anchor{id="DecodeReason.InputBytes"}
 
@@ -377,7 +410,7 @@ The PEM label is not CERTIFICATE.
 InputBytes
 ```
 
-The complete input exceeds its limit.
+The input is longer than `inputBytes`.
 
 ::Anchor{id="DecodeReason.CertificateBytes"}
 
@@ -387,7 +420,7 @@ The complete input exceeds its limit.
 CertificateBytes
 ```
 
-One certificate exceeds its DER byte limit.
+A certificate is longer than `certificateBytes`.
 
 ::Anchor{id="DecodeReason.TotalDerBytes"}
 
@@ -397,7 +430,7 @@ One certificate exceeds its DER byte limit.
 TotalDerBytes
 ```
 
-The aggregate DER bytes exceed their limit.
+All certificates together are longer than `totalDerBytes`.
 
 ::Anchor{id="DecodeReason.Certificates"}
 
@@ -407,7 +440,7 @@ The aggregate DER bytes exceed their limit.
 Certificates
 ```
 
-The certificate count exceeds its limit.
+There are more certificates than `certificates`.
 
 ::Anchor{id="DecodeReason.FieldBytes"}
 
@@ -417,7 +450,7 @@ The certificate count exceeds its limit.
 FieldBytes
 ```
 
-A primitive or open field exceeds its content limit.
+A field is longer than `fieldBytes`.
 
 ::Anchor{id="DecodeReason.Extensions"}
 
@@ -427,7 +460,7 @@ A primitive or open field exceeds its content limit.
 Extensions
 ```
 
-The extension count exceeds its limit.
+A certificate has more extensions than `extensions`.
 
 ::Anchor{id="DecodeReason.Depth"}
 
@@ -437,7 +470,7 @@ The extension count exceeds its limit.
 Depth
 ```
 
-The traversed TLV depth exceeds its limit.
+The DER values nest deeper than `depth`.
 
 ::Anchor{id="DecodeReason.Nodes"}
 
@@ -447,7 +480,7 @@ The traversed TLV depth exceeds its limit.
 Nodes
 ```
 
-The traversed TLV count exceeds its limit.
+A certificate has more DER values than `nodes`.
 
 ::Anchor{id="DecodeReason.SizeOverflow"}
 
@@ -457,7 +490,7 @@ The traversed TLV count exceeds its limit.
 SizeOverflow
 ```
 
-A length, tag number, or allocation size exceeds the target size range.
+A length, a tag number, or an allocation size does not fit in `usize`.
 
 ::Anchor{id="DecodeOffsetSpace"}
 
@@ -467,7 +500,7 @@ A length, tag number, or allocation size exceeds the target size range.
 pub enum DecodeOffsetSpace
 ```
 
-The byte sequence used by a diagnostic offset.
+The bytes that [`DecodeError.offset`](#DecodeError.offset) counts in.
 
 ::Anchor{id="DecodeOffsetSpace.Input"}
 
@@ -477,7 +510,7 @@ The byte sequence used by a diagnostic offset.
 Input
 ```
 
-The offset is in the original supplied input.
+The offset is a position in the input that you gave.
 
 ::Anchor{id="DecodeOffsetSpace.Der"}
 
@@ -487,7 +520,8 @@ The offset is in the original supplied input.
 Der
 ```
 
-The offset is in the DER decoded from the indicated PEM block.
+The offset is a position in the DER of the PEM block at `certificateIndex`, after Base64
+decoding.
 
 ::Anchor{id="CertificateVersion"}
 
@@ -497,7 +531,7 @@ The offset is in the DER decoded from the indicated PEM block.
 pub enum CertificateVersion
 ```
 
-The structural X.509 certificate version.
+The X.509 version of a certificate.
 
 ::Anchor{id="CertificateVersion.V1"}
 
@@ -507,7 +541,7 @@ The structural X.509 certificate version.
 V1
 ```
 
-Version one, encoded by an absent version field.
+Version 1. The version field is absent.
 
 ::Anchor{id="CertificateVersion.V2"}
 
@@ -517,7 +551,7 @@ Version one, encoded by an absent version field.
 V2
 ```
 
-Version two, encoded as INTEGER one.
+Version 2.
 
 ::Anchor{id="CertificateVersion.V3"}
 
@@ -527,7 +561,7 @@ Version two, encoded as INTEGER one.
 V3
 ```
 
-Version three, encoded as INTEGER two.
+Version 3. Most certificates use it, because only v3 has extensions.
 
 ::Anchor{id="DecodeError"}
 
@@ -537,7 +571,7 @@ Version three, encoded as INTEGER two.
 pub struct DecodeError
 ```
 
-A decoding failure without a borrow of the input.
+A certificate decoding error, with the rule and the position. It does not borrow the input.
 
 ::Anchor{id="DecodeError.kind"}
 
@@ -547,7 +581,7 @@ A decoding failure without a borrow of the input.
 pub kind: DecodeClass
 ```
 
-The failure category.
+The kind of error.
 
 ::Anchor{id="DecodeError.reason"}
 
@@ -557,7 +591,7 @@ The failure category.
 pub reason: DecodeReason
 ```
 
-The failed rule.
+The rule that the input broke.
 
 ::Anchor{id="DecodeError.certificateIndex"}
 
@@ -567,7 +601,7 @@ The failed rule.
 pub certificateIndex: usize
 ```
 
-The zero-based attempted certificate index; document failures use zero.
+The index of the certificate that failed, from 0. Errors in the document itself use 0.
 
 ::Anchor{id="DecodeError.offsetSpace"}
 
@@ -577,7 +611,7 @@ The zero-based attempted certificate index; document failures use zero.
 pub offsetSpace: DecodeOffsetSpace
 ```
 
-The coordinate system for the offset.
+Tells you if `offset` counts in the input or in the decoded DER.
 
 ::Anchor{id="DecodeError.offset"}
 
@@ -587,7 +621,7 @@ The coordinate system for the offset.
 pub offset: usize
 ```
 
-The offending byte, TLV tag, or end offset when required input is missing.
+The position of the byte or tag that failed, or the position where missing data must be.
 
 ::Anchor{id="DecodeError.impl.Copy"}
 
@@ -605,7 +639,7 @@ impl Copy for DecodeError
 pub struct CertificateTime
 ```
 
-A decoded Gregorian certificate time in UTC.
+A date and time in UTC from a certificate.
 
 ::Anchor{id="CertificateTime.year"}
 
@@ -615,7 +649,7 @@ A decoded Gregorian certificate time in UTC.
 pub year: u16
 ```
 
-The full year, from 1 through 9999.
+The year, from 1 to 9999.
 
 ::Anchor{id="CertificateTime.month"}
 
@@ -625,7 +659,7 @@ The full year, from 1 through 9999.
 pub month: u8
 ```
 
-The month, from 1 through 12.
+The month, from 1 to 12.
 
 ::Anchor{id="CertificateTime.day"}
 
@@ -635,7 +669,7 @@ The month, from 1 through 12.
 pub day: u8
 ```
 
-The valid day of the month.
+The day of the month.
 
 ::Anchor{id="CertificateTime.hour"}
 
@@ -645,7 +679,7 @@ The valid day of the month.
 pub hour: u8
 ```
 
-The hour, from 0 through 23.
+The hour, from 0 to 23.
 
 ::Anchor{id="CertificateTime.minute"}
 
@@ -655,7 +689,7 @@ The hour, from 0 through 23.
 pub minute: u8
 ```
 
-The minute, from 0 through 59.
+The minute, from 0 to 59.
 
 ::Anchor{id="CertificateTime.second"}
 
@@ -665,7 +699,7 @@ The minute, from 0 through 59.
 pub second: u8
 ```
 
-The second, from 0 through 59.
+The second, from 0 to 59.
 
 ::Anchor{id="CertificateTime.impl.Copy"}
 
@@ -683,7 +717,7 @@ impl Copy for CertificateTime
 pub struct BitStringView<'a>
 ```
 
-A borrowed BIT STRING payload with its unused-bit metadata.
+The content of a BIT STRING, such as a public key or a signature. It borrows the certificate.
 
 ::Anchor{id="BitStringView.bytes"}
 
@@ -693,7 +727,7 @@ A borrowed BIT STRING payload with its unused-bit metadata.
 pub bytes: &'a [u8]
 ```
 
-The original payload, excluding its initial count octet.
+The bits, without the first byte that counts the unused bits.
 
 ::Anchor{id="BitStringView.unusedBits"}
 
@@ -703,7 +737,7 @@ The original payload, excluding its initial count octet.
 pub unusedBits: u8
 ```
 
-The number of zero low bits in the last payload octet.
+The number of unused bits at the end of the last byte. Keys and signatures use 0.
 
 ::Anchor{id="AlgorithmView"}
 
@@ -713,7 +747,7 @@ The number of zero low bits in the last payload octet.
 pub struct AlgorithmView<'a>
 ```
 
-A borrowed AlgorithmIdentifier with uninterpreted parameters.
+An algorithm identifier, such as the signature algorithm. It borrows the certificate.
 
 ::Anchor{id="AlgorithmView.der"}
 
@@ -723,7 +757,7 @@ A borrowed AlgorithmIdentifier with uninterpreted parameters.
 pub der: &'a [u8]
 ```
 
-The complete original AlgorithmIdentifier TLV.
+The full DER of the AlgorithmIdentifier.
 
 ::Anchor{id="AlgorithmView.oid"}
 
@@ -733,7 +767,7 @@ The complete original AlgorithmIdentifier TLV.
 pub oid: &'a [u8]
 ```
 
-The canonical OID content octets, without tag or length.
+The bytes of the object identifier, without the tag and the length.
 
 ::Anchor{id="AlgorithmView.parametersDer"}
 
@@ -743,7 +777,8 @@ The canonical OID content octets, without tag or length.
 pub parametersDer: Option<&'a [u8]>
 ```
 
-The complete parameter TLV; absence differs from explicit NULL.
+The full DER of the parameters, or `None` if they are absent. Absent parameters and an
+explicit NULL are different.
 
 ::Anchor{id="CertificateOffsets"}
 
@@ -753,7 +788,8 @@ The complete parameter TLV; absence differs from explicit NULL.
 pub struct CertificateOffsets
 ```
 
-Stable byte offsets for semantically significant fields in the retained certificate DER.
+The positions of the main fields in the DER of a certificate. Use them to point at a field in an
+error message.
 
 ::Anchor{id="CertificateOffsets.tbs"}
 
@@ -763,7 +799,7 @@ Stable byte offsets for semantically significant fields in the retained certific
 pub tbs: usize
 ```
 
-Complete TBSCertificate tag.
+The position of the TBSCertificate, the part that the issuer signs.
 
 ::Anchor{id="CertificateOffsets.version"}
 
@@ -773,7 +809,7 @@ Complete TBSCertificate tag.
 pub version: usize
 ```
 
-Explicit version wrapper, or the first TBSCertificate field when version is absent.
+The position of the version field, or the first TBSCertificate field if the version is absent.
 
 ::Anchor{id="CertificateOffsets.serial"}
 
@@ -783,7 +819,7 @@ Explicit version wrapper, or the first TBSCertificate field when version is abse
 pub serial: usize
 ```
 
-Serial-number INTEGER tag.
+The position of the serial number.
 
 ::Anchor{id="CertificateOffsets.tbsSignatureAlgorithm"}
 
@@ -793,7 +829,7 @@ Serial-number INTEGER tag.
 pub tbsSignatureAlgorithm: usize
 ```
 
-Inner TBSCertificate signature AlgorithmIdentifier tag.
+The position of the signature algorithm inside the TBSCertificate.
 
 ::Anchor{id="CertificateOffsets.issuer"}
 
@@ -803,7 +839,7 @@ Inner TBSCertificate signature AlgorithmIdentifier tag.
 pub issuer: usize
 ```
 
-Issuer Name tag.
+The position of the issuer name.
 
 ::Anchor{id="CertificateOffsets.subject"}
 
@@ -813,7 +849,7 @@ Issuer Name tag.
 pub subject: usize
 ```
 
-Subject Name tag.
+The position of the subject name.
 
 ::Anchor{id="CertificateOffsets.spki"}
 
@@ -823,7 +859,7 @@ Subject Name tag.
 pub spki: usize
 ```
 
-SubjectPublicKeyInfo tag.
+The position of the SubjectPublicKeyInfo.
 
 ::Anchor{id="CertificateOffsets.publicKey"}
 
@@ -833,7 +869,7 @@ SubjectPublicKeyInfo tag.
 pub publicKey: usize
 ```
 
-SubjectPublicKey BIT STRING tag.
+The position of the public key BIT STRING.
 
 ::Anchor{id="CertificateOffsets.signatureAlgorithm"}
 
@@ -843,7 +879,7 @@ SubjectPublicKey BIT STRING tag.
 pub signatureAlgorithm: usize
 ```
 
-Outer signature AlgorithmIdentifier tag.
+The position of the outer signature algorithm.
 
 ::Anchor{id="CertificateOffsets.signature"}
 
@@ -853,7 +889,7 @@ Outer signature AlgorithmIdentifier tag.
 pub signature: usize
 ```
 
-Signature-value BIT STRING tag.
+The position of the signature BIT STRING.
 
 ::Anchor{id="CertificateOffsets.issuerUniqueId"}
 
@@ -863,7 +899,7 @@ Signature-value BIT STRING tag.
 pub issuerUniqueId: usize
 ```
 
-Issuer unique-identifier tag, or the TBSCertificate tag when absent.
+The position of the issuer unique ID, or the TBSCertificate if it is absent.
 
 ::Anchor{id="CertificateOffsets.subjectUniqueId"}
 
@@ -873,7 +909,7 @@ Issuer unique-identifier tag, or the TBSCertificate tag when absent.
 pub subjectUniqueId: usize
 ```
 
-Subject unique-identifier tag, or the TBSCertificate tag when absent.
+The position of the subject unique ID, or the TBSCertificate if it is absent.
 
 ::Anchor{id="ExtensionView"}
 
@@ -883,7 +919,7 @@ Subject unique-identifier tag, or the TBSCertificate tag when absent.
 pub struct ExtensionView<'a>
 ```
 
-A borrowed raw extension, including unknown or duplicate extensions.
+One extension of a certificate, as it is in the DER. It borrows the certificate.
 
 ::Anchor{id="ExtensionView.offset"}
 
@@ -893,7 +929,7 @@ A borrowed raw extension, including unknown or duplicate extensions.
 pub offset: usize
 ```
 
-Byte offset of the complete Extension TLV in the certificate DER.
+The position of the extension in the DER of the certificate.
 
 ::Anchor{id="ExtensionView.valueOffset"}
 
@@ -903,7 +939,7 @@ Byte offset of the complete Extension TLV in the certificate DER.
 pub valueOffset: usize
 ```
 
-Byte offset of the extension value content in the certificate DER.
+The position of the extension value in the DER of the certificate.
 
 ::Anchor{id="ExtensionView.der"}
 
@@ -913,7 +949,7 @@ Byte offset of the extension value content in the certificate DER.
 pub der: &'a [u8]
 ```
 
-The complete original Extension TLV.
+The full DER of the extension.
 
 ::Anchor{id="ExtensionView.oid"}
 
@@ -923,7 +959,7 @@ The complete original Extension TLV.
 pub oid: &'a [u8]
 ```
 
-The canonical OID content octets, without tag or length.
+The bytes of the extension object identifier, without the tag and the length.
 
 ::Anchor{id="ExtensionView.critical"}
 
@@ -933,7 +969,7 @@ The canonical OID content octets, without tag or length.
 pub critical: bool
 ```
 
-The critical bit, false when absent.
+`true` if the extension is marked critical. An absent flag is `false`.
 
 ::Anchor{id="ExtensionView.value"}
 
@@ -943,7 +979,7 @@ The critical bit, false when absent.
 pub value: &'a [u8]
 ```
 
-The exact OCTET STRING content, without ASN.1 interpretation.
+The bytes inside the extension OCTET STRING. They are not decoded.
 
 ::Anchor{id="Certificate"}
 
@@ -953,12 +989,10 @@ The exact OCTET STRING content, without ASN.1 interpretation.
 pub struct Certificate
 ```
 
-An immutable owned certificate that preserves its original DER and all raw extensions.
+A decoded X.509 certificate that owns its DER bytes.
 
-### Details
-
-Accessors borrow this owner. Dropping the certificate releases all owned storage.
-Unknown algorithms, duplicate extensions, and policy-invalid serials remain available to independent validators.
+The accessors borrow the certificate. Unknown algorithms, duplicate extensions, and other values
+that a validator can reject stay available, so that `silk.certificate_profile` can check them.
 
 ::Anchor{id="Certificate.impl"}
 
@@ -976,13 +1010,10 @@ impl Certificate
 pub effect fn copy(self: &Self) -> Certificate ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies this decoded certificate into independent owned storage without reinterpreting it.
+Returns a copy of the certificate. It does not decode again.
 
-#### Details
-
-The copy preserves every original DER byte, checked field offset, algorithm spelling, and raw
-extension in source order. Allocation refusal releases partial storage and returns
-`OutOfMemoryError`; no semantic validation is performed.
+#### Errors
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="Certificate.impl.decodeDer"}
 
@@ -994,16 +1025,14 @@ pub effect fn decodeDer(input: &[u8], limits: DecodeLimits) -> Result<Certificat
   ? &mut Allocator
 ```
 
-Decodes exactly one DER certificate into independent owned storage.
+Decodes one DER certificate from `input`, and copies it.
 
-#### Details
+All of `input` must be the certificate. Bytes after it, also whitespace, are an error.
 
-Limits are inclusive. Structural failures return `DecodeError`; allocation refusal uses `OutOfMemoryError`.
-No partial result escapes. The result retains no input borrow. Trailing bytes, including whitespace, fail.
-
-#### Gotchas
-
-Success does not verify signatures, trust, names, or current validity. Extensions remain opaque.
+#### Errors
+- `Failure` with a [`DecodeError`](#DecodeError) if `input` is not one valid certificate or goes over a
+  limit.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="Certificate.impl.decodePem"}
 
@@ -1015,18 +1044,18 @@ pub effect fn decodePem(input: &[u8], limits: DecodeLimits) -> Result<Certificat
   ? &mut Allocator
 ```
 
-Decodes exactly one strict CERTIFICATE PEM block into independent owned storage.
+Decodes one PEM `CERTIFICATE` block from `input`.
 
-#### Details
+Spaces, tabs, CR, and LF are allowed around the Base64 lines. The Base64 must be canonical.
 
-The parser accepts SP, HT, LF, CRLF, and CR whitespace, with canonical base64 padding and pad bits.
-Other labels are unsupported. Text outside markers, malformed markers, and a second block fail.
-Allocation refusal uses `OutOfMemoryError`; no partial certificate escapes.
+#### Errors
+- `Failure` with a [`DecodeError`](#DecodeError) if there is text outside the block, a second block, another
+  label, or a certificate that is not valid.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 #### Gotchas
-
-This strict profile rejects explanatory text and VT/FF that permissive RFC 7468 readers can ignore.
-Success does not establish trust or validate a signature.
+Some PEM readers ignore text outside the block. This one does not. Use
+`CertificateBundle.decodeAnnotatedPem` for a CA file with comments.
 
 ::Anchor{id="Certificate.impl.tbsDer"}
 
@@ -1036,7 +1065,7 @@ Success does not establish trust or validate a signature.
 pub fn tbsDer(self: &Self) -> &[u8]
 ```
 
-Borrows the complete original signed TBSCertificate TLV; the view cannot outlive this owner.
+Returns the DER of the TBSCertificate, the part that the issuer signs.
 
 ::Anchor{id="Certificate.impl.issuerDer"}
 
@@ -1046,7 +1075,7 @@ Borrows the complete original signed TBSCertificate TLV; the view cannot outlive
 pub fn issuerDer(self: &Self) -> &[u8]
 ```
 
-Borrows the complete issuer Name TLV, without normalization; the view cannot outlive this owner.
+Returns the DER of the issuer name, as it is. It is not normalized.
 
 ::Anchor{id="Certificate.impl.subjectDer"}
 
@@ -1056,7 +1085,7 @@ Borrows the complete issuer Name TLV, without normalization; the view cannot out
 pub fn subjectDer(self: &Self) -> &[u8]
 ```
 
-Borrows the complete subject Name TLV, without normalization; the view cannot outlive this owner.
+Returns the DER of the subject name, as it is. It is not normalized.
 
 ::Anchor{id="Certificate.impl.validityDer"}
 
@@ -1066,7 +1095,7 @@ Borrows the complete subject Name TLV, without normalization; the view cannot ou
 pub fn validityDer(self: &Self) -> &[u8]
 ```
 
-Borrows the complete original Validity TLV; the view cannot outlive this owner.
+Returns the DER of the validity period.
 
 ::Anchor{id="Certificate.impl.spkiDer"}
 
@@ -1076,7 +1105,7 @@ Borrows the complete original Validity TLV; the view cannot outlive this owner.
 pub fn spkiDer(self: &Self) -> &[u8]
 ```
 
-Borrows the complete original SubjectPublicKeyInfo TLV; the view cannot outlive this owner.
+Returns the DER of the SubjectPublicKeyInfo: the key algorithm and the public key.
 
 ::Anchor{id="Certificate.impl.der"}
 
@@ -1086,7 +1115,7 @@ Borrows the complete original SubjectPublicKeyInfo TLV; the view cannot outlive 
 pub fn der(self: &Self) -> &[u8]
 ```
 
-Borrows all original DER bytes; the view cannot outlive this owner.
+Returns the full DER of the certificate.
 
 ::Anchor{id="Certificate.impl.version"}
 
@@ -1096,7 +1125,7 @@ Borrows all original DER bytes; the view cannot outlive this owner.
 pub fn version(self: &Self) -> CertificateVersion
 ```
 
-Returns the structural certificate version without imposing validation policy.
+Returns the X.509 version.
 
 ::Anchor{id="Certificate.impl.offsets"}
 
@@ -1106,7 +1135,7 @@ Returns the structural certificate version without imposing validation policy.
 pub fn offsets(self: &Self) -> CertificateOffsets
 ```
 
-Returns stable byte offsets for semantic diagnostics over the retained DER.
+Returns the positions of the main fields in [`Certificate.der`](#Certificate.impl.der).
 
 ::Anchor{id="Certificate.impl.serial"}
 
@@ -1116,7 +1145,8 @@ Returns stable byte offsets for semantic diagnostics over the retained DER.
 pub fn serial(self: &Self) -> &[u8]
 ```
 
-Borrows minimal signed INTEGER content, including a required sign octet; the view borrows this owner.
+Returns the bytes of the serial number, as a big-endian signed integer. A leading zero byte is
+kept when the high bit is set.
 
 ::Anchor{id="Certificate.impl.notBefore"}
 
@@ -1126,7 +1156,7 @@ Borrows minimal signed INTEGER content, including a required sign octet; the vie
 pub fn notBefore(self: &Self) -> CertificateTime
 ```
 
-Returns the decoded UTC lower validity boundary without consulting a clock.
+Returns the start of the validity period. It does not read a clock.
 
 ::Anchor{id="Certificate.impl.notAfter"}
 
@@ -1136,7 +1166,8 @@ Returns the decoded UTC lower validity boundary without consulting a clock.
 pub fn notAfter(self: &Self) -> CertificateTime
 ```
 
-Returns the decoded UTC upper validity boundary without checking interval order.
+Returns the end of the validity period. It does not check that it is after
+[`Certificate.notBefore`](#Certificate.impl.notBefore).
 
 ::Anchor{id="Certificate.impl.publicKey"}
 
@@ -1146,7 +1177,7 @@ Returns the decoded UTC upper validity boundary without checking interval order.
 pub fn publicKey<'a>(self: &'a Self) -> BitStringView<'a>
 ```
 
-Borrows the original subjectPublicKey payload and unused-bit count; the view borrows this owner.
+Returns the subject public key bits.
 
 ::Anchor{id="Certificate.impl.signature"}
 
@@ -1156,7 +1187,7 @@ Borrows the original subjectPublicKey payload and unused-bit count; the view bor
 pub fn signature<'a>(self: &'a Self) -> BitStringView<'a>
 ```
 
-Borrows the original signatureValue payload and unused-bit count; the view borrows this owner.
+Returns the signature bits.
 
 ::Anchor{id="Certificate.impl.publicKeyAlgorithm"}
 
@@ -1166,7 +1197,7 @@ Borrows the original signatureValue payload and unused-bit count; the view borro
 pub fn publicKeyAlgorithm<'a>(self: &'a Self) -> AlgorithmView<'a>
 ```
 
-Borrows the SPKI AlgorithmIdentifier, preserving parameter absence and original encoding.
+Returns the algorithm of the subject public key.
 
 ::Anchor{id="Certificate.impl.tbsSignatureAlgorithm"}
 
@@ -1176,7 +1207,8 @@ Borrows the SPKI AlgorithmIdentifier, preserving parameter absence and original 
 pub fn tbsSignatureAlgorithm<'a>(self: &'a Self) -> AlgorithmView<'a>
 ```
 
-Borrows the TBSCertificate signature AlgorithmIdentifier, preserving parameter absence and original encoding.
+Returns the signature algorithm inside the TBSCertificate. It must be the same as
+[`Certificate.signatureAlgorithm`](#Certificate.impl.signatureAlgorithm), but this function does not check it.
 
 ::Anchor{id="Certificate.impl.signatureAlgorithm"}
 
@@ -1186,7 +1218,7 @@ Borrows the TBSCertificate signature AlgorithmIdentifier, preserving parameter a
 pub fn signatureAlgorithm<'a>(self: &'a Self) -> AlgorithmView<'a>
 ```
 
-Borrows the outer signature AlgorithmIdentifier, preserving parameter absence and original encoding.
+Returns the outer signature algorithm, which the issuer used to sign.
 
 ::Anchor{id="Certificate.impl.issuerUniqueId"}
 
@@ -1196,7 +1228,7 @@ Borrows the outer signature AlgorithmIdentifier, preserving parameter absence an
 pub fn issuerUniqueId<'a>(self: &'a Self) -> Option<BitStringView<'a>>
 ```
 
-Borrows the optional unique ID and unused-bit count; absence returns `None`. The view borrows this owner.
+Returns the issuer unique ID, or `None` if it is absent. Modern certificates do not use it.
 
 ::Anchor{id="Certificate.impl.subjectUniqueId"}
 
@@ -1206,7 +1238,7 @@ Borrows the optional unique ID and unused-bit count; absence returns `None`. The
 pub fn subjectUniqueId<'a>(self: &'a Self) -> Option<BitStringView<'a>>
 ```
 
-Borrows the optional unique ID and unused-bit count; absence returns `None`. The view borrows this owner.
+Returns the subject unique ID, or `None` if it is absent. Modern certificates do not use it.
 
 ::Anchor{id="Certificate.impl.extensionCount"}
 
@@ -1216,7 +1248,7 @@ Borrows the optional unique ID and unused-bit count; absence returns `None`. The
 pub fn extensionCount(self: &Self) -> usize
 ```
 
-Returns the extension count, including duplicates and unknown OIDs.
+Returns the number of extensions, with unknown and duplicate ones.
 
 ::Anchor{id="Certificate.impl.extension"}
 
@@ -1226,10 +1258,7 @@ Returns the extension count, including duplicates and unknown OIDs.
 pub fn extension<'a>(self: &'a Self, index: usize) -> Option<ExtensionView<'a>>
 ```
 
-Borrows an extension in input order, or returns `None` when the index is out of range.
-
-#### Details
-
-The value is exact OCTET STRING content. Unknown and duplicate OIDs remain present. The view borrows this owner.
+Returns the extension at `index` in source order, or `None` if `index` is out of range. The
+value is not decoded.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

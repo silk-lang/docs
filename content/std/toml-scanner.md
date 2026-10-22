@@ -1,13 +1,92 @@
-TOML 1.1.0 lexical scanning and document syntax validation.
+Validate TOML source and read it as a sequence of tokens.
 
 ## When to use
-Validate a complete UTF-8 document with [`TomlScanner.validate`](#TomlScanner.impl.validate), then use
-[`TomlScanner.next`](#TomlScanner.impl.next) to inspect its source tokens and byte spans.
+Most programs use `silk.toml_value`, which calls this scanner for them. Use [`TomlScanner`](#TomlScanner)
+directly to check that a document is valid TOML without allocating, or to read tokens and their
+source spans, for example in an editor tool.
 
 ## Details
-Tokens retain their source spelling. Validation checks keys, scalar forms, strings,
-arrays, inline tables, and headers. Defining and reconciling document keys belongs
-to the document reader.
+[`TomlScanner.validate`](#TomlScanner.impl.validate) checks the full syntax of TOML 1.1.0: UTF-8, keys, strings, numbers,
+dates and times, arrays, inline tables, and headers. It does not check that each key is defined
+one time, because that needs a table tree. [`TomlScanner.next`](#TomlScanner.impl.next) returns one token at a time.
+Tokens hold a [`TomlSpan`](#TomlSpan) into the input, not a copy, and do not decode strings. The scanner
+does not allocate.
+
+## Errors
+The functions return a `Result` with a [`TomlError`](#TomlError). `offset` is the byte position of the first
+problem in the input.
+
+## Gotchas
+[`TomlScanner.next`](#TomlScanner.impl.next) does not check that the tokens make a valid document. Call
+[`TomlScanner.validate`](#TomlScanner.impl.validate) first. `validate` does not move the position of the scanner.
+
+## Examples
+### Validate a document and count its keys
+```silk
+import silk.result { Result }
+import silk.toml_scanner { TomlError, TomlScanner, TomlToken }
+
+pub fn main() -> i32 {
+  let mut scanner = TomlScanner.make(b"name = \"Ada\"\nyear = 1815\n")
+  match TomlScanner.validate(&mut scanner) {
+    Result<bool, TomlError>.Success { value: _ } => {}
+    Result<bool, TomlError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let mut keys = 0
+  let mut atLineStart = true
+  while true {
+    match TomlScanner.next(&mut scanner) {
+      Result<TomlToken, TomlError>.Success { value } => match move value {
+        TomlToken.EndOfInput => {
+          break
+        }
+        TomlToken.Newline => {
+          atLineStart = true
+        }
+        TomlToken.Text { span: _ } => {
+          if atLineStart {
+            keys = keys + 1
+          }
+          atLineStart = false
+        }
+        _ => {
+          atLineStart = false
+        }
+      }
+      Result<TomlToken, TomlError>.Failure { error: _ } => {
+        return 1
+      }
+    }
+  }
+  if keys != 2 {
+    return 1
+  }
+  return 0
+}
+```
+
+### Find the position of a syntax error
+```silk
+import silk.result { Result }
+import silk.toml_scanner { TomlError, TomlReason, TomlScanner }
+
+pub fn main() -> i32 {
+  let mut scanner = TomlScanner.make(b"port = 80x\n")
+  return match TomlScanner.validate(&mut scanner) {
+    Result<bool, TomlError>.Failure {
+      error: TomlError { reason: TomlReason.InvalidNumber, offset }
+    } => {
+      if offset != 7 {
+        return 1
+      }
+      return 0
+    }
+    _ => 1
+  }
+}
+```
 
 Import as `TomlScanner` with `import silk.toml_scanner { TomlScanner }`.
 
@@ -21,7 +100,7 @@ Public declarations: 7.
 pub const MAX_DEPTH: usize
 ```
 
-Maximum nested arrays and inline tables.
+The maximum number of arrays and inline tables that can be nested in one value.
 
 ::Anchor{id="TomlSpan"}
 
@@ -31,7 +110,7 @@ Maximum nested arrays and inline tables.
 pub struct TomlSpan
 ```
 
-A half-open source byte range.
+A range of bytes in the input: `length` bytes from `offset`.
 
 ::Anchor{id="TomlSpan.offset"}
 
@@ -41,7 +120,7 @@ A half-open source byte range.
 pub offset: usize
 ```
 
-First byte in the complete input.
+The position of the first byte, from the start of the input.
 
 ::Anchor{id="TomlSpan.length"}
 
@@ -51,7 +130,7 @@ First byte in the complete input.
 pub length: usize
 ```
 
-Number of source bytes.
+The number of bytes.
 
 ::Anchor{id="TomlSpan.impl.Copy"}
 
@@ -77,7 +156,7 @@ impl Copy for TomlError
 pub enum TomlReason
 ```
 
-Stable scanner failure categories.
+The cause of a [`TomlError`](#TomlError).
 
 ::Anchor{id="TomlReason.UnexpectedByte"}
 
@@ -87,7 +166,8 @@ Stable scanner failure categories.
 UnexpectedByte
 ```
 
-A byte is not permitted in the current construct.
+A byte that TOML does not allow at this position, such as a missing `=` or an unexpected
+bracket.
 
 ::Anchor{id="TomlReason.UnexpectedEnd"}
 
@@ -97,7 +177,7 @@ A byte is not permitted in the current construct.
 UnexpectedEnd
 ```
 
-The document ended before the construct was complete.
+The input ends before a string, array, inline table, or header is closed.
 
 ::Anchor{id="TomlReason.InvalidUtf8"}
 
@@ -107,7 +187,7 @@ The document ended before the construct was complete.
 InvalidUtf8
 ```
 
-The input is not well-formed UTF-8.
+The input is not valid UTF-8.
 
 ::Anchor{id="TomlReason.InvalidString"}
 
@@ -117,7 +197,7 @@ The input is not well-formed UTF-8.
 InvalidString
 ```
 
-A string delimiter or unescaped control character is invalid.
+A string is not closed, or holds a control character that must be escaped.
 
 ::Anchor{id="TomlReason.InvalidEscape"}
 
@@ -127,7 +207,8 @@ A string delimiter or unescaped control character is invalid.
 InvalidEscape
 ```
 
-A basic string escape is invalid.
+A basic string has an escape that TOML does not define, or a `\u` or `\U` escape that is not a
+Unicode scalar value.
 
 ::Anchor{id="TomlReason.InvalidNumber"}
 
@@ -137,7 +218,7 @@ A basic string escape is invalid.
 InvalidNumber
 ```
 
-An unquoted numeric or boolean spelling is invalid.
+An unquoted value is not a valid integer, float, or boolean.
 
 ::Anchor{id="TomlReason.InvalidDateTime"}
 
@@ -147,7 +228,7 @@ An unquoted numeric or boolean spelling is invalid.
 InvalidDateTime
 ```
 
-A date or time spelling has an invalid field or structure.
+A date or time has a field out of range or the wrong form.
 
 ::Anchor{id="TomlReason.TypeMismatch"}
 
@@ -157,7 +238,7 @@ A date or time spelling has an invalid field or structure.
 TypeMismatch
 ```
 
-A typed conversion expected another TOML value kind.
+A `silk.toml_codec` conversion found a value of a different kind.
 
 ::Anchor{id="TomlReason.NumberOutOfRange"}
 
@@ -167,7 +248,7 @@ A typed conversion expected another TOML value kind.
 NumberOutOfRange
 ```
 
-A valid TOML number does not fit the requested numeric type.
+A `silk.toml_codec` conversion found a valid number that does not fit the target type.
 
 ::Anchor{id="TomlReason.DuplicateKey"}
 
@@ -177,7 +258,7 @@ A valid TOML number does not fit the requested numeric type.
 DuplicateKey
 ```
 
-A key is defined more than once in one table.
+A key is defined two times in one table.
 
 ::Anchor{id="TomlReason.TableConflict"}
 
@@ -187,7 +268,9 @@ A key is defined more than once in one table.
 TableConflict
 ```
 
-A table definition conflicts with an earlier value or table.
+A table definition conflicts with an earlier value or table, for example a second `[a]` header
+or a header inside an inline table. `silk.toml_output` also uses it for a tree that it cannot
+write.
 
 ::Anchor{id="TomlReason.DepthExceeded"}
 
@@ -207,7 +290,7 @@ More than [`MAX_DEPTH`](#MAX_DEPTH) arrays or inline tables are nested.
 pub struct TomlError
 ```
 
-A scanner failure at a source byte offset.
+A TOML error: the cause and the byte position where it occurred.
 
 ::Anchor{id="TomlError.reason"}
 
@@ -217,7 +300,7 @@ A scanner failure at a source byte offset.
 pub reason: TomlReason
 ```
 
-Stable category of the first syntax failure.
+The cause of the error.
 
 ::Anchor{id="TomlError.offset"}
 
@@ -227,7 +310,8 @@ Stable category of the first syntax failure.
 pub offset: usize
 ```
 
-Absolute byte position of the failure.
+The byte position of the problem in the input. Errors that are not tied to a source position,
+such as codec errors, use 0.
 
 ::Anchor{id="TomlScalarKind"}
 
@@ -237,7 +321,7 @@ Absolute byte position of the failure.
 pub enum TomlScalarKind
 ```
 
-The validated type of an unquoted TOML scalar.
+The kind of an unquoted value, from [`TomlScanner.scalarKind`](#TomlScanner.impl.scalarKind).
 
 ::Anchor{id="TomlScalarKind.Integer"}
 
@@ -247,7 +331,7 @@ The validated type of an unquoted TOML scalar.
 Integer
 ```
 
-A decimal or base-prefixed whole number.
+A decimal integer, or a hexadecimal (`0x`), octal (`0o`), or binary (`0b`) integer.
 
 ::Anchor{id="TomlScalarKind.Float"}
 
@@ -257,7 +341,7 @@ A decimal or base-prefixed whole number.
 Float
 ```
 
-A decimal, exponent, infinity, or NaN spelling.
+A float with a fraction or an exponent, or `inf` or `nan` with an optional sign.
 
 ::Anchor{id="TomlScalarKind.Boolean"}
 
@@ -267,7 +351,7 @@ A decimal, exponent, infinity, or NaN spelling.
 Boolean
 ```
 
-The literal `true` or `false`.
+`true` or `false`.
 
 ::Anchor{id="TomlScalarKind.OffsetDateTime"}
 
@@ -277,7 +361,7 @@ The literal `true` or `false`.
 OffsetDateTime
 ```
 
-A date and time with an explicit UTC offset.
+A date and time with a UTC offset, such as `1979-05-27T07:32:00Z`.
 
 ::Anchor{id="TomlScalarKind.LocalDateTime"}
 
@@ -297,7 +381,7 @@ A date and time without an offset.
 LocalDate
 ```
 
-A calendar date without a time.
+A calendar date.
 
 ::Anchor{id="TomlScalarKind.LocalTime"}
 
@@ -307,7 +391,7 @@ A calendar date without a time.
 LocalTime
 ```
 
-A clock time without a date.
+A time of day.
 
 ::Anchor{id="TomlToken"}
 
@@ -317,7 +401,7 @@ A clock time without a date.
 pub union TomlToken
 ```
 
-Source-level token. `Text` is classified by [`TomlScanner.scalarKind`](#TomlScanner.impl.scalarKind) in value position.
+One token of TOML source. Use [`TomlScanner.slice`](#TomlScanner.impl.slice) to get the bytes of a span.
 
 ::Anchor{id="TomlToken.Text"}
 
@@ -327,7 +411,10 @@ Source-level token. `Text` is classified by [`TomlScanner.scalarKind`](#TomlScan
 Text
 ```
 
-A bare key or unquoted value spelling, including any interior decimal points.
+A bare key or an unquoted value, such as `name`, `42`, or `1979-05-27 07:32:00`.
+
+Dots stay in the token, so a dotted bare key such as `a.b` and a float such as `3.14` are each
+one token. In a value position, use [`TomlScanner.scalarKind`](#TomlScanner.impl.scalarKind) to find the kind of value.
 
 ::Anchor{id="TomlToken.Text.span"}
 
@@ -337,7 +424,7 @@ A bare key or unquoted value spelling, including any interior decimal points.
 pub span: TomlSpan
 ```
 
-The raw source range.
+The source bytes of the token.
 
 ::Anchor{id="TomlToken.String"}
 
@@ -347,7 +434,8 @@ The raw source range.
 String
 ```
 
-A quoted string or key, including its source delimiters.
+A quoted key or string. The span includes the quotes, and escapes are not decoded. Use
+`silk.toml_text` to decode it.
 
 ::Anchor{id="TomlToken.String.span"}
 
@@ -357,7 +445,7 @@ A quoted string or key, including its source delimiters.
 pub span: TomlSpan
 ```
 
-The raw quoted source range.
+The source bytes of the token, with the quotes.
 
 ::Anchor{id="TomlToken.String.literal"}
 
@@ -367,7 +455,7 @@ The raw quoted source range.
 pub literal: bool
 ```
 
-Whether the quote character is an apostrophe.
+`true` for a literal string, which uses `'` quotes and has no escapes.
 
 ::Anchor{id="TomlToken.String.multiline"}
 
@@ -377,7 +465,7 @@ Whether the quote character is an apostrophe.
 pub multiline: bool
 ```
 
-Whether the source uses triple quotes.
+`true` for a string with three quotes at each end.
 
 ::Anchor{id="TomlToken.Equals"}
 
@@ -387,7 +475,7 @@ Whether the source uses triple quotes.
 Equals
 ```
 
-A key/value separator.
+The `=` between a key and its value.
 
 ::Anchor{id="TomlToken.Dot"}
 
@@ -397,7 +485,8 @@ A key/value separator.
 Dot
 ```
 
-A dot between quoted or bare key parts.
+A `.` at the start of a token, such as the one after the quoted part of `"a".b`. A dot inside
+a bare spelling stays in [`TomlToken.Text`](#TomlToken.Text).
 
 ::Anchor{id="TomlToken.Comma"}
 
@@ -407,7 +496,7 @@ A dot between quoted or bare key parts.
 Comma
 ```
 
-A separator between array elements or inline table entries.
+The `,` between array elements or inline table members.
 
 ::Anchor{id="TomlToken.ArrayBegin"}
 
@@ -417,7 +506,7 @@ A separator between array elements or inline table entries.
 ArrayBegin
 ```
 
-An opening square bracket.
+A `[`. It starts an array or a header.
 
 ::Anchor{id="TomlToken.ArrayEnd"}
 
@@ -427,7 +516,7 @@ An opening square bracket.
 ArrayEnd
 ```
 
-A closing square bracket.
+A `]`. It ends an array or a header.
 
 ::Anchor{id="TomlToken.InlineBegin"}
 
@@ -437,7 +526,7 @@ A closing square bracket.
 InlineBegin
 ```
 
-An opening inline table brace.
+A `{`. It starts an inline table.
 
 ::Anchor{id="TomlToken.InlineEnd"}
 
@@ -447,7 +536,7 @@ An opening inline table brace.
 InlineEnd
 ```
 
-A closing inline table brace.
+A `}`. It ends an inline table.
 
 ::Anchor{id="TomlToken.Newline"}
 
@@ -457,7 +546,7 @@ A closing inline table brace.
 Newline
 ```
 
-An LF or CRLF source newline.
+The end of a line: LF or CRLF. Comments are skipped.
 
 ::Anchor{id="TomlToken.EndOfInput"}
 
@@ -467,7 +556,7 @@ An LF or CRLF source newline.
 EndOfInput
 ```
 
-The end of the complete input.
+The end of the input. Each later call returns it again.
 
 ::Anchor{id="TomlToken.impl.Copy"}
 
@@ -485,7 +574,7 @@ impl Copy for TomlToken
 pub struct TomlScanner<'input>
 ```
 
-A complete-input scanner. `validate` starts from the beginning and does not consume tokens.
+A scanner that borrows the complete source of one TOML document. It does not allocate.
 
 ::Anchor{id="TomlScanner.impl"}
 
@@ -503,7 +592,7 @@ impl<'input> TomlScanner<'input>
 pub fn make(input: &'input [u8]) -> TomlScanner<'input>
 ```
 
-Creates a scanner borrowing a complete TOML source.
+Returns a scanner at the start of `input`.
 
 ::Anchor{id="TomlScanner.impl.validate"}
 
@@ -513,7 +602,13 @@ Creates a scanner borrowing a complete TOML source.
 pub fn validate(self: &mut TomlScanner) -> Result<bool, TomlError>
 ```
 
-Validates the complete document; key equality is handled by the document reader.
+Checks the syntax of the full input as a TOML 1.1.0 document. It does not move the scanner.
+
+Returns `Success(true)` for valid syntax. It does not check that each key is defined one time.
+`silk.toml_value` does that when it builds the tree.
+
+#### Errors
+- [`TomlError`](#TomlError) for the first syntax problem in the input.
 
 ::Anchor{id="TomlScanner.impl.next"}
 
@@ -523,7 +618,13 @@ Validates the complete document; key equality is handled by the document reader.
 pub fn next(self: &mut TomlScanner) -> Result<TomlToken, TomlError>
 ```
 
-Returns the next lexical source token.
+Returns the next token and moves past it. Spaces, tabs, and comments are skipped.
+
+After the last token, it returns [`TomlToken.EndOfInput`](#TomlToken.EndOfInput) on each call.
+
+#### Errors
+- [`TomlError`](#TomlError) for a string that is not closed, a bad comment, or a lone carriage return.
+  `next` does not check the full syntax. Call [`TomlScanner.validate`](#TomlScanner.impl.validate) first.
 
 ::Anchor{id="TomlScanner.impl.scalarKind"}
 
@@ -533,7 +634,8 @@ Returns the next lexical source token.
 pub fn scalarKind(self: &TomlScanner, span: TomlSpan) -> Option<TomlScalarKind>
 ```
 
-Classifies an unquoted scalar spelling.
+Returns the kind of the unquoted value in `span`, or `None` if the bytes are not a valid
+integer, float, boolean, date, or time.
 
 ::Anchor{id="TomlScanner.impl.slice"}
 
@@ -543,7 +645,7 @@ Classifies an unquoted scalar spelling.
 pub fn slice(self: &TomlScanner<'input>, span: TomlSpan) -> &'input [u8]
 ```
 
-Borrows the raw source bytes of a token span.
+Returns the source bytes of `span`. They borrow from the input, not from the scanner.
 
 ::Anchor{id="TomlScanner.impl.offset"}
 
@@ -553,6 +655,6 @@ Borrows the raw source bytes of a token span.
 pub fn offset(self: &TomlScanner) -> usize
 ```
 
-Returns the byte offset of the next lexical token.
+Returns the byte position where the next call to [`TomlScanner.next`](#TomlScanner.impl.next) starts.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

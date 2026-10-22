@@ -1,37 +1,34 @@
-Portable fixed-output SHA-3 digests with allocation-free streaming states.
+Compute SHA-3 digests: SHA3-224, SHA3-256, SHA3-384, and SHA3-512 (FIPS 202).
 
 ## When to use
-Use [`Sha3_224`](#Sha3_224), [`Sha3_256`](#Sha3_256), [`Sha3_384`](#Sha3_384), or [`Sha3_512`](#Sha3_512) when a protocol
-requires the related fixed-output SHA-3 algorithm. Use `silk.hash` for collection keys.
+Use these types when a protocol names SHA-3. For a general cryptographic hash, `silk.sha2` is
+more common. Use `silk.hash` for the keys of a hash map.
 
 ## Details
-The actors return 28-byte, 32-byte, 48-byte, and 64-byte digests. Each actor supports
-incremental `update`, consuming `finish`, and one-shot `hash` operations without allocation.
+[`Sha3_224`](#Sha3_224), [`Sha3_256`](#Sha3_256), [`Sha3_384`](#Sha3_384), and [`Sha3_512`](#Sha3_512) return 28, 32, 48, and 64 bytes. Each
+type has the same functions: `hash` returns the digest of one slice, and `make`, `update`, and
+`finish` hash a message that arrives in parts. The states are fixed-size values and nothing
+allocates. There is no length limit.
 
 ## Gotchas
-These actors implement fixed-output SHA-3. They do not implement SHAKE or another
-extendable-output function.
+SHA-3 is not Keccak-256 as Ethereum uses it: the padding is different, so the digests are
+different. This module has no SHAKE or other extendable-output function.
 
 ## Examples
-### Compare segmented and one-shot SHA3-256 input
+### Hash a message in one call and in parts
 ```silk
-import silk.sha3 {Sha3_256}
+import silk.sha3 { Sha3_256 }
 
 pub fn main() -> i32 {
+  let oneShot = Sha3_256.hash(b"abc")
   let mut state = Sha3_256.make()
   state.update(b"a")
   state.update(b"bc")
-  let segmented = state.finish()
-  let oneShot = Sha3_256.hash(b"abc")
-  let mut index: usize = 0
-  while index < 32 {
-    if segmented[index] != oneShot[index] {
-      return 1
-    }
-    index = index + 1
-  }
-  if segmented[0] != 58 {
-    return 2
+  let streamed = state.finish()
+
+  // SHA3-256("abc") is 3a985da7...1532.
+  if oneShot[0] != 0x3a || oneShot[31] != 0x32 || streamed[31] != oneShot[31] {
+    return 1
   }
   return 0
 }
@@ -49,12 +46,11 @@ Public declarations: 4.
 pub struct Sha3_224
 ```
 
-An allocation-free streaming SHA3-224 state with a 28-byte fixed digest.
+A streaming SHA3-224 state that returns a 28-byte digest.
 
-### Details
-
-Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
-borrowed byte sequence. Finalization consumes the state.
+Call [`Sha3_224.update`](#Sha3_224.impl.update) for each part of the message, then [`Sha3_224.finish`](#Sha3_224.impl.finish). Use
+[`Sha3_224.hash`](#Sha3_224.impl.hash) when the full message is in one slice. The state is a fixed-size value and
+does not allocate.
 
 ::Anchor{id="Sha3_224.impl"}
 
@@ -72,7 +68,7 @@ impl Sha3_224
 pub fn make() -> Sha3_224
 ```
 
-Creates an empty SHA3-224 streaming state without allocation.
+Returns a SHA3-224 state for an empty message.
 
 ::Anchor{id="Sha3_224.impl.update"}
 
@@ -82,12 +78,8 @@ Creates an empty SHA3-224 streaming state without allocation.
 pub fn update(self: &mut Self, bytes: &[u8]) -> ()
 ```
 
-Absorbs `bytes` in order into this SHA3-224 state.
-
-#### Details
-
-An empty slice does not change the digest. Any chunking of the same byte sequence gives the
-same digest.
+Adds `bytes` to the end of the message. Any split of the message into parts gives the same
+digest. An empty slice changes nothing.
 
 ::Anchor{id="Sha3_224.impl.finish"}
 
@@ -97,7 +89,7 @@ same digest.
 pub fn finish(self: Self) -> [u8; 28]
 ```
 
-Consumes this state and returns its standardized 28-byte SHA3-224 digest.
+Returns the 28-byte SHA3-224 digest of the message and consumes the state.
 
 ::Anchor{id="Sha3_224.impl.hash"}
 
@@ -107,12 +99,7 @@ Consumes this state and returns its standardized 28-byte SHA3-224 digest.
 pub fn hash(bytes: &[u8]) -> [u8; 28]
 ```
 
-Returns the standardized 28-byte SHA3-224 digest of `bytes`.
-
-#### Details
-
-This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
-use. It does not allocate.
+Returns the 28-byte SHA3-224 digest of `bytes`.
 
 ::Anchor{id="Sha3_256"}
 
@@ -122,12 +109,11 @@ use. It does not allocate.
 pub struct Sha3_256
 ```
 
-An allocation-free streaming SHA3-256 state with a 32-byte fixed digest.
+A streaming SHA3-256 state that returns a 32-byte digest.
 
-### Details
-
-Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
-borrowed byte sequence. Finalization consumes the state.
+Call [`Sha3_256.update`](#Sha3_256.impl.update) for each part of the message, then [`Sha3_256.finish`](#Sha3_256.impl.finish). Use
+[`Sha3_256.hash`](#Sha3_256.impl.hash) when the full message is in one slice. The state is a fixed-size value and
+does not allocate.
 
 ::Anchor{id="Sha3_256.impl"}
 
@@ -145,7 +131,7 @@ impl Sha3_256
 pub fn make() -> Sha3_256
 ```
 
-Creates an empty SHA3-256 streaming state without allocation.
+Returns a SHA3-256 state for an empty message.
 
 ::Anchor{id="Sha3_256.impl.update"}
 
@@ -155,12 +141,8 @@ Creates an empty SHA3-256 streaming state without allocation.
 pub fn update(self: &mut Self, bytes: &[u8]) -> ()
 ```
 
-Absorbs `bytes` in order into this SHA3-256 state.
-
-#### Details
-
-An empty slice does not change the digest. Any chunking of the same byte sequence gives the
-same digest.
+Adds `bytes` to the end of the message. Any split of the message into parts gives the same
+digest. An empty slice changes nothing.
 
 ::Anchor{id="Sha3_256.impl.finish"}
 
@@ -170,7 +152,7 @@ same digest.
 pub fn finish(self: Self) -> [u8; 32]
 ```
 
-Consumes this state and returns its standardized 32-byte SHA3-256 digest.
+Returns the 32-byte SHA3-256 digest of the message and consumes the state.
 
 ::Anchor{id="Sha3_256.impl.hash"}
 
@@ -180,12 +162,7 @@ Consumes this state and returns its standardized 32-byte SHA3-256 digest.
 pub fn hash(bytes: &[u8]) -> [u8; 32]
 ```
 
-Returns the standardized 32-byte SHA3-256 digest of `bytes`.
-
-#### Details
-
-This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
-use. It does not allocate.
+Returns the 32-byte SHA3-256 digest of `bytes`.
 
 ::Anchor{id="Sha3_384"}
 
@@ -195,12 +172,11 @@ use. It does not allocate.
 pub struct Sha3_384
 ```
 
-An allocation-free streaming SHA3-384 state with a 48-byte fixed digest.
+A streaming SHA3-384 state that returns a 48-byte digest.
 
-### Details
-
-Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
-borrowed byte sequence. Finalization consumes the state.
+Call [`Sha3_384.update`](#Sha3_384.impl.update) for each part of the message, then [`Sha3_384.finish`](#Sha3_384.impl.finish). Use
+[`Sha3_384.hash`](#Sha3_384.impl.hash) when the full message is in one slice. The state is a fixed-size value and
+does not allocate.
 
 ::Anchor{id="Sha3_384.impl"}
 
@@ -218,7 +194,7 @@ impl Sha3_384
 pub fn make() -> Sha3_384
 ```
 
-Creates an empty SHA3-384 streaming state without allocation.
+Returns a SHA3-384 state for an empty message.
 
 ::Anchor{id="Sha3_384.impl.update"}
 
@@ -228,12 +204,8 @@ Creates an empty SHA3-384 streaming state without allocation.
 pub fn update(self: &mut Self, bytes: &[u8]) -> ()
 ```
 
-Absorbs `bytes` in order into this SHA3-384 state.
-
-#### Details
-
-An empty slice does not change the digest. Any chunking of the same byte sequence gives the
-same digest.
+Adds `bytes` to the end of the message. Any split of the message into parts gives the same
+digest. An empty slice changes nothing.
 
 ::Anchor{id="Sha3_384.impl.finish"}
 
@@ -243,7 +215,7 @@ same digest.
 pub fn finish(self: Self) -> [u8; 48]
 ```
 
-Consumes this state and returns its standardized 48-byte SHA3-384 digest.
+Returns the 48-byte SHA3-384 digest of the message and consumes the state.
 
 ::Anchor{id="Sha3_384.impl.hash"}
 
@@ -253,12 +225,7 @@ Consumes this state and returns its standardized 48-byte SHA3-384 digest.
 pub fn hash(bytes: &[u8]) -> [u8; 48]
 ```
 
-Returns the standardized 48-byte SHA3-384 digest of `bytes`.
-
-#### Details
-
-This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
-use. It does not allocate.
+Returns the 48-byte SHA3-384 digest of `bytes`.
 
 ::Anchor{id="Sha3_512"}
 
@@ -268,12 +235,11 @@ use. It does not allocate.
 pub struct Sha3_512
 ```
 
-An allocation-free streaming SHA3-512 state with a 64-byte fixed digest.
+A streaming SHA3-512 state that returns a 64-byte digest.
 
-### Details
-
-Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
-borrowed byte sequence. Finalization consumes the state.
+Call [`Sha3_512.update`](#Sha3_512.impl.update) for each part of the message, then [`Sha3_512.finish`](#Sha3_512.impl.finish). Use
+[`Sha3_512.hash`](#Sha3_512.impl.hash) when the full message is in one slice. The state is a fixed-size value and
+does not allocate.
 
 ::Anchor{id="Sha3_512.impl"}
 
@@ -291,7 +257,7 @@ impl Sha3_512
 pub fn make() -> Sha3_512
 ```
 
-Creates an empty SHA3-512 streaming state without allocation.
+Returns a SHA3-512 state for an empty message.
 
 ::Anchor{id="Sha3_512.impl.update"}
 
@@ -301,12 +267,8 @@ Creates an empty SHA3-512 streaming state without allocation.
 pub fn update(self: &mut Self, bytes: &[u8]) -> ()
 ```
 
-Absorbs `bytes` in order into this SHA3-512 state.
-
-#### Details
-
-An empty slice does not change the digest. Any chunking of the same byte sequence gives the
-same digest.
+Adds `bytes` to the end of the message. Any split of the message into parts gives the same
+digest. An empty slice changes nothing.
 
 ::Anchor{id="Sha3_512.impl.finish"}
 
@@ -316,7 +278,7 @@ same digest.
 pub fn finish(self: Self) -> [u8; 64]
 ```
 
-Consumes this state and returns its standardized 64-byte SHA3-512 digest.
+Returns the 64-byte SHA3-512 digest of the message and consumes the state.
 
 ::Anchor{id="Sha3_512.impl.hash"}
 
@@ -326,11 +288,6 @@ Consumes this state and returns its standardized 64-byte SHA3-512 digest.
 pub fn hash(bytes: &[u8]) -> [u8; 64]
 ```
 
-Returns the standardized 64-byte SHA3-512 digest of `bytes`.
-
-#### Details
-
-This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
-use. It does not allocate.
+Returns the 64-byte SHA3-512 digest of `bytes`.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

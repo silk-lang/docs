@@ -1,19 +1,68 @@
-Owned network addresses, endpoints, and validated origin hosts.
+IP addresses, ports, endpoints, and the host of a URI, as checked values that do not allocate.
 
 ## When to use
-
-Parse URI hosts before resolution, retain the resulting Host for HTTP/TLS identity, and pass
-its numeric address or domain to silk.resolver.
+Use [`Host.parse`](#Host.impl.parse) on the host of a URI. It returns a domain name, an IPv4 address, or an IPv6
+address. Give the result to `silk.resolver` to get endpoints, and keep it to check the identity
+of an HTTPS server. Use [`Ipv4Address`](#Ipv4Address), [`Ipv6Address`](#Ipv6Address), [`Port`](#Port), and [`Endpoint`](#Endpoint) when you
+already have a numeric address.
 
 ## Details
+Addresses store their bytes in network order. A [`DomainHost`](#DomainHost) keeps the spelling of its input
+in a fixed buffer of 253 bytes, and compares without case. The `formatInto` functions write the
+canonical text into a buffer that you give. IPv6 text uses the short lowercase form of RFC 5952,
+for example `2001:db8::1`.
 
-IPv4 and IPv6 own network-order octets. DomainHost owns its admitted source spelling in fixed
-253-byte storage and compares ASCII case-insensitively. Parsing and formatting allocate nothing.
+## Errors
+- [`AddressError`](#AddressError) tells which rule failed, and the byte offset where it failed.
 
 ## Gotchas
+Only plain ASCII domains are accepted. Convert an internationalized name to its `xn--` form
+first. These forms fail: a trailing dot, percent escapes, an IPv6 zone such as `%eth0`,
+IPvFuture, user information, a port, and old IPv4 forms such as `127.1` or `0x7f.0.0.1`.
 
-This profile accepts prepared ASCII LDH/A-label domains only. It rejects search-root dots,
-Unicode mapping, escapes, zones, IPvFuture, userinfo, ports, and legacy libc IPv4 spellings.
+## Examples
+### Parse hosts and format an address
+```silk
+import silk.network_address { AddressError, Host, Ipv6Address, Port }
+import silk.result { Result }
+
+pub fn main() -> i32 {
+  let host = match Host.parse(b"[2001:DB8:0:0::1]") {
+    Result<Host, AddressError>.Success { value } => value
+    Result<Host, AddressError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let address = match host {
+    Host.Ipv6 { value } => value
+    _ => {
+      return 1
+    }
+  }
+  let mut text: [u8; 64] = [0; 64]
+  let length = match Ipv6Address.formatInto(&address, &mut text) {
+    Result<usize, AddressError>.Success { value } => value
+    Result<usize, AddressError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // The canonical form is "2001:db8::1".
+  if length != 11 || text[0] != 50 || text[9] != 58 || text[10] != 49 {
+    return 1
+  }
+  let failed = match Port.make(70000) {
+    Result<Port, AddressError>.Success { value: _ } => false
+    Result<Port, AddressError>.Failure { error: AddressError.InvalidPort { value } } => value
+      == 70000
+    Result<Port, AddressError>.Failure { error: _ } => false
+  }
+  if !failed {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `NetworkAddress` with `import silk.network_address { NetworkAddress }`.
 
@@ -27,7 +76,7 @@ Public declarations: 12.
 pub enum AddressReason
 ```
 
-The failed network-address admission rule.
+The rule that rejected an IP address. See [`AddressError.InvalidAddress`](#AddressError.InvalidAddress).
 
 ::Anchor{id="AddressReason.Empty"}
 
@@ -67,7 +116,7 @@ An address component has invalid syntax.
 LeadingZero
 ```
 
-An IPv4 component contains a prohibited leading zero.
+An IPv4 part has a leading zero, as in `010`. The old octal form is not accepted.
 
 ::Anchor{id="AddressReason.ComponentOverflow"}
 
@@ -87,7 +136,7 @@ An address component exceeds its numeric range.
 WrongComponentCount
 ```
 
-The address has the wrong number of components.
+The address has the wrong number of parts: IPv4 needs 4, and IPv6 needs 8 or `::`.
 
 ::Anchor{id="AddressReason.MultipleCompression"}
 
@@ -97,7 +146,7 @@ The address has the wrong number of components.
 MultipleCompression
 ```
 
-The IPv6 spelling contains multiple compression markers.
+The IPv6 text has `::` more than one time.
 
 ::Anchor{id="AddressReason.CompressionWithoutOmission"}
 
@@ -107,7 +156,7 @@ The IPv6 spelling contains multiple compression markers.
 CompressionWithoutOmission
 ```
 
-IPv6 compression does not omit any component.
+The IPv6 text has `::` together with all 8 parts, so `::` replaces nothing.
 
 ::Anchor{id="HostReason"}
 
@@ -117,7 +166,7 @@ IPv6 compression does not omit any component.
 pub enum HostReason
 ```
 
-The failed domain-host admission rule.
+The rule that rejected a domain name. See [`AddressError.InvalidHost`](#AddressError.InvalidHost).
 
 ::Anchor{id="HostReason.EmptyName"}
 
@@ -137,7 +186,7 @@ The domain name is empty.
 NameTooLong
 ```
 
-The domain name exceeds the admitted byte length.
+The name is longer than 253 bytes.
 
 ::Anchor{id="HostReason.EmptyLabel"}
 
@@ -157,7 +206,7 @@ A domain label is empty.
 LabelTooLong
 ```
 
-A domain label exceeds the admitted byte length.
+A label, the part between two dots, is longer than 63 bytes.
 
 ::Anchor{id="HostReason.Nul"}
 
@@ -207,7 +256,7 @@ A domain label begins or ends with a hyphen.
 InvalidALabel
 ```
 
-An encoded internationalized label is invalid.
+A label that starts with `xn--` is not a valid Punycode label.
 
 ::Anchor{id="HostReason.TrailingDot"}
 
@@ -217,7 +266,7 @@ An encoded internationalized label is invalid.
 TrailingDot
 ```
 
-The domain has a prohibited trailing dot.
+The name ends with a dot, as in `example.com.`.
 
 ::Anchor{id="HostReason.NumericFinalLabel"}
 
@@ -227,7 +276,7 @@ The domain has a prohibited trailing dot.
 NumericFinalLabel
 ```
 
-The final domain label is entirely numeric.
+The last label has only digits, so the name looks like an IPv4 address.
 
 ::Anchor{id="UnsupportedHostForm"}
 
@@ -237,7 +286,7 @@ The final domain label is entirely numeric.
 pub enum UnsupportedHostForm
 ```
 
-A URI host form outside the first network profile.
+A host form that is valid in a URI, but that this module does not accept.
 
 ::Anchor{id="UnsupportedHostForm.IpvFuture"}
 
@@ -257,7 +306,7 @@ The host uses unsupported IPvFuture syntax.
 ZoneIdentifier
 ```
 
-The host contains an unsupported IPv6 zone identifier.
+The IPv6 host has a zone, as in `[fe80::1%25eth0]`.
 
 ::Anchor{id="UnsupportedHostForm.EscapedHost"}
 
@@ -277,7 +326,7 @@ The host contains unsupported percent escapes.
 UserInfo
 ```
 
-The host input contains URI user information.
+The input has user information, as in `user@host`. Give only the host.
 
 ::Anchor{id="UnsupportedHostForm.PortDelimiter"}
 
@@ -287,7 +336,7 @@ The host input contains URI user information.
 PortDelimiter
 ```
 
-The host input contains a port delimiter.
+The input has a port, as in `host:80`. Give only the host.
 
 ::Anchor{id="UnsupportedHostForm.UriDelimiter"}
 
@@ -297,7 +346,7 @@ The host input contains a port delimiter.
 UriDelimiter
 ```
 
-The host input contains a URI delimiter.
+The input has `/`, `?`, or `#`. Give only the host.
 
 ::Anchor{id="AddressError"}
 
@@ -307,7 +356,7 @@ The host input contains a URI delimiter.
 pub union AddressError
 ```
 
-A typed value-construction or presentation failure.
+The error from parsing, checking, or formatting a value in this module.
 
 ::Anchor{id="AddressError.InvalidAddress"}
 
@@ -317,7 +366,7 @@ A typed value-construction or presentation failure.
 InvalidAddress
 ```
 
-Numeric address admission failed.
+The IP address text is not valid.
 
 ::Anchor{id="AddressError.InvalidAddress.reason"}
 
@@ -327,7 +376,7 @@ Numeric address admission failed.
 pub reason: AddressReason
 ```
 
-The admission rule that rejected the supplied bytes.
+The rule that failed.
 
 ::Anchor{id="AddressError.InvalidAddress.offset"}
 
@@ -347,7 +396,7 @@ The zero-based byte offset of the rejected input.
 InvalidHost
 ```
 
-Domain host admission failed.
+The domain name is not valid.
 
 ::Anchor{id="AddressError.InvalidHost.reason"}
 
@@ -357,7 +406,7 @@ Domain host admission failed.
 pub reason: HostReason
 ```
 
-The admission rule that rejected the supplied bytes.
+The rule that failed.
 
 ::Anchor{id="AddressError.InvalidHost.offset"}
 
@@ -377,7 +426,7 @@ The zero-based byte offset of the rejected input.
 InvalidPort
 ```
 
-The supplied port is outside 0..65535.
+The port number is more than 65535.
 
 ::Anchor{id="AddressError.InvalidPort.value"}
 
@@ -387,7 +436,7 @@ The supplied port is outside 0..65535.
 pub value: usize
 ```
 
-The supplied port number outside the admitted 0..65535 range.
+The number that you gave.
 
 ::Anchor{id="AddressError.UnsupportedForm"}
 
@@ -397,7 +446,7 @@ The supplied port number outside the admitted 0..65535 range.
 UnsupportedForm
 ```
 
-The input uses an unsupported host form.
+The host uses a form that this module does not accept.
 
 ::Anchor{id="AddressError.UnsupportedForm.form"}
 
@@ -407,7 +456,7 @@ The input uses an unsupported host form.
 pub form: UnsupportedHostForm
 ```
 
-The unsupported URI host form.
+The form that was found.
 
 ::Anchor{id="AddressError.UnsupportedForm.offset"}
 
@@ -427,7 +476,7 @@ The zero-based byte offset of the rejected input.
 OutputTooSmall
 ```
 
-The supplied output cannot hold the complete formatted value.
+The output buffer is too small. Nothing was written.
 
 ::Anchor{id="AddressError.OutputTooSmall.required"}
 
@@ -437,7 +486,7 @@ The supplied output cannot hold the complete formatted value.
 pub required: usize
 ```
 
-The output capacity needed for the complete spelling.
+The number of bytes that the text needs.
 
 ::Anchor{id="AddressError.OutputTooSmall.available"}
 
@@ -447,7 +496,7 @@ The output capacity needed for the complete spelling.
 pub available: usize
 ```
 
-The output capacity supplied by the caller.
+The length of the buffer that you gave.
 
 ::Anchor{id="Ipv4Address"}
 
@@ -457,7 +506,7 @@ The output capacity supplied by the caller.
 pub struct Ipv4Address
 ```
 
-Four owned network-order IPv4 octets.
+An IPv4 address, as 4 bytes in network order.
 
 ::Anchor{id="Ipv6Address"}
 
@@ -467,7 +516,7 @@ Four owned network-order IPv4 octets.
 pub struct Ipv6Address
 ```
 
-Sixteen owned network-order IPv6 octets.
+An IPv6 address, as 16 bytes in network order.
 
 ::Anchor{id="IpAddress"}
 
@@ -477,7 +526,7 @@ Sixteen owned network-order IPv6 octets.
 pub union IpAddress
 ```
 
-An owned numeric network address whose family remains explicit.
+An IPv4 or an IPv6 address.
 
 ::Anchor{id="IpAddress.V4"}
 
@@ -527,7 +576,8 @@ The sixteen network-order IPv6 octets.
 pub struct Port
 ```
 
-A checked transport port. Zero is valid for listener binding.
+A TCP or UDP port, from 0 to 65535. Port 0 is accepted, for example to let the system choose the
+port of a listener.
 
 ::Anchor{id="Endpoint"}
 
@@ -537,7 +587,7 @@ A checked transport port. Zero is valid for listener binding.
 pub struct Endpoint
 ```
 
-An owned connectable numeric address and port.
+An IP address and a port that you can connect to.
 
 ::Anchor{id="DomainHost"}
 
@@ -547,7 +597,8 @@ An owned connectable numeric address and port.
 pub struct DomainHost
 ```
 
-A validated absolute ASCII domain in preserved source spelling.
+A checked ASCII domain name, such as `example.com`. It keeps the spelling of its input, and
+compares without case.
 
 ::Anchor{id="Host"}
 
@@ -557,7 +608,8 @@ A validated absolute ASCII domain in preserved source spelling.
 pub union Host
 ```
 
-A classified owned origin host.
+The host of a URI: a domain name, an IPv4 address, or an IPv6 address. Make it with
+[`Host.parse`](#Host.impl.parse).
 
 ::Anchor{id="Host.Domain"}
 
@@ -577,7 +629,7 @@ A validated ASCII domain host.
 pub value: DomainHost
 ```
 
-The validated ASCII domain in its original spelling.
+The domain name, spelled as in the input.
 
 ::Anchor{id="Host.Ipv4"}
 
@@ -627,7 +679,7 @@ The sixteen network-order IPv6 octets.
 pub struct NetworkAddress
 ```
 
-Operations shared across the network address value family.
+The namespace of this module. The functions are on the value types.
 
 ::Anchor{id="AddressError.impl.Copy"}
 
@@ -709,7 +761,7 @@ impl Ipv4Address
 pub fn fromOctets(octets: [u8; 4]) -> Ipv4Address
 ```
 
-Constructs an IPv4 address from exact network-order octets.
+Returns the IPv4 address with these 4 bytes, in network order.
 
 ::Anchor{id="Ipv4Address.impl.parse"}
 
@@ -719,7 +771,7 @@ Constructs an IPv4 address from exact network-order octets.
 pub fn parse(bytes: &[u8]) -> Result<Ipv4Address, AddressError>
 ```
 
-Parses a strict RFC 3986 decimal dotted quad.
+Parses decimal dotted text, such as `192.0.2.1`. Each part is 0 to 255 without leading zeros.
 
 ::Anchor{id="Ipv4Address.impl.octets"}
 
@@ -749,7 +801,8 @@ Reports exact binary equality.
 pub fn formatInto(self: &Self, output: &mut [u8]) -> Result<usize, AddressError>
 ```
 
-Formats canonical decimal dotted-quad text without partial output.
+Writes the canonical text to the start of `output`, and returns its length. If `output` is too
+small, it writes nothing and returns `OutputTooSmall`.
 
 ::Anchor{id="Ipv6Address.impl"}
 
@@ -767,7 +820,7 @@ impl Ipv6Address
 pub fn fromOctets(octets: [u8; 16]) -> Ipv6Address
 ```
 
-Constructs an IPv6 address from exact network-order octets.
+Returns the IPv6 address with these 16 bytes, in network order.
 
 ::Anchor{id="Ipv6Address.impl.parse"}
 
@@ -777,7 +830,8 @@ Constructs an IPv6 address from exact network-order octets.
 pub fn parse(bytes: &[u8]) -> Result<Ipv6Address, AddressError>
 ```
 
-Parses RFC 4291 IPv6 text without zones or IPvFuture.
+Parses hexadecimal IPv6 text, such as `2001:db8::1`, without brackets or a zone. A dotted IPv4
+end, as in `::ffff:192.0.2.1`, is not accepted.
 
 ::Anchor{id="Ipv6Address.impl.octets"}
 
@@ -807,7 +861,8 @@ Reports exact binary equality.
 pub fn formatInto(self: &Self, output: &mut [u8]) -> Result<usize, AddressError>
 ```
 
-Formats canonical RFC 5952 lowercase text without partial output.
+Writes the canonical lowercase text, such as `2001:db8::1`, to the start of `output`, and
+returns its length. If `output` is too small, it writes nothing and returns `OutputTooSmall`.
 
 ::Anchor{id="IpAddress.impl"}
 
@@ -825,7 +880,7 @@ impl IpAddress
 pub fn isV4(self: &Self) -> bool
 ```
 
-Reports whether this address is IPv4.
+Returns `true` for an IPv4 address.
 
 ::Anchor{id="IpAddress.impl.equals"}
 
@@ -835,7 +890,8 @@ Reports whether this address is IPv4.
 pub fn equals(self: &Self, other: &Self) -> bool
 ```
 
-Reports family-sensitive exact equality.
+Returns `true` if the two addresses are of the same family and have the same bytes. An IPv4
+address never equals an IPv6 address, also not an IPv4-mapped one.
 
 ::Anchor{id="IpAddress.impl.formatInto"}
 
@@ -845,7 +901,8 @@ Reports family-sensitive exact equality.
 pub fn formatInto(self: &Self, output: &mut [u8]) -> Result<usize, AddressError>
 ```
 
-Formats the selected canonical address form.
+Writes the canonical text of the IPv4 or IPv6 address to the start of `output`, and returns
+its length. IPv6 has no brackets.
 
 ::Anchor{id="Port.impl"}
 
@@ -863,7 +920,7 @@ impl Port
 pub fn make(value: usize) -> Result<Port, AddressError>
 ```
 
-Checks a pointer-width integer as an inclusive u16 transport port.
+Returns the port, or `InvalidPort` if `value` is more than 65535.
 
 ::Anchor{id="Port.impl.fromU16"}
 
@@ -873,7 +930,7 @@ Checks a pointer-width integer as an inclusive u16 transport port.
 pub fn fromU16(value: u16) -> Port
 ```
 
-Constructs a port from an already checked u16.
+Returns the port with this number. Every `u16` is a valid port.
 
 ::Anchor{id="Port.impl.value"}
 
@@ -883,7 +940,7 @@ Constructs a port from an already checked u16.
 pub fn value(self: &Self) -> u16
 ```
 
-Returns the underlying checked u16.
+Returns the port number.
 
 ::Anchor{id="Endpoint.impl"}
 
@@ -901,7 +958,7 @@ impl Endpoint
 pub fn make(address: IpAddress, port: Port) -> Endpoint
 ```
 
-Owns one numeric address and checked port.
+Returns the endpoint for `address` and `port`.
 
 ::Anchor{id="Endpoint.impl.address"}
 
@@ -949,7 +1006,7 @@ impl DomainHost
 pub fn make(bytes: &[u8]) -> Result<DomainHost, AddressError>
 ```
 
-Copies and validates an absolute unrooted ASCII LDH/A-label domain.
+Checks `bytes` as a domain name and copies it. See [`HostReason`](#HostReason) for the rules.
 
 ::Anchor{id="DomainHost.impl.bytes"}
 
@@ -959,7 +1016,7 @@ Copies and validates an absolute unrooted ASCII LDH/A-label domain.
 pub fn bytes<'a>(self: &'a Self) -> &'a [u8]
 ```
 
-Borrows the preserved source-spelling bytes.
+Returns the name, spelled as in the input.
 
 ::Anchor{id="DomainHost.impl.length"}
 
@@ -979,7 +1036,7 @@ Returns the stored byte length.
 pub fn equals(self: &Self, other: &Self) -> bool
 ```
 
-Reports ASCII case-insensitive equality.
+Returns `true` if the names are equal without case, so `Example.COM` equals `example.com`.
 
 ::Anchor{id="Host.impl"}
 
@@ -997,7 +1054,11 @@ impl Host
 pub fn parse(bytes: &[u8]) -> Result<Host, AddressError>
 ```
 
-Classifies an RFC 3986 URI host into owned numeric or domain identity.
+Parses the host part of a URI.
+
+#### Details
+`[...]` is parsed as IPv6, decimal dotted text is parsed as IPv4, and all other text as a
+domain name. Give only the host, without user information or a port.
 
 ::Anchor{id="Host.impl.numeric"}
 
@@ -1007,7 +1068,7 @@ Classifies an RFC 3986 URI host into owned numeric or domain identity.
 pub fn numeric(self: &Self) -> IpAddress | ()
 ```
 
-Returns the numeric address when this host is numeric.
+Returns the IP address of a numeric host, or `()` for a domain name.
 
 ::Anchor{id="Ipv4Address.impl.Display"}
 

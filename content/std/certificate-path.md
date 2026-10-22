@@ -1,21 +1,28 @@
-Deterministic bounded TLS-server certificate paths to explicit trust authority.
+Validate the certificate chain of a TLS server, from its leaf certificate to a trust anchor.
 
 ## When to use
-
-Use [`CertificatePath.validate`](#CertificatePath.impl.validate) after certificate decoding and before HTTPS identity and TLS
-CertificateVerify checks. Supply every trust candidate explicitly as a [`TrustAnchor`](/docs/std/trust-anchor#TrustAnchor).
+Call [`CertificatePath.validate`](#CertificatePath.impl.validate) with the certificates that a server sent and your
+`TrustAnchor` list, before you trust the server. After it succeeds, check the host name with
+`silk.https_identity`, and check the TLS CertificateVerify and Finished messages.
+`silk.tls_client` does all of these steps for you.
 
 ## Details
+The validator tries to build a path from the leaf, through the intermediates, to an anchor. At
+each step it tries the anchors first and then the intermediates, in the order that you gave
+them, and it backtracks when a candidate fails. It checks signatures, validity dates at the
+[`Instant`](/docs/std/system-clock#Instant) that you give, basic constraints, key usage, path length, and DNS and IP name
+constraints. [`ValidationLimits`](#ValidationLimits) bound all work, so a hostile chain cannot make it run for
+long.
 
-Validation borrows all certificate input. It searches anchors first and then intermediates in
-caller order. All resource and work bounds are finite and inclusive. One caller-supplied
-[`Instant`](/docs/std/system-clock#Instant) controls every date check.
+## Errors
+- [`ValidationError`](#ValidationError) if no valid path exists, an input is not valid, or a limit is exceeded.
+  `reason`, `location`, and `offset` tell you what failed and where.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ## Gotchas
-
-A [`ValidatedPath`](#ValidatedPath) does not authenticate a TLS connection. The caller must verify the service
-identity, CertificateVerify, and Finished before it accepts application data. Revocation,
-certificate transparency, network retrieval, and browser root policy are not checked.
+A [`ValidatedPath`](#ValidatedPath) does not authenticate a TLS connection by itself. Revocation (CRL and OCSP),
+certificate transparency, fetching missing intermediates, and browser root policies are not
+checked.
 
 Import as `CertificatePath` with `import silk.certificate_path { CertificatePath }`.
 
@@ -29,7 +36,8 @@ Public declarations: 9.
 pub struct ValidationLimits
 ```
 
-Inclusive input and work limits for one path-validation call.
+The limits for one validation call. Each limit is inclusive, and 0 allows nothing.
+[`ValidationLimits.defaults`](#ValidationLimits.impl.defaults) gives safe values.
 
 ::Anchor{id="ValidationLimits.peerCertificates"}
 
@@ -165,7 +173,9 @@ impl ValidationLimits
 pub fn defaults() -> ValidationLimits
 ```
 
-Returns the fixed default input, search, signature, path, comparison, and profile bounds.
+Returns the default limits: 64 peer certificates of up to 64 KiB each and 1 MiB in total, 1024
+anchors and 16 MiB of anchor data, paths of up to 8 certificates, 4096 issuer candidates, 100
+signature checks, 100 complete paths, 250000 name comparisons, and the profile defaults.
 
 ::Anchor{id="ValidationClass"}
 
@@ -793,7 +803,9 @@ No CRL, OCSP, must-staple, or other revocation check was performed.
 pub struct ValidatedPath<'a>
 ```
 
-One borrowed selected path plus owned caller-order intermediate indices.
+A path that passed validation. It borrows the certificates and anchors that you gave.
+
+The intermediates are given as indexes into your list, from the leaf toward the anchor.
 
 ::Anchor{id="ValidatedPath.impl"}
 
@@ -811,7 +823,7 @@ impl<'a> ValidatedPath<'a>
 pub fn leaf(self: &Self) -> &'a Certificate
 ```
 
-Borrows the exact caller-supplied leaf certificate.
+Returns the leaf certificate.
 
 ::Anchor{id="ValidatedPath.impl.anchorIndex"}
 
@@ -821,7 +833,7 @@ Borrows the exact caller-supplied leaf certificate.
 pub fn anchorIndex(self: &Self) -> usize
 ```
 
-Returns the selected trust anchor's original caller index.
+Returns the index of the trust anchor that the path ends at, in your anchor list.
 
 ::Anchor{id="ValidatedPath.impl.intermediateCount"}
 
@@ -831,7 +843,7 @@ Returns the selected trust anchor's original caller index.
 pub fn intermediateCount(self: &Self) -> usize
 ```
 
-Returns the number of selected peer intermediate certificates.
+Returns the number of intermediate certificates in the path.
 
 ::Anchor{id="ValidatedPath.impl.intermediateIndex"}
 
@@ -841,7 +853,8 @@ Returns the number of selected peer intermediate certificates.
 pub fn intermediateIndex(self: &Self, index: usize) -> Option<usize>
 ```
 
-Returns one selected intermediate's original caller index, in leaf-to-anchor order.
+Returns the index in your intermediate list of the path certificate at `index`, counted from
+the leaf, or `None` if `index` is out of range.
 
 ::Anchor{id="ValidatedPath.impl.validationTime"}
 
@@ -851,7 +864,7 @@ Returns one selected intermediate's original caller index, in leaf-to-anchor ord
 pub fn validationTime(self: &Self) -> Instant
 ```
 
-Returns the copied caller-supplied validation instant.
+Returns the time that the dates were checked at.
 
 ::Anchor{id="ValidatedPath.impl.revocationStatus"}
 
@@ -861,7 +874,7 @@ Returns the copied caller-supplied validation instant.
 pub fn revocationStatus(self: &Self) -> RevocationStatus
 ```
 
-Returns `NotChecked` because path validation performs no revocation operation.
+Returns `NotChecked`, because path validation does not check revocation.
 
 ::Anchor{id="CertificatePath"}
 
@@ -871,7 +884,7 @@ Returns `NotChecked` because path validation performs no revocation operation.
 pub struct CertificatePath
 ```
 
-The namespace for bounded deterministic certificate-path validation.
+Functions that validate certificate paths.
 
 ::Anchor{id="CertificatePath.impl"}
 
@@ -897,17 +910,15 @@ pub effect fn validate<'a>(
   ? &mut Allocator
 ```
 
-Builds and validates the first deterministic TLS-server path to explicit authority.
+Finds and checks a path from `leaf` through `intermediates` to one of `anchors`, at time `at`.
 
-#### Details
+It returns the first valid path that it finds. A candidate that fails does not stop the
+search, but each limit counts across the whole call. The result borrows `leaf`,
+`intermediates`, and `anchors`.
 
-The result borrows `leaf`, `intermediates`, and `anchors` for `'a`. Search tries anchors in
-caller order before intermediates in caller order at each depth. Counters span the complete
-call and do not reset during backtracking.
-
-#### Gotchas
-
-Zero permits no corresponding input or operation. Work-budget exhaustion is terminal. An
-ordinary candidate rejection does not stop a later alternate path.
+#### Errors
+- `Failure` with a [`ValidationError`](#ValidationError). If no path is valid, `reason` is `NoValidPath` and
+  `detailReason` gives the first rejection.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

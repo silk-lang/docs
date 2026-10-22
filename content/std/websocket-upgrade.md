@@ -1,11 +1,181 @@
-Bounded WebSocket server handshake inspection and explicit application acceptance.
+The server side of the WebSocket opening handshake (RFC 6455, version 13).
+
+## When to use
+In an `silk.http_server` request callback, call [`withUpgrade`](#withUpgrade) with a [`DecisionHandler`](#DecisionHandler). The
+handler looks at the [`Offer`](#Offer) and returns a [`Decision`](#Decision): accept, maybe with a subprotocol, or
+reject with a status. After an accept, your callback gets the channel for WebSocket frames, for
+example through `silk.websocket_server`.
+
+Use [`inspect`](#inspect) and [`acceptInto`](#acceptInto) alone to check a handshake without a server.
 
 ## Details
+[`inspect`](#inspect) checks a parsed request head. It does not allocate. The request must be an HTTP/1.1
+`GET` with a valid `Host`, `Upgrade: websocket`, `Connection: upgrade`, a 16-byte key, version
+13, and no body or `Expect`.
 
-`inspect` borrows a parsed HTTP head without allocation. `withUpgrade` runs the application
-decision before output, flushes the switching response, then lends the existing buffered channel.
-Origin is policy input, not authentication. Valid extension offers are declined; frames and
-compression are outside this module.
+[`withUpgrade`](#withUpgrade) does these steps:
+1. It calls [`inspect`](#inspect). If it fails, nothing is sent and the request stays active, so you can
+   call [`reject`](#reject).
+2. It calls the [`DecisionHandler`](#DecisionHandler). The decision is checked before any output.
+3. For `Reject`, it sends that status. For `Accept`, it sends 101 with the accept value and the
+   protocol, flushes it, and lends the channel to your callback.
+
+## Errors
+- [`UpgradeError`](#UpgradeError) if the request is not a valid handshake, a limit is exceeded, or the decision
+  is not valid. No response was sent.
+- `ServerError` from `silk.http_server` if the output fails.
+- The errors of the decision handler and the callback.
+
+## Gotchas
+- `Origin` is only a hint from the browser. It is not authentication. Check it in the decision
+  if you need it.
+- Extensions such as `permessage-deflate` are not supported. Offers are ignored, and an `Accept`
+  with `extensions: true` fails with `UnsupportedNegotiation`.
+- This module does only the handshake. It does not read or write frames.
+
+## Examples
+### Inspect a handshake
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http_head {
+  Limits as HeadLimits,
+  ParseError,
+  ParsedRequest,
+  RequestHead,
+  RequestParser,
+  parseRequest
+}
+import silk.http_headers { Limits as ValueLimits }
+import silk.option { Option }
+import silk.result { Result }
+import silk.websocket_upgrade { Limits, Offer, UpgradeError, acceptInto, inspect, rejectionStatus }
+
+fn headLimits() -> HeadLimits {
+  return HeadLimits {
+    maxHeadBytes: 4096,
+    maxStartLineBytes: 1024,
+    maxFieldLineBytes: 1024,
+    maxOwnedBytes: 8192,
+    values: ValueLimits {
+      maxMethodBytes: 16,
+      maxTargetBytes: 1024,
+      maxNameBytes: 64,
+      maxValueBytes: 1024,
+      maxFields: 32,
+      maxFieldBytes: 4096,
+      maxOwnedBytes: 8192,
+    },
+  }
+}
+
+fn equal(left: &[u8], right: &[u8]) -> bool {
+  if left.length != right.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < left.length {
+    if left[index] != right[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError
+  ? &mut Allocator {
+  // The sample handshake from RFC 6455.
+  let wire = b"GET /chat HTTP/1.1\r\nHost: server.example.com\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Protocol: chat, superchat\r\nSec-WebSocket-Version: 13\r\n\r\n"
+  let parsed = match move run parseRequest(&wire, headLimits()) {
+    Result<ParsedRequest, ParseError>.Success { value } => move value
+    Result<ParsedRequest, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let head = match RequestParser.head(&parsed.parser) {
+    Result<RequestHead, ParseError>.Success { value } => value
+    Result<RequestHead, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let offer = match move inspect(&head, Limits.default()) {
+    Result<Offer, UpgradeError>.Success { value } => move value
+    Result<Offer, UpgradeError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if offer.protocolCount() != 2 {
+    return 1
+  }
+  let first = match offer.protocolAt(0) {
+    Option.Some { value } => value
+    Option.None => {
+      return 1
+    }
+  }
+  if !equal(first, b"chat") {
+    return 1
+  }
+  let mut accept: [u8; 28] = [0; 28]
+  let written = match move offer.acceptInto(&mut accept) {
+    Result<usize, UpgradeError>.Success { value } => value
+    Result<usize, UpgradeError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if written != 28 || !equal(&accept, b"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=") {
+    return 1
+  }
+
+  // The same value, from the key alone.
+  let mut again: [u8; 28] = [0; 28]
+  let direct = match move acceptInto(b"dGhlIHNhbXBsZSBub25jZQ==", &mut again) {
+    Result<usize, UpgradeError>.Success { value } => value
+    Result<usize, UpgradeError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if direct != 28 || !equal(&again, &accept) {
+    return 1
+  }
+
+  // An old protocol version fails. `reject` would answer with 426.
+  let old = b"GET /chat HTTP/1.1\r\nHost: server.example.com\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 8\r\n\r\n"
+  let oldParsed = match move run parseRequest(&old, headLimits()) {
+    Result<ParsedRequest, ParseError>.Success { value } => move value
+    Result<ParsedRequest, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let oldHead = match RequestParser.head(&oldParsed.parser) {
+    Result<RequestHead, ParseError>.Success { value } => value
+    Result<RequestHead, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  return match move inspect(&oldHead, Limits.default()) {
+    Result<Offer, UpgradeError>.Success { value: _ } => 1
+    Result<Offer, UpgradeError>.Failure { error } => {
+      if rejectionStatus(&error) != 426 {
+        return 1
+      }
+      return 0
+    }
+  }
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
 
 Import as `WebSocketUpgrade` with `import silk.websocket_upgrade as WebSocketUpgrade`.
 
@@ -19,7 +189,7 @@ Public declarations: 14.
 pub struct Limits
 ```
 
-Finite handshake budgets. Zero forbids the corresponding resource.
+The limits of a handshake. A zero limit allows none of that resource.
 
 ::Anchor{id="Limits.maxProtocols"}
 
@@ -29,7 +199,7 @@ Finite handshake budgets. Zero forbids the corresponding resource.
 pub maxProtocols: usize
 ```
 
-Maximum offered subprotocol tokens across all fields.
+The maximum number of offered subprotocols, in all `Sec-WebSocket-Protocol` fields.
 
 ::Anchor{id="Limits.maxProtocolBytes"}
 
@@ -39,7 +209,7 @@ Maximum offered subprotocol tokens across all fields.
 pub maxProtocolBytes: usize
 ```
 
-Maximum bytes in each offered subprotocol token.
+The maximum length of one offered subprotocol.
 
 ::Anchor{id="Limits.maxExtensionBytes"}
 
@@ -49,7 +219,7 @@ Maximum bytes in each offered subprotocol token.
 pub maxExtensionBytes: usize
 ```
 
-Maximum aggregate extension field-value bytes.
+The maximum total length of the `Sec-WebSocket-Extensions` values.
 
 ::Anchor{id="Limits.maxResponseBytes"}
 
@@ -59,7 +229,7 @@ Maximum aggregate extension field-value bytes.
 pub maxResponseBytes: usize
 ```
 
-Maximum serialized response bytes, including generated fields.
+The maximum size of the response head, with the fields that are added.
 
 ::Anchor{id="Limits.maxOwnedBytes"}
 
@@ -69,7 +239,7 @@ Maximum serialized response bytes, including generated fields.
 pub maxOwnedBytes: usize
 ```
 
-Maximum simultaneous owned payload and index capacities for the response plan.
+The maximum memory for the response.
 
 ::Anchor{id="Limits.impl.Copy"}
 
@@ -95,11 +265,8 @@ impl Limits
 pub fn default() -> Limits
 ```
 
-Returns the default finite handshake budgets.
-
-#### Details
-
-The defaults are 32 protocols, 128 token bytes, 4096 extension bytes, 8192 response bytes, and 16384 owned bytes.
+Returns the default limits: 32 protocols, 128 bytes for each protocol, 4096 extension bytes,
+8192 response bytes, and 16384 owned bytes.
 
 ::Anchor{id="ValidationReason"}
 
@@ -109,7 +276,7 @@ The defaults are 32 protocols, 128 token bytes, 4096 extension bytes, 8192 respo
 pub enum ValidationReason
 ```
 
-The peer-input rule that rejected an offer.
+The rule of the request that failed.
 
 ::Anchor{id="ValidationReason.Request"}
 
@@ -119,7 +286,7 @@ The peer-input rule that rejected an offer.
 Request
 ```
 
-The method or HTTP version is unsupported.
+The method is not `GET`, or the version is not HTTP/1.1.
 
 ::Anchor{id="ValidationReason.Singleton"}
 
@@ -129,7 +296,7 @@ The method or HTTP version is unsupported.
 Singleton
 ```
 
-A required field is absent or a singleton field repeats.
+A required field is missing, or a field that is allowed one time occurs more.
 
 ::Anchor{id="ValidationReason.Host"}
 
@@ -139,7 +306,7 @@ A required field is absent or a singleton field repeats.
 Host
 ```
 
-Host is not a valid HTTP authority.
+`Host` is not a valid authority.
 
 ::Anchor{id="ValidationReason.Tokens"}
 
@@ -149,7 +316,8 @@ Host is not a valid HTTP authority.
 Tokens
 ```
 
-A comma-token field has invalid syntax or lacks a required token.
+`Upgrade` or `Connection` is not a valid token list, or does not have `websocket` or
+`upgrade`.
 
 ::Anchor{id="ValidationReason.ConnectionClose"}
 
@@ -159,7 +327,7 @@ A comma-token field has invalid syntax or lacks a required token.
 ConnectionClose
 ```
 
-Connection explicitly requests closure.
+`Connection` has `close`.
 
 ::Anchor{id="ValidationReason.Version"}
 
@@ -169,7 +337,7 @@ Connection explicitly requests closure.
 Version
 ```
 
-The version field has invalid decimal syntax.
+`Sec-WebSocket-Version` is not a decimal number.
 
 ::Anchor{id="ValidationReason.Key"}
 
@@ -179,7 +347,7 @@ The version field has invalid decimal syntax.
 Key
 ```
 
-The key is not canonical padded Base64 for sixteen bytes.
+`Sec-WebSocket-Key` is not 16 bytes in canonical padded Base64.
 
 ::Anchor{id="ValidationReason.Body"}
 
@@ -189,7 +357,7 @@ The key is not canonical padded Base64 for sixteen bytes.
 Body
 ```
 
-Request framing permits a nonempty body.
+The request can have a body.
 
 ::Anchor{id="ValidationReason.Expect"}
 
@@ -199,7 +367,7 @@ Request framing permits a nonempty body.
 Expect
 ```
 
-An Expect field is present.
+The request has `Expect`.
 
 ::Anchor{id="ValidationReason.Origin"}
 
@@ -209,7 +377,7 @@ An Expect field is present.
 Origin
 ```
 
-Origin is not one serialized HTTP(S) origin or null.
+`Origin` is not one HTTP or HTTPS origin, or `null`.
 
 ::Anchor{id="ValidationReason.DuplicateProtocol"}
 
@@ -219,7 +387,7 @@ Origin is not one serialized HTTP(S) origin or null.
 DuplicateProtocol
 ```
 
-A subprotocol token occurs more than once.
+A subprotocol is offered two times.
 
 ::Anchor{id="ValidationReason.Extensions"}
 
@@ -229,7 +397,7 @@ A subprotocol token occurs more than once.
 Extensions
 ```
 
-The extension field grammar is malformed.
+`Sec-WebSocket-Extensions` is not valid.
 
 ::Anchor{id="LimitKind"}
 
@@ -239,7 +407,7 @@ The extension field grammar is malformed.
 pub enum LimitKind
 ```
 
-The finite budget that rejected the handshake.
+The limit that was exceeded.
 
 ::Anchor{id="LimitKind.Protocols"}
 
@@ -249,7 +417,7 @@ The finite budget that rejected the handshake.
 Protocols
 ```
 
-Too many offered protocols.
+Too many subprotocols.
 
 ::Anchor{id="LimitKind.ProtocolBytes"}
 
@@ -259,7 +427,7 @@ Too many offered protocols.
 ProtocolBytes
 ```
 
-An offered protocol is too long.
+A subprotocol is too long.
 
 ::Anchor{id="LimitKind.ExtensionBytes"}
 
@@ -269,7 +437,7 @@ An offered protocol is too long.
 ExtensionBytes
 ```
 
-Extension fields exceed their aggregate budget.
+The extension fields are too long.
 
 ::Anchor{id="LimitKind.ResponseBytes"}
 
@@ -279,7 +447,7 @@ Extension fields exceed their aggregate budget.
 ResponseBytes
 ```
 
-Serialized response bytes exceed the budget.
+The response head is too large.
 
 ::Anchor{id="LimitKind.OwnedBytes"}
 
@@ -289,7 +457,7 @@ Serialized response bytes exceed the budget.
 OwnedBytes
 ```
 
-Owned capacities exceed the budget.
+The response needs too much memory.
 
 ::Anchor{id="LimitKind.SizeOverflow"}
 
@@ -299,7 +467,7 @@ Owned capacities exceed the budget.
 SizeOverflow
 ```
 
-Checked size arithmetic overflowed.
+A size does not fit in `usize`.
 
 ::Anchor{id="DecisionReason"}
 
@@ -309,7 +477,7 @@ Checked size arithmetic overflowed.
 pub enum DecisionReason
 ```
 
-The application decision rule that failed before output.
+The rule of the decision that failed.
 
 ::Anchor{id="DecisionReason.Protocol"}
 
@@ -319,7 +487,7 @@ The application decision rule that failed before output.
 Protocol
 ```
 
-The selected protocol is not exactly one offered token.
+The selected protocol is not one of the offered protocols. The compare is case-sensitive.
 
 ::Anchor{id="DecisionReason.Header"}
 
@@ -329,7 +497,8 @@ The selected protocol is not exactly one offered token.
 Header
 ```
 
-An extra response field overrides a generated or framing field.
+An extra header replaces a field that the handshake sets, such as `Sec-WebSocket-Protocol` or
+`Content-Length`.
 
 ::Anchor{id="DecisionReason.Status"}
 
@@ -339,7 +508,7 @@ An extra response field overrides a generated or framing field.
 Status
 ```
 
-Application rejection must use a final response status.
+A `Reject` status is less than 200.
 
 ::Anchor{id="UpgradeError"}
 
@@ -349,7 +518,7 @@ Application rejection must use a final response status.
 pub union UpgradeError
 ```
 
-A typed inspection or decision failure. No variant writes a response by itself.
+The error of a handshake. No error sends a response. Use [`reject`](#reject) to send one.
 
 ::Anchor{id="UpgradeError.Validation"}
 
@@ -359,7 +528,7 @@ A typed inspection or decision failure. No variant writes a response by itself.
 Validation
 ```
 
-Peer metadata violates the selected WebSocket handshake profile.
+The request is not a valid handshake.
 
 ::Anchor{id="UpgradeError.Validation.reason"}
 
@@ -369,7 +538,7 @@ Peer metadata violates the selected WebSocket handshake profile.
 pub reason: ValidationReason
 ```
 
-The failed peer-input rule.
+The rule that failed.
 
 ::Anchor{id="UpgradeError.UnsupportedVersion"}
 
@@ -379,7 +548,7 @@ The failed peer-input rule.
 UnsupportedVersion
 ```
 
-A well-formed version is unsupported; the server supports version 13.
+The request asks for another WebSocket version. [`reject`](#reject) sends 426.
 
 ::Anchor{id="UpgradeError.UnsupportedVersion.supported"}
 
@@ -389,7 +558,7 @@ A well-formed version is unsupported; the server supports version 13.
 pub supported: u16
 ```
 
-The supported protocol version, always 13.
+The supported version: 13.
 
 ::Anchor{id="UpgradeError.Limit"}
 
@@ -399,7 +568,7 @@ The supported protocol version, always 13.
 Limit
 ```
 
-A finite budget or checked size operation failed.
+A limit was exceeded.
 
 ::Anchor{id="UpgradeError.Limit.kind"}
 
@@ -409,7 +578,7 @@ A finite budget or checked size operation failed.
 pub kind: LimitKind
 ```
 
-The exceeded budget or overflow category.
+The limit.
 
 ::Anchor{id="UpgradeError.InvalidDecision"}
 
@@ -419,7 +588,7 @@ The exceeded budget or overflow category.
 InvalidDecision
 ```
 
-Application acceptance cannot be serialized as a valid handshake.
+The decision cannot make a valid response.
 
 ::Anchor{id="UpgradeError.InvalidDecision.reason"}
 
@@ -429,7 +598,7 @@ Application acceptance cannot be serialized as a valid handshake.
 pub reason: DecisionReason
 ```
 
-The failed application decision rule.
+The rule that failed.
 
 ::Anchor{id="UpgradeError.UnsupportedNegotiation"}
 
@@ -439,7 +608,7 @@ The failed application decision rule.
 UnsupportedNegotiation
 ```
 
-Application acceptance requested an unimplemented extension.
+The decision asks for extensions, which are not supported.
 
 ::Anchor{id="UpgradeError.Value"}
 
@@ -449,7 +618,7 @@ Application acceptance requested an unimplemented extension.
 Value
 ```
 
-Shared HTTP value validation rejected response metadata.
+A response value is not valid.
 
 ::Anchor{id="UpgradeError.Value.error"}
 
@@ -459,7 +628,7 @@ Shared HTTP value validation rejected response metadata.
 pub error: ValueError
 ```
 
-The original structured HTTP value failure.
+The value error.
 
 ::Anchor{id="Offer"}
 
@@ -469,7 +638,7 @@ The original structured HTTP value failure.
 pub struct Offer<'head>
 ```
 
-Validated metadata that borrows one parsed request and cannot authorize another request.
+A valid handshake request, from [`inspect`](#inspect). It borrows the request head.
 
 ::Anchor{id="Offer.impl"}
 
@@ -487,7 +656,7 @@ impl<'head> Offer<'head>
 pub fn target(self: &Self) -> RequestTarget<'head>
 ```
 
-Returns the request target borrowed from the parsed head.
+Returns the request target, such as `/chat`.
 
 ::Anchor{id="Offer.impl.host"}
 
@@ -497,7 +666,7 @@ Returns the request target borrowed from the parsed head.
 pub fn host(self: &Self) -> &'head [u8]
 ```
 
-Returns the validated Host field bytes.
+Returns the value of `Host`.
 
 ::Anchor{id="Offer.impl.origin"}
 
@@ -507,7 +676,7 @@ Returns the validated Host field bytes.
 pub fn origin(self: &Self) -> Option<&'head [u8]>
 ```
 
-Returns absent Origin or its exact validated bytes, including literal null.
+Returns the value of `Origin`, or `None` if there is none. The value can be `null`.
 
 ::Anchor{id="Offer.impl.protocolCount"}
 
@@ -517,7 +686,7 @@ Returns absent Origin or its exact validated bytes, including literal null.
 pub fn protocolCount(self: &Self) -> usize
 ```
 
-Returns the number of unique protocols in combined wire order.
+Returns the number of offered subprotocols.
 
 ::Anchor{id="Offer.impl.protocolAt"}
 
@@ -527,7 +696,7 @@ Returns the number of unique protocols in combined wire order.
 pub fn protocolAt(self: &Self, index: usize) -> Option<&'head [u8]>
 ```
 
-Returns one protocol by combined wire index, or None for an absent index.
+Returns the offered subprotocol at `index`, in the order of the request, or `None`.
 
 ::Anchor{id="Offer.impl.extensionsPresent"}
 
@@ -537,7 +706,7 @@ Returns one protocol by combined wire index, or None for an absent index.
 pub fn extensionsPresent(self: &Self) -> bool
 ```
 
-Returns whether at least one syntactically valid extension field was supplied.
+Returns whether the request offers extensions. They are ignored.
 
 ::Anchor{id="Offer.impl.acceptInto"}
 
@@ -547,7 +716,10 @@ Returns whether at least one syntactically valid extension field was supplied.
 pub fn acceptInto(self: &Self, output: &mut [u8]) -> Result<usize, UpgradeError>
 ```
 
-Writes the 28-byte accept value into caller storage without allocation.
+Writes the 28-byte `Sec-WebSocket-Accept` value for the key to `output`, and returns 28.
+
+#### Errors
+`Limit` with `ResponseBytes` if `output` is shorter than 28 bytes.
 
 ::Anchor{id="acceptInto"}
 
@@ -557,12 +729,15 @@ Writes the 28-byte accept value into caller storage without allocation.
 pub fn acceptInto(key: &[u8], output: &mut [u8]) -> Result<usize, UpgradeError>
 ```
 
-Validates a canonical sixteen-byte WebSocket key and writes its 28-byte accept value.
+Writes the 28-byte `Sec-WebSocket-Accept` value for `key` to `output`, and returns 28.
 
 ### Details
+It removes spaces and tabs around `key` first. It does not check the rest of the handshake. If
+it fails, `output` is not changed.
 
-This pure transformation trims outer HTTP OWS and hashes the original encoded key. It does not
-authorize an upgrade. Invalid input or insufficient output capacity leaves output unchanged.
+### Errors
+- `Validation` with `Key` if `key` is not 16 bytes in canonical padded Base64.
+- `Limit` with `ResponseBytes` if `output` is shorter than 28 bytes.
 
 ::Anchor{id="Outcome"}
 
@@ -572,7 +747,7 @@ authorize an upgrade. Invalid input or insufficient output capacity leaves outpu
 pub union Outcome<A>
 ```
 
-The completed handshake outcome, including ordinary application rejection.
+The result of [`withUpgrade`](#withUpgrade).
 
 ::Anchor{id="Outcome.Upgraded"}
 
@@ -582,7 +757,7 @@ The completed handshake outcome, including ordinary application rejection.
 Upgraded
 ```
 
-The upgraded channel callback completed successfully.
+The 101 response was sent, and the callback finished.
 
 ::Anchor{id="Outcome.Upgraded.value"}
 
@@ -592,7 +767,7 @@ The upgraded channel callback completed successfully.
 pub value: A
 ```
 
-The callback's result.
+The value of the callback.
 
 ::Anchor{id="Outcome.Rejected"}
 
@@ -602,7 +777,7 @@ The callback's result.
 Rejected
 ```
 
-The application rejection was sent as an ordinary HTTP response.
+The decision was `Reject`, and its response was sent.
 
 ::Anchor{id="Outcome.Rejected.status"}
 
@@ -612,7 +787,7 @@ The application rejection was sent as an ordinary HTTP response.
 pub status: u16
 ```
 
-The sent HTTP status code.
+The status that was sent.
 
 ::Anchor{id="Decision"}
 
@@ -622,7 +797,7 @@ The sent HTTP status code.
 pub union Decision<'value>
 ```
 
-An explicit application decision whose values borrow the scoped policy or request offer.
+The answer of a [`DecisionHandler`](#DecisionHandler).
 
 ::Anchor{id="Decision.Accept"}
 
@@ -632,7 +807,7 @@ An explicit application decision whose values borrow the scoped policy or reques
 Accept
 ```
 
-Accepts an optional offered protocol and ordinary response headers. Extensions must be false.
+Accepts the handshake.
 
 ::Anchor{id="Decision.Accept.protocol"}
 
@@ -642,7 +817,8 @@ Accepts an optional offered protocol and ordinary response headers. Extensions m
 pub protocol: Option<string<'value>>
 ```
 
-No protocol, or exactly one case-sensitive offered token.
+The selected subprotocol, or `None`. It must be one of the offered protocols, with the same
+case.
 
 ::Anchor{id="Decision.Accept.headers"}
 
@@ -652,7 +828,8 @@ No protocol, or exactly one case-sensitive offered token.
 pub headers: Option<Headers<'value>>
 ```
 
-Validated extra fields; repeated ordinary fields remain in order.
+More fields for the response, such as `Set-Cookie`. They cannot replace the fields of the
+handshake.
 
 ::Anchor{id="Decision.Accept.extensions"}
 
@@ -662,7 +839,7 @@ Validated extra fields; repeated ordinary fields remain in order.
 pub extensions: bool
 ```
 
-Requests extension negotiation. True fails with UnsupportedNegotiation.
+Set it to false. True fails with `UnsupportedNegotiation`.
 
 ::Anchor{id="Decision.Reject"}
 
@@ -672,7 +849,7 @@ Requests extension negotiation. True fails with UnsupportedNegotiation.
 Reject
 ```
 
-Sends an ordinary final body-free rejection and does not lend the channel.
+Rejects the handshake with a normal HTTP response with no body.
 
 ::Anchor{id="Decision.Reject.status"}
 
@@ -682,7 +859,7 @@ Sends an ordinary final body-free rejection and does not lend the channel.
 pub status: Status
 ```
 
-The application-selected final HTTP status.
+The status, 200 or more. For example, 403.
 
 ::Anchor{id="Decision.Reject.headers"}
 
@@ -692,7 +869,7 @@ The application-selected final HTTP status.
 pub headers: Option<Headers<'value>>
 ```
 
-Optional ordinary response fields, including authentication headers.
+More fields for the response, such as `WWW-Authenticate`.
 
 ::Anchor{id="DecisionHandler"}
 
@@ -702,7 +879,7 @@ Optional ordinary response fields, including authentication headers.
 pub interface DecisionHandler<D, ?R>
 ```
 
-A compile-time policy that makes one explicit decision from a scoped request offer.
+Decides if a handshake is accepted. See [`withUpgrade`](#withUpgrade).
 
 ::Anchor{id="DecisionHandler.decide"}
 
@@ -714,7 +891,7 @@ effect<'call> fn decide<'call, 'head: 'call>(handler: &'call Self, offer: &'call
   > ! D ? R
 ```
 
-Borrows policy and offer data for one decision and preserves failure and requirement channels.
+Returns the [`Decision`](#Decision) for `offer`. The decision can borrow from the handler or the offer.
 
 ::Anchor{id="inspect"}
 
@@ -727,7 +904,14 @@ pub fn inspect<'head>(head: &RequestHead<'head>, limits: Limits) -> Result<
 >
 ```
 
-Validates one borrowed parsed request without allocation or ambient services.
+Checks that `head` is a valid WebSocket handshake, and returns its [`Offer`](#Offer).
+
+It does not allocate or use services.
+
+### Errors
+- `Validation` if a rule fails. The reason tells which.
+- `UnsupportedVersion` if the version is a number other than 13.
+- `Limit` if the subprotocols or extensions exceed `limits`.
 
 ::Anchor{id="rejectionStatus"}
 
@@ -737,7 +921,8 @@ Validates one borrowed parsed request without allocation or ambient services.
 pub fn rejectionStatus(error: &UpgradeError) -> u16
 ```
 
-Returns the default rejection status without writing: 417 for Expect, 426 for version, otherwise 400.
+Returns the status that [`reject`](#reject) sends for `error`: 417 for `Expect`, 426 for a version, and
+400 for all others.
 
 ::Anchor{id="withUpgrade"}
 
@@ -772,19 +957,22 @@ pub effect<'env> fn withUpgrade<
 where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Runs explicit acceptance and lends the existing channel only after the complete 101 flush.
+Checks the handshake, asks `handler`, and sends the response. After an accept, it lends the
+channel to `use`.
 
 ### Details
+The handler gets the [`Offer`](#Offer). The response is made and checked before any output, so the
+decision can borrow from the offer. The channel keeps any bytes that the client sent after the
+request head. Give the same deadline that you used for the request.
 
-The decision borrows the policy or current offer. The operation copies its response before
-the HTTP handoff, so borrowed metadata cannot escape the handshake.
-Rejected retains the sent application status. Errors before output leave HTTP active.
-Use the same absolute deadline for the enclosing HTTP request acquisition.
+### Errors
+- [`UpgradeError`](#UpgradeError) before any output. The request is still active, so you can call [`reject`](#reject).
+- `ServerError` if the output fails.
+- The errors of the handler and of `use`.
 
 ### Gotchas
-
-After switching output starts, transport failure is terminal. The enclosing server scope keeps
-its close authority armed. This operation provides no frame or native TLS server implementation.
+After the 101 response starts, a transport error ends the connection. This function does not
+read or write frames, and does not do TLS.
 
 ::Anchor{id="reject"}
 
@@ -802,11 +990,10 @@ pub effect fn reject<'loan, 'request: 'loan, 'connection: 'request, 'transport: 
 where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Sends the deterministic body-free HTTP rejection for a typed handshake failure.
+Sends the response for a handshake error, with no body.
 
 ### Details
-
-UnsupportedVersion sends 426 with Sec-WebSocket-Version: 13. Expect sends 417; other failures
-send 400. This operation is available only before switching output starts.
+It sends the status of [`rejectionStatus`](#rejectionStatus). For `UnsupportedVersion`, it also sends
+`Sec-WebSocket-Version: 13`. Call it only before a 101 response starts.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

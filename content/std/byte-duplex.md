@@ -1,20 +1,34 @@
-Partial reliable-byte input and output with explicit deadlines and directional shutdown.
+The `ByteDuplex` effect: a two-way byte stream, such as a TCP connection, with partial reads and
+writes and deadlines.
 
 ## When to use
-
-Require [`ByteDuplex`](#ByteDuplex) when a protocol driver owns its buffers and must acknowledge exact
-transport prefixes. Use `silk.writer.Writer` when each write is all-or-error.
+Require `&mut ByteDuplex` in protocol code that must know exactly how many bytes each read and
+write moved, such as HTTP or TLS. Most code uses it through `silk.buffered_duplex`. Use
+`silk.writer.Writer` when each write must complete or fail as a whole.
 
 ## Details
+[`ByteDuplex.readSome`](#ByteDuplex.impl.readSome) and [`ByteDuplex.writeSome`](#ByteDuplex.impl.writeSome) can move fewer bytes than the caller
+offers. A successful read or write of a non-empty slice moves at least one byte. The bytes after
+that count stay with the caller. `ReadTransfer.End` means that the peer ended the stream. It is
+not a message of the protocol.
 
-Each nonempty successful transfer reports one positive prefix. Bytes after that prefix remain
-with the caller. Deadlines are absolute marks from the active `MonotonicClock` provider.
-`ReadTransfer.End` is transport end. It is not a protocol close message.
+Each operation takes a deadline: an absolute time on the active `MonotonicClock`, or none.
+
+A provider implements the `unsafe` `...Raw` operations. The safe operations check the counts
+that the provider reports, so callers use only the safe operations.
+
+## Errors
+- [`ByteIoError`](#ByteIoError) for each failure. `Timeout` when the deadline passes, `Closed` after a close,
+  `Provider` for a failure of the transport.
 
 ## Gotchas
+If a provider reports a count that is not possible, the safe operation closes the transport and
+fails with `InvalidTransferCount`. Do not try again with the same buffer. If an operation is
+canceled during a transfer, it is not known how many bytes moved. Close the transport.
 
-An invalid provider count makes the lease unusable. A canceled external transfer can also make
-ownership ambiguous. Close such a lease and do not retry its last buffer.
+## See also
+- `silk.buffered_duplex` for buffered reads and writes over a `ByteDuplex`.
+- `silk.memory_byte_duplex` for a scripted transport to use in tests.
 
 Import as `ByteDuplex` with `import silk.byte_duplex { ByteDuplex }`.
 
@@ -28,7 +42,7 @@ Public declarations: 4.
 pub enum ByteIoOperation
 ```
 
-The operation associated with one portable byte-I/O failure.
+The operation that failed, as recorded in a [`ByteIoError`](#ByteIoError).
 
 ::Anchor{id="ByteIoOperation.Read"}
 
@@ -38,7 +52,7 @@ The operation associated with one portable byte-I/O failure.
 Read
 ```
 
-A partial input transfer.
+A read.
 
 ::Anchor{id="ByteIoOperation.Write"}
 
@@ -48,7 +62,7 @@ A partial input transfer.
 Write
 ```
 
-A partial output transfer.
+A write.
 
 ::Anchor{id="ByteIoOperation.Flush"}
 
@@ -58,7 +72,7 @@ A partial output transfer.
 Flush
 ```
 
-A transport-boundary flush.
+A flush.
 
 ::Anchor{id="ByteIoOperation.ShutdownWrite"}
 
@@ -68,7 +82,7 @@ A transport-boundary flush.
 ShutdownWrite
 ```
 
-A write-direction shutdown.
+A close of the write direction.
 
 ::Anchor{id="ByteIoOperation.Close"}
 
@@ -78,7 +92,7 @@ A write-direction shutdown.
 Close
 ```
 
-A terminal duplex close.
+A close of the whole transport.
 
 ::Anchor{id="ByteIoError"}
 
@@ -88,7 +102,7 @@ A terminal duplex close.
 pub union ByteIoError
 ```
 
-A typed failure from one [`ByteDuplex`](#ByteDuplex) operation.
+The error from a [`ByteDuplex`](#ByteDuplex) operation.
 
 ::Anchor{id="ByteIoError.Timeout"}
 
@@ -98,7 +112,7 @@ A typed failure from one [`ByteDuplex`](#ByteDuplex) operation.
 Timeout
 ```
 
-The absolute monotonic deadline was reached.
+The deadline passed before the operation completed.
 
 ::Anchor{id="ByteIoError.Timeout.operation"}
 
@@ -108,7 +122,7 @@ The absolute monotonic deadline was reached.
 pub operation: ByteIoOperation
 ```
 
-The operation that reached its deadline.
+The operation that failed.
 
 ::Anchor{id="ByteIoError.InvalidTransferCount"}
 
@@ -118,7 +132,8 @@ The operation that reached its deadline.
 InvalidTransferCount
 ```
 
-The provider reported an impossible successful prefix.
+The provider reported a count that is not possible: 0, or more than the slice length. The
+transport is closed.
 
 ::Anchor{id="ByteIoError.InvalidTransferCount.operation"}
 
@@ -128,7 +143,7 @@ The provider reported an impossible successful prefix.
 pub operation: ByteIoOperation
 ```
 
-The operation that reported the count.
+The operation that failed.
 
 ::Anchor{id="ByteIoError.InvalidTransferCount.count"}
 
@@ -138,7 +153,7 @@ The operation that reported the count.
 pub count: usize
 ```
 
-The count reported by the provider.
+The count that the provider reported.
 
 ::Anchor{id="ByteIoError.InvalidTransferCount.limit"}
 
@@ -148,7 +163,7 @@ The count reported by the provider.
 pub limit: usize
 ```
 
-The caller buffer length for that transfer.
+The length of the slice that the caller offered.
 
 ::Anchor{id="ByteIoError.Closed"}
 
@@ -158,7 +173,7 @@ The caller buffer length for that transfer.
 Closed
 ```
 
-The requested direction or complete lease is closed.
+The transport, or its write direction, is closed.
 
 ::Anchor{id="ByteIoError.Closed.operation"}
 
@@ -168,7 +183,7 @@ The requested direction or complete lease is closed.
 pub operation: ByteIoOperation
 ```
 
-The operation rejected after closure.
+The operation that failed.
 
 ::Anchor{id="ByteIoError.Provider"}
 
@@ -178,7 +193,7 @@ The operation rejected after closure.
 Provider
 ```
 
-The provider rejected an otherwise valid operation.
+The transport failed for its own reason, such as a connection reset.
 
 ::Anchor{id="ByteIoError.Provider.operation"}
 
@@ -188,7 +203,7 @@ The provider rejected an otherwise valid operation.
 pub operation: ByteIoOperation
 ```
 
-The rejected operation.
+The operation that failed.
 
 ::Anchor{id="ByteIoError.Provider.code"}
 
@@ -198,7 +213,7 @@ The rejected operation.
 pub code: i32
 ```
 
-One provider-defined diagnostic code.
+A code that the provider defines, such as an `errno` value.
 
 ::Anchor{id="ReadTransfer"}
 
@@ -208,7 +223,7 @@ One provider-defined diagnostic code.
 pub union ReadTransfer
 ```
 
-The result of one partial input operation.
+The result of a read.
 
 ::Anchor{id="ReadTransfer.Data"}
 
@@ -218,7 +233,7 @@ The result of one partial input operation.
 Data
 ```
 
-A positive prefix of the output slice now contains input bytes.
+The read put bytes at the start of the output slice.
 
 ::Anchor{id="ReadTransfer.Data.count"}
 
@@ -228,7 +243,8 @@ A positive prefix of the output slice now contains input bytes.
 pub count: usize
 ```
 
-The exact initialized prefix length.
+The number of bytes that the read put in the output slice. It is at least 1 for a non-empty
+slice.
 
 ::Anchor{id="ReadTransfer.End"}
 
@@ -238,7 +254,7 @@ The exact initialized prefix length.
 End
 ```
 
-The underlying transport reached orderly end-of-input.
+The peer ended the stream. Later reads also return `End`.
 
 ::Anchor{id="ByteDuplex"}
 
@@ -248,13 +264,14 @@ The underlying transport reached orderly end-of-input.
 pub service ByteDuplex
 ```
 
-Unsafe provider hooks for one exclusive reliable-byte transport.
+The effect for one two-way byte stream that the code uses alone.
 
 ### Details
 
-Ordinary callers use the safe inherent operations with the corresponding names. Provider
-implementations satisfy these hooks; calling one directly acknowledges that its raw transfer
-count has not passed the canonical boundary validation.
+A provider implements the `...Raw` operations. Callers use the safe operations with the same
+names without `Raw`: [`ByteDuplex.readSome`](#ByteDuplex.impl.readSome), [`ByteDuplex.writeSome`](#ByteDuplex.impl.writeSome), [`ByteDuplex.flush`](#ByteDuplex.impl.flush),
+[`ByteDuplex.shutdownWrite`](#ByteDuplex.impl.shutdownWrite), and [`ByteDuplex.close`](#ByteDuplex.impl.close). A direct call to a `...Raw` operation is
+`unsafe`, because its count is not checked.
 
 ::Anchor{id="ByteDuplex.readSomeRaw"}
 
@@ -267,7 +284,7 @@ unsafe effect fn readSomeRaw(
   ) -> ReadTransfer ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Performs one provider read before canonical transfer validation.
+The provider read. It puts bytes at the start of `output` and returns their count, or `End`.
 
 ::Anchor{id="ByteDuplex.writeSomeRaw"}
 
@@ -280,7 +297,7 @@ unsafe effect fn writeSomeRaw(
   ) -> usize ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Performs one provider write before canonical transfer validation.
+The provider write. It sends bytes from the start of `input` and returns their count.
 
 ::Anchor{id="ByteDuplex.flushRaw"}
 
@@ -292,7 +309,7 @@ unsafe effect fn flushRaw(
   ) -> () ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Performs the provider's transport-boundary flush.
+The provider flush. It sends any bytes that the provider holds in a buffer.
 
 ::Anchor{id="ByteDuplex.shutdownWriteRaw"}
 
@@ -304,7 +321,7 @@ unsafe effect fn shutdownWriteRaw(
   ) -> () ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Closes only the provider's write direction after the canonical wrapper has flushed.
+The provider close of the write direction. The safe wrapper flushes before it calls this.
 
 ::Anchor{id="ByteDuplex.closeRaw"}
 
@@ -314,7 +331,8 @@ Closes only the provider's write direction after the canonical wrapper has flush
 unsafe effect fn closeRaw() -> () ! ByteIoError ? &mut ByteDuplex with Intrinsic.nonParking()
 ```
 
-Closes the complete transport lease. Implementations must remain terminal and idempotent.
+The provider close of the whole transport. After the first call, the provider stays closed,
+and a later call must succeed and do nothing.
 
 ::Anchor{id="ByteDuplex.impl"}
 
@@ -335,12 +353,20 @@ pub effect fn readSome(
   ) -> ReadTransfer ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Reads one positive prefix or reports orderly transport end.
+Reads at least one byte into the start of `output`, or returns `ReadTransfer.End` if the peer
+ended the stream.
 
 #### Details
 
-Empty output completes without calling the provider. An impossible provider count terminally
-closes the lease and returns `InvalidTransferCount`, even if that close itself fails.
+An empty `output` returns a count of 0 and does not use the provider. `deadline` is an
+absolute time on the active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `ByteIoError.Timeout` if the deadline passes.
+- `ByteIoError.InvalidTransferCount` if the provider reports 0 or more than `output.length`.
+  The transport is closed, also if the close fails.
+- `ByteIoError.Closed` or `ByteIoError.Provider` from the provider.
 
 ::Anchor{id="ByteDuplex.impl.writeSome"}
 
@@ -353,12 +379,20 @@ pub effect fn writeSome(
   ) -> usize ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Writes one positive prefix and returns its exact length.
+Writes at least one byte from the start of `input` and returns how many bytes it wrote.
 
 #### Details
 
-Empty input completes without calling the provider. An impossible provider count terminally
-closes the lease and returns `InvalidTransferCount`, even if that close itself fails.
+An empty `input` returns 0 and does not use the provider. The bytes after the returned count
+are not written. Call `writeSome` again with the rest. `deadline` is an absolute time on the
+active `MonotonicClock`. `Option.none()` means no time limit.
+
+#### Errors
+
+- `ByteIoError.Timeout` if the deadline passes.
+- `ByteIoError.InvalidTransferCount` if the provider reports 0 or more than `input.length`.
+  The transport is closed, also if the close fails.
+- `ByteIoError.Closed` or `ByteIoError.Provider` from the provider.
 
 ::Anchor{id="ByteDuplex.impl.flush"}
 
@@ -370,7 +404,11 @@ pub effect fn flush(
   ) -> () ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Flushes accepted output to the provider's documented transport boundary.
+Sends any bytes that the provider holds in a buffer.
+
+#### Errors
+
+- `ByteIoError` from the provider, or `Timeout` if the deadline passes.
 
 ::Anchor{id="ByteDuplex.impl.shutdownWrite"}
 
@@ -382,7 +420,15 @@ pub effect fn shutdownWrite(
   ) -> () ! ByteIoError ? &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Flushes accepted output and then closes only the write direction.
+Flushes and then closes the write direction. Reads still work.
+
+#### When to use
+
+Use it to tell the peer that no more data comes, while you still read its answer.
+
+#### Errors
+
+- `ByteIoError` from the flush or the shutdown, or `Timeout` if the deadline passes.
 
 ::Anchor{id="ByteDuplex.impl.close"}
 
@@ -392,7 +438,12 @@ Flushes accepted output and then closes only the write direction.
 pub effect fn close() -> () ! ByteIoError ? &mut ByteDuplex
 ```
 
-Closes the complete transport lease. Repeated calls remain terminal.
+Closes the whole transport. A later call does nothing.
+
+#### Errors
+
+- `ByteIoError` from the provider. The transport is closed also when the close reports an
+  error.
 
 ::Anchor{id="ByteDuplex.impl.timeout"}
 
@@ -402,7 +453,7 @@ Closes the complete transport lease. Repeated calls remain terminal.
 pub fn timeout(operation: ByteIoOperation) -> ByteIoError
 ```
 
-Constructs a timeout failure for `operation`.
+Returns `ByteIoError.Timeout` for `operation`. Providers use it.
 
 ::Anchor{id="ByteDuplex.impl.invalidTransferCount"}
 
@@ -416,7 +467,8 @@ pub fn invalidTransferCount(
   ) -> ByteIoError
 ```
 
-Constructs an invalid-count failure with the observed and permitted counts.
+Returns `ByteIoError.InvalidTransferCount` with the reported `count` and the slice length
+`limit`.
 
 ::Anchor{id="ByteDuplex.impl.closed"}
 
@@ -426,7 +478,7 @@ Constructs an invalid-count failure with the observed and permitted counts.
 pub fn closed(operation: ByteIoOperation) -> ByteIoError
 ```
 
-Constructs a closed-direction failure for `operation`.
+Returns `ByteIoError.Closed` for `operation`. Providers use it.
 
 ::Anchor{id="ByteDuplex.impl.provider"}
 
@@ -436,6 +488,6 @@ Constructs a closed-direction failure for `operation`.
 pub fn provider(operation: ByteIoOperation, code: i32) -> ByteIoError
 ```
 
-Constructs a provider failure with one provider-defined diagnostic code.
+Returns `ByteIoError.Provider` for `operation` with a provider-defined `code`.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

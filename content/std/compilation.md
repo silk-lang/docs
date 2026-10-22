@@ -1,12 +1,37 @@
-Typed logical build choices fixed before source specialization.
+Build choices of the current compilation, such as safety, threading, and artifact kind, for use
+in
+static evaluation.
 
 ## When to use
-Use [`artifact`](#Compilation.impl.artifact), [`safety`](#Compilation.impl.safety), and [`threading`](#Compilation.impl.threading) to select source behavior from the build request.
-Use `silk.target` for machine facts such as architecture and pointer width.
+Use [`Compilation`](#Compilation) to select code for the build request, for example with `static if`. Use
+[`Compilation.safety`](#Compilation.impl.safety) to select checked or unchecked library code, and
+[`Compilation.threading`](#Compilation.impl.threading)
+to select single-thread or multi-thread code. Use `silk.target` for facts about the machine,
+such
+as the architecture and the pointer width.
 
 ## Details
-These values describe logical requests. They do not discover SDKs, load runtime packages, or
-change ownership rules. All operations in this module run during static evaluation.
+Each value comes from the compilation profile, which is fixed before specialization. The values
+describe logical requests. They do not find SDKs, load runtime packages, or change the ownership
+rules. Each operation in this module is `static`, so the selection adds no runtime cost.
+
+## Examples
+### Select code for the safety policy
+```silk
+import silk.compilation { Compilation, Safety }
+
+fn boundsChecked() -> bool {
+  static if Compilation.safety() == Safety.Checked {
+    return true
+  }
+  return false
+}
+
+pub fn main() -> i32 {
+  let checked = boundsChecked()
+  return 0
+}
+```
 
 Import as `Compilation` with `import silk.compilation { Compilation }`.
 
@@ -20,7 +45,11 @@ Public declarations: 13.
 pub enum Libc
 ```
 
-The admitted choices for the C library request.
+The C library that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.libc`](#Compilation.impl.libc).
 
 ::Anchor{id="Libc.None"}
 
@@ -30,7 +59,7 @@ The admitted choices for the C library request.
 None
 ```
 
-The `none` C library request.
+No C library. The program uses only Silk code and direct system calls.
 
 ::Anchor{id="Libc.System"}
 
@@ -40,7 +69,7 @@ The `none` C library request.
 System
 ```
 
-The `system` C library request.
+The C library of the platform, such as the libc of macOS.
 
 ::Anchor{id="Libc.Gnu"}
 
@@ -50,7 +79,7 @@ The `system` C library request.
 Gnu
 ```
 
-The `gnu` C library request.
+The GNU C library (glibc).
 
 ::Anchor{id="Artifact"}
 
@@ -60,7 +89,11 @@ The `gnu` C library request.
 pub enum Artifact
 ```
 
-The admitted choices for the artifact request.
+The kind of output file that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.artifact`](#Compilation.impl.artifact).
 
 ::Anchor{id="Artifact.Executable"}
 
@@ -70,7 +103,7 @@ The admitted choices for the artifact request.
 Executable
 ```
 
-The `executable` artifact request.
+A program that the operating system can start.
 
 ::Anchor{id="Artifact.LoadableModule"}
 
@@ -80,7 +113,8 @@ The `executable` artifact request.
 LoadableModule
 ```
 
-The `loadable-module` artifact request.
+A module that a host program loads at runtime, such as a shared library or a WebAssembly
+module.
 
 ::Anchor{id="Artifact.StaticArchive"}
 
@@ -90,7 +124,7 @@ The `loadable-module` artifact request.
 StaticArchive
 ```
 
-The `static-archive` artifact request.
+A static library archive for a later link step.
 
 ::Anchor{id="Artifact.Object"}
 
@@ -100,7 +134,7 @@ The `static-archive` artifact request.
 Object
 ```
 
-The `object` artifact request.
+One relocatable object file.
 
 ::Anchor{id="Link"}
 
@@ -110,7 +144,11 @@ The `object` artifact request.
 pub enum Link
 ```
 
-The admitted choices for the link request.
+The link mode that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.link`](#Compilation.impl.link).
 
 ::Anchor{id="Link.Static"}
 
@@ -120,7 +158,7 @@ The admitted choices for the link request.
 Static
 ```
 
-The `static` link request.
+Static linking. The artifact includes its dependencies.
 
 ::Anchor{id="Link.Dynamic"}
 
@@ -130,7 +168,7 @@ The `static` link request.
 Dynamic
 ```
 
-The `dynamic` link request.
+Dynamic linking. The artifact loads shared libraries at startup.
 
 ::Anchor{id="CodeModel"}
 
@@ -140,7 +178,11 @@ The `dynamic` link request.
 pub enum CodeModel
 ```
 
-The admitted choices for the code model.
+The code model that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.codeModel`](#Compilation.impl.codeModel).
 
 ::Anchor{id="CodeModel.Small"}
 
@@ -150,7 +192,7 @@ The admitted choices for the code model.
 Small
 ```
 
-The `small` code model.
+The small code model. Code and static data must be in a limited address range.
 
 ::Anchor{id="CodeModel.Large"}
 
@@ -160,7 +202,7 @@ The `small` code model.
 Large
 ```
 
-The `large` code model.
+The large code model. Code and static data can be at any address.
 
 ::Anchor{id="Relocation"}
 
@@ -170,7 +212,11 @@ The `large` code model.
 pub enum Relocation
 ```
 
-The admitted choices for the relocation model.
+The relocation model that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.relocation`](#Compilation.impl.relocation).
 
 ::Anchor{id="Relocation.Static"}
 
@@ -180,7 +226,7 @@ The admitted choices for the relocation model.
 Static
 ```
 
-The `static` relocation model.
+Code for a fixed load address.
 
 ::Anchor{id="Relocation.Pic"}
 
@@ -190,7 +236,7 @@ The `static` relocation model.
 Pic
 ```
 
-The `pic` relocation model.
+Position-independent code, which can load at any address.
 
 ::Anchor{id="Optimization"}
 
@@ -200,7 +246,11 @@ The `pic` relocation model.
 pub enum Optimization
 ```
 
-The admitted choices for the optimization request.
+The optimization level that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.optimization`](#Compilation.impl.optimization).
 
 ::Anchor{id="Optimization.None"}
 
@@ -210,7 +260,7 @@ The admitted choices for the optimization request.
 None
 ```
 
-The `none` optimization request.
+No optimization.
 
 ::Anchor{id="Optimization.Speed"}
 
@@ -220,7 +270,7 @@ The `none` optimization request.
 Speed
 ```
 
-The `speed` optimization request.
+Optimization for speed.
 
 ::Anchor{id="Safety"}
 
@@ -230,7 +280,11 @@ The `speed` optimization request.
 pub enum Safety
 ```
 
-The admitted choices for the library safety policy.
+The library safety policy that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.safety`](#Compilation.impl.safety).
 
 ::Anchor{id="Safety.Checked"}
 
@@ -240,7 +294,7 @@ The admitted choices for the library safety policy.
 Checked
 ```
 
-The `checked` library safety policy.
+The library does its runtime checks.
 
 ::Anchor{id="Safety.Unchecked"}
 
@@ -250,7 +304,7 @@ The `checked` library safety policy.
 Unchecked
 ```
 
-The `unchecked` library safety policy.
+Library code can omit runtime checks. The caller is responsible for valid inputs.
 
 ::Anchor{id="Threading"}
 
@@ -260,7 +314,11 @@ The `unchecked` library safety policy.
 pub enum Threading
 ```
 
-The admitted choices for the library threading policy.
+The library threading policy that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.threading`](#Compilation.impl.threading).
 
 ::Anchor{id="Threading.Single"}
 
@@ -270,7 +328,7 @@ The admitted choices for the library threading policy.
 Single
 ```
 
-The `single` library threading policy.
+The program has one thread. The library can use code without synchronization.
 
 ::Anchor{id="Threading.Multi"}
 
@@ -280,7 +338,7 @@ The `single` library threading policy.
 Multi
 ```
 
-The `multi` library threading policy.
+The program can have more than one thread. The library uses synchronized code.
 
 ::Anchor{id="Unwind"}
 
@@ -290,7 +348,11 @@ The `multi` library threading policy.
 pub enum Unwind
 ```
 
-The admitted choices for the unwind request.
+The unwind mode that the build requests.
+
+### Details
+
+Read the selected value with [`Compilation.unwind`](#Compilation.impl.unwind).
 
 ::Anchor{id="Unwind.None"}
 
@@ -300,7 +362,7 @@ The admitted choices for the unwind request.
 None
 ```
 
-The `none` unwind request.
+No unwind tables.
 
 ::Anchor{id="Unwind.Native"}
 
@@ -310,7 +372,7 @@ The `none` unwind request.
 Native
 ```
 
-The `native` unwind request.
+Unwind tables for the native platform.
 
 ::Anchor{id="Selection"}
 
@@ -320,7 +382,13 @@ The `native` unwind request.
 pub union Selection
 ```
 
-A logical default, absent, or named entry/runtime request.
+An entry or runtime request: the platform default, none, or a named symbol or package.
+
+### Details
+
+[`Compilation.entry`](#Compilation.impl.entry) and [`Compilation.runtime`](#Compilation.impl.runtime) return this type. A name is a logical
+identity,
+not a file path.
 
 ::Anchor{id="Selection.Default"}
 
@@ -330,7 +398,7 @@ A logical default, absent, or named entry/runtime request.
 Default
 ```
 
-The platform's default request.
+The default of the platform.
 
 ::Anchor{id="Selection.None"}
 
@@ -340,7 +408,7 @@ The platform's default request.
 None
 ```
 
-An explicit request for no composition or entry.
+No entry point or no runtime.
 
 ::Anchor{id="Selection.Named"}
 
@@ -350,7 +418,7 @@ An explicit request for no composition or entry.
 Named
 ```
 
-A logical symbol or package identity, without a physical path.
+A named symbol or package.
 
 ::Anchor{id="Selection.Named.name"}
 
@@ -360,7 +428,7 @@ A logical symbol or package identity, without a physical path.
 pub name: string<'static>
 ```
 
-The selected logical identity.
+The logical name of the symbol or package.
 
 ::Anchor{id="Sanitizer"}
 
@@ -370,7 +438,11 @@ The selected logical identity.
 pub enum Sanitizer
 ```
 
-The sanitizer requests supported by a compilation profile.
+A sanitizer that a build can request.
+
+### Details
+
+Test a sanitizer with [`Compilation.hasSanitizer`](#Compilation.impl.hasSanitizer). A build can request more than one sanitizer.
 
 ::Anchor{id="Sanitizer.Address"}
 
@@ -410,7 +482,7 @@ Checks for instrumented undefined behavior.
 pub const debug: bool
 ```
 
-Whether the build requests debug information.
+`true` if the build requests debug information.
 
 ::Anchor{id="Compilation"}
 
@@ -420,12 +492,11 @@ Whether the build requests debug information.
 pub struct Compilation
 ```
 
-The scope for Compilation operations.
+The owner type of the compilation queries. It has no fields and is never constructed.
 
 ### Details
 
-This owner carries no data. Select it with `import silk.compilation { Compilation }`
-to access its inherent operations.
+Each operation is `static`. Use it in a `static if`, a `static fn`, or a `const` initializer.
 
 ::Anchor{id="Compilation.impl"}
 
@@ -443,7 +514,7 @@ impl Compilation
 pub static fn libc() -> Libc
 ```
 
-Returns the selected C library request during static evaluation.
+Returns the C library that the build requests.
 
 ::Anchor{id="Compilation.impl.artifact"}
 
@@ -453,7 +524,7 @@ Returns the selected C library request during static evaluation.
 pub static fn artifact() -> Artifact
 ```
 
-Returns the selected artifact request during static evaluation.
+Returns the kind of output file that the build requests.
 
 ::Anchor{id="Compilation.impl.link"}
 
@@ -463,7 +534,7 @@ Returns the selected artifact request during static evaluation.
 pub static fn link() -> Link
 ```
 
-Returns the selected link request during static evaluation.
+Returns the link mode that the build requests.
 
 ::Anchor{id="Compilation.impl.codeModel"}
 
@@ -473,7 +544,7 @@ Returns the selected link request during static evaluation.
 pub static fn codeModel() -> CodeModel
 ```
 
-Returns the selected code model during static evaluation.
+Returns the code model that the build requests.
 
 ::Anchor{id="Compilation.impl.relocation"}
 
@@ -483,7 +554,7 @@ Returns the selected code model during static evaluation.
 pub static fn relocation() -> Relocation
 ```
 
-Returns the selected relocation model during static evaluation.
+Returns the relocation model that the build requests.
 
 ::Anchor{id="Compilation.impl.optimization"}
 
@@ -493,7 +564,7 @@ Returns the selected relocation model during static evaluation.
 pub static fn optimization() -> Optimization
 ```
 
-Returns the selected optimization request during static evaluation.
+Returns the optimization level that the build requests.
 
 ::Anchor{id="Compilation.impl.safety"}
 
@@ -503,7 +574,12 @@ Returns the selected optimization request during static evaluation.
 pub static fn safety() -> Safety
 ```
 
-Returns the selected library safety policy during static evaluation.
+Returns the library safety policy that the build requests.
+
+#### When to use
+
+Use `safety` to select between checked and unchecked library code, for example to omit bounds
+checks in an unchecked build.
 
 ::Anchor{id="Compilation.impl.threading"}
 
@@ -513,7 +589,11 @@ Returns the selected library safety policy during static evaluation.
 pub static fn threading() -> Threading
 ```
 
-Returns the selected library threading policy during static evaluation.
+Returns the library threading policy that the build requests.
+
+#### When to use
+
+Use `threading` to select between code with and without synchronization.
 
 ::Anchor{id="Compilation.impl.unwind"}
 
@@ -523,7 +603,7 @@ Returns the selected library threading policy during static evaluation.
 pub static fn unwind() -> Unwind
 ```
 
-Returns the selected unwind request during static evaluation.
+Returns the unwind mode that the build requests.
 
 ::Anchor{id="Compilation.impl.entry"}
 
@@ -533,7 +613,11 @@ Returns the selected unwind request during static evaluation.
 pub static fn entry() -> Selection
 ```
 
-Returns the logical entry request without resolving a startup symbol.
+Returns the entry point request of the build.
+
+#### Details
+
+The result is a logical request. This function does not find a startup symbol.
 
 ::Anchor{id="Compilation.impl.runtime"}
 
@@ -543,7 +627,11 @@ Returns the logical entry request without resolving a startup symbol.
 pub static fn runtime() -> Selection
 ```
 
-Returns the logical runtime request without loading a runtime package.
+Returns the runtime request of the build.
+
+#### Details
+
+The result is a logical request. This function does not load a runtime package.
 
 ::Anchor{id="Compilation.impl.hasSanitizer"}
 
@@ -553,6 +641,6 @@ Returns the logical runtime request without loading a runtime package.
 pub static fn hasSanitizer(value: Sanitizer) -> bool
 ```
 
-Returns whether the build requests the selected sanitizer.
+Returns `true` if the build requests the sanitizer `value`.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -1,23 +1,168 @@
-Bounded scoped HTTP response content decoding over strict body framing.
+Decode the content of an HTTP response: gzip, deflate, and Zstandard, as named in
+`Content-Encoding`.
 
 ## When to use
-Build a [`ResponseContext`](#ResponseContext) from one validated response head, request method, and trailer
-policy, consume it into a [`CodingPlan`](#CodingPlan), then use [`withReader`](#withReader) to stream either the raw
-representation or a validated reverse content-decoding stack.
+Make a [`ResponseContext`](#ResponseContext) from a response head, and a [`CodingPlan`](#CodingPlan) from it. Then decode the
+body with a [`Decoder`](#Decoder) when you have the wire bytes, or with [`withReader`](#withReader) over a
+`BufferedDuplex`. Use [`acceptEncoding`](#acceptEncoding) to make the `Accept-Encoding` field of a request.
+`silk.http_exchange` and `silk.http_fetch` use this module for you.
 
 ## Details
-Planning parses at most four content codings and performs every configuration and owned-memory
-check before codec acquisition or body I/O. Readers exclusively borrow an existing
-[`BufferedDuplex`](/docs/std/buffered-duplex#BufferedDuplex) for one callback. Bytes returned before [`ContentCompletion`](#ContentCompletion) are
-provisional because a later wrapper checksum, trailer, or framed boundary can still fail.
+With `Mode.Raw`, the body is returned as it was sent. With `Mode.Decode`, the codings in
+`Content-Encoding` are decoded in reverse order. A response can have at most four codings.
+[`CodingPlan.make`](#CodingPlan.impl.make) checks all limits and memory before it reads the body. The decoder also
+removes the body framing, so give it the bytes after the head.
+
+## Errors
+- [`ContentError`](#ContentError) tells the reason and the byte counts so far. A coding error tells where the
+  coding is in `Content-Encoding`.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ## Gotchas
-This low-level actor treats the body supplied to each `withReader` invocation as the encoded
-representation described by the plan. It does not prove that those bytes came from the retained
-head and cannot prevent a copied head from being planned over already-decoded bytes. The affine
-response/body envelope in `silk.http_exchange` owns that stronger provenance and decode-once contract.
-Cleanup is guaranteed for structured Effect exits, including interruption, but not for fatal
-traps that bypass Effect finalizers and Drop.
+Decoded bytes are not final until the state is `End`. A later checksum, trailer, or framing
+error can still fail. A step can return no bytes, so call it again until the state is `End`.
+This module does not check that the body belongs to the head. `silk.http_exchange` does.
+
+## Examples
+### Decode a gzip body
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http { Method }
+import silk.http_body { TrailerPolicy }
+import silk.http_content {
+  CodingPlan,
+  ContentError,
+  ContentProgressState,
+  DecodeFailure,
+  DecodeProgress,
+  Decoder,
+  Mode,
+  ResponseContext
+}
+import silk.http_exchange { Limits as ClientLimits }
+import silk.http_fetch { FetchOptions }
+import silk.http_head { ParseError, ParsedResponse, ResponseHead, ResponseParser, parseResponse }
+import silk.http_body { BodyError }
+import silk.result { Result }
+import silk.slice { Slice }
+import silk.usize
+
+effect fn program() -> i32
+  ! OutOfMemoryError
+  ? &mut Allocator {
+  let limits = ClientLimits.defaults()
+  let wire = b"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 28\r\n\r\n"
+  let parsed = match run parseResponse(&wire, limits.head) {
+    Result<ParsedResponse, ParseError>.Success { value } => move value
+    Result<ParsedResponse, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let head = match ResponseParser.head(&parsed.parser) {
+    Result<ResponseHead, ParseError>.Success { value } => value
+    Result<ResponseHead, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let context = match ResponseContext.make(head, Method.get(), TrailerPolicy.defaultPolicy()) {
+    Result<ResponseContext, BodyError>.Success { value } => move value
+    Result<ResponseContext, BodyError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let options = FetchOptions.defaults()
+  let plan = match CodingPlan.make(
+    move context,
+    Mode.Decode,
+    limits.responseBody,
+    move options.contentLimits
+  ) {
+    Result<CodingPlan, ContentError>.Success { value } => move value
+    Result<CodingPlan, ContentError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let made = run Effect.result(Decoder.make(move plan))
+  let mut decoder = match move made {
+    Result.Success { value } => move value
+    Result.Failure { error } => {
+      drop error
+      return 1
+    }
+  }
+
+  // gzip of "hello hello hello"
+  let body: [u8; 28] = [
+    31,
+    139,
+    8,
+    0,
+    0,
+    0,
+    0,
+    0,
+    2,
+    255,
+    203,
+    72,
+    205,
+    201,
+    201,
+    87,
+    200,
+    64,
+    144,
+    0,
+    128,
+    136,
+    249,
+    229,
+    17,
+    0,
+    0,
+    0,
+  ]
+
+  // A step can return no bytes. Call it again until the state is End.
+  let mut chunk: [u8; 64] = [0; 64]
+  let mut offset = usize.ZERO
+  let mut total = usize.ZERO
+  let mut first: u8 = 0
+  let mut done = false
+  let mut steps = 0
+  while !done && steps < 1000 {
+    let rest = Slice.view<u8>(&body, offset, body.length - offset)
+    let step = match Decoder.step(&mut decoder, rest, &mut chunk, true) {
+      Result<DecodeProgress, DecodeFailure>.Success { value } => move value
+      Result<DecodeProgress, DecodeFailure>.Failure { error: _ } => {
+        return 1
+      }
+    }
+    offset = offset + step.consumed
+    if step.progress.written > usize.ZERO && total == usize.ZERO {
+      first = chunk[0]
+    }
+    total = total + step.progress.written
+    done = step.progress.state == ContentProgressState.End
+    steps = steps + 1
+  }
+  if !done || total != 17 || first != 104 {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
 
 Import as `ContentReader` with `import silk.http_content { ContentReader }`.
 
@@ -31,7 +176,7 @@ Public declarations: 25.
 pub enum Mode
 ```
 
-Whether the representation is preserved or decoded.
+Whether to decode the content.
 
 ::Anchor{id="Mode.Raw"}
 
@@ -41,7 +186,7 @@ Whether the representation is preserved or decoded.
 Raw
 ```
 
-Preserves encoded representation bytes without interpreting Content-Encoding.
+Return the body as it was sent. `Content-Encoding` is not read.
 
 ::Anchor{id="Mode.Decode"}
 
@@ -51,7 +196,7 @@ Preserves encoded representation bytes without interpreting Content-Encoding.
 Decode
 ```
 
-Validates Content-Encoding and applies the supported reverse decoding stack.
+Decode the codings in `Content-Encoding`.
 
 ::Anchor{id="Coding"}
 
@@ -61,7 +206,7 @@ Validates Content-Encoding and applies the supported reverse decoding stack.
 pub enum Coding
 ```
 
-One recognized response content coding.
+A content coding that this module knows.
 
 ::Anchor{id="Coding.Identity"}
 
@@ -71,7 +216,7 @@ One recognized response content coding.
 Identity
 ```
 
-Leaves representation bytes unchanged and counts toward the coding depth.
+`identity`: no change. It still counts in `maxDepth`.
 
 ::Anchor{id="Coding.Gzip"}
 
@@ -81,7 +226,7 @@ Leaves representation bytes unchanged and counts toward the coding depth.
 Gzip
 ```
 
-Decodes gzip members, including permitted concatenated members.
+`gzip`. More gzip members after the first are decoded too.
 
 ::Anchor{id="Coding.XGzip"}
 
@@ -91,7 +236,7 @@ Decodes gzip members, including permitted concatenated members.
 XGzip
 ```
 
-Accepts the legacy response spelling of gzip with the same decoding rules.
+`x-gzip`, the old name of `gzip`.
 
 ::Anchor{id="Coding.Deflate"}
 
@@ -101,7 +246,7 @@ Accepts the legacy response spelling of gzip with the same decoding rules.
 Deflate
 ```
 
-Decodes one zlib-wrapped stream; raw DEFLATE and trailing bytes fail.
+`deflate`, as a zlib stream. Raw DEFLATE without the zlib wrapper fails.
 
 ::Anchor{id="Coding.Zstd"}
 
@@ -111,7 +256,7 @@ Decodes one zlib-wrapped stream; raw DEFLATE and trailing bytes fail.
 Zstd
 ```
 
-Decodes Zstandard frames under the configured window and workspace limits.
+`zstd`, within the window and memory limits.
 
 ::Anchor{id="CodingPosition"}
 
@@ -121,7 +266,7 @@ Decodes Zstandard frames under the configured window and workspace limits.
 pub struct CodingPosition
 ```
 
-The exact source coordinates of one coding token.
+Where a coding is in the `Content-Encoding` fields.
 
 ::Anchor{id="CodingPosition.wireIndex"}
 
@@ -131,7 +276,7 @@ The exact source coordinates of one coding token.
 pub wireIndex: usize
 ```
 
-The zero-based coding position across all Content-Encoding fields.
+The position of the coding over all `Content-Encoding` fields, from 0.
 
 ::Anchor{id="CodingPosition.fieldIndex"}
 
@@ -141,7 +286,7 @@ The zero-based coding position across all Content-Encoding fields.
 pub fieldIndex: usize
 ```
 
-The zero-based header field position in the original response.
+The position of the field in the response head, from 0.
 
 ::Anchor{id="CodingPosition.elementIndex"}
 
@@ -151,7 +296,7 @@ The zero-based header field position in the original response.
 pub elementIndex: usize
 ```
 
-The zero-based comma element within its Content-Encoding field.
+The position of the coding in its field, from 0.
 
 ::Anchor{id="CodingPosition.offset"}
 
@@ -161,7 +306,7 @@ The zero-based comma element within its Content-Encoding field.
 pub offset: usize
 ```
 
-The byte offset of the coding token or invalid byte within the field value.
+The byte offset of the coding, or the bad byte, in the field value.
 
 ::Anchor{id="CodingPosition.impl.Copy"}
 
@@ -179,7 +324,7 @@ impl Copy for CodingPosition
 pub struct Limits
 ```
 
-The finite content, composition, and codec allowances copied into a plan.
+The limits for content decoding.
 
 ::Anchor{id="Limits.maxEncoded"}
 
@@ -189,7 +334,7 @@ The finite content, composition, and codec allowances copied into a plan.
 pub maxEncoded: u64
 ```
 
-The maximum representation bytes accepted after HTTP deframing.
+The maximum body bytes before decoding, after the framing is removed.
 
 ::Anchor{id="Limits.maxIntermediate"}
 
@@ -199,7 +344,7 @@ The maximum representation bytes accepted after HTTP deframing.
 pub maxIntermediate: u64
 ```
 
-The maximum combined bytes produced by all nonfinal codec stages.
+The maximum total bytes from all decoding stages except the last.
 
 ::Anchor{id="Limits.maxDecoded"}
 
@@ -209,7 +354,7 @@ The maximum combined bytes produced by all nonfinal codec stages.
 pub maxDecoded: u64
 ```
 
-The maximum final representation bytes returned to the caller.
+The maximum decoded bytes.
 
 ::Anchor{id="Limits.maxOwned"}
 
@@ -219,7 +364,7 @@ The maximum final representation bytes returned to the caller.
 pub maxOwned: usize
 ```
 
-The maximum admitted composition and codec storage reservation, excluding body-decoder storage.
+The maximum memory for the decoders, without the memory of the body decoder.
 
 ::Anchor{id="Limits.maxDepth"}
 
@@ -229,7 +374,7 @@ The maximum admitted composition and codec storage reservation, excluding body-d
 pub maxDepth: usize
 ```
 
-The maximum coding entries, including identity; must be between one and four.
+The maximum number of codings, including `identity`. It is from 1 to 4.
 
 ::Anchor{id="Limits.intermediateCapacity"}
 
@@ -239,7 +384,7 @@ The maximum coding entries, including identity; must be between one and four.
 pub intermediateCapacity: usize
 ```
 
-The capacity of each active stage edge; must be between one and 65,536 bytes.
+The size of the buffer between two stages. It is from 1 to 65536.
 
 ::Anchor{id="Limits.inflate"}
 
@@ -249,7 +394,7 @@ The capacity of each active stage edge; must be between one and 65,536 bytes.
 pub inflate: InflateLimits
 ```
 
-The limits applied independently to each gzip or zlib decoder.
+The limits for each gzip or deflate decoder.
 
 ::Anchor{id="Limits.zstd"}
 
@@ -259,7 +404,7 @@ The limits applied independently to each gzip or zlib decoder.
 pub zstd: ZstdLimits
 ```
 
-The limits applied independently to each Zstandard decoder.
+The limits for each Zstandard decoder.
 
 ::Anchor{id="ContentLimitKind"}
 
@@ -269,7 +414,7 @@ The limits applied independently to each Zstandard decoder.
 pub enum ContentLimitKind
 ```
 
-The configuration or byte class rejected by the content layer.
+The limit that failed. See [`ContentReason.InvalidLimit`](#ContentReason.InvalidLimit).
 
 ::Anchor{id="ContentLimitKind.CodingDepth"}
 
@@ -279,7 +424,7 @@ The configuration or byte class rejected by the content layer.
 CodingDepth
 ```
 
-The permitted number of content-coding entries.
+`maxDepth`.
 
 ::Anchor{id="ContentLimitKind.IntermediateCapacity"}
 
@@ -289,7 +434,7 @@ The permitted number of content-coding entries.
 IntermediateCapacity
 ```
 
-The finite capacity of one stage edge.
+`intermediateCapacity`.
 
 ::Anchor{id="ContentLimitKind.OwnedBytes"}
 
@@ -299,7 +444,7 @@ The finite capacity of one stage edge.
 OwnedBytes
 ```
 
-The admitted composition and codec storage reservation.
+`maxOwned`.
 
 ::Anchor{id="ContentLimitKind.EncodedBytes"}
 
@@ -309,7 +454,7 @@ The admitted composition and codec storage reservation.
 EncodedBytes
 ```
 
-The deframed representation input byte allowance.
+`maxEncoded`.
 
 ::Anchor{id="ContentLimitKind.IntermediateBytes"}
 
@@ -319,7 +464,7 @@ The deframed representation input byte allowance.
 IntermediateBytes
 ```
 
-The combined output allowance for nonfinal decoding stages.
+`maxIntermediate`.
 
 ::Anchor{id="ContentLimitKind.DecodedBytes"}
 
@@ -329,7 +474,7 @@ The combined output allowance for nonfinal decoding stages.
 DecodedBytes
 ```
 
-The final representation output byte allowance.
+`maxDecoded`.
 
 ::Anchor{id="ContentReason"}
 
@@ -339,7 +484,7 @@ The final representation output byte allowance.
 pub union ContentReason<'head>
 ```
 
-A stage-aware content, framing, transport, or codec failure.
+The reason that content decoding failed.
 
 ::Anchor{id="ContentReason.InvalidLimit"}
 
@@ -349,7 +494,7 @@ A stage-aware content, framing, transport, or codec failure.
 InvalidLimit
 ```
 
-A configuration or byte count exceeds its permitted range.
+A limit is not valid, or a byte count exceeded it.
 
 ::Anchor{id="ContentReason.InvalidLimit.limit"}
 
@@ -359,7 +504,7 @@ A configuration or byte count exceeds its permitted range.
 pub limit: ContentLimitKind
 ```
 
-The rejected configuration or byte class.
+The limit.
 
 ::Anchor{id="ContentReason.InvalidLimit.allowed"}
 
@@ -369,7 +514,7 @@ The rejected configuration or byte class.
 pub allowed: u64
 ```
 
-The applicable maximum.
+The value of the limit.
 
 ::Anchor{id="ContentReason.InvalidLimit.attempted"}
 
@@ -379,7 +524,7 @@ The applicable maximum.
 pub attempted: u64
 ```
 
-The rejected value or count.
+The value that was found.
 
 ::Anchor{id="ContentReason.CodingSyntax"}
 
@@ -389,7 +534,7 @@ The rejected value or count.
 CodingSyntax
 ```
 
-A Content-Encoding element is empty or contains invalid syntax.
+An item in `Content-Encoding` is empty or not valid.
 
 ::Anchor{id="ContentReason.CodingSyntax.position"}
 
@@ -399,7 +544,7 @@ A Content-Encoding element is empty or contains invalid syntax.
 pub position: CodingPosition
 ```
 
-The exact location of the invalid token or byte.
+Where the item is.
 
 ::Anchor{id="ContentReason.UnsupportedCoding"}
 
@@ -409,7 +554,7 @@ The exact location of the invalid token or byte.
 UnsupportedCoding
 ```
 
-A valid coding token names an unsupported decoder.
+A coding has no decoder, for example `br`.
 
 ::Anchor{id="ContentReason.UnsupportedCoding.position"}
 
@@ -419,7 +564,7 @@ A valid coding token names an unsupported decoder.
 pub position: CodingPosition
 ```
 
-The token position in the original response.
+Where the coding is.
 
 ::Anchor{id="ContentReason.UnsupportedCoding.token"}
 
@@ -429,7 +574,7 @@ The token position in the original response.
 pub token: &'head [u8]
 ```
 
-The untouched unsupported token borrowed from the response.
+The name of the coding, from the response head.
 
 ::Anchor{id="ContentReason.PartialResponse"}
 
@@ -439,7 +584,8 @@ The untouched unsupported token borrowed from the response.
 PartialResponse
 ```
 
-A 206 response selects a nonidentity coding in Decode mode.
+A 206 partial response has a coding other than `identity`, and `Mode.Decode` cannot decode a
+part.
 
 ::Anchor{id="ContentReason.PartialResponse.position"}
 
@@ -449,7 +595,7 @@ A 206 response selects a nonidentity coding in Decode mode.
 pub position: CodingPosition
 ```
 
-The first nonidentity coding in wire order.
+The first coding that is not `identity`.
 
 ::Anchor{id="ContentReason.Tunnel"}
 
@@ -459,7 +605,7 @@ The first nonidentity coding in wire order.
 Tunnel
 ```
 
-The selected body is a protocol tunnel rather than an HTTP representation.
+The body is a tunnel, not content.
 
 ::Anchor{id="ContentReason.Body"}
 
@@ -469,7 +615,7 @@ The selected body is a protocol tunnel rather than an HTTP representation.
 Body
 ```
 
-HTTP body framing failed before content completion.
+The body framing failed.
 
 ::Anchor{id="ContentReason.Body.error"}
 
@@ -479,7 +625,7 @@ HTTP body framing failed before content completion.
 pub error: BodyError
 ```
 
-The original body error, including committed wire progress.
+The error from `silk.http_body`.
 
 ::Anchor{id="ContentReason.Buffer"}
 
@@ -489,7 +635,7 @@ The original body error, including committed wire progress.
 Buffer
 ```
 
-The buffered transport failed.
+Reading from the transport failed.
 
 ::Anchor{id="ContentReason.Buffer.error"}
 
@@ -499,7 +645,7 @@ The buffered transport failed.
 pub error: BufferError
 ```
 
-The original buffer error and its transport cause.
+The error, with its transport cause.
 
 ::Anchor{id="ContentReason.Inflate"}
 
@@ -509,7 +655,7 @@ The original buffer error and its transport cause.
 Inflate
 ```
 
-A gzip or zlib decoder rejected configuration or input.
+Gzip or deflate decoding failed.
 
 ::Anchor{id="ContentReason.Inflate.stage"}
 
@@ -519,7 +665,7 @@ A gzip or zlib decoder rejected configuration or input.
 pub stage: usize
 ```
 
-The zero-based reverse application stage.
+The decoding stage, from 0. Stage 0 decodes the last coding.
 
 ::Anchor{id="ContentReason.Inflate.wireIndex"}
 
@@ -529,7 +675,7 @@ The zero-based reverse application stage.
 pub wireIndex: usize
 ```
 
-The original coding position in wire order.
+The position of the coding in `Content-Encoding`, from 0.
 
 ::Anchor{id="ContentReason.Inflate.error"}
 
@@ -539,7 +685,7 @@ The original coding position in wire order.
 pub error: DecodeError
 ```
 
-The exact inflate failure and decoder-call progress.
+The error from `silk.inflate`.
 
 ::Anchor{id="ContentReason.Zstandard"}
 
@@ -549,7 +695,7 @@ The exact inflate failure and decoder-call progress.
 Zstandard
 ```
 
-A Zstandard decoder rejected configuration or input.
+Zstandard decoding failed.
 
 ::Anchor{id="ContentReason.Zstandard.stage"}
 
@@ -559,7 +705,7 @@ A Zstandard decoder rejected configuration or input.
 pub stage: usize
 ```
 
-The zero-based reverse application stage.
+The decoding stage, from 0. Stage 0 decodes the last coding.
 
 ::Anchor{id="ContentReason.Zstandard.wireIndex"}
 
@@ -569,7 +715,7 @@ The zero-based reverse application stage.
 pub wireIndex: usize
 ```
 
-The original coding position in wire order.
+The position of the coding in `Content-Encoding`, from 0.
 
 ::Anchor{id="ContentReason.Zstandard.error"}
 
@@ -579,7 +725,7 @@ The original coding position in wire order.
 pub error: ZstdError
 ```
 
-The exact Zstandard failure and decoder-call progress.
+The error from `silk.zstd`.
 
 ::Anchor{id="ContentReason.TrailingEncodedData"}
 
@@ -589,7 +735,7 @@ The exact Zstandard failure and decoder-call progress.
 TrailingEncodedData
 ```
 
-A finished coding stream has additional encoded bytes.
+There were more bytes after the end of a compressed stream.
 
 ::Anchor{id="ContentReason.TrailingEncodedData.stage"}
 
@@ -599,7 +745,7 @@ A finished coding stream has additional encoded bytes.
 pub stage: usize
 ```
 
-The zero-based reverse application stage.
+The decoding stage, from 0. Stage 0 decodes the last coding.
 
 ::Anchor{id="ContentReason.TrailingEncodedData.wireIndex"}
 
@@ -609,7 +755,7 @@ The zero-based reverse application stage.
 pub wireIndex: usize
 ```
 
-The original coding position in wire order.
+The position of the coding in `Content-Encoding`, from 0.
 
 ::Anchor{id="ContentReason.ArithmeticOverflow"}
 
@@ -619,7 +765,7 @@ The original coding position in wire order.
 ArithmeticOverflow
 ```
 
-A checked byte or reservation calculation cannot represent its result.
+A byte count overflowed.
 
 ::Anchor{id="ContentReason.InvalidState"}
 
@@ -629,7 +775,7 @@ A checked byte or reservation calculation cannot represent its result.
 InvalidState
 ```
 
-The reader previously failed or was abandoned.
+The reader had already failed or stopped.
 
 ::Anchor{id="ContentError"}
 
@@ -639,7 +785,7 @@ The reader previously failed or was abandoned.
 pub struct ContentError<'head>
 ```
 
-Exact per-call and cumulative coordinates for a content failure.
+The error from content decoding, with the byte counts so far.
 
 ::Anchor{id="ContentError.reason"}
 
@@ -649,7 +795,7 @@ Exact per-call and cumulative coordinates for a content failure.
 pub reason: ContentReason<'head>
 ```
 
-The exact failure category and its lower-level cause when available.
+The reason.
 
 ::Anchor{id="ContentError.written"}
 
@@ -659,7 +805,7 @@ The exact failure category and its lower-level cause when available.
 pub written: usize
 ```
 
-The representation bytes written to the caller destination during this read.
+The decoded bytes written by the call before the error.
 
 ::Anchor{id="ContentError.totalEncoded"}
 
@@ -669,7 +815,7 @@ The representation bytes written to the caller destination during this read.
 pub totalEncoded: u64
 ```
 
-The cumulative representation bytes accepted after HTTP deframing.
+The total body bytes read, after the framing is removed.
 
 ::Anchor{id="ContentError.totalIntermediate"}
 
@@ -679,7 +825,7 @@ The cumulative representation bytes accepted after HTTP deframing.
 pub totalIntermediate: u64
 ```
 
-The cumulative output bytes accepted from all nonfinal codec stages.
+The total bytes from all stages except the last.
 
 ::Anchor{id="ContentError.totalDecoded"}
 
@@ -689,7 +835,7 @@ The cumulative output bytes accepted from all nonfinal codec stages.
 pub totalDecoded: u64
 ```
 
-The cumulative representation bytes written to caller destinations.
+The total decoded bytes written.
 
 ::Anchor{id="ContentProgressState"}
 
@@ -699,7 +845,7 @@ The cumulative representation bytes written to caller destinations.
 pub enum ContentProgressState
 ```
 
-Whether one successful read returned data or established terminal completion.
+Whether the content is complete.
 
 ::Anchor{id="ContentProgressState.Data"}
 
@@ -709,7 +855,7 @@ Whether one successful read returned data or established terminal completion.
 Data
 ```
 
-Reports provisional output or internal progress before complete validation.
+There is more content. The bytes so far are not final.
 
 ::Anchor{id="ContentProgressState.End"}
 
@@ -719,7 +865,7 @@ Reports provisional output or internal progress before complete validation.
 End
 ```
 
-Reports successful completion of the framed body and all content stages.
+The body and all decoding completed, and all checks passed.
 
 ::Anchor{id="ContentProgress"}
 
@@ -729,7 +875,7 @@ Reports successful completion of the framed body and all content stages.
 pub struct ContentProgress
 ```
 
-Exact per-call and cumulative committed content progress.
+The progress of a read.
 
 ::Anchor{id="ContentProgress.written"}
 
@@ -739,7 +885,7 @@ Exact per-call and cumulative committed content progress.
 pub written: usize
 ```
 
-The representation bytes written to the caller destination during this read.
+The decoded bytes written by this call.
 
 ::Anchor{id="ContentProgress.totalEncoded"}
 
@@ -749,7 +895,7 @@ The representation bytes written to the caller destination during this read.
 pub totalEncoded: u64
 ```
 
-The cumulative representation bytes accepted after HTTP deframing.
+The total body bytes read, after the framing is removed.
 
 ::Anchor{id="ContentProgress.totalIntermediate"}
 
@@ -759,7 +905,7 @@ The cumulative representation bytes accepted after HTTP deframing.
 pub totalIntermediate: u64
 ```
 
-The cumulative output bytes accepted from all nonfinal codec stages.
+The total bytes from all stages except the last.
 
 ::Anchor{id="ContentProgress.totalDecoded"}
 
@@ -769,7 +915,7 @@ The cumulative output bytes accepted from all nonfinal codec stages.
 pub totalDecoded: u64
 ```
 
-The cumulative representation bytes written to caller destinations.
+The total decoded bytes written.
 
 ::Anchor{id="ContentProgress.state"}
 
@@ -779,7 +925,7 @@ The cumulative representation bytes written to caller destinations.
 pub state: ContentProgressState
 ```
 
-Whether content remains provisional or has completed validation.
+Whether the content is complete.
 
 ::Anchor{id="ReuseDisposition"}
 
@@ -789,7 +935,7 @@ Whether content remains provisional or has completed validation.
 pub enum ReuseDisposition
 ```
 
-Connection reuse policy before and after positive completion evidence.
+Whether the connection can be used again after this response.
 
 ::Anchor{id="ReuseDisposition.EligibleAfterCompletion"}
 
@@ -799,7 +945,7 @@ Connection reuse policy before and after positive completion evidence.
 EligibleAfterCompletion
 ```
 
-Allows reuse only after successful content completion supplies positive evidence.
+Yes, but only after the content completes.
 
 ::Anchor{id="ReuseDisposition.Reusable"}
 
@@ -809,7 +955,7 @@ Allows reuse only after successful content completion supplies positive evidence
 Reusable
 ```
 
-Confirms delimited framing, no framing anomaly, and successful content completion.
+Yes. The body had a clear end, there was no problem, and the content completed.
 
 ::Anchor{id="ReuseDisposition.NonReusable"}
 
@@ -819,7 +965,7 @@ Confirms delimited framing, no framing anomaly, and successful content completio
 NonReusable
 ```
 
-Forbids reuse because framing closes the connection or carries an anomaly.
+No. The body ends when the connection closes, or the framing had a problem.
 
 ::Anchor{id="AppliedPlan"}
 
@@ -829,7 +975,7 @@ Forbids reuse because framing closes the connection or carries an anomaly.
 pub struct AppliedPlan
 ```
 
-Public applied-plan metadata without exposing the affine plan itself.
+A summary of a [`CodingPlan`](#CodingPlan).
 
 ::Anchor{id="AppliedPlan.mode"}
 
@@ -839,7 +985,7 @@ Public applied-plan metadata without exposing the affine plan itself.
 pub mode: Mode
 ```
 
-Whether the plan preserves or decodes the representation.
+Whether the content is decoded.
 
 ::Anchor{id="AppliedPlan.codingCount"}
 
@@ -849,7 +995,7 @@ Whether the plan preserves or decodes the representation.
 pub codingCount: usize
 ```
 
-The number of parsed coding entries, including identity.
+The number of codings in `Content-Encoding`, including `identity`.
 
 ::Anchor{id="AppliedPlan.decoderCount"}
 
@@ -859,7 +1005,7 @@ The number of parsed coding entries, including identity.
 pub decoderCount: usize
 ```
 
-The number of active nonidentity codec stages.
+The number of decoders that run, without `identity`.
 
 ::Anchor{id="AppliedPlan.reuse"}
 
@@ -869,7 +1015,7 @@ The number of active nonidentity codec stages.
 pub reuse: ReuseDisposition
 ```
 
-The reuse disposition established by the plan or completion.
+Whether the connection can be used again.
 
 ::Anchor{id="AppliedPlan.impl.Copy"}
 
@@ -887,7 +1033,7 @@ impl Copy for AppliedPlan
 pub struct RepresentationView<'owner, 'head>
 ```
 
-Borrowed effective representation metadata that never rewrites wire headers.
+Information about the decoded content. The headers of the response are not changed.
 
 ::Anchor{id="RepresentationView.impl"}
 
@@ -905,7 +1051,7 @@ impl<'owner, 'head> RepresentationView<'owner, 'head>
 pub fn originalHead(self: &Self) -> ResponseHead<'head>
 ```
 
-Returns the untouched response head with its original coding and length headers.
+Returns the response head as received, with its `Content-Encoding` and `Content-Length`.
 
 ::Anchor{id="RepresentationView.impl.appliedPlan"}
 
@@ -915,7 +1061,7 @@ Returns the untouched response head with its original coding and length headers.
 pub fn appliedPlan(self: &Self) -> AppliedPlan
 ```
 
-Returns the effective coding counts, mode, and reuse disposition.
+Returns the summary of the plan.
 
 ::Anchor{id="RepresentationView.impl.anomaly"}
 
@@ -925,7 +1071,7 @@ Returns the effective coding counts, mode, and reuse disposition.
 pub fn anomaly(self: &Self) -> Anomaly
 ```
 
-Returns the exact framing anomaly selected from the original response.
+Returns a framing problem of the response, if any.
 
 ::Anchor{id="RepresentationView.impl.decodingApplied"}
 
@@ -935,7 +1081,7 @@ Returns the exact framing anomaly selected from the original response.
 pub fn decodingApplied(self: &Self) -> bool
 ```
 
-Returns whether at least one nonidentity content decoder was selected.
+Returns `true` if at least one decoder runs.
 
 ::Anchor{id="RepresentationView.impl.decodedLength"}
 
@@ -945,7 +1091,8 @@ Returns whether at least one nonidentity content decoder was selected.
 pub fn decodedLength(self: &Self) -> Option<u64>
 ```
 
-Returns the final decoded length only after completion, or zero for semantic no-body responses.
+Returns the decoded length after completion, 0 for a response without a body, or `None` before
+completion.
 
 ::Anchor{id="ContentCompletion"}
 
@@ -955,7 +1102,7 @@ Returns the final decoded length only after completion, or zero for semantic no-
 pub struct ContentCompletion<'owner>
 ```
 
-Opaque positive evidence that framing and every selected codec completed.
+Proof that the body and all decoding completed.
 
 ::Anchor{id="ContentCompletion.impl"}
 
@@ -973,7 +1120,7 @@ impl<'owner> ContentCompletion<'owner>
 pub fn bodyKind(self: &Self) -> BodyCompletionKind
 ```
 
-Returns whether the completed body was delimited or ended at transport closure.
+Returns how the body ended: at a clear end, or when the connection closed.
 
 ::Anchor{id="ContentCompletion.impl.decodedBytes"}
 
@@ -983,7 +1130,7 @@ Returns whether the completed body was delimited or ended at transport closure.
 pub fn decodedBytes(self: &Self) -> u64
 ```
 
-Returns the final validated representation byte count.
+Returns the number of decoded bytes.
 
 ::Anchor{id="ContentCompletion.impl.anomaly"}
 
@@ -993,7 +1140,7 @@ Returns the final validated representation byte count.
 pub fn anomaly(self: &Self) -> Anomaly
 ```
 
-Returns the exact framing anomaly selected from the original response.
+Returns a framing problem of the response, if any.
 
 ::Anchor{id="ContentCompletion.impl.reuse"}
 
@@ -1003,7 +1150,7 @@ Returns the exact framing anomaly selected from the original response.
 pub fn reuse(self: &Self) -> ReuseDisposition
 ```
 
-Returns the reuse disposition supported by this completed representation.
+Returns whether the connection can be used again.
 
 ::Anchor{id="ResponseContext"}
 
@@ -1013,7 +1160,7 @@ Returns the reuse disposition supported by this completed representation.
 pub struct ResponseContext<'head, 'method, 'names>
 ```
 
-Atomic response-selection provenance. Its fields are intentionally private.
+A response head with its request method and trailer policy, ready for a [`CodingPlan`](#CodingPlan).
 
 ::Anchor{id="ResponseContext.impl"}
 
@@ -1035,7 +1182,7 @@ pub fn make(
   ) -> Result<ResponseContext<'head, 'method, 'names>, BodyError>
 ```
 
-Selects response framing and constructs no context when selection fails.
+Selects the body framing of `head`, and returns a context. Fails if the framing is not valid.
 
 ::Anchor{id="CodingPlan"}
 
@@ -1045,7 +1192,7 @@ Selects response framing and constructs no context when selection fails.
 pub struct CodingPlan<'head, 'method, 'names>
 ```
 
-A validated single-use response plan. Construction consumes its complete context.
+A checked plan to decode one response body. Use it one time.
 
 ::Anchor{id="CodingPlan.impl"}
 
@@ -1068,7 +1215,9 @@ pub fn make(
   ) -> Result<CodingPlan<'head, 'method, 'names>, ContentError<'head>>
 ```
 
-Validates all policy and storage requirements without allocation or body I/O.
+Reads `Content-Encoding` in `Mode.Decode`, and checks all limits and memory.
+
+It does not allocate or read the body.
 
 ::Anchor{id="CodingPlan.impl.originalHead"}
 
@@ -1078,7 +1227,7 @@ Validates all policy and storage requirements without allocation or body I/O.
 pub fn originalHead(self: &Self) -> ResponseHead<'head>
 ```
 
-Returns the untouched response head with its original coding and length headers.
+Returns the response head as received.
 
 ::Anchor{id="CodingPlan.impl.selectionAnomaly"}
 
@@ -1088,7 +1237,7 @@ Returns the untouched response head with its original coding and length headers.
 pub fn selectionAnomaly(self: &Self) -> Anomaly
 ```
 
-Returns the selected framing anomaly exactly.
+Returns a framing problem of the response, if any.
 
 ::Anchor{id="CodingPlan.impl.selectedFraming"}
 
@@ -1098,7 +1247,7 @@ Returns the selected framing anomaly exactly.
 pub fn selectedFraming(self: &Self) -> Framing
 ```
 
-Returns the framing retained by atomic selection.
+Returns the body framing.
 
 ::Anchor{id="CodingPlan.impl.applied"}
 
@@ -1108,7 +1257,7 @@ Returns the framing retained by atomic selection.
 pub fn applied(self: &Self) -> AppliedPlan
 ```
 
-Returns the effective plan metadata.
+Returns the summary of the plan.
 
 ::Anchor{id="CodingPlan.impl.ownedBytes"}
 
@@ -1118,7 +1267,7 @@ Returns the effective plan metadata.
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns the deterministic owned reservation admitted by the plan.
+Returns the memory that the plan needs, as counted against `maxOwned`.
 
 ::Anchor{id="EnabledCodings"}
 
@@ -1128,7 +1277,7 @@ Returns the deterministic owned reservation admitted by the plan.
 pub struct EnabledCodings
 ```
 
-Enabled automatic request codings. `x-gzip` is deliberately absent.
+The codings to name in an automatic `Accept-Encoding` field. `x-gzip` is never named.
 
 ::Anchor{id="EnabledCodings.gzip"}
 
@@ -1138,7 +1287,7 @@ Enabled automatic request codings. `x-gzip` is deliberately absent.
 pub gzip: bool
 ```
 
-Enables gzip in automatic Accept-Encoding output.
+Name `gzip`.
 
 ::Anchor{id="EnabledCodings.deflate"}
 
@@ -1148,7 +1297,7 @@ Enables gzip in automatic Accept-Encoding output.
 pub deflate: bool
 ```
 
-Enables zlib-wrapped deflate in automatic Accept-Encoding output.
+Name `deflate`.
 
 ::Anchor{id="EnabledCodings.zstd"}
 
@@ -1158,7 +1307,7 @@ Enables zlib-wrapped deflate in automatic Accept-Encoding output.
 pub zstd: bool
 ```
 
-Enables zstd in automatic Accept-Encoding output.
+Name `zstd`.
 
 ::Anchor{id="EnabledCodings.impl.Copy"}
 
@@ -1176,7 +1325,7 @@ impl Copy for EnabledCodings
 pub enum EmptyEncodingPolicy
 ```
 
-The explicit automatic behavior when no decoder is enabled.
+What to send when no coding is enabled.
 
 ::Anchor{id="EmptyEncodingPolicy.Identity"}
 
@@ -1186,7 +1335,7 @@ The explicit automatic behavior when no decoder is enabled.
 Identity
 ```
 
-Advertises identity when automatic negotiation enables no codec.
+Send `Accept-Encoding: identity`.
 
 ::Anchor{id="EmptyEncodingPolicy.Omit"}
 
@@ -1196,7 +1345,7 @@ Advertises identity when automatic negotiation enables no codec.
 Omit
 ```
 
-Omits Accept-Encoding when automatic negotiation enables no codec.
+Send no `Accept-Encoding` field.
 
 ::Anchor{id="AcceptEncoding"}
 
@@ -1206,7 +1355,7 @@ Omits Accept-Encoding when automatic negotiation enables no codec.
 pub union AcceptEncoding<'value>
 ```
 
-Automatic, exact borrowed override, or omitted `Accept-Encoding` policy.
+How to make the `Accept-Encoding` field.
 
 ::Anchor{id="AcceptEncoding.Automatic"}
 
@@ -1216,7 +1365,7 @@ Automatic, exact borrowed override, or omitted `Accept-Encoding` policy.
 Automatic
 ```
 
-Advertises enabled codecs in stable gzip, deflate, zstd order for Decode mode.
+Name the enabled codings, in the order gzip, deflate, zstd. Only in `Mode.Decode`.
 
 ::Anchor{id="AcceptEncoding.Automatic.enabled"}
 
@@ -1226,7 +1375,7 @@ Advertises enabled codecs in stable gzip, deflate, zstd order for Decode mode.
 pub enabled: EnabledCodings
 ```
 
-The supported codecs to advertise.
+The codings to name.
 
 ::Anchor{id="AcceptEncoding.Automatic.empty"}
 
@@ -1236,7 +1385,7 @@ The supported codecs to advertise.
 pub empty: EmptyEncodingPolicy
 ```
 
-The policy when no codec is enabled.
+What to send when no coding is enabled.
 
 ::Anchor{id="AcceptEncoding.Override"}
 
@@ -1246,7 +1395,7 @@ The policy when no codec is enabled.
 Override
 ```
 
-Uses the caller value exactly after shared HTTP header validation.
+Send this value. The response is still checked as in the other cases.
 
 ::Anchor{id="AcceptEncoding.Override.value"}
 
@@ -1256,7 +1405,7 @@ Uses the caller value exactly after shared HTTP header validation.
 pub value: &'value [u8]
 ```
 
-The borrowed field value; this value does not weaken response decoding validation.
+The field value.
 
 ::Anchor{id="AcceptEncoding.Omit"}
 
@@ -1266,7 +1415,7 @@ The borrowed field value; this value does not weaken response decoding validatio
 Omit
 ```
 
-Omits Accept-Encoding without constructing a header.
+Send no `Accept-Encoding` field.
 
 ::Anchor{id="acceptEncoding"}
 
@@ -1280,7 +1429,7 @@ pub fn acceptEncoding<'value>(
 ) -> Result<Option<Header<'value>>, ValueError>
 ```
 
-Builds at most one validated `Accept-Encoding` field without mutating a request.
+Returns the `Accept-Encoding` field for `mode` and `policy`, or `None` when no field is sent.
 
 ::Anchor{id="validateLimits"}
 
@@ -1290,13 +1439,12 @@ Builds at most one validated `Accept-Encoding` field without mutating a request.
 pub fn validateLimits<'head>(limits: &Limits) -> Result<(), ContentError<'head>>
 ```
 
-Validates source-independent content limits without allocation or body I/O.
+Checks `limits` without allocation or I/O.
 
 ### Details
-
-`maxDepth` must be from one through four. `intermediateCapacity` must be from one through
-65,536 bytes. Other byte limits can be zero and are enforced by planning or content I/O.
-Codec-specific storage validation occurs when a plan selects that codec.
+`maxDepth` must be from 1 to 4, and `intermediateCapacity` from 1 to 65536. The other limits can
+be 0, and are checked during planning or decoding. The limits of a decoder are checked when a
+plan selects it.
 
 ::Anchor{id="Decoder"}
 
@@ -1306,12 +1454,11 @@ Codec-specific storage validation occurs when a plan selects that codec.
 pub struct Decoder
 ```
 
-Owned framing and content state for a caller-owned wire transport.
+Decodes a body from wire bytes that you give, without I/O.
 
 ### Details
-Planning consumes borrowed metadata, but the resulting decoder owns all runtime state. The
-caller retains input bytes not consumed by `step`, including the next HTTP message suffix.
-A higher-level response owner must bind the plan and those wire bytes to the same response.
+The decoder owns its state. Bytes that `step` does not use, such as the next HTTP message, stay
+with you.
 
 ::Anchor{id="DecodeProgress"}
 
@@ -1321,7 +1468,7 @@ A higher-level response owner must bind the plan and those wire bytes to the sam
 pub struct DecodeProgress
 ```
 
-One incremental wire-to-representation transition.
+The result of a [`Decoder.step`](#Decoder.impl.step).
 
 ::Anchor{id="DecodeProgress.consumed"}
 
@@ -1331,7 +1478,7 @@ One incremental wire-to-representation transition.
 pub consumed: usize
 ```
 
-The exact wire prefix consumed from the supplied input.
+The input bytes that the step used.
 
 ::Anchor{id="DecodeProgress.progress"}
 
@@ -1341,7 +1488,7 @@ The exact wire prefix consumed from the supplied input.
 pub progress: ContentProgress
 ```
 
-Provisional output and cumulative representation coordinates.
+The decoded bytes and the totals.
 
 ::Anchor{id="DecodeProgress.needsInput"}
 
@@ -1351,7 +1498,7 @@ Provisional output and cumulative representation coordinates.
 pub needsInput: bool
 ```
 
-Whether another wire prefix is needed before the decoder can advance.
+`true` when the decoder needs more input before it can continue.
 
 ::Anchor{id="DecodeFailure"}
 
@@ -1361,7 +1508,7 @@ Whether another wire prefix is needed before the decoder can advance.
 pub struct DecodeFailure
 ```
 
-A content failure with its committed input prefix and owned runtime cause.
+The error from a [`Decoder.step`](#Decoder.impl.step).
 
 ::Anchor{id="DecodeFailure.consumed"}
 
@@ -1371,7 +1518,7 @@ A content failure with its committed input prefix and owned runtime cause.
 pub consumed: usize
 ```
 
-The exact wire prefix consumed before the failure.
+The input bytes that the step used before the error.
 
 ::Anchor{id="DecodeFailure.error"}
 
@@ -1381,7 +1528,7 @@ The exact wire prefix consumed before the failure.
 pub error: ContentError<'static>
 ```
 
-The original content, framing, or codec failure and output coordinates.
+The error.
 
 ::Anchor{id="Decoder.impl"}
 
@@ -1401,7 +1548,7 @@ pub effect fn make<'head, 'method, 'names>(plan: CodingPlan<'head, 'method, 'nam
   ? &mut Allocator
 ```
 
-Acquires the existing bounded framing and codec stack from one validated plan.
+Returns a decoder for `plan`, and allocates its memory.
 
 ::Anchor{id="Decoder.impl.step"}
 
@@ -1414,12 +1561,12 @@ pub fn step(self: &mut Self, input: &[u8], output: &mut [u8], endOfInput: bool) 
   >
 ```
 
-Advances without I/O, retaining exact consumed and written prefixes on failure.
+Decodes from `input` into `output`, and returns how much it used and wrote.
 
 #### Details
-`endOfInput` promises no bytes follow the supplied input. Returned representation bytes
-remain provisional until `completion` confirms framing, checksums and pending output.
-Empty output completes locally without consuming input or changing a live decoder.
+Set `endOfInput` to `true` when no bytes come after `input`. The decoded bytes are final only
+after the state is `End`. A step can write no bytes, so call it again. An empty `output` does
+nothing.
 
 ::Anchor{id="Decoder.impl.progress"}
 
@@ -1429,7 +1576,7 @@ Empty output completes locally without consuming input or changing a live decode
 pub fn progress(self: &Self) -> ContentProgress
 ```
 
-Reports the current cumulative representation coordinates without advancing input.
+Returns the totals so far.
 
 ::Anchor{id="Decoder.impl.completion"}
 
@@ -1442,7 +1589,7 @@ pub fn completion<'owner>(self: &'owner Self) -> Result<
   >
 ```
 
-Borrows successful framing and content completion from this owner.
+Returns proof of completion, or `None` if the content is not complete.
 
 ::Anchor{id="Decoder.impl.trailers"}
 
@@ -1455,7 +1602,7 @@ pub fn trailers<'owner>(self: &'owner Self) -> Result<
   >
 ```
 
-Borrows trailers only after successful content and body completion.
+Returns the trailers, after the content completes.
 
 ::Anchor{id="Decoder.impl.abandon"}
 
@@ -1465,7 +1612,7 @@ Borrows trailers only after successful content and body completion.
 pub fn abandon(self: &mut Self) -> ()
 ```
 
-Permanently abandons unfinished decoding without reading or draining the transport.
+Stops the decoder. Later calls fail.
 
 ::Anchor{id="ContentReader"}
 
@@ -1475,7 +1622,7 @@ Permanently abandons unfinished decoding without reading or draining the transpo
 pub struct ContentReader<'reader, 'transport, 'head, P>
 ```
 
-One callback-scoped exclusive content reader.
+Reads the content of a body in the callback of [`withReader`](#withReader).
 
 ::Anchor{id="ContentReader.impl"}
 
@@ -1495,7 +1642,7 @@ pub fn representation<'owner>(
   ) -> Result<RepresentationView<'owner, 'head>, ContentError<'head>>
 ```
 
-Borrows untouched wire metadata and the effective applied plan.
+Returns information about the response head and the plan.
 
 ::Anchor{id="ContentReader.impl.completion"}
 
@@ -1507,7 +1654,7 @@ pub fn completion<'owner>(
   ) -> Result<Option<ContentCompletion<'owner>>, ContentError<'head>>
 ```
 
-Returns positive completion only after framing, codecs, and pending output finish.
+Returns proof of completion, after the body and all decoders finish.
 
 ::Anchor{id="ContentReader.impl.trailers"}
 
@@ -1519,7 +1666,7 @@ pub fn trailers<'owner>(
   ) -> Result<Option<Trailers<'owner>>, ContentError<'head>>
 ```
 
-Borrows trailers only through successful content and body completion.
+Returns the trailers, after the content completes.
 
 ::Anchor{id="ContentReader.impl.readSome"}
 
@@ -1536,7 +1683,8 @@ pub effect fn readSome(
   where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Streams one provisional prefix with one unchanged absolute deadline.
+Reads decoded bytes into `output`. The bytes are final only after the state is `End`.
+`deadline` is on the `MonotonicClock`.
 
 ::Anchor{id="withReader"}
 
@@ -1571,6 +1719,6 @@ pub effect fn withReader<
 where &'transport mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock
 ```
 
-Runs one higher-ranked callback while exclusively borrowing the encoded body.
+Gives a [`ContentReader`](#ContentReader) for the body in `body` to `callback`, with the decoders of `plan`.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

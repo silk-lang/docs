@@ -1,17 +1,146 @@
-Bounded, replay-aware HTTP redirect policy and scoped attempt orchestration.
+Follow HTTP redirects with a [`Policy`](#Policy): which statuses to follow, how the method and the body
+change, which origins are allowed, and which headers are kept.
 
 ## When to use
-
-Use [`Policy`](#Policy) to admit finite redirect authority before an HTTP attempt. Select
-[`withEmptyResponse`](#withEmptyResponse), [`withBytesResponse`](#withBytesResponse), [`withOneShotResponse`](#withOneShotResponse), or
-[`withReplayResponse`](#withReplayResponse) according to the request body's replay authority.
+Most programs set a [`Policy`](#Policy) in `FetchOptions` of `silk.http_fetch`. Use the `with*Response`
+functions to follow redirects with your own [`AttemptClient`](#AttemptClient). Use [`statusDecision`](#statusDecision),
+[`transition`](#transition), [`resolveLocation`](#resolveLocation), [`admitOrigin`](#admitOrigin), [`History`](#History), and [`sanitizeHeaders`](#sanitizeHeaders) to
+build your own redirect loop.
 
 ## Details
+For each response, [`statusDecision`](#statusDecision) decides if it is a redirect. [`transition`](#transition) selects the
+next method and whether the body is sent again:
+- 303 changes the method to GET, or keeps HEAD, and drops the body.
+- 301 and 302 change POST to GET and drop the body when `post301302` is `ToGet`.
+- All other cases keep the method and the body.
 
-This actor owns policy names, bounded redirect history, independently owned next-attempt state,
-replay-aware body writing, intermediate-response cleanup, and final callback dispatch. Routed
-acquisition remains behind [`AttemptClient`](#AttemptClient); final responses are lent only to a higher-ranked
-[`ResponseHandler`](#ResponseHandler).
+[`resolveLocation`](#resolveLocation) reads the `Location` field. [`admitOrigin`](#admitOrigin) applies the cross-origin and
+downgrade rules. [`History`](#History) finds loops. [`sanitizeHeaders`](#sanitizeHeaders) removes headers that must not go
+to the next request.
+
+The suffix of a `with*Response` function tells what the request body is, as in
+`silk.http_fetch`: `Empty`, `Bytes`, `OneShot`, or `Replay`. The `Hybrid` forms take a client
+that can connect through a proxy route or directly.
+
+## Errors
+- [`RedirectError`](#RedirectError) tells the part, the reason, and the URIs and status, when they are known. It
+  holds no credentials or body.
+
+## Gotchas
+The default [`Policy`](#Policy) does not follow redirects. It denies a change of origin and a change from
+HTTPS to HTTP. A `OneShot` body cannot be sent again, so a redirect that keeps the body fails
+with `ReplayUnavailable`.
+
+## Examples
+### Apply redirect rules
+```silk
+import silk.http { Method, Status, ValueError }
+import silk.http_origin { Origin, OriginError }
+import silk.http_redirect {
+  BodyDecision,
+  CrossOriginPolicy,
+  DowngradePolicy,
+  Mode,
+  NameList,
+  Policy,
+  Post301302Policy,
+  PreviousResponsePolicy,
+  RedirectError,
+  RedirectReason,
+  StatusDecision,
+  Transition,
+  admitOrigin,
+  statusDecision,
+  transition
+}
+import silk.result { Result }
+import silk.uri { Uri }
+import silk.uri_reference { ParseError }
+
+fn status(code: u16) -> Status {
+  return match Status.fromCode(code) {
+    Result<Status, ValueError>.Success { value } => value
+    Result<Status, ValueError>.Failure { error: _ } => {
+      let invalid = 1 / 0
+      return status(code)
+    }
+  }
+}
+
+fn origin(text: string<'static>) -> Origin {
+  let uri = match Uri.parse(text) {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      let invalid = 1 / 0
+      return origin(text)
+    }
+  }
+  return match Origin.fromUri(&uri) {
+    Result<Origin, OriginError>.Success { value } => value
+    Result<Origin, OriginError>.Failure { error: _ } => {
+      let invalid = 1 / 0
+      return origin(text)
+    }
+  }
+}
+
+pub fn main() -> i32 {
+  let defaults = Policy.defaults()
+  let policy = match Policy.make(
+    Mode.Follow,
+    Policy.historyLimits(&defaults),
+    CrossOriginPolicy.Allow,
+    DowngradePolicy.Deny,
+    Post301302Policy.ToGet,
+    PreviousResponsePolicy.Close,
+    NameList.empty(),
+    NameList.empty(),
+  ) {
+    Result<Policy, RedirectError>.Success { value } => move value
+    Result<Policy, RedirectError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // 303 is a redirect. It changes POST to GET and drops the body.
+  let decision = match statusDecision(&policy, status(303), 0) {
+    Result<StatusDecision, RedirectError>.Success { value } => value
+    Result<StatusDecision, RedirectError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let seeOther = transition(&policy, status(303), Method.post())
+  if decision != StatusDecision.Redirect || Method.format(&seeOther.method) != "GET"
+    || seeOther.body != BodyDecision.Drop {
+    return 1
+  }
+
+  // 307 keeps the method and the body.
+  let temporary = transition(&policy, status(307), Method.post())
+  if Method.format(&temporary.method) != "POST" || temporary.body != BodyDecision.Retain {
+    return 1
+  }
+
+  // A redirect from HTTPS to HTTP fails.
+  let downgrade = match admitOrigin(
+    &policy,
+    &origin("https://example.com/"),
+    &origin("http://example.com/"),
+    0,
+    status(302),
+  ) {
+    Result<bool, RedirectError>.Success { value: _ } => false
+    Result<bool, RedirectError>.Failure { error } => match error.reason {
+      RedirectReason.DowngradeDenied => true
+      _ => false
+    }
+  }
+  if !downgrade {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `Redirect` with `import silk.http_redirect as Redirect`.
 
@@ -25,7 +154,7 @@ Public declarations: 48.
 pub enum Mode
 ```
 
-Whether a response is returned unchanged or eligible redirect statuses are followed.
+Whether to follow redirects.
 
 ::Anchor{id="Mode.Manual"}
 
@@ -35,7 +164,7 @@ Whether a response is returned unchanged or eligible redirect statuses are follo
 Manual
 ```
 
-Returns the first response without inspecting `Location`.
+Return the first response. `Location` is not read.
 
 ::Anchor{id="Mode.Follow"}
 
@@ -45,7 +174,7 @@ Returns the first response without inspecting `Location`.
 Follow
 ```
 
-Applies the admitted redirect policy.
+Follow redirects by the policy.
 
 ::Anchor{id="CrossOriginPolicy"}
 
@@ -55,7 +184,7 @@ Applies the admitted redirect policy.
 pub enum CrossOriginPolicy
 ```
 
-Whether a cross-origin redirect is admitted.
+Whether a redirect can go to another origin.
 
 ::Anchor{id="CrossOriginPolicy.Deny"}
 
@@ -65,7 +194,7 @@ Whether a cross-origin redirect is admitted.
 Deny
 ```
 
-Rejects every normalized-origin change.
+A redirect to another origin fails with `RedirectOriginDenied`.
 
 ::Anchor{id="CrossOriginPolicy.Allow"}
 
@@ -75,7 +204,7 @@ Rejects every normalized-origin change.
 Allow
 ```
 
-Admits an origin change after deny-last header sanitization.
+A redirect to another origin is followed. Sensitive headers are removed first.
 
 ::Anchor{id="DowngradePolicy"}
 
@@ -85,7 +214,7 @@ Admits an origin change after deny-last header sanitization.
 pub enum DowngradePolicy
 ```
 
-Whether an HTTPS-to-HTTP redirect is admitted after cross-origin admission.
+Whether a redirect can go from HTTPS to HTTP.
 
 ::Anchor{id="DowngradePolicy.Deny"}
 
@@ -95,7 +224,7 @@ Whether an HTTPS-to-HTTP redirect is admitted after cross-origin admission.
 Deny
 ```
 
-Rejects a secure-to-plaintext transition.
+A redirect from HTTPS to HTTP fails with `DowngradeDenied`.
 
 ::Anchor{id="DowngradePolicy.Allow"}
 
@@ -105,7 +234,7 @@ Rejects a secure-to-plaintext transition.
 Allow
 ```
 
-Admits a secure-to-plaintext transition after cross-origin sanitization.
+A redirect from HTTPS to HTTP is followed, if the cross-origin policy allows it.
 
 ::Anchor{id="Post301302Policy"}
 
@@ -115,7 +244,7 @@ Admits a secure-to-plaintext transition after cross-origin sanitization.
 pub enum Post301302Policy
 ```
 
-The special method rule for exact uppercase POST on status 301 or 302.
+What a 301 or 302 redirect does with a POST request.
 
 ::Anchor{id="Post301302Policy.Preserve"}
 
@@ -125,7 +254,7 @@ The special method rule for exact uppercase POST on status 301 or 302.
 Preserve
 ```
 
-Preserves POST and its body.
+Send POST again, with the body.
 
 ::Anchor{id="Post301302Policy.ToGet"}
 
@@ -135,7 +264,7 @@ Preserves POST and its body.
 ToGet
 ```
 
-Changes exact uppercase POST to GET and drops its body.
+Send GET without the body, as browsers do.
 
 ::Anchor{id="PreviousResponsePolicy"}
 
@@ -145,7 +274,7 @@ Changes exact uppercase POST to GET and drops its body.
 pub union PreviousResponsePolicy
 ```
 
-How an intermediate response is handled before its attempt scope is released.
+What to do with the body of a redirect response before the next request.
 
 ::Anchor{id="PreviousResponsePolicy.Close"}
 
@@ -155,7 +284,7 @@ How an intermediate response is handled before its attempt scope is released.
 Close
 ```
 
-Performs no drain and lets the attempt owner close an incomplete response.
+Do not read it. The connection closes if the body is not complete.
 
 ::Anchor{id="PreviousResponsePolicy.Drain"}
 
@@ -165,7 +294,7 @@ Performs no drain and lets the attempt owner close an incomplete response.
 Drain
 ```
 
-Attempts a bounded discard under a finite absolute deadline.
+Read and drop the body, up to a limit, so that the connection can be used again.
 
 ::Anchor{id="PreviousResponsePolicy.Drain.maxDiscardWireBytes"}
 
@@ -175,7 +304,7 @@ Attempts a bounded discard under a finite absolute deadline.
 pub maxDiscardWireBytes: u64
 ```
 
-Maximum response wire bytes that may be discarded.
+The maximum bytes to read.
 
 ::Anchor{id="PreviousResponsePolicy.Drain.deadline"}
 
@@ -185,7 +314,8 @@ Maximum response wire bytes that may be discarded.
 pub deadline: Instant
 ```
 
-Absolute discard deadline, later clamped to the operation deadline.
+The deadline of the drain on the `MonotonicClock`. The deadline of the operation also
+applies.
 
 ::Anchor{id="NameListLimits"}
 
@@ -195,7 +325,7 @@ Absolute discard deadline, later clamped to the operation deadline.
 pub struct NameListLimits
 ```
 
-Finite admission limits for one owned case-insensitive field-name list.
+The limits of a [`NameList`](#NameList).
 
 ::Anchor{id="NameListLimits.maxNames"}
 
@@ -205,7 +335,7 @@ Finite admission limits for one owned case-insensitive field-name list.
 pub maxNames: usize
 ```
 
-Maximum number of names, including duplicates.
+The maximum number of names.
 
 ::Anchor{id="NameListLimits.maxNameBytes"}
 
@@ -215,7 +345,7 @@ Maximum number of names, including duplicates.
 pub maxNameBytes: usize
 ```
 
-Maximum bytes in any one name.
+The maximum length of one name.
 
 ::Anchor{id="NameListLimits.maxOwnedBytes"}
 
@@ -225,7 +355,7 @@ Maximum bytes in any one name.
 pub maxOwnedBytes: usize
 ```
 
-Maximum aggregate name payload plus owned index storage.
+The maximum memory of the list, in bytes.
 
 ::Anchor{id="NameListLimits.impl.Copy"}
 
@@ -243,7 +373,7 @@ impl Copy for NameListLimits
 pub struct NameList
 ```
 
-A bounded owned list of validated HTTP field names.
+A list of header names, compared without case.
 
 ::Anchor{id="HistoryLimits"}
 
@@ -253,7 +383,7 @@ A bounded owned list of validated HTTP field names.
 pub struct HistoryLimits
 ```
 
-Finite URI, hop, and history capacities for one redirect operation.
+The limits of a redirect operation.
 
 ::Anchor{id="HistoryLimits.maxHops"}
 
@@ -263,7 +393,7 @@ Finite URI, hop, and history capacities for one redirect operation.
 pub maxHops: usize
 ```
 
-Maximum followed redirects.
+The maximum number of redirects to follow.
 
 ::Anchor{id="HistoryLimits.maxUriBytes"}
 
@@ -273,7 +403,7 @@ Maximum followed redirects.
 pub maxUriBytes: usize
 ```
 
-Maximum bytes in each raw or resolved URI serialization.
+The maximum length of a `Location` value and of a resolved URI.
 
 ::Anchor{id="HistoryLimits.maxHistoryBytes"}
 
@@ -283,7 +413,7 @@ Maximum bytes in each raw or resolved URI serialization.
 pub maxHistoryBytes: usize
 ```
 
-Maximum serialized key bytes in the preallocated history arena.
+The maximum memory of the [`History`](#History), in bytes.
 
 ::Anchor{id="HistoryLimits.impl.Copy"}
 
@@ -301,7 +431,7 @@ impl Copy for HistoryLimits
 pub struct Policy
 ```
 
-An immutable admitted redirect policy with owned field-name lists.
+The redirect rules. Start from [`Policy.defaults`](#Policy.impl.defaults), or make one with [`Policy.make`](#Policy.impl.make).
 
 ::Anchor{id="RedirectComponent"}
 
@@ -311,7 +441,7 @@ An immutable admitted redirect policy with owned field-name lists.
 pub enum RedirectComponent
 ```
 
-The bounded value whose admission or transition failed.
+The part of a redirect where an error occurred.
 
 ::Anchor{id="RedirectComponent.Policy"}
 
@@ -321,7 +451,7 @@ The bounded value whose admission or transition failed.
 Policy
 ```
 
-The admitted policy and its owned lists.
+The policy.
 
 ::Anchor{id="RedirectComponent.Location"}
 
@@ -331,7 +461,7 @@ The admitted policy and its owned lists.
 Location
 ```
 
-A response `Location` field.
+The `Location` field.
 
 ::Anchor{id="RedirectComponent.Uri"}
 
@@ -341,7 +471,7 @@ A response `Location` field.
 Uri
 ```
 
-The resolved next URI.
+The next URI.
 
 ::Anchor{id="RedirectComponent.Origin"}
 
@@ -351,7 +481,7 @@ The resolved next URI.
 Origin
 ```
 
-The normalized destination origin.
+The next origin.
 
 ::Anchor{id="RedirectComponent.History"}
 
@@ -361,7 +491,7 @@ The normalized destination origin.
 History
 ```
 
-The method-aware redirect history.
+The redirect history.
 
 ::Anchor{id="RedirectComponent.Body"}
 
@@ -371,7 +501,7 @@ The method-aware redirect history.
 Body
 ```
 
-The current body replay authority.
+The request body.
 
 ::Anchor{id="RedirectLimit"}
 
@@ -381,7 +511,7 @@ The current body replay authority.
 pub enum RedirectLimit
 ```
 
-The finite redirect resource that exceeded its bound.
+The limit that was exceeded.
 
 ::Anchor{id="RedirectLimit.PolicyNames"}
 
@@ -391,7 +521,7 @@ The finite redirect resource that exceeded its bound.
 PolicyNames
 ```
 
-Owned policy-name count.
+`maxNames` of a name list.
 
 ::Anchor{id="RedirectLimit.PolicyNameBytes"}
 
@@ -401,7 +531,7 @@ Owned policy-name count.
 PolicyNameBytes
 ```
 
-One policy-name byte count.
+`maxNameBytes` of a name list.
 
 ::Anchor{id="RedirectLimit.PolicyOwnedBytes"}
 
@@ -411,7 +541,7 @@ One policy-name byte count.
 PolicyOwnedBytes
 ```
 
-Aggregate policy-name payload and index storage.
+`maxOwnedBytes` of a name list.
 
 ::Anchor{id="RedirectLimit.UriBytes"}
 
@@ -421,7 +551,7 @@ Aggregate policy-name payload and index storage.
 UriBytes
 ```
 
-Raw or resolved URI bytes.
+`maxUriBytes`.
 
 ::Anchor{id="RedirectLimit.HistoryEntries"}
 
@@ -431,7 +561,7 @@ Raw or resolved URI bytes.
 HistoryEntries
 ```
 
-Method-aware history entries.
+The number of history entries, `maxHops` plus 1.
 
 ::Anchor{id="RedirectLimit.HistoryBytes"}
 
@@ -441,7 +571,7 @@ Method-aware history entries.
 HistoryBytes
 ```
 
-Aggregate serialized history-key bytes.
+`maxHistoryBytes`.
 
 ::Anchor{id="RedirectReason"}
 
@@ -451,7 +581,7 @@ Aggregate serialized history-key bytes.
 pub union RedirectReason
 ```
 
-A redirect-specific failure reason without response or credential borrows.
+The reason of a [`RedirectError`](#RedirectError).
 
 ::Anchor{id="RedirectReason.InvalidPolicy"}
 
@@ -461,7 +591,7 @@ A redirect-specific failure reason without response or credential borrows.
 InvalidPolicy
 ```
 
-Policy arithmetic or values cannot be admitted.
+The policy is not valid, for example `maxHops` plus 1 overflows.
 
 ::Anchor{id="RedirectReason.NameListOverlap"}
 
@@ -471,7 +601,7 @@ Policy arithmetic or values cannot be admitted.
 NameListOverlap
 ```
 
-A name appears in both the safe-custom and sensitive lists.
+A name is in both the safe list and the sensitive list.
 
 ::Anchor{id="RedirectReason.SizeOverflow"}
 
@@ -481,7 +611,7 @@ A name appears in both the safe-custom and sensitive lists.
 SizeOverflow
 ```
 
-Required finite storage does not fit in `usize`.
+A size does not fit in `usize`.
 
 ::Anchor{id="RedirectReason.LimitExceeded"}
 
@@ -491,7 +621,7 @@ Required finite storage does not fit in `usize`.
 LimitExceeded
 ```
 
-A finite resource exceeds its inclusive bound.
+A limit was exceeded.
 
 ::Anchor{id="RedirectReason.LimitExceeded.limit"}
 
@@ -501,7 +631,7 @@ A finite resource exceeds its inclusive bound.
 pub limit: RedirectLimit
 ```
 
-The resource whose limit was exceeded.
+The limit.
 
 ::Anchor{id="RedirectReason.LimitExceeded.allowed"}
 
@@ -511,7 +641,7 @@ The resource whose limit was exceeded.
 pub allowed: usize
 ```
 
-The inclusive admitted maximum.
+The value of the limit.
 
 ::Anchor{id="RedirectReason.LimitExceeded.attempted"}
 
@@ -521,7 +651,7 @@ The inclusive admitted maximum.
 pub attempted: usize
 ```
 
-The rejected resource value.
+The value that was found.
 
 ::Anchor{id="RedirectReason.LocationMissing"}
 
@@ -531,7 +661,7 @@ The rejected resource value.
 LocationMissing
 ```
 
-A selected redirect has no `Location` field.
+The redirect has no `Location` field.
 
 ::Anchor{id="RedirectReason.LocationAmbiguous"}
 
@@ -541,7 +671,7 @@ A selected redirect has no `Location` field.
 LocationAmbiguous
 ```
 
-A selected redirect has more than one `Location` field.
+The redirect has more than one `Location` field.
 
 ::Anchor{id="RedirectReason.LocationInvalid"}
 
@@ -551,7 +681,7 @@ A selected redirect has more than one `Location` field.
 LocationInvalid
 ```
 
-A `Location` field is not UTF-8 or is not a valid URI reference.
+The `Location` value is not UTF-8, or is not a valid URI reference.
 
 ::Anchor{id="RedirectReason.RedirectSchemeDenied"}
 
@@ -561,7 +691,7 @@ A `Location` field is not UTF-8 or is not a valid URI reference.
 RedirectSchemeDenied
 ```
 
-The resolved URI is not an admitted HTTP or HTTPS origin.
+The next URI is not `http` or `https`, or has no host or has user information.
 
 ::Anchor{id="RedirectReason.RedirectOriginDenied"}
 
@@ -571,7 +701,7 @@ The resolved URI is not an admitted HTTP or HTTPS origin.
 RedirectOriginDenied
 ```
 
-Policy rejects a normalized-origin change.
+The policy does not allow a change of origin.
 
 ::Anchor{id="RedirectReason.DowngradeDenied"}
 
@@ -581,7 +711,7 @@ Policy rejects a normalized-origin change.
 DowngradeDenied
 ```
 
-Policy rejects an HTTPS-to-HTTP transition.
+The policy does not allow a change from HTTPS to HTTP.
 
 ::Anchor{id="RedirectReason.HopLimit"}
 
@@ -591,7 +721,7 @@ Policy rejects an HTTPS-to-HTTP transition.
 HopLimit
 ```
 
-A selected redirect has no remaining hop capacity.
+There are more redirects than `maxHops`.
 
 ::Anchor{id="RedirectReason.RedirectLoop"}
 
@@ -601,7 +731,7 @@ A selected redirect has no remaining hop capacity.
 RedirectLoop
 ```
 
-A transformed method and request target repeat an earlier history key.
+The next request has the same method and URI as an earlier request.
 
 ::Anchor{id="RedirectReason.ReplayUnavailable"}
 
@@ -611,7 +741,7 @@ A transformed method and request target repeat an earlier history key.
 ReplayUnavailable
 ```
 
-A retained body has no replay authority.
+The redirect keeps the body, but the body cannot be sent again.
 
 ::Anchor{id="RedirectReason.ReplayContractMismatch"}
 
@@ -621,7 +751,7 @@ A retained body has no replay authority.
 ReplayContractMismatch
 ```
 
-A producer's framing or observed length violates its declared contract.
+A body producer sent another length or framing than its `mode` said.
 
 ::Anchor{id="RedirectReason.impl.Copy"}
 
@@ -639,7 +769,7 @@ impl Copy for RedirectReason
 pub struct RedirectContext
 ```
 
-Independently owned, bounded context attached at the redirect boundary.
+The context of a [`RedirectError`](#RedirectError). It owns its data.
 
 ::Anchor{id="RedirectContext.hop"}
 
@@ -649,7 +779,7 @@ Independently owned, bounded context attached at the redirect boundary.
 pub hop: usize
 ```
 
-Zero-based current attempt number.
+The number of the attempt, from 0.
 
 ::Anchor{id="RedirectContext.status"}
 
@@ -659,7 +789,7 @@ Zero-based current attempt number.
 pub status: Option<Status>
 ```
 
-Response status when one is relevant.
+The status of the response, when it is known.
 
 ::Anchor{id="RedirectContext.currentUri"}
 
@@ -669,7 +799,7 @@ Response status when one is relevant.
 pub currentUri: Option<OwnedUri>
 ```
 
-Independently owned current URI when retained by the failure boundary.
+A copy of the current URI, when it is known.
 
 ::Anchor{id="RedirectContext.nextUri"}
 
@@ -679,7 +809,7 @@ Independently owned current URI when retained by the failure boundary.
 pub nextUri: Option<OwnedUri>
 ```
 
-Independently owned next URI when retained by the failure boundary.
+A copy of the next URI, when it is known.
 
 ::Anchor{id="RedirectError"}
 
@@ -689,7 +819,7 @@ Independently owned next URI when retained by the failure boundary.
 pub struct RedirectError
 ```
 
-A redirect-specific failure with no response, credential, body, or proxy-token borrow.
+The error from a redirect. It holds no response, credentials, or body.
 
 ::Anchor{id="RedirectError.component"}
 
@@ -699,7 +829,7 @@ A redirect-specific failure with no response, credential, body, or proxy-token b
 pub component: RedirectComponent
 ```
 
-The bounded value associated with the failure.
+The part where the error occurred.
 
 ::Anchor{id="RedirectError.reason"}
 
@@ -709,7 +839,7 @@ The bounded value associated with the failure.
 pub reason: RedirectReason
 ```
 
-The stable machine-readable failure reason.
+The reason.
 
 ::Anchor{id="RedirectError.context"}
 
@@ -719,7 +849,7 @@ The stable machine-readable failure reason.
 pub context: RedirectContext
 ```
 
-Independently owned bounded transition context.
+The URIs and the status.
 
 ::Anchor{id="Request"}
 
@@ -729,7 +859,7 @@ Independently owned bounded transition context.
 pub struct Request<'uri, 'method, 'headers, 'policy>
 ```
 
-A rebuildable semantic request, distinct from an owned serialized prepared request.
+A request that can be built again for each redirect. It does not hold the body.
 
 ::Anchor{id="Request.uri-2"}
 
@@ -739,7 +869,7 @@ A rebuildable semantic request, distinct from an owned serialized prepared reque
 pub uri: Uri<'uri>
 ```
 
-Caller-owned initial URI, including fragment metadata.
+The first URI. Its fragment is kept for later URIs that have none.
 
 ::Anchor{id="Request.method-2"}
 
@@ -749,7 +879,7 @@ Caller-owned initial URI, including fragment metadata.
 pub method: Method<'method>
 ```
 
-Caller-owned initial method with exact spelling.
+The first method.
 
 ::Anchor{id="Request.headers-2"}
 
@@ -759,7 +889,7 @@ Caller-owned initial method with exact spelling.
 pub headers: Headers<'headers>
 ```
 
-Caller-owned semantic fields, excluding generated framing and authority fields.
+Your headers, without the fields that the policy and the body make.
 
 ::Anchor{id="Request.headerPolicy"}
 
@@ -769,7 +899,7 @@ Caller-owned semantic fields, excluding generated framing and authority fields.
 pub headerPolicy: HeaderPolicy<'policy>
 ```
 
-Caller-owned generated-field and credential policy.
+The policy for the fields that the request adds, and the credentials.
 
 ::Anchor{id="Request.version"}
 
@@ -779,7 +909,7 @@ Caller-owned generated-field and credential policy.
 pub version: Version
 ```
 
-HTTP version used for every rebuilt attempt.
+The HTTP version of all attempts.
 
 ::Anchor{id="Request.continuePolicy"}
 
@@ -789,7 +919,7 @@ HTTP version used for every rebuilt attempt.
 pub continuePolicy: ContinuePolicy
 ```
 
-Upload expectation policy used for every rebuilt attempt.
+Whether all attempts wait for 100 Continue.
 
 ::Anchor{id="Request.limits"}
 
@@ -799,7 +929,7 @@ Upload expectation policy used for every rebuilt attempt.
 pub limits: HeaderLimits
 ```
 
-Shared request and owned-header value limits.
+The limits of the values and fields.
 
 ::Anchor{id="Request.maxHeadBytes"}
 
@@ -809,7 +939,7 @@ Shared request and owned-header value limits.
 pub maxHeadBytes: usize
 ```
 
-Maximum bytes in each owned serialized request head.
+The maximum size of each request head.
 
 ::Anchor{id="Request.maxCredentialBytes"}
 
@@ -819,7 +949,7 @@ Maximum bytes in each owned serialized request head.
 pub maxCredentialBytes: usize
 ```
 
-Maximum generated credential bytes in each request head.
+The maximum size of the credentials in each request head.
 
 ::Anchor{id="AttemptRequest"}
 
@@ -829,13 +959,11 @@ Maximum generated credential bytes in each request head.
 pub struct AttemptRequest<'policy>
 ```
 
-Owned semantic state for rebuilding exactly one redirect attempt.
+The request for one attempt, which an [`AttemptClient`](#AttemptClient) prepares and sends.
 
 ### Details
-
-The attempt client borrows views from these owners only inside its higher-ranked handler call.
-It must rebuild a fresh prepared request after route selection rather than retaining serialized
-bytes from an earlier origin.
+The client borrows from this value only in its handler call. It must prepare a new request after
+it selects the route, and never send the bytes of an earlier request to another origin.
 
 ::Anchor{id="AttemptRequest.uri"}
 
@@ -845,7 +973,7 @@ bytes from an earlier origin.
 pub uri: OwnedUri
 ```
 
-Independently owned current URI, including fragment metadata outside the wire target.
+The URI of this attempt. The fragment is not sent.
 
 ::Anchor{id="AttemptRequest.method"}
 
@@ -855,7 +983,7 @@ Independently owned current URI, including fragment metadata outside the wire ta
 pub method: String
 ```
 
-Independently owned exact method spelling.
+The method of this attempt.
 
 ::Anchor{id="AttemptRequest.headers"}
 
@@ -865,7 +993,7 @@ Independently owned exact method spelling.
 pub headers: OwnedHeaders
 ```
 
-Independently owned ordered semantic fields before generated-field preparation.
+The headers, after [`sanitizeHeaders`](#sanitizeHeaders).
 
 ::Anchor{id="AttemptRequest.headerPolicy"}
 
@@ -875,7 +1003,8 @@ Independently owned ordered semantic fields before generated-field preparation.
 pub headerPolicy: HeaderPolicy<'policy>
 ```
 
-Generated-field and origin-credential policy borrowing caller-owned bytes.
+The policy for the fields that the request adds, and the credentials. See
+[`crossOriginHeaderPolicy`](#crossOriginHeaderPolicy).
 
 ::Anchor{id="AttemptRequest.version"}
 
@@ -885,7 +1014,7 @@ Generated-field and origin-credential policy borrowing caller-owned bytes.
 pub version: Version
 ```
 
-HTTP version selected for this attempt.
+The HTTP version.
 
 ::Anchor{id="AttemptRequest.continuePolicy"}
 
@@ -895,7 +1024,7 @@ HTTP version selected for this attempt.
 pub continuePolicy: ContinuePolicy
 ```
 
-Upload expectation policy paired with the prepared request.
+Whether to wait for 100 Continue.
 
 ::Anchor{id="AttemptRequest.requestLimits"}
 
@@ -905,7 +1034,7 @@ Upload expectation policy paired with the prepared request.
 pub requestLimits: HeaderLimits
 ```
 
-Shared method, target, field, and owned-header bounds used during preparation.
+The limits of the values and fields.
 
 ::Anchor{id="AttemptRequest.maxHeadBytes"}
 
@@ -915,7 +1044,7 @@ Shared method, target, field, and owned-header bounds used during preparation.
 pub maxHeadBytes: usize
 ```
 
-Maximum bytes in the newly owned serialized request head.
+The maximum size of the request head.
 
 ::Anchor{id="AttemptRequest.maxCredentialBytes"}
 
@@ -925,7 +1054,7 @@ Maximum bytes in the newly owned serialized request head.
 pub maxCredentialBytes: usize
 ```
 
-Maximum generated origin or proxy credential bytes in the request head.
+The maximum size of the credentials in the request head.
 
 ::Anchor{id="AttemptRequest.bodyMode"}
 
@@ -935,7 +1064,7 @@ Maximum generated origin or proxy credential bytes in the request head.
 pub bodyMode: BodyMode
 ```
 
-Exact body delimiter that orchestration validates against its source before acquisition.
+The framing of the body of this attempt.
 
 ::Anchor{id="crossOriginHeaderPolicy"}
 
@@ -945,16 +1074,14 @@ Exact body delimiter that orchestration validates against its source before acqu
 pub fn crossOriginHeaderPolicy<'value>(policy: HeaderPolicy<'value>) -> HeaderPolicy<'value>
 ```
 
-Returns generated-field policy for a cross-origin attempt without origin credentials.
+Returns the header policy for a request to another origin, without credentials.
 
 ### When to use
-
-Use before request preparation after [`admitOrigin`](#admitOrigin) reports an origin change.
+Use it when [`admitOrigin`](#admitOrigin) returns `true`, before you prepare the request.
 
 ### Details
-
-The result selects the next normalized origin for Host and removes generated Authorization.
-It preserves User-Agent, Accept, Basic security, and HTTP/1.0 persistence controls.
+`Host` is made for the new origin, and `Authorization` is removed. `User-Agent`, `Accept`, the
+Basic security, and the HTTP/1.0 keep-alive setting stay.
 
 ::Anchor{id="BodyChunk"}
 
@@ -964,7 +1091,7 @@ It preserves User-Agent, Accept, Basic security, and HTTP/1.0 persistence contro
 pub struct BodyChunk
 ```
 
-The result of pulling one bounded producer chunk into caller storage.
+The result of [`BodyProducer.pull`](#BodyProducer.pull).
 
 ::Anchor{id="BodyChunk.length"}
 
@@ -974,7 +1101,7 @@ The result of pulling one bounded producer chunk into caller storage.
 pub length: usize
 ```
 
-Number of initialized bytes written at the start of caller storage.
+The number of bytes written at the start of the output.
 
 ::Anchor{id="BodyChunk.end"}
 
@@ -984,7 +1111,7 @@ Number of initialized bytes written at the start of caller storage.
 pub end: bool
 ```
 
-Whether no later pull may produce bytes.
+`true` when there are no more bytes.
 
 ::Anchor{id="BodyChunk.impl.Copy"}
 
@@ -1002,7 +1129,7 @@ impl Copy for BodyChunk
 pub interface BodyProducer<E, ?R>
 ```
 
-A scoped body source with explicit framing metadata and bounded pulls.
+A source of request body bytes.
 
 ::Anchor{id="BodyProducer.mode"}
 
@@ -1012,7 +1139,7 @@ A scoped body source with explicit framing metadata and bounded pulls.
 fn mode(producer: &Self) -> BodyMode
 ```
 
-Returns framing metadata before an attempt writes its request head.
+Returns the framing of the body, before the head is sent.
 
 ::Anchor{id="BodyProducer.pull"}
 
@@ -1022,7 +1149,7 @@ Returns framing metadata before an attempt writes its request head.
 effect fn pull(producer: &mut Self, output: &mut [u8]) -> BodyChunk ! E ? R
 ```
 
-Initializes at most `output.length` bytes and reports progress without retaining `output`.
+Writes the next bytes of the body to the start of `output`. It does not keep `output`.
 
 ::Anchor{id="ReplayFactory"}
 
@@ -1032,13 +1159,11 @@ Initializes at most `output.length` bytes and reports progress without retaining
 pub interface ReplayFactory<P, FactoryError, ?FactoryRequirements>
 ```
 
-A reusable factory that lends one fresh scoped producer for each attempted request.
+Makes a new [`BodyProducer`](#BodyProducer) for each attempt that sends the body.
 
 ### Details
-
-Redirect orchestration owns each acquired producer and brackets it through one complete
-attempt. `release` is infallible and non-suspending, so cleanup cannot replace the attempt's
-success or failure. Factory result and callback types remain outside this public contract.
+Each producer is released after its attempt, also after an error or a cancel. `release` cannot
+fail or wait.
 
 ::Anchor{id="ReplayFactory.acquire"}
 
@@ -1048,7 +1173,7 @@ success or failure. Factory result and callback types remain outside this public
 effect fn acquire(factory: &mut Self) -> P ! FactoryError ? FactoryRequirements
 ```
 
-Acquires one fresh owned producer for the next retained-body attempt.
+Returns a new producer for the next attempt.
 
 ::Anchor{id="ReplayFactory.release"}
 
@@ -1058,7 +1183,7 @@ Acquires one fresh owned producer for the next retained-body attempt.
 fn release(factory: &mut Self, producer: &mut P) -> ()
 ```
 
-Releases one acquired producer after success, failure, or structured cancellation.
+Releases a producer after its attempt.
 
 ::Anchor{id="AttemptBody"}
 
@@ -1068,12 +1193,7 @@ Releases one acquired producer after success, failure, or structured cancellatio
 pub union AttemptBody<'bytes, 'oneShot, 'replay, OneShot, ReplayProducer>
 ```
 
-One attempt's uniform producer authority after replay selection.
-
-### Details
-
-Empty and repeatable-byte attempts are implemented inside this actor. Producer variants lend
-the already-selected OneShot or factory producer without erasing either channel family.
+The body of one attempt, as given to [`writeBody`](#writeBody).
 
 ::Anchor{id="AttemptBody.Empty"}
 
@@ -1083,7 +1203,7 @@ the already-selected OneShot or factory producer without erasing either channel 
 Empty
 ```
 
-Completes one body-free attempt without consulting a producer.
+No body.
 
 ::Anchor{id="AttemptBody.RepeatableBytes"}
 
@@ -1093,7 +1213,7 @@ Completes one body-free attempt without consulting a producer.
 RepeatableBytes
 ```
 
-Reads one attempt from immutable caller bytes through a private cursor.
+Bytes that can be sent again from the start.
 
 ::Anchor{id="AttemptBody.OneShot-2"}
 
@@ -1103,7 +1223,7 @@ Reads one attempt from immutable caller bytes through a private cursor.
 OneShot
 ```
 
-Lends the affine producer consumed for this attempt.
+A producer that can run only one time.
 
 ::Anchor{id="AttemptBody.ReplayFactory"}
 
@@ -1113,7 +1233,7 @@ Lends the affine producer consumed for this attempt.
 ReplayFactory
 ```
 
-Lends the fresh producer owned by the current replay-factory scope.
+A new producer from a [`ReplayFactory`](#AttemptBody.ReplayFactory).
 
 ::Anchor{id="BodyWriteOutcome"}
 
@@ -1123,7 +1243,7 @@ Lends the fresh producer owned by the current replay-factory scope.
 pub union BodyWriteOutcome
 ```
 
-Whether the shared writer completed upload or received a final response before pulling bytes.
+The result of [`writeBody`](#writeBody).
 
 ::Anchor{id="BodyWriteOutcome.Completed"}
 
@@ -1133,7 +1253,7 @@ Whether the shared writer completed upload or received a final response before p
 Completed
 ```
 
-Upload framing finished and one final response is ready for body handling.
+The body was sent, and a final response arrived.
 
 ::Anchor{id="BodyWriteOutcome.Completed.status"}
 
@@ -1143,7 +1263,7 @@ Upload framing finished and one final response is ready for body handling.
 pub status: u16
 ```
 
-Final response status.
+The status of the final response.
 
 ::Anchor{id="BodyWriteOutcome.EarlyFinal"}
 
@@ -1153,7 +1273,7 @@ Final response status.
 EarlyFinal
 ```
 
-Require100 received a final response before the first producer pull.
+With `Require100`, a final response arrived before the body was sent.
 
 ::Anchor{id="BodyWriteOutcome.EarlyFinal.status"}
 
@@ -1163,7 +1283,7 @@ Require100 received a final response before the first producer pull.
 pub status: u16
 ```
 
-Final response status.
+The status of the final response.
 
 ::Anchor{id="Attempt"}
 
@@ -1173,13 +1293,7 @@ Final response status.
 pub service Attempt<'policy, P, A, E, ?R>
 ```
 
-A higher-ranked routed-attempt callback provided lexically by redirect orchestration.
-
-### Details
-
-Acquisition clients invoke this service once after request preparation and scoped connection
-acquisition. Naming the service in a requirement row preserves exact handler channels without
-exposing redirect's concrete callback adapter.
+The service that an [`AttemptClient`](#AttemptClient) calls with the exchange of one attempt.
 
 ::Anchor{id="Attempt.handle"}
 
@@ -1221,29 +1335,21 @@ pub interface AttemptClient<
 >
 ```
 
-A routed HTTP acquisition boundary for one rebuilt redirect attempt.
+Connects and runs one attempt of a redirect operation.
 
 ### When to use
-
-Implement this interface beside routed connection acquisition, then pass it to redirect
-orchestration without exposing sockets, TLS state, proxy credentials, or pooled leases.
+Implement it to give your own connections to the `with*Response` functions. It hides the
+sockets, TLS, proxy credentials, and pools from the redirect code.
 
 ### Details
-
-`withAttempt` consumes and retains `request` through its complete bracket. It derives one
-validated method and the URI/header views from that owner, selects the current route, prepares a
-new origin- or absolute-form request, acquires its physical peer under the unchanged absolute
-deadline, and invokes exactly one `http_exchange.withExchange`. The same method view, a fresh
-request borrow, and the resulting exchange are lent only through [`Attempt`](#Attempt), so redirect
-transition and sanitization do not copy semantic state or reparse the method. Handler and source
-errors remain direct. `AcquisitionError` directly carries preparation, route, acquisition, and
-exchange-admission failures without wrapping either channel family.
+`withAttempt` selects the route for the URI of `request`, prepares a new request, connects
+before the deadline, and runs one `withExchange` of `silk.http_exchange`. It gives the exchange
+to the redirect code through [`Attempt`](#Attempt). Errors from the connection come back as
+`AcquisitionError`.
 
 ### Gotchas
-
-The implementation must release its transport after handler success, typed failure, defect, or
-cancellation. It must not return the fresh request borrow, method view, transport loan, or
-exchange loan.
+The implementation must close or release its transport after the handler returns, fails, or is
+cancelled. It must not keep the request, the transport, or the exchange.
 
 ::Anchor{id="AttemptClient.withAttempt"}
 
@@ -1269,13 +1375,11 @@ Rebuilds, acquires, and drives one scoped request while preserving both channel 
 pub service HybridAttempt<'policy, RoutedP, DirectP, A, E, ?R>
 ```
 
-A higher-ranked callback for one routed or direct redirect attempt.
+The service that a [`HybridAttemptClient`](#HybridAttemptClient) calls with the exchange of one attempt.
 
 ### Details
-
-A routed client calls `handleRouted` with its final routed transport. A direct client calls
-`handleDirect` with its direct HTTP transport. Each operation lends the same owned request and
-validated method only for its exchange scope. Neither exchange form can escape in `A`.
+A routed client calls `handleRouted`, and a direct client calls `handleDirect`. The exchange
+cannot be kept after the call.
 
 ::Anchor{id="HybridAttempt.handleRouted"}
 
@@ -1302,7 +1406,7 @@ effect<'call> fn handleRouted<
     &mut RoutedP provides &ByteDuplex from &mut ByteDuplex
 ```
 
-Handles one routed exchange after route preparation and acquisition finish.
+Handles the exchange of one attempt over a route.
 
 ::Anchor{id="HybridAttempt.handleDirect"}
 
@@ -1318,7 +1422,7 @@ effect<'call> fn handleDirect<'call, 'exchangeView: 'call>(
     &mut DirectP provides &HttpTransport from &mut HttpTransport
 ```
 
-Handles one direct exchange after direct request preparation and acquisition finish.
+Handles the exchange of one attempt over a direct connection.
 
 ::Anchor{id="HybridAttemptClient"}
 
@@ -1337,13 +1441,11 @@ pub interface HybridAttemptClient<
 >
 ```
 
-A routed-or-direct acquisition boundary for one rebuilt redirect attempt.
+Like [`AttemptClient`](#AttemptClient), but each attempt can use a proxy route or a direct connection.
 
 ### Details
-
-The client selects one acquisition form before contact and calls exactly one handler operation.
-It preserves the unchanged deadline and both caller-defined channel families. The direct form
-does not require duplex authority because it cannot establish a CONNECT tunnel.
+The client selects the form before it connects, and calls one handler. A direct connection
+cannot open a `CONNECT` tunnel.
 
 ::Anchor{id="HybridAttemptClient.withAttempt"}
 
@@ -1369,17 +1471,14 @@ Rebuilds, acquires, and drives one routed or direct scoped request.
 pub interface ResponseHandler<P, A, E, ?R>
 ```
 
-A higher-ranked callback for the one final response selected by redirect orchestration.
+Handles the final response of a redirect operation.
 
 ### When to use
-
-Pass an implementation to one of the four `with*Response` operations to consume the final
-response while its routed exchange is live.
+Give it to a `with*Response` function. It reads the final response while the exchange is open.
 
 ### Details
-
-`uri` borrows the independently owned final URI only for `handle`. `hop` is the number of
-redirects followed. Neither the URI nor exchange loan can escape in `A`.
+`uri` is the final URI, and `hop` the number of redirects. The URI and the exchange cannot be
+kept after the call.
 
 ::Anchor{id="ResponseHandler.handle"}
 
@@ -1404,7 +1503,7 @@ effect<'call> fn handle<
     &mut P provides &ByteDuplex from &mut ByteDuplex
 ```
 
-Handles exactly one selected final response.
+Handles the final response.
 
 ::Anchor{id="HybridResponseHandler"}
 
@@ -1414,17 +1513,10 @@ Handles exactly one selected final response.
 pub interface HybridResponseHandler<RoutedP, DirectP, A, E, ?R>
 ```
 
-A final-response callback that accepts either a routed or a direct exchange.
+Like [`ResponseHandler`](#ResponseHandler), for a route or a direct connection.
 
 ### When to use
-
-Use with the four `with*HybridResponse` operations when one acquisition context can select a
-proxy-aware route or a direct pooled connection.
-
-### Details
-
-The acquisition client calls exactly one operation. Each operation lends the independently
-owned final URI and live exchange only for that call.
+Give it to a `with*HybridResponse` function.
 
 ::Anchor{id="HybridResponseHandler.handleRouted"}
 
@@ -1452,7 +1544,7 @@ effect<'call> fn handleRouted<
     &mut RoutedP provides &ByteDuplex from &mut ByteDuplex
 ```
 
-Handles exactly one final response on a routed transport.
+Handles the final response over a route.
 
 ::Anchor{id="HybridResponseHandler.handleDirect"}
 
@@ -1469,7 +1561,7 @@ effect<'call> fn handleDirect<'call, 'exchangeView: 'call>(
     &mut DirectP provides &HttpTransport from &mut HttpTransport
 ```
 
-Handles exactly one final response on a direct HTTP transport.
+Handles the final response over a direct connection.
 
 ::Anchor{id="SelectedBody"}
 
@@ -1479,12 +1571,7 @@ Handles exactly one final response on a direct HTTP transport.
 pub service SelectedBody<E, ?R>
 ```
 
-Opaque selected request-body authority used while a redirect attempt is live.
-
-### Details
-
-Redirect orchestration provides this service only inside the scoped attempt callback. Clients
-may name it to preserve exact requirement rows, but cannot retain its producer or body loan.
+The body of the current attempt. It exists only during the attempt.
 
 ::Anchor{id="SelectedBody.pull"}
 
@@ -1494,7 +1581,7 @@ may name it to preserve exact requirement rows, but cannot retain its producer o
 effect fn pull(output: &mut [u8]) -> BodyChunk ! E ? R | &mut SelectedBody<E, R>
 ```
 
-Writes the next selected request-body chunk into `output` without retaining the buffer.
+Writes the next bytes of the body to the start of `output`.
 
 ::Anchor{id="AttemptStep"}
 
@@ -1504,12 +1591,7 @@ Writes the next selected request-body chunk into `output` without retaining the 
 pub union AttemptStep<'policy, A>
 ```
 
-Opaque outcome of one redirect attempt.
-
-### Details
-
-Acquisition clients may name this result in exact conformance bounds. Redirect orchestration
-alone constructs and consumes its state, history, and transition authority.
+The result of one attempt. Only the redirect code makes and reads it.
 
 ::Anchor{id="AttemptStep.Final"}
 
@@ -1572,17 +1654,12 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows a body-free request and lends exactly one final response.
-
-### When to use
-
-Use when every retained redirect can repeat an empty request without source authority.
+Follows redirects for a request without a body, and gives the final response to `handler`.
 
 ### Details
-
-Each attempt is rebuilt under the unchanged caller deadline. Intermediate responses are closed
-or boundedly drained according to `policy`. If orchestration reaches a final response,
-`handler` runs exactly once; an earlier failure does not invoke it.
+Each attempt is a new request with the same deadline. The body of each redirect response is
+closed or drained as `policy` says. `handler` runs one time, and only if a final response
+arrives.
 
 ::Anchor{id="withEmptyHybridResponse"}
 
@@ -1632,12 +1709,7 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows a body-free request through a client that can select routed or direct acquisition.
-
-### Details
-
-Each attempt uses one acquisition form. The operation reuses the same iterative redirect state
-machine as [`withEmptyResponse`](#withEmptyResponse) and invokes `handler` exactly once for the final response.
+Like [`withEmptyResponse`](#withEmptyResponse), with a client that can use a route or a direct connection.
 
 ::Anchor{id="withBytesResponse"}
 
@@ -1686,17 +1758,13 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows a request using immutable bytes that can be replayed without resource acquisition.
-
-### When to use
-
-Use for a complete in-memory body whose borrow remains live for the redirect operation.
+Follows redirects for a request with the body `bytes`, and gives the final response to
+`handler`.
 
 ### Details
-
-Every retained-body attempt starts a fresh cursor at byte zero. A transition that drops content
-changes all later attempts to empty framing. Nonempty bytes require nonempty body scratch before
-the first routed attempt can be acquired.
+Each attempt that keeps the body sends `bytes` from the start. After a redirect that drops the
+body, all later attempts have no body. A body that is not empty needs a scratch buffer that is
+not empty.
 
 ::Anchor{id="withBytesHybridResponse"}
 
@@ -1748,12 +1816,7 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows replayable bytes through a client that can select routed or direct acquisition.
-
-### Details
-
-Every retained-body attempt starts at byte zero. A dropped-body transition changes all later
-attempts to empty framing. A nonempty body requires positive scratch before contact.
+Like [`withBytesResponse`](#withBytesResponse), with a client that can use a route or a direct connection.
 
 ::Anchor{id="withOneShotResponse"}
 
@@ -1806,17 +1869,15 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows redirects while consuming one affine body producer at most once.
+Follows redirects for a request whose body comes from a producer that runs one time.
 
 ### When to use
-
-Use when the first attempted body cannot be recreated for a retained redirect.
+Use it when the body cannot be made again, for example a stream.
 
 ### Details
-
-Producer framing and scratch are checked before routed acquisition. The first attempt spends
-producer authority even when Require100 returns an early final response. A retained-body
-redirect fails with `ReplayUnavailable`; a dropped-body redirect continues empty.
+The first attempt uses the producer, also when `Require100` gets an early final response. A
+later redirect that keeps the body fails with `ReplayUnavailable`. A redirect that drops the
+body continues without it.
 
 ::Anchor{id="withOneShotHybridResponse"}
 
@@ -1872,12 +1933,7 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows an affine body producer through routed or direct acquisition.
-
-### Details
-
-The producer is consumed for the first attempted body only. A redirect that retains the body
-fails with `ReplayUnavailable`; a transition that drops the body continues with empty framing.
+Like [`withOneShotResponse`](#withOneShotResponse), with a client that can use a route or a direct connection.
 
 ::Anchor{id="withReplayResponse"}
 
@@ -1935,18 +1991,14 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows redirects by acquiring one fresh scoped producer for each retained-body attempt.
+Follows redirects for a request whose body comes from a new producer for each attempt.
 
 ### When to use
-
-Use for replayable streams whose files, handles, or other resources require caller-owned
-factory bracketing.
+Use it for a body that you can read again, such as a file, with a [`ReplayFactory`](#ReplayFactory).
 
 ### Details
-
-Each factory loan encloses selected-body provision and the complete attempt-client bracket. A
-dropped-body transition stops consulting the factory. Factory, producer, acquisition, and final
-callback channels remain direct members of this operation's unions.
+Each producer lives for one attempt. After a redirect that drops the body, the factory is not
+used again.
 
 ::Anchor{id="withReplayHybridResponse"}
 
@@ -2007,12 +2059,7 @@ where
   AcquisitionRequirements in Without<AcquisitionRequirements, HttpTransport>
 ```
 
-Follows replayable producer scopes through routed or direct acquisition.
-
-### Details
-
-Each retained-body attempt receives one fresh producer inside the factory scope. A dropped-body
-transition stops factory acquisition. All source and acquisition channels remain direct.
+Like [`withReplayResponse`](#withReplayResponse), with a client that can use a route or a direct connection.
 
 ::Anchor{id="writeBody"}
 
@@ -2047,27 +2094,20 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Drives one admitted attempt from prepared head through the first final response.
+Sends the head and the body of one attempt, and reads until the first final response.
 
 ### When to use
-
-Use inside an attempt client's exchange callback after selecting one [`AttemptBody`](#AttemptBody).
+Use it in the exchange callback of an attempt client, with the [`AttemptBody`](#AttemptBody) of the attempt.
 
 ### Details
-
-The operation validates the selected and produced framing before sending the head. Require100
-informational responses are consumed until 100 permits upload or a final response returns
-`EarlyFinal`. Redirect bodies do not admit trailers, so non-empty `trailers` are rejected before
-the head is sent. Produced chunks must fit `scratch`; known-length excess is rejected before it
-can be written, and every completed upload finishes exactly once before receiving its final
-head. Empty attempts never inspect or pull a producer. Locally created body-contract failures
-copy the already bounded `current` URI into their owned redirect context.
+The framing of the body is checked before the head is sent. With `Require100`, 1xx responses are
+read until 100 Continue, or until a final response, which returns `EarlyFinal`. Redirected
+requests cannot have trailers, so `trailers` must be empty. Each chunk must fit in `scratch`.
 
 ### Gotchas
-
-`scratch` must be non-empty for KnownLength and Chunked bodies. A zero-length nonterminal pull
-is a producer contract failure. An early final consumes the enclosing attempt's OneShot
-authority even though this operation has not called `pull`.
+`scratch` must not be empty for a body with a length or chunks. A pull that returns 0 bytes and
+not `end` fails. An early final response uses up a `OneShot` producer, also when it was never
+pulled.
 
 ::Anchor{id="StatusDecision"}
 
@@ -2077,7 +2117,7 @@ authority even though this operation has not called `pull`.
 pub enum StatusDecision
 ```
 
-Whether the current response is final or selects redirect transition processing.
+The result of [`statusDecision`](#statusDecision).
 
 ::Anchor{id="StatusDecision.Final"}
 
@@ -2087,7 +2127,7 @@ Whether the current response is final or selects redirect transition processing.
 Final
 ```
 
-Returns the current response without inspecting `Location`.
+Return this response. `Location` is not read.
 
 ::Anchor{id="StatusDecision.Redirect"}
 
@@ -2097,7 +2137,7 @@ Returns the current response without inspecting `Location`.
 Redirect
 ```
 
-Applies redirect transition processing.
+Follow the redirect.
 
 ::Anchor{id="BodyDecision"}
 
@@ -2107,7 +2147,7 @@ Applies redirect transition processing.
 pub enum BodyDecision
 ```
 
-Whether the next attempt retains or drops the current body.
+Whether the next request sends the body again.
 
 ::Anchor{id="BodyDecision.Retain"}
 
@@ -2117,7 +2157,7 @@ Whether the next attempt retains or drops the current body.
 Retain
 ```
 
-Retains framing and requires repeatability for a later attempt.
+Send the body again. The body must be repeatable.
 
 ::Anchor{id="BodyDecision.Drop"}
 
@@ -2127,7 +2167,7 @@ Retains framing and requires repeatability for a later attempt.
 Drop
 ```
 
-Drops the source and every content-associated field.
+Do not send the body, and remove the content headers.
 
 ::Anchor{id="Transition"}
 
@@ -2137,7 +2177,7 @@ Drops the source and every content-associated field.
 pub struct Transition<'method>
 ```
 
-A selected next method and body disposition.
+The method and the body of the next request, from [`transition`](#transition).
 
 ::Anchor{id="Transition.method-2"}
 
@@ -2147,7 +2187,7 @@ A selected next method and body disposition.
 pub method: Method<'method>
 ```
 
-Exact next method, either preserved or the canonical GET/HEAD value.
+The next method: the same method, or GET.
 
 ::Anchor{id="Transition.body"}
 
@@ -2157,7 +2197,7 @@ Exact next method, either preserved or the canonical GET/HEAD value.
 pub body: BodyDecision
 ```
 
-Whether content remains part of the next attempt.
+Whether the body is sent again.
 
 ::Anchor{id="Transition.impl.Copy"}
 
@@ -2183,7 +2223,7 @@ impl NameList
 pub fn empty() -> NameList
 ```
 
-Creates an empty admitted list without allocating.
+Returns an empty list. It does not allocate.
 
 ::Anchor{id="NameList.impl.copy"}
 
@@ -2195,7 +2235,7 @@ pub effect fn copy(names: &[string], limits: NameListLimits) -> Result<NameList,
   ? &mut Allocator
 ```
 
-Validates and copies field names under exact count, per-name, and owned-byte boundaries.
+Checks and copies `names` into a new list. Each name must be a valid field name.
 
 ::Anchor{id="NameList.impl.contains"}
 
@@ -2205,7 +2245,7 @@ Validates and copies field names under exact count, per-name, and owned-byte bou
 pub fn contains(self: &Self, name: string) -> bool
 ```
 
-Reports ASCII case-insensitive membership without allocating.
+Returns `true` if the list has `name`, compared without case.
 
 ::Anchor{id="NameList.impl.count"}
 
@@ -2215,7 +2255,7 @@ Reports ASCII case-insensitive membership without allocating.
 pub fn count(self: &Self) -> usize
 ```
 
-Returns the number of owned names.
+Returns the number of names.
 
 ::Anchor{id="NameList.impl.ownedBytes"}
 
@@ -2225,7 +2265,7 @@ Returns the number of owned names.
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns accounted payload plus index storage bytes.
+Returns the memory of the list, in bytes.
 
 ::Anchor{id="Policy.impl"}
 
@@ -2243,13 +2283,12 @@ impl Policy
 pub fn defaults() -> Policy
 ```
 
-Returns Manual policy with the standard finite redirect limits and no admitted custom names.
+Returns a policy that does not follow redirects.
 
 #### Details
-
-The result permits 10 hops, 8192 URI bytes, and 90112 history bytes. It denies origin changes
-and downgrades, preserves POST for 301 and 302, and closes intermediate responses. Both owned
-name lists are empty.
+It allows 10 redirects, URIs of 8192 bytes, and a history of 90112 bytes, if you change the
+mode to `Follow`. It denies a change of origin and a change from HTTPS to HTTP, keeps POST for
+301 and 302, and closes redirect responses. The name lists are empty.
 
 ::Anchor{id="Policy.impl.make"}
 
@@ -2268,7 +2307,14 @@ pub fn make(
   ) -> Result<Policy, RedirectError>
 ```
 
-Admits an immutable policy, rejecting list overlap and hop-count overflow before I/O.
+Returns a policy.
+
+`safeCustom` names extra headers that can go to another origin. `sensitive` names headers that
+never go to another origin.
+
+#### Errors
+- `NameListOverlap` if a name is in both lists.
+- `InvalidPolicy` if `maxHops` plus 1 overflows.
 
 ::Anchor{id="Policy.impl.mode"}
 
@@ -2278,7 +2324,7 @@ Admits an immutable policy, rejecting list overlap and hop-count overflow before
 pub fn mode(self: &Self) -> Mode
 ```
 
-Returns whether responses are returned manually or followed.
+Returns whether redirects are followed.
 
 ::Anchor{id="Policy.impl.historyLimits"}
 
@@ -2288,7 +2334,7 @@ Returns whether responses are returned manually or followed.
 pub fn historyLimits(self: &Self) -> HistoryLimits
 ```
 
-Returns admitted URI, history, and hop capacities.
+Returns the limits.
 
 ::Anchor{id="Policy.impl.crossOrigin"}
 
@@ -2298,7 +2344,7 @@ Returns admitted URI, history, and hop capacities.
 pub fn crossOrigin(self: &Self) -> CrossOriginPolicy
 ```
 
-Returns cross-origin admission policy.
+Returns whether a redirect can go to another origin.
 
 ::Anchor{id="Policy.impl.downgrade"}
 
@@ -2308,7 +2354,7 @@ Returns cross-origin admission policy.
 pub fn downgrade(self: &Self) -> DowngradePolicy
 ```
 
-Returns HTTPS-to-HTTP downgrade policy.
+Returns whether a redirect can go from HTTPS to HTTP.
 
 ::Anchor{id="Policy.impl.post301302"}
 
@@ -2318,7 +2364,7 @@ Returns HTTPS-to-HTTP downgrade policy.
 pub fn post301302(self: &Self) -> Post301302Policy
 ```
 
-Returns exact POST behavior for 301 and 302.
+Returns what 301 and 302 do with POST.
 
 ::Anchor{id="Policy.impl.previousResponse"}
 
@@ -2328,7 +2374,7 @@ Returns exact POST behavior for 301 and 302.
 pub fn previousResponse(self: &Self) -> &PreviousResponsePolicy
 ```
 
-Borrows intermediate-response cleanup policy.
+Returns what to do with the body of a redirect response.
 
 ::Anchor{id="Policy.impl.safeCustom"}
 
@@ -2338,7 +2384,7 @@ Borrows intermediate-response cleanup policy.
 pub fn safeCustom(self: &Self) -> &NameList
 ```
 
-Borrows the admitted cross-origin safe-custom field names.
+Returns the extra headers that can go to another origin.
 
 ::Anchor{id="Policy.impl.sensitive"}
 
@@ -2348,7 +2394,7 @@ Borrows the admitted cross-origin safe-custom field names.
 pub fn sensitive(self: &Self) -> &NameList
 ```
 
-Borrows the admitted always-sensitive field names.
+Returns the headers that never go to another origin.
 
 ::Anchor{id="statusDecision"}
 
@@ -2361,7 +2407,10 @@ pub fn statusDecision(policy: &Policy, status: Status, followedHops: usize) -> R
 >
 ```
 
-Classifies a response status without inspecting `Location` and enforces selected-hop capacity.
+Returns whether a response with `status` is a redirect to follow. It does not read `Location`.
+
+The statuses 301, 302, 303, 307, and 308 are followed in `Follow` mode. Fails with `HopLimit` if
+`followedHops` is already `maxHops`.
 
 ::Anchor{id="transition"}
 
@@ -2373,7 +2422,7 @@ pub fn transition<'method>(policy: &Policy, status: Status, method: Method<'meth
 >
 ```
 
-Computes the exact RFC redirect method and body transition for a selected status.
+Returns the method and the body of the next request, by the rules of RFC 9110 and the policy.
 
 ::Anchor{id="resolveLocation"}
 
@@ -2389,22 +2438,18 @@ pub effect fn resolveLocation<'head>(
 ) -> Result<OwnedUri, RedirectError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Returns one independently owned HTTP or HTTPS URI from the selected response `Location`.
+Returns the next URI, from the `Location` field of the response.
 
 ### When to use
-
-Use while the selected response head is live and before the next route is acquired.
+Use it while the response head is still available, before you connect to the next origin.
 
 ### Details
-
-The operation requires exactly one field and copies it under `maxUriBytes`. It applies RFC 3986
-resolution, rejects a resolved serialization above the same bound, and admits only HTTP or
-HTTPS origins with a host, effective port, and no user information. It inherits the current
-fragment only when the reference has no fragment.
+There must be exactly one `Location` field. Its value is resolved against `current` by RFC 3986,
+and must be an `http` or `https` URI with a host and without user information. If it has no
+fragment, it gets the fragment of `current`.
 
 ### Gotchas
-
-A present empty fragment replaces the current fragment. The operation does not change `current`.
+An empty fragment, as in `/a#`, replaces the fragment of `current`.
 
 ::Anchor{id="admitOrigin"}
 
@@ -2417,7 +2462,9 @@ pub fn admitOrigin(policy: &Policy, current: &Origin, next: &Origin, hop: usize,
 >
 ```
 
-Validates cross-origin and downgrade policy and reports whether sanitization is cross-origin.
+Checks the cross-origin and downgrade rules for a redirect from `current` to `next`. Returns
+`true` if the origin changes, so that the next request must use [`crossOriginHeaderPolicy`](#crossOriginHeaderPolicy) and
+[`sanitizeHeaders`](#sanitizeHeaders).
 
 ::Anchor{id="History"}
 
@@ -2427,7 +2474,7 @@ Validates cross-origin and downgrade policy and reports whether sanitization is 
 pub struct History
 ```
 
-Bounded method-aware redirect-loop history in one preallocated byte arena.
+The requests of a redirect operation, to find loops. It allocates its memory one time.
 
 ::Anchor{id="History.impl"}
 
@@ -2447,12 +2494,7 @@ pub effect fn make(limits: HistoryLimits) -> Result<History, RedirectError>
   ? &mut Allocator
 ```
 
-Checks `maxHops + 1` and reserves the complete history-byte budget before network I/O.
-
-#### Details
-
-All later inserts use one arena. An insert can fail its exact byte limit without another
-history allocation.
+Returns an empty history, and allocates all its memory before any network I/O.
 
 ::Anchor{id="History.impl.insert"}
 
@@ -2465,7 +2507,8 @@ pub effect fn insert<'method>(self: &mut Self, method: Method<'method>, origin: 
   > ! OutOfMemoryError ? &mut Allocator
 ```
 
-Checks and inserts one transformed method, normalized origin, and exact path/query key.
+Adds a request, by its method, origin, path, and query. Fails with `RedirectLoop` if the same
+request is already in the history.
 
 ::Anchor{id="History.impl.count"}
 
@@ -2475,7 +2518,7 @@ Checks and inserts one transformed method, normalized origin, and exact path/que
 pub fn count(self: &Self) -> usize
 ```
 
-Returns the number of stored method-aware keys.
+Returns the number of requests in the history.
 
 ::Anchor{id="History.impl.ownedBytes"}
 
@@ -2485,7 +2528,7 @@ Returns the number of stored method-aware keys.
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns the initialized bytes used by stored keys in the preallocated history arena.
+Returns the bytes of the history that are used.
 
 ::Anchor{id="sanitizeHeaders"}
 
@@ -2501,25 +2544,21 @@ pub effect fn sanitizeHeaders<'value>(
 ) -> Result<OwnedHeaders, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Returns independently owned fields after redirect-specific removal and cross-origin filtering.
+Returns a copy of `headers` without the headers that must not go to the next request.
 
 ### When to use
-
-Use before request preparation for each selected redirect attempt.
+Use it before you prepare the request of each redirect.
 
 ### Details
-
-The operation removes Host, Connection, Keep-Alive, TE, Trailer, Transfer-Encoding, Upgrade,
-Proxy-Connection, Proxy-Authorization, framing fields, Expect, and Connection-nominated fields.
-A dropped body also removes content metadata and digests. Cross-origin filtering retains only
-Accept, Accept-Encoding, Accept-Language, User-Agent, configured safe names, and retained-body
-content type, encoding, and language. Authorization, Cookie, Proxy-Authorization, Origin,
-Referer, and configured sensitive names are then denied with final precedence.
+It removes `Host`, `Connection`, `Keep-Alive`, `TE`, `Trailer`, `Transfer-Encoding`, `Upgrade`,
+`Proxy-Connection`, `Proxy-Authorization`, `Content-Length`, `Expect`, and the fields that
+`Connection` names. When the body is dropped, it also removes the content headers. For another
+origin, it keeps only `Accept`, `Accept-Encoding`, `Accept-Language`, `User-Agent`, the safe
+names of the policy, and the content headers of a kept body. Then `Authorization`, `Cookie`,
+`Origin`, `Referer`, and the sensitive names of the policy are always removed.
 
 ### Gotchas
-
-The result never contains Host, framing fields, Expect, or Proxy-Authorization. Request
-preparation must generate those fields from the next origin, body mode, and selected route. An
-invalid Connection token returns its original `ValueError` before output construction.
+The request preparation makes `Host`, the framing fields, `Expect`, and `Proxy-Authorization`
+again for the next request. A bad `Connection` value fails with its `ValueError`.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

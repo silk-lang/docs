@@ -1,9 +1,37 @@
-Immutable homogeneous sequences available only during static evaluation.
+Immutable lists of values that exist only during static evaluation.
+
+## When to use
+Use [`StaticSequence`](#StaticSequence) to build a list of values at compile time and then generate code for each
+value with `static for`. Use `silk.list.List` for a list at runtime.
 
 ## Details
+A static sequence has no runtime value. It has no allocator, capacity, or address. Each
+operation returns a new sequence and does not change its input. All elements have the same
+type.
 
-Every operation returns a complete canonical value. Sequences expose no allocator, capacity,
-address, mutable alias, destructor, or runtime layout.
+## Examples
+### Generate one addition for each element
+```silk
+import silk.static_sequence { StaticSequence }
+
+static fn weights() -> Intrinsic.StaticSequence<i32> {
+  let mut result = StaticSequence.empty<i32>()
+  result = StaticSequence.append<i32>(move result, 20)
+  result = StaticSequence.append<i32>(move result, 22)
+  return move result
+}
+
+pub fn main() -> i32 {
+  let mut total = 0
+  static for weight in weights() {
+    total = total + weight
+  }
+  if total != 42 {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `StaticSequence` with `import silk.static_sequence { StaticSequence }`.
 
@@ -17,12 +45,12 @@ Public declarations: 1.
 pub struct StaticSequence
 ```
 
-The scope for StaticSequence operations.
+The owner type of the static sequence operations. It has no fields and is never constructed.
 
 ### Details
 
-This owner carries no data. Select it with `import silk.static_sequence { StaticSequence }`
-to access its inherent operations.
+Each operation is `static`. It runs only during static evaluation, such as in a `static fn`, a
+`static for`, or a `const` initializer.
 
 ::Anchor{id="StaticSequence.impl"}
 
@@ -40,7 +68,7 @@ impl StaticSequence
 pub static fn empty<Element>() -> Intrinsic.StaticSequence<Element>
 ```
 
-Returns the empty sequence for `Element`.
+Returns an empty sequence of `Element` values.
 
 ::Anchor{id="StaticSequence.impl.append"}
 
@@ -52,7 +80,12 @@ pub static fn append<Element>(self: Intrinsic.StaticSequence<Element>, value: El
   >
 ```
 
-Returns `self` followed by `value` without changing `self`.
+Returns a new sequence with the elements of `self` and then `value`.
+
+#### Details
+
+This function consumes `self`. To grow a sequence in a loop, assign the result back to the same
+binding, as in `result = StaticSequence.append<i32>(move result, 1)`.
 
 ::Anchor{id="StaticSequence.impl.concat"}
 
@@ -65,7 +98,7 @@ pub static fn concat<Element>(
   ) -> Intrinsic.StaticSequence<Element>
 ```
 
-Returns every element of `left` followed by every element of `right`.
+Returns a new sequence with the elements of `left` and then the elements of `right`.
 
 ::Anchor{id="StaticSequence.impl.length"}
 
@@ -75,7 +108,7 @@ Returns every element of `left` followed by every element of `right`.
 pub static fn length<Element>(self: Intrinsic.StaticSequence<Element>) -> usize
 ```
 
-Returns the finite sequence length.
+Returns the number of elements in `self`.
 
 ::Anchor{id="StaticSequence.impl.at"}
 
@@ -85,6 +118,11 @@ Returns the finite sequence length.
 pub static fn at<Element>(self: Intrinsic.StaticSequence<Element>, index: usize) -> Element
 ```
 
-Returns the element at `index`, or reports a static phase violation when out of bounds.
+Returns the element at the zero-based position `index`.
+
+#### Gotchas
+
+If `index` is not less than the length, static evaluation stops and the compiler reports an
+error.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

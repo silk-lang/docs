@@ -1,21 +1,117 @@
-A bounded scripted in-memory [`ByteDuplex`](/docs/std/byte-duplex#ByteDuplex) provider for deterministic protocol execution.
+A scripted `ByteDuplex` transport in memory, for tests of protocol code.
 
 ## When to use
-
-Use [`MemoryByteDuplex`](#MemoryByteDuplex) to drive exact transport fragments, deadlines, end, and failures
-without a socket. Supply it lexically as `silk.byte_duplex.ByteDuplex`.
+Use [`MemoryByteDuplex`](#MemoryByteDuplex) to test code that uses `silk.byte_duplex.ByteDuplex` without a network.
+A script controls what each read returns, how many bytes each write accepts, and when failures
+happen. After the test, check the bytes that the code wrote with [`MemoryByteDuplex.outbound`](#MemoryByteDuplex.impl.outbound)
+and the order of operations with [`MemoryByteDuplex.audit`](#MemoryByteDuplex.impl.audit).
 
 ## Details
+[`MemoryByteDuplex.make`](#MemoryByteDuplex.impl.make) takes the read events, the write events, and the sizes of the output
+and audit storage. It allocates everything one time. The operations do not allocate.
 
-Construction owns all script, output, and audit storage. Service operations allocate nothing.
-Event times and operation deadlines use the active `MonotonicClock` timeline. The provider
-records accepted byte prefixes and lifecycle order for later inspection. Once input reports
-`End`, later reads remain at end without consulting another script event.
+Each event has a `readyAt` time on the active `MonotonicClock`. An operation waits until the
+event is ready. If the deadline comes first, the operation fails with `Timeout`. When an event
+time is equal to the deadline, the deadline wins.
+
+A read returns the bytes of the current `Data` event, as many as fit in the output slice. When
+the read script is empty, reads return `End`. After `End`, reads return `End` and do not use the
+script.
 
 ## Gotchas
+Each write uses the next write event. If there are no more write events, or the output storage
+is full, the write fails with a `Provider` error, code 1 or 2. If the audit storage is full, the
+next operation fails with code 3. Make the storage large enough for the whole test.
 
-This provider models reliable bytes only. It does not model packets, network policy, DNS, or
-host trust. When an event time equals a deadline, the deadline wins.
+This transport models a reliable byte stream only. It does not model packets, DNS, or
+certificates.
+
+## Examples
+### Answer a request and check the response
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.buffered_duplex { BufferedDuplex, withBufferedCapacity }
+import silk.buffered_input { BufferError }
+import silk.byte_duplex { ByteDuplex }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.list { List }
+import silk.memory_byte_duplex {
+  MemoryByteDuplex,
+  MemoryReadEvent,
+  MemoryWriteAction,
+  MemoryWriteEvent
+}
+import silk.monotonic_clock { MonotonicClock }
+import silk.option { Option }
+import silk.system_clock { Instant, SystemClock }
+
+struct FixedClock {}
+
+impl MonotonicClock for FixedClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return 1
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    return ()
+  }
+}
+
+effect fn transport() -> MemoryByteDuplex
+  ! OutOfMemoryError
+  ? &mut Allocator {
+  let mut reads = List<MemoryReadEvent>.make()
+  let bytes = run Bytes.copy(&b"ping")
+  run List<MemoryReadEvent>.append(
+    &mut reads,
+    MemoryReadEvent.Data { readyAt: SystemClock.make(0, 0), bytes: move bytes }
+  )
+  let mut writes = List<MemoryWriteEvent>.make()
+  run List<MemoryWriteEvent>.append(
+    &mut writes,
+    MemoryWriteEvent {
+      readyAt: SystemClock.make(0, 0),
+      action: MemoryWriteAction.Accept { count: 4 }
+    }
+  )
+  return run MemoryByteDuplex.make(move reads, move writes, 4, 8, Option<i32>.none())
+}
+
+// Reads a 4-byte request and answers it.
+effect<'session> fn answer<'session, P>(session: &'session mut BufferedDuplex<'session, P>) -> ()
+  ! BufferError
+  ? &mut MonotonicClock where
+  &'session mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock {
+  let mut request: [u8; 4] = [0, 0, 0, 0]
+  run BufferedDuplex.readExact(&mut session.*, &mut request, Option<Instant>.none())
+  run BufferedDuplex.writeAll(&mut session.*, b"pong", Option<Instant>.none())
+  return run BufferedDuplex.flush(&mut session.*, Option<Instant>.none())
+}
+
+pub effect fn main() -> i32
+  ! BufferError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut clock = FixedClock {}
+  let mut duplex = run transport() |> Effect.provideMut<Allocator>(&mut allocator)
+  run withBufferedCapacity<(), BufferError>(&mut duplex, 16, 16, answer)
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let sent = MemoryByteDuplex.outbound(&duplex)
+  if sent.length != 4 || sent[0] != 112 || sent[1] != 111 {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `MemoryByteDuplex` with `import silk.memory_byte_duplex { MemoryByteDuplex }`.
 
@@ -29,7 +125,7 @@ Public declarations: 6.
 pub union MemoryReadEvent
 ```
 
-One scripted input event on an absolute monotonic timeline.
+One step of the read script.
 
 ::Anchor{id="MemoryReadEvent.Data"}
 
@@ -39,7 +135,8 @@ One scripted input event on an absolute monotonic timeline.
 Data
 ```
 
-Makes owned bytes available at `readyAt` and permits fragmentation by caller buffer size.
+Makes `bytes` available at `readyAt`. Reads take them in order, as many as fit in each output
+slice.
 
 ::Anchor{id="MemoryReadEvent.Data.readyAt"}
 
@@ -49,7 +146,7 @@ Makes owned bytes available at `readyAt` and permits fragmentation by caller buf
 pub readyAt: Instant
 ```
 
-The event's absolute ready mark.
+The time when the event is ready.
 
 ::Anchor{id="MemoryReadEvent.Data.bytes"}
 
@@ -59,7 +156,7 @@ The event's absolute ready mark.
 pub bytes: Bytes
 ```
 
-The complete bytes released in order.
+The bytes that reads return.
 
 ::Anchor{id="MemoryReadEvent.End"}
 
@@ -69,7 +166,7 @@ The complete bytes released in order.
 End
 ```
 
-Reports orderly transport end at `readyAt`.
+Ends the stream at `readyAt`.
 
 ::Anchor{id="MemoryReadEvent.End.readyAt"}
 
@@ -79,7 +176,7 @@ Reports orderly transport end at `readyAt`.
 pub readyAt: Instant
 ```
 
-The event's absolute ready mark.
+The time when the event is ready.
 
 ::Anchor{id="MemoryReadEvent.Failure"}
 
@@ -89,7 +186,7 @@ The event's absolute ready mark.
 Failure
 ```
 
-Reports one provider failure at `readyAt`.
+Makes the read fail at `readyAt` with `ByteIoError.Provider`.
 
 ::Anchor{id="MemoryReadEvent.Failure.readyAt"}
 
@@ -99,7 +196,7 @@ Reports one provider failure at `readyAt`.
 pub readyAt: Instant
 ```
 
-The event's absolute ready mark.
+The time when the event is ready.
 
 ::Anchor{id="MemoryReadEvent.Failure.code"}
 
@@ -109,7 +206,7 @@ The event's absolute ready mark.
 pub code: i32
 ```
 
-One provider-defined diagnostic code.
+The `code` of the `Provider` error.
 
 ::Anchor{id="MemoryReadEvent.InvalidCount"}
 
@@ -119,7 +216,7 @@ One provider-defined diagnostic code.
 InvalidCount
 ```
 
-Reports an impossible count to test lease validation.
+Makes the read report `count` without writing bytes, to test the count check.
 
 ::Anchor{id="MemoryReadEvent.InvalidCount.readyAt"}
 
@@ -129,7 +226,7 @@ Reports an impossible count to test lease validation.
 pub readyAt: Instant
 ```
 
-The event's absolute ready mark.
+The time when the event is ready.
 
 ::Anchor{id="MemoryReadEvent.InvalidCount.count"}
 
@@ -139,7 +236,7 @@ The event's absolute ready mark.
 pub count: usize
 ```
 
-The impossible count returned without changing the output buffer.
+The count to report. Use 0 or a value larger than the output slice.
 
 ::Anchor{id="MemoryWriteAction"}
 
@@ -149,7 +246,7 @@ The impossible count returned without changing the output buffer.
 pub union MemoryWriteAction
 ```
 
-One scripted output action on an absolute monotonic timeline.
+What one write does.
 
 ::Anchor{id="MemoryWriteAction.Accept"}
 
@@ -159,7 +256,7 @@ One scripted output action on an absolute monotonic timeline.
 Accept
 ```
 
-Accepts at most this positive prefix.
+Accepts up to `count` bytes from the start of the input.
 
 ::Anchor{id="MemoryWriteAction.Accept.count"}
 
@@ -169,7 +266,7 @@ Accepts at most this positive prefix.
 pub count: usize
 ```
 
-The maximum accepted prefix.
+The maximum number of bytes to accept.
 
 ::Anchor{id="MemoryWriteAction.Failure"}
 
@@ -179,7 +276,7 @@ The maximum accepted prefix.
 Failure
 ```
 
-Reports one provider failure without accepting bytes.
+Makes the write fail with `ByteIoError.Provider`. No bytes are accepted.
 
 ::Anchor{id="MemoryWriteAction.Failure.code"}
 
@@ -189,7 +286,7 @@ Reports one provider failure without accepting bytes.
 pub code: i32
 ```
 
-One provider-defined diagnostic code.
+The `code` of the `Provider` error.
 
 ::Anchor{id="MemoryWriteAction.InvalidCount"}
 
@@ -199,7 +296,7 @@ One provider-defined diagnostic code.
 InvalidCount
 ```
 
-Reports an impossible count without accepting bytes.
+Makes the write report `count` without accepting bytes, to test the count check.
 
 ::Anchor{id="MemoryWriteAction.InvalidCount.count"}
 
@@ -209,7 +306,7 @@ Reports an impossible count without accepting bytes.
 pub count: usize
 ```
 
-The impossible returned count.
+The count to report.
 
 ::Anchor{id="MemoryWriteEvent"}
 
@@ -219,7 +316,7 @@ The impossible returned count.
 pub struct MemoryWriteEvent
 ```
 
-One scripted output event on an absolute monotonic timeline.
+One step of the write script.
 
 ::Anchor{id="MemoryWriteEvent.readyAt"}
 
@@ -229,7 +326,7 @@ One scripted output event on an absolute monotonic timeline.
 pub readyAt: Instant
 ```
 
-The event's absolute ready mark.
+The time when the write can happen.
 
 ::Anchor{id="MemoryWriteEvent.action"}
 
@@ -239,7 +336,7 @@ The event's absolute ready mark.
 pub action: MemoryWriteAction
 ```
 
-The action performed when the event becomes ready.
+What the write does.
 
 ::Anchor{id="MemoryByteDuplexPhase"}
 
@@ -249,7 +346,7 @@ The action performed when the event becomes ready.
 pub enum MemoryByteDuplexPhase
 ```
 
-The provider lifecycle phase visible to deterministic assertions.
+The state of a [`MemoryByteDuplex`](#MemoryByteDuplex), for checks in tests.
 
 ::Anchor{id="MemoryByteDuplexPhase.Open"}
 
@@ -259,7 +356,7 @@ The provider lifecycle phase visible to deterministic assertions.
 Open
 ```
 
-The complete lease and write direction remain active; input may still be readable or at end.
+Reads and writes work.
 
 ::Anchor{id="MemoryByteDuplexPhase.WriteShutdown"}
 
@@ -269,7 +366,7 @@ The complete lease and write direction remain active; input may still be readabl
 WriteShutdown
 ```
 
-The write direction is closed; input may still be readable or at end.
+The write direction is closed. Reads still work.
 
 ::Anchor{id="MemoryByteDuplexPhase.Closed"}
 
@@ -279,7 +376,7 @@ The write direction is closed; input may still be readable or at end.
 Closed
 ```
 
-The complete lease is terminal.
+The transport is closed.
 
 ::Anchor{id="MemoryByteDuplexPhase.Invalid"}
 
@@ -289,7 +386,7 @@ The complete lease is terminal.
 Invalid
 ```
 
-An impossible transfer count invalidated the lease.
+A write failed, or the script or storage ran out. Reads and writes fail.
 
 ::Anchor{id="MemoryByteDuplexAudit"}
 
@@ -299,7 +396,7 @@ An impossible transfer count invalidated the lease.
 pub struct MemoryByteDuplexAudit
 ```
 
-One operation recorded in provider order.
+One recorded operation.
 
 ::Anchor{id="MemoryByteDuplexAudit.operation"}
 
@@ -309,7 +406,7 @@ One operation recorded in provider order.
 pub operation: ByteIoOperation
 ```
 
-The observed operation.
+The operation.
 
 ::Anchor{id="MemoryByteDuplexAudit.count"}
 
@@ -319,7 +416,8 @@ The observed operation.
 pub count: usize
 ```
 
-The exact successful transfer prefix, or zero for lifecycle operations and failures.
+The number of bytes that the operation moved. It is 0 for flush, shutdown, close, and
+failures.
 
 ::Anchor{id="MemoryWriteAction.impl.Copy"}
 
@@ -345,7 +443,7 @@ impl Copy for MemoryByteDuplexAudit
 pub struct MemoryByteDuplex
 ```
 
-A bounded scripted provider with owned input, output, and audit storage.
+A scripted transport. Make one with [`MemoryByteDuplex.make`](#MemoryByteDuplex.impl.make) and provide it as `ByteDuplex`.
 
 ::Anchor{id="MemoryByteDuplex.impl"}
 
@@ -369,7 +467,17 @@ pub effect fn make(
   ) -> MemoryByteDuplex ! OutOfMemoryError ? &mut Allocator
 ```
 
-Constructs a bounded provider and preallocates every byte and audit slot used by operations.
+Returns a transport that follows `reads` and `writes`.
+
+#### Details
+
+`outboundCapacity` is the maximum number of bytes that writes can accept in total.
+`auditCapacity` is the maximum number of operations that the audit records, including the
+close. If `closeFailure` is present, the first close fails with that provider code.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage.
 
 ::Anchor{id="MemoryByteDuplex.impl.outbound"}
 
@@ -379,7 +487,7 @@ Constructs a bounded provider and preallocates every byte and audit slot used by
 pub fn outbound<'a>(self: &'a Self) -> &'a [u8]
 ```
 
-Returns the exact accepted output prefix in write order.
+Returns all bytes that writes accepted, in order.
 
 ::Anchor{id="MemoryByteDuplex.impl.audit"}
 
@@ -389,7 +497,7 @@ Returns the exact accepted output prefix in write order.
 pub fn audit<'a>(self: &'a Self) -> &'a [MemoryByteDuplexAudit]
 ```
 
-Returns the initialized audit prefix in operation order.
+Returns the recorded operations, in order.
 
 ::Anchor{id="MemoryByteDuplex.impl.phase"}
 
@@ -399,7 +507,7 @@ Returns the initialized audit prefix in operation order.
 pub fn phase(self: &Self) -> MemoryByteDuplexPhase
 ```
 
-Returns the current directional or terminal phase.
+Returns the current state.
 
 ::Anchor{id="MemoryByteDuplex.impl.closeAttempts"}
 
@@ -409,7 +517,7 @@ Returns the current directional or terminal phase.
 pub fn closeAttempts(self: &Self) -> usize
 ```
 
-Returns the number of first and repeated terminal close calls.
+Returns how many times the transport was closed, including closes that did nothing.
 
 ::Anchor{id="MemoryByteDuplex.impl.ByteDuplex"}
 

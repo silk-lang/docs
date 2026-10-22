@@ -1,10 +1,160 @@
-Strict bounded HTTP/1 message-body framing without transport or content-decoding policy.
+Read and write the body of an HTTP/1 message: fixed length, chunked, or until the connection
+closes.
+
+## When to use
+After you parse a head with `silk.http_head`, call [`selectRequest`](#selectRequest) or [`selectResponse`](#selectResponse) to
+find how the body is framed. Then make a [`Decoder`](#Decoder) and call [`Decoder.step`](#Decoder.impl.step) with the bytes
+after the head. To send a body, check the head with [`validateOutgoingRequest`](#validateOutgoingRequest) or
+[`validateOutgoingResponse`](#validateOutgoingResponse), make an [`Encoder`](#Encoder), and call [`Encoder.step`](#Encoder.impl.step),
+[`Encoder.beginFinish`](#Encoder.impl.beginFinish), and [`Encoder.continueFinish`](#Encoder.impl.continueFinish).
 
 ## Details
+`make` allocates all the memory. After that, `step` does not allocate and does not keep your
+buffers. Each call returns how many input bytes it used and how many output bytes it wrote, and
+the next action in [`ProgressState`](#ProgressState). The decoder removes the chunk framing and gives only the
+payload. This module does not decompress content: see `silk.http_content`.
 
-Select framing from a validated head, then drive Decoder or Encoder with caller buffers.
-Construction owns every working allocation. Streaming calls retain no caller borrow and do not
-allocate. Completion evidence proves only a framing boundary, never transport health.
+## Errors
+- [`BodyError`](#BodyError) tells which rule failed, in which part, and the byte offset on the wire. After
+  an error, the decoder or encoder stays failed.
+- `OutOfMemoryError` from `make` if the `Allocator` fails.
+
+## Gotchas
+A complete body does not mean that the connection is good. Check the connection separately
+before you use it again. A response with `CloseDelimited` framing ends only when the connection
+closes, so give `finalInput` as `true` at the end of the transport.
+
+## Examples
+### Decode a chunked response
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http { Method }
+import silk.http_body {
+  BodyError,
+  Decoder,
+  Framing,
+  Limits as BodyLimits,
+  Progress,
+  ProgressState,
+  Selection,
+  TrailerPolicy,
+  selectResponse
+}
+import silk.http_head {
+  Limits,
+  ParseError,
+  ParsedResponse,
+  ResponseHead,
+  ResponseParser,
+  parseResponse
+}
+import silk.http_headers { Limits as ValueLimits }
+import silk.result { Result }
+import silk.slice { Slice }
+
+fn values() -> ValueLimits {
+  return ValueLimits {
+    maxMethodBytes: 16,
+    maxTargetBytes: 1024,
+    maxNameBytes: 64,
+    maxValueBytes: 1024,
+    maxFields: 32,
+    maxFieldBytes: 4096,
+    maxOwnedBytes: 8192,
+  }
+}
+
+fn headLimits() -> Limits {
+  return Limits {
+    maxHeadBytes: 4096,
+    maxStartLineBytes: 1024,
+    maxFieldLineBytes: 1024,
+    maxOwnedBytes: 8192,
+    values: values(),
+  }
+}
+
+fn bodyLimits() -> BodyLimits {
+  return BodyLimits {
+    maxWireBytes: 65536,
+    maxPayloadBytes: 65536,
+    maxChunkBytes: 4096,
+    maxChunks: 64,
+    maxChunkLineBytes: 256,
+    maxExtensionBytes: 1024,
+    maxTrailerBytes: 1024,
+    maxTrailerFields: 8,
+    maxOwnedBytes: 16384,
+    trailerValues: values(),
+  }
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let wire = b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n"
+  let parsed = run parseResponse(&wire, headLimits())
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let result = match move parsed {
+    Result<ParsedResponse, ParseError>.Success { value } => move value
+    Result<ParsedResponse, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let head = match ResponseParser.head(&result.parser) {
+    Result<ResponseHead, ParseError>.Success { value } => value
+    Result<ResponseHead, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let get = Method.get()
+  let selection = match selectResponse(head, &get, TrailerPolicy.defaultPolicy()) {
+    Result<Selection, BodyError>.Success { value } => move value
+    Result<Selection, BodyError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let chunked = match Selection.framing(&selection) {
+    Framing.Chunked => true
+    _ => false
+  }
+  if !chunked {
+    return 1
+  }
+  let made = run Decoder.make(move selection, bodyLimits(), TrailerPolicy.defaultPolicy())
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut decoder = match move made {
+    Result<Decoder, BodyError>.Success { value } => move value
+    Result<Decoder, BodyError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // The body starts after the head.
+  let body = Slice.view<u8>(&wire, result.progress.consumed, wire.length - result.progress.consumed)
+  let mut payload: [u8; 16] = [0; 16]
+  let progress = match Decoder.step(&mut decoder, body, &mut payload, true) {
+    Result<Progress, BodyError>.Success { value } => move value
+    Result<Progress, BodyError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if progress.state != ProgressState.Complete || progress.written != 5 || payload[0] != 104 {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
+```
 
 Import as `Decoder` with `import silk.http_body { Decoder }`.
 
@@ -18,7 +168,7 @@ Public declarations: 22.
 pub union Framing
 ```
 
-The selected body delimiter.
+How the end of a body is found.
 
 ::Anchor{id="Framing.Empty"}
 
@@ -28,7 +178,7 @@ The selected body delimiter.
 Empty
 ```
 
-The message has no payload bytes.
+There is no body, for example in a response to `HEAD`, or with status 204 or 304.
 
 ::Anchor{id="Framing.Fixed"}
 
@@ -38,7 +188,7 @@ The message has no payload bytes.
 Fixed
 ```
 
-The payload has one exact declared length.
+The body has the length in `Content-Length`.
 
 ::Anchor{id="Framing.Fixed.length"}
 
@@ -48,7 +198,7 @@ The payload has one exact declared length.
 pub length: u64
 ```
 
-The exact payload byte count selected by Content-Length.
+The length of the body, in bytes.
 
 ::Anchor{id="Framing.Chunked"}
 
@@ -58,7 +208,7 @@ The exact payload byte count selected by Content-Length.
 Chunked
 ```
 
-Chunk sizes and delimiters frame the payload.
+The body is sent in chunks, with `Transfer-Encoding: chunked`.
 
 ::Anchor{id="Framing.CloseDelimited"}
 
@@ -68,7 +218,7 @@ Chunk sizes and delimiters frame the payload.
 CloseDelimited
 ```
 
-Transport end delimits the payload.
+The body ends when the connection closes. The connection cannot be used again.
 
 ::Anchor{id="Framing.Tunnel"}
 
@@ -78,7 +228,8 @@ Transport end delimits the payload.
 Tunnel
 ```
 
-The bytes belong to a tunnel rather than an HTTP body.
+The bytes after the head are a tunnel, for example after a successful `CONNECT`. They are not
+an HTTP body.
 
 ::Anchor{id="Framing.impl.Copy"}
 
@@ -96,7 +247,8 @@ impl Copy for Framing
 pub enum Anomaly
 ```
 
-Receiving metadata that makes an otherwise empty response non-reusable.
+A problem in a response with no body. The body is still empty, but do not use the connection
+again.
 
 ::Anchor{id="Anomaly.None"}
 
@@ -106,7 +258,7 @@ Receiving metadata that makes an otherwise empty response non-reusable.
 None
 ```
 
-No framing anomaly was observed.
+There is no problem.
 
 ::Anchor{id="Anomaly.ProhibitedFraming"}
 
@@ -116,7 +268,7 @@ No framing anomaly was observed.
 ProhibitedFraming
 ```
 
-An otherwise empty response contains prohibited framing metadata.
+A 1xx or 204 response has `Content-Length` or `Transfer-Encoding`.
 
 ::Anchor{id="Anomaly.Http10TransferEncoding"}
 
@@ -126,7 +278,7 @@ An otherwise empty response contains prohibited framing metadata.
 Http10TransferEncoding
 ```
 
-An HTTP/1.0 message contains transfer-encoding metadata.
+An HTTP/1.0 response has `Transfer-Encoding`.
 
 ::Anchor{id="Selection"}
 
@@ -136,7 +288,8 @@ An HTTP/1.0 message contains transfer-encoding metadata.
 pub struct Selection<'head>
 ```
 
-A borrowed framing selection.
+The framing of a body, from [`selectRequest`](#selectRequest) or [`selectResponse`](#selectResponse). Give it to [`Decoder.make`](#Decoder.impl.make)
+or [`Encoder.make`](#Encoder.impl.make).
 
 ::Anchor{id="Selection.impl"}
 
@@ -154,7 +307,7 @@ impl<'head> Selection<'head>
 pub fn framing(self: &Self) -> Framing
 ```
 
-Returns the selected payload delimiter.
+Returns how the end of the body is found.
 
 ::Anchor{id="Selection.impl.anomaly"}
 
@@ -164,7 +317,7 @@ Returns the selected payload delimiter.
 pub fn anomaly(self: &Self) -> Anomaly
 ```
 
-Returns metadata that prevents reuse of an otherwise empty response.
+Returns a problem that prevents use of the connection again, if any.
 
 ::Anchor{id="Limits"}
 
@@ -174,7 +327,7 @@ Returns metadata that prevents reuse of an otherwise empty response.
 pub struct Limits
 ```
 
-Every finite framing and owned-storage budget.
+The maximum sizes for a body and its framing.
 
 ::Anchor{id="Limits.maxWireBytes"}
 
@@ -184,7 +337,7 @@ Every finite framing and owned-storage budget.
 pub maxWireBytes: u64
 ```
 
-Maximum cumulative wire bytes, including framing syntax.
+The maximum number of bytes on the wire, including the chunk framing.
 
 ::Anchor{id="Limits.maxPayloadBytes"}
 
@@ -194,7 +347,7 @@ Maximum cumulative wire bytes, including framing syntax.
 pub maxPayloadBytes: u64
 ```
 
-Maximum cumulative payload bytes.
+The maximum number of payload bytes.
 
 ::Anchor{id="Limits.maxChunkBytes"}
 
@@ -204,7 +357,7 @@ Maximum cumulative payload bytes.
 pub maxChunkBytes: usize
 ```
 
-Maximum payload bytes in one chunk.
+The maximum size of one chunk.
 
 ::Anchor{id="Limits.maxChunks"}
 
@@ -214,7 +367,7 @@ Maximum payload bytes in one chunk.
 pub maxChunks: usize
 ```
 
-Maximum nonempty chunks in one body.
+The maximum number of chunks that are not empty.
 
 ::Anchor{id="Limits.maxChunkLineBytes"}
 
@@ -224,7 +377,7 @@ Maximum nonempty chunks in one body.
 pub maxChunkLineBytes: usize
 ```
 
-Maximum bytes in one chunk size line.
+The maximum length of one chunk size line.
 
 ::Anchor{id="Limits.maxExtensionBytes"}
 
@@ -234,7 +387,7 @@ Maximum bytes in one chunk size line.
 pub maxExtensionBytes: u64
 ```
 
-Maximum cumulative chunk extension bytes.
+The maximum total length of all chunk extensions.
 
 ::Anchor{id="Limits.maxTrailerBytes"}
 
@@ -244,7 +397,7 @@ Maximum cumulative chunk extension bytes.
 pub maxTrailerBytes: usize
 ```
 
-Maximum trailer section bytes.
+The maximum size of the trailer section.
 
 ::Anchor{id="Limits.maxTrailerFields"}
 
@@ -254,7 +407,7 @@ Maximum trailer section bytes.
 pub maxTrailerFields: usize
 ```
 
-Maximum trailer field count.
+The maximum number of trailer fields.
 
 ::Anchor{id="Limits.maxOwnedBytes"}
 
@@ -264,7 +417,7 @@ Maximum trailer field count.
 pub maxOwnedBytes: usize
 ```
 
-Maximum bytes retained in owned framing storage.
+The maximum memory of a decoder or an encoder.
 
 ::Anchor{id="Limits.trailerValues"}
 
@@ -274,7 +427,7 @@ Maximum bytes retained in owned framing storage.
 pub trailerValues: ValueLimits
 ```
 
-Admission limits for each retained trailer name and value.
+The limits for each trailer name and value.
 
 ::Anchor{id="Limits.impl.Copy"}
 
@@ -292,7 +445,7 @@ impl Copy for Limits
 pub enum ProgressState
 ```
 
-The next action required by one incremental body operation.
+What to do after a `step`.
 
 ::Anchor{id="ProgressState.NeedInput"}
 
@@ -302,7 +455,7 @@ The next action required by one incremental body operation.
 NeedInput
 ```
 
-More input is required before progress can continue.
+Give more input.
 
 ::Anchor{id="ProgressState.NeedOutput"}
 
@@ -312,7 +465,7 @@ More input is required before progress can continue.
 NeedOutput
 ```
 
-More output capacity is required before progress can continue.
+Give more space in the output buffer.
 
 ::Anchor{id="ProgressState.Complete"}
 
@@ -322,7 +475,7 @@ More output capacity is required before progress can continue.
 Complete
 ```
 
-The complete framed body has been processed.
+The body is complete.
 
 ::Anchor{id="ProgressState.Tunnel"}
 
@@ -332,7 +485,7 @@ The complete framed body has been processed.
 Tunnel
 ```
 
-The bytes belong to a tunnel rather than an HTTP body.
+The bytes are a tunnel, not an HTTP body.
 
 ::Anchor{id="Progress"}
 
@@ -342,7 +495,7 @@ The bytes belong to a tunnel rather than an HTTP body.
 pub struct Progress
 ```
 
-Exact local and cumulative committed progress.
+The result of a successful `step`.
 
 ::Anchor{id="Progress.consumed"}
 
@@ -352,7 +505,7 @@ Exact local and cumulative committed progress.
 pub consumed: usize
 ```
 
-Input bytes committed by the current operation.
+The number of input bytes that this call used.
 
 ::Anchor{id="Progress.written"}
 
@@ -362,7 +515,7 @@ Input bytes committed by the current operation.
 pub written: usize
 ```
 
-Output bytes committed by the current operation.
+The number of output bytes that this call wrote.
 
 ::Anchor{id="Progress.totalWire"}
 
@@ -372,7 +525,7 @@ Output bytes committed by the current operation.
 pub totalWire: u64
 ```
 
-Cumulative committed wire bytes.
+The total number of wire bytes so far.
 
 ::Anchor{id="Progress.totalPayload"}
 
@@ -382,7 +535,7 @@ Cumulative committed wire bytes.
 pub totalPayload: u64
 ```
 
-Cumulative committed payload bytes.
+The total number of payload bytes so far.
 
 ::Anchor{id="Progress.state"}
 
@@ -392,7 +545,7 @@ Cumulative committed payload bytes.
 pub state: ProgressState
 ```
 
-The next required action or completed disposition.
+What to do next.
 
 ::Anchor{id="CompletionKind"}
 
@@ -402,7 +555,7 @@ The next required action or completed disposition.
 pub enum CompletionKind
 ```
 
-The established body-boundary disposition.
+How a body ended. See [`Completion.kind`](#Completion.impl.kind).
 
 ::Anchor{id="CompletionKind.Delimited"}
 
@@ -412,7 +565,7 @@ The established body-boundary disposition.
 Delimited
 ```
 
-The framing establishes an explicit body boundary.
+The framing marked the end: the length, the last chunk, or no body.
 
 ::Anchor{id="CompletionKind.CloseDelimited"}
 
@@ -422,7 +575,7 @@ The framing establishes an explicit body boundary.
 CloseDelimited
 ```
 
-Transport end delimits the payload.
+The connection closed.
 
 ::Anchor{id="CompletionKind.Tunnel"}
 
@@ -432,7 +585,7 @@ Transport end delimits the payload.
 Tunnel
 ```
 
-The bytes belong to a tunnel rather than an HTTP body.
+The bytes were a tunnel.
 
 ::Anchor{id="Completion"}
 
@@ -442,7 +595,7 @@ The bytes belong to a tunnel rather than an HTTP body.
 pub struct Completion<'owner>
 ```
 
-Opaque positive evidence borrowed from a completed owner.
+Proof that a body is complete. Get it from [`Decoder.completion`](#Decoder.impl.completion) or [`Encoder.completion`](#Encoder.impl.completion).
 
 ::Anchor{id="Completion.impl"}
 
@@ -460,7 +613,7 @@ impl<'owner> Completion<'owner>
 pub fn kind(self: &Self) -> CompletionKind
 ```
 
-Returns the established body completion disposition.
+Returns how the body ended.
 
 ::Anchor{id="BodyComponent"}
 
@@ -470,7 +623,7 @@ Returns the established body completion disposition.
 pub enum BodyComponent
 ```
 
-The framing component responsible for a body failure.
+The part of the body work where an error occurred.
 
 ::Anchor{id="BodyComponent.Selection"}
 
@@ -480,7 +633,7 @@ The framing component responsible for a body failure.
 Selection
 ```
 
-Body framing selection.
+The selection of the framing from the head.
 
 ::Anchor{id="BodyComponent.ContentLength"}
 
@@ -490,7 +643,7 @@ Body framing selection.
 ContentLength
 ```
 
-Content-Length field admission.
+The `Content-Length` field.
 
 ::Anchor{id="BodyComponent.TransferEncoding"}
 
@@ -500,7 +653,7 @@ Content-Length field admission.
 TransferEncoding
 ```
 
-Transfer-Encoding field admission.
+The `Transfer-Encoding` field.
 
 ::Anchor{id="BodyComponent.ChunkLine"}
 
@@ -510,7 +663,7 @@ Transfer-Encoding field admission.
 ChunkLine
 ```
 
-Chunk size and extension syntax.
+A chunk size line, with its extensions.
 
 ::Anchor{id="BodyComponent.ChunkPayload"}
 
@@ -520,7 +673,7 @@ Chunk size and extension syntax.
 ChunkPayload
 ```
 
-Chunk payload bytes.
+The bytes of a chunk.
 
 ::Anchor{id="BodyComponent.ChunkDelimiter"}
 
@@ -530,7 +683,7 @@ Chunk payload bytes.
 ChunkDelimiter
 ```
 
-The delimiter following a chunk payload.
+The CRLF after the bytes of a chunk.
 
 ::Anchor{id="BodyComponent.TrailerName"}
 
@@ -540,7 +693,7 @@ The delimiter following a chunk payload.
 TrailerName
 ```
 
-Trailer field name admission.
+The name of a trailer field.
 
 ::Anchor{id="BodyComponent.TrailerValue"}
 
@@ -550,7 +703,7 @@ Trailer field name admission.
 TrailerValue
 ```
 
-Trailer field value admission.
+The value of a trailer field.
 
 ::Anchor{id="BodyComponent.TrailerPolicy"}
 
@@ -560,7 +713,7 @@ Trailer field value admission.
 TrailerPolicy
 ```
 
-Trailer name policy admission.
+The check of a trailer name against the [`TrailerPolicy`](#BodyComponent.TrailerPolicy).
 
 ::Anchor{id="BodyComponent.Decoder"}
 
@@ -570,7 +723,7 @@ Trailer name policy admission.
 Decoder
 ```
 
-Body decoder state.
+The decoder.
 
 ::Anchor{id="BodyComponent.Encoder"}
 
@@ -580,7 +733,7 @@ Body decoder state.
 Encoder
 ```
 
-Body encoder state.
+The encoder.
 
 ::Anchor{id="BodyComponent.Discard"}
 
@@ -590,7 +743,7 @@ Body encoder state.
 Discard
 ```
 
-Bounded body discard.
+A [`Decoder.discard`](#Decoder.impl.discard) call.
 
 ::Anchor{id="BodyLimitKind"}
 
@@ -600,7 +753,7 @@ Bounded body discard.
 pub enum BodyLimitKind
 ```
 
-The finite budget exceeded by a body operation.
+The limit that a body exceeded. Each value names a field of [`Limits`](#Limits).
 
 ::Anchor{id="BodyLimitKind.WireBytes"}
 
@@ -690,7 +843,7 @@ The trailer field-count budget.
 TrailerNameBytes
 ```
 
-The per-field trailer name-byte budget.
+`trailerValues.maxNameBytes`.
 
 ::Anchor{id="BodyLimitKind.TrailerValueBytes"}
 
@@ -700,7 +853,7 @@ The per-field trailer name-byte budget.
 TrailerValueBytes
 ```
 
-The per-field trailer value-byte budget.
+`trailerValues.maxValueBytes`.
 
 ::Anchor{id="BodyLimitKind.TrailerFieldBytes"}
 
@@ -710,7 +863,7 @@ The per-field trailer value-byte budget.
 TrailerFieldBytes
 ```
 
-The combined trailer field-byte budget.
+`trailerValues.maxFieldBytes`.
 
 ::Anchor{id="BodyLimitKind.OwnedBytes"}
 
@@ -730,7 +883,7 @@ The owned-storage byte budget.
 pub union BodyReason
 ```
 
-The reason a body operation cannot continue.
+The rule that failed.
 
 ::Anchor{id="BodyReason.InvalidFraming"}
 
@@ -740,7 +893,7 @@ The reason a body operation cannot continue.
 InvalidFraming
 ```
 
-The supplied metadata does not admit the requested framing.
+The head does not allow this framing.
 
 ::Anchor{id="BodyReason.ConflictingFraming"}
 
@@ -750,7 +903,7 @@ The supplied metadata does not admit the requested framing.
 ConflictingFraming
 ```
 
-The supplied framing fields disagree.
+The head has both `Content-Length` and `Transfer-Encoding`.
 
 ::Anchor{id="BodyReason.UnsupportedTransferCoding"}
 
@@ -760,7 +913,7 @@ The supplied framing fields disagree.
 UnsupportedTransferCoding
 ```
 
-A transfer coding is outside the supported profile.
+A transfer coding other than `chunked` is used.
 
 ::Anchor{id="BodyReason.InvalidLength"}
 
@@ -770,7 +923,7 @@ A transfer coding is outside the supported profile.
 InvalidLength
 ```
 
-The declared payload length is invalid.
+The `Content-Length` value is not valid.
 
 ::Anchor{id="BodyReason.SizeOverflow"}
 
@@ -780,7 +933,7 @@ The declared payload length is invalid.
 SizeOverflow
 ```
 
-Size arithmetic exceeds the representable range.
+A size calculation overflowed.
 
 ::Anchor{id="BodyReason.ChunkSyntax"}
 
@@ -790,7 +943,7 @@ Size arithmetic exceeds the representable range.
 ChunkSyntax
 ```
 
-Chunk framing syntax is invalid.
+A chunk size line or a chunk delimiter is not valid.
 
 ::Anchor{id="BodyReason.TrailerSyntax"}
 
@@ -800,7 +953,7 @@ Chunk framing syntax is invalid.
 TrailerSyntax
 ```
 
-Trailer syntax is invalid.
+A trailer field is not valid.
 
 ::Anchor{id="BodyReason.TrailerPolicy"}
 
@@ -810,7 +963,7 @@ Trailer syntax is invalid.
 TrailerPolicy
 ```
 
-Trailer name policy admission.
+A trailer name is not allowed by the [`TrailerPolicy`](#BodyReason.TrailerPolicy).
 
 ::Anchor{id="BodyReason.Truncated"}
 
@@ -820,7 +973,7 @@ Trailer name policy admission.
 Truncated
 ```
 
-Input ends before the framed body is complete.
+The input ended before the body was complete.
 
 ::Anchor{id="BodyReason.FixedLengthUnderrun"}
 
@@ -830,7 +983,7 @@ Input ends before the framed body is complete.
 FixedLengthUnderrun
 ```
 
-Finalization occurs before the declared payload length is supplied.
+The encoder finished before it got `Content-Length` bytes.
 
 ::Anchor{id="BodyReason.FixedLengthOverrun"}
 
@@ -840,7 +993,7 @@ Finalization occurs before the declared payload length is supplied.
 FixedLengthOverrun
 ```
 
-Payload input exceeds the declared length.
+The encoder got more than `Content-Length` bytes.
 
 ::Anchor{id="BodyReason.UnexpectedPayload"}
 
@@ -850,7 +1003,7 @@ Payload input exceeds the declared length.
 UnexpectedPayload
 ```
 
-Payload was supplied for empty framing.
+The encoder got bytes for a message with no body.
 
 ::Anchor{id="BodyReason.UnsupportedTunnelEncoding"}
 
@@ -860,7 +1013,7 @@ Payload was supplied for empty framing.
 UnsupportedTunnelEncoding
 ```
 
-The encoder cannot encode tunnel bytes as an HTTP body.
+An encoder cannot send tunnel bytes as a body.
 
 ::Anchor{id="BodyReason.DiscardLimit"}
 
@@ -870,7 +1023,7 @@ The encoder cannot encode tunnel bytes as an HTTP body.
 DiscardLimit
 ```
 
-Discard would exceed its caller-supplied limit.
+A [`Decoder.discard`](#Decoder.impl.discard) call would read more than its `maxDiscardWireBytes`.
 
 ::Anchor{id="BodyReason.DiscardLimit.allowed"}
 
@@ -880,7 +1033,7 @@ Discard would exceed its caller-supplied limit.
 pub allowed: u64
 ```
 
-The admitted maximum for the rejected operation.
+The value of the limit.
 
 ::Anchor{id="BodyReason.DiscardLimit.attempted"}
 
@@ -890,7 +1043,7 @@ The admitted maximum for the rejected operation.
 pub attempted: u64
 ```
 
-The count that would exceed the admitted maximum.
+The size that was found.
 
 ::Anchor{id="BodyReason.LimitExceeded"}
 
@@ -900,7 +1053,7 @@ The count that would exceed the admitted maximum.
 LimitExceeded
 ```
 
-The operation would exceed a configured budget.
+The body exceeded a limit in [`Limits`](#Limits).
 
 ::Anchor{id="BodyReason.LimitExceeded.limit"}
 
@@ -910,7 +1063,7 @@ The operation would exceed a configured budget.
 pub limit: BodyLimitKind
 ```
 
-The budget exceeded by this operation.
+The limit that was exceeded.
 
 ::Anchor{id="BodyReason.LimitExceeded.allowed"}
 
@@ -920,7 +1073,7 @@ The budget exceeded by this operation.
 pub allowed: u64
 ```
 
-The admitted maximum for the rejected operation.
+The value of the limit.
 
 ::Anchor{id="BodyReason.LimitExceeded.attempted"}
 
@@ -930,7 +1083,7 @@ The admitted maximum for the rejected operation.
 pub attempted: u64
 ```
 
-The count that would exceed the admitted maximum.
+The size that was found.
 
 ::Anchor{id="BodyReason.InvalidState"}
 
@@ -940,7 +1093,7 @@ The count that would exceed the admitted maximum.
 InvalidState
 ```
 
-The operation is not permitted in the current state.
+The call is not valid now, for example a `step` after the body is complete or after an error.
 
 ::Anchor{id="BodyReason.impl.Copy"}
 
@@ -958,7 +1111,7 @@ impl Copy for BodyReason
 pub struct BodyError
 ```
 
-A terminal failure with exact committed coordinates.
+The error from body work. After it, the decoder or encoder stays failed.
 
 ::Anchor{id="BodyError.reason"}
 
@@ -968,7 +1121,7 @@ A terminal failure with exact committed coordinates.
 pub reason: BodyReason
 ```
 
-The rule that made the body terminal.
+The rule that failed.
 
 ::Anchor{id="BodyError.component"}
 
@@ -978,7 +1131,7 @@ The rule that made the body terminal.
 pub component: BodyComponent
 ```
 
-The framing component that rejected the operation.
+The part where it failed.
 
 ::Anchor{id="BodyError.wireOffset"}
 
@@ -988,7 +1141,7 @@ The framing component that rejected the operation.
 pub wireOffset: u64
 ```
 
-The zero-based wire byte offset of the failure.
+The byte offset on the wire, from the start of the body.
 
 ::Anchor{id="BodyError.consumed"}
 
@@ -998,7 +1151,7 @@ The zero-based wire byte offset of the failure.
 pub consumed: usize
 ```
 
-Input bytes committed by the current operation.
+The number of input bytes that this call used before the error.
 
 ::Anchor{id="BodyError.written"}
 
@@ -1008,7 +1161,7 @@ Input bytes committed by the current operation.
 pub written: usize
 ```
 
-Output bytes committed by the current operation.
+The number of output bytes that this call wrote before the error.
 
 ::Anchor{id="BodyError.totalWire"}
 
@@ -1018,7 +1171,7 @@ Output bytes committed by the current operation.
 pub totalWire: u64
 ```
 
-Cumulative committed wire bytes.
+The total number of wire bytes before the error.
 
 ::Anchor{id="BodyError.totalPayload"}
 
@@ -1028,7 +1181,7 @@ Cumulative committed wire bytes.
 pub totalPayload: u64
 ```
 
-Cumulative committed payload bytes.
+The total number of payload bytes before the error.
 
 ::Anchor{id="BodyError.fieldIndex"}
 
@@ -1038,7 +1191,7 @@ Cumulative committed payload bytes.
 pub fieldIndex: Option<usize>
 ```
 
-The zero-based trailer field index, when the failure identifies one.
+The position of the trailer field, from 0, when the error is in a trailer.
 
 ::Anchor{id="TrailerPolicy"}
 
@@ -1048,7 +1201,7 @@ The zero-based trailer field index, when the failure identifies one.
 pub union TrailerPolicy<'names>
 ```
 
-An explicit trailer-name allowlist.
+The trailer fields that a chunked body can have.
 
 ::Anchor{id="TrailerPolicy.Default"}
 
@@ -1058,7 +1211,8 @@ An explicit trailer-name allowlist.
 Default
 ```
 
-Applies the default forbidden-trailer policy.
+Allow trailers, but not fields that change the framing, routing, or authentication, such as
+`Content-Length` or `Host`.
 
 ::Anchor{id="TrailerPolicy.Explicit"}
 
@@ -1068,7 +1222,7 @@ Applies the default forbidden-trailer policy.
 Explicit
 ```
 
-Restricts trailers to the supplied admitted field names.
+Allow only the trailers with these names.
 
 ::Anchor{id="TrailerPolicy.impl.Copy"}
 
@@ -1094,7 +1248,7 @@ impl<'names> TrailerPolicy<'names>
 pub fn defaultPolicy() -> TrailerPolicy<'names>
 ```
 
-Returns the default forbidden-trailer policy.
+Returns the `Default` policy.
 
 ::Anchor{id="TrailerPolicy.impl.fromNames"}
 
@@ -1106,7 +1260,8 @@ pub fn fromNames(
   ) -> Result<TrailerPolicy<'names>, BodyError>
 ```
 
-Validates an explicit trailer-name allowlist and borrows it without allocation.
+Returns a policy that allows only `names`. It fails if a name is not a token, or is a field
+that is never allowed in a trailer.
 
 ::Anchor{id="selectRequest"}
 
@@ -1119,7 +1274,9 @@ pub fn selectRequest<'value>(
 ) -> Result<Selection<'value>, BodyError>
 ```
 
-Selects receiving request framing.
+Returns the framing of a received request body.
+
+A request without `Content-Length` or `Transfer-Encoding` has no body.
 
 ::Anchor{id="selectResponse"}
 
@@ -1133,7 +1290,12 @@ pub fn selectResponse<'value>(
 ) -> Result<Selection<'value>, BodyError>
 ```
 
-Selects receiving response framing.
+Returns the framing of a received response body. `requestMethod` is the method of the request.
+
+### Details
+A response to `HEAD`, a 1xx, 204, or 304 response has no body. A 2xx response to `CONNECT` is a
+tunnel. A response without `Content-Length` or `Transfer-Encoding` ends when the connection
+closes.
 
 ::Anchor{id="validateOutgoingRequest"}
 
@@ -1146,7 +1308,8 @@ pub fn validateOutgoingRequest<'value>(
 ) -> Result<Selection<'value>, BodyError>
 ```
 
-Validates request framing and trailer policy before payload encoding.
+Checks the framing fields of a request that you send, and returns the framing for
+[`Encoder.make`](#Encoder.impl.make).
 
 ::Anchor{id="validateOutgoingResponse"}
 
@@ -1160,7 +1323,9 @@ pub fn validateOutgoingResponse<'value>(
 ) -> Result<Selection<'value>, BodyError>
 ```
 
-Validates response framing, including status and request-method restrictions, before payload encoding.
+Checks the framing fields of a response that you send, and returns the framing for
+[`Encoder.make`](#Encoder.impl.make). A 1xx, 204, or 2xx `CONNECT` response cannot have `Content-Length` or
+`Transfer-Encoding`.
 
 ::Anchor{id="Decoder"}
 
@@ -1170,7 +1335,7 @@ Validates response framing, including status and request-method restrictions, be
 pub struct Decoder
 ```
 
-Affine allocation-free incremental body decoder.
+Reads a body from wire bytes. Make it with [`Decoder.make`](#Decoder.impl.make).
 
 ::Anchor{id="Decoder.impl"}
 
@@ -1192,7 +1357,11 @@ pub effect fn make<'head>(
   ) -> Result<Decoder, BodyError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Acquires every decoder buffer and copies trailer policy and Connection exclusions.
+Returns a decoder for the framing in `selection`, and allocates all its memory.
+
+#### Errors
+- `LimitExceeded` with `OwnedBytes` if the memory is more than `maxOwnedBytes`.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="Decoder.impl.step"}
 
@@ -1207,7 +1376,13 @@ pub fn step(
   ) -> Result<Progress, BodyError>
 ```
 
-Decodes into caller output without consuming unwritten payload.
+Reads wire bytes from `input`, and writes payload bytes to `output`.
+
+#### Details
+The decoder uses only the input bytes whose payload fits in `output`. Give the rest again in
+the next call. Set `finalInput` to `true` when the transport has no more bytes. For a body
+that ends with the connection, this completes the body. For other bodies, it makes an
+incomplete body fail with `Truncated`.
 
 ::Anchor{id="Decoder.impl.discard"}
 
@@ -1222,7 +1397,10 @@ pub fn discard(
   ) -> Result<Progress, BodyError>
 ```
 
-Discards wire bytes under an explicit cumulative framing-byte budget.
+Reads and drops body bytes, for example to use the connection again without the body.
+
+`maxDiscardWireBytes` limits the total wire bytes of all discard calls. If more are needed, it
+fails with `DiscardLimit`.
 
 ::Anchor{id="Decoder.impl.completion"}
 
@@ -1232,7 +1410,7 @@ Discards wire bytes under an explicit cumulative framing-byte budget.
 pub fn completion<'owner>(self: &'owner Self) -> Option<Completion<'owner>>
 ```
 
-Returns positive evidence only after a successful terminal boundary.
+Returns proof that the body is complete, or `None`.
 
 ::Anchor{id="Decoder.impl.trailers"}
 
@@ -1242,7 +1420,8 @@ Returns positive evidence only after a successful terminal boundary.
 pub fn trailers<'owner>(self: &'owner Self) -> Option<Trailers<'owner>>
 ```
 
-Returns completed chunk trailers without merging them into initial fields.
+Returns the trailer fields of a complete chunked body, or `None`. They are separate from the
+fields of the head.
 
 ::Anchor{id="Decoder.impl.abandon"}
 
@@ -1252,7 +1431,7 @@ Returns completed chunk trailers without merging them into initial fields.
 pub fn abandon(self: &mut Self) -> ()
 ```
 
-Makes the decoder terminal without performing transport work.
+Stops the decoder. Later calls fail. It does no I/O.
 
 ::Anchor{id="Trailers"}
 
@@ -1262,7 +1441,7 @@ Makes the decoder terminal without performing transport work.
 pub struct Trailers<'owner>
 ```
 
-A decoder-borrowed trailer section.
+The trailer fields of a chunked body. They borrow the decoder.
 
 ::Anchor{id="Trailers.impl"}
 
@@ -1280,7 +1459,7 @@ impl<'owner> Trailers<'owner>
 pub fn count(self: &Self) -> usize
 ```
 
-Returns the number of retained trailer fields.
+Returns the number of trailer fields.
 
 ::Anchor{id="Trailers.impl.requiredOwnedBytes"}
 
@@ -1290,7 +1469,7 @@ Returns the number of retained trailer fields.
 pub fn requiredOwnedBytes(self: &Self) -> Result<usize, BodyError>
 ```
 
-Returns the exact payload-plus-index bytes required by an independent owned copy.
+Returns the memory that [`Trailers.copy`](#Trailers.impl.copy) needs.
 
 ::Anchor{id="Trailers.impl.fields"}
 
@@ -1300,7 +1479,7 @@ Returns the exact payload-plus-index bytes required by an independent owned copy
 pub fn fields(self: &'owner Self) -> TrailerIterator<'owner>
 ```
 
-Borrows an iterator over trailer fields in their retained order.
+Returns an iterator over the trailer fields, in order.
 
 ::Anchor{id="Trailers.impl.copy"}
 
@@ -1313,7 +1492,7 @@ pub effect fn copy(
   ) -> Result<OwnedTrailers, BodyError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies the trailer section into an independent owner under the supplied admission limits.
+Copies the trailers into new memory, so that they do not borrow the decoder.
 
 ::Anchor{id="OwnedTrailers"}
 
@@ -1323,7 +1502,7 @@ Copies the trailer section into an independent owner under the supplied admissio
 pub struct OwnedTrailers
 ```
 
-An independently owned trailer section.
+Trailer fields that own their memory. Get a [`Trailers`](#Trailers) from it with [`OwnedTrailers.view`](#OwnedTrailers.impl.view).
 
 ::Anchor{id="OwnedTrailers.impl"}
 
@@ -1341,7 +1520,7 @@ impl OwnedTrailers
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns the exact retained trailer payload-plus-index byte count.
+Returns the memory that this copy uses, in bytes.
 
 ::Anchor{id="OwnedTrailers.impl.view"}
 
@@ -1351,7 +1530,7 @@ Returns the exact retained trailer payload-plus-index byte count.
 pub fn view<'owner>(self: &'owner Self) -> Trailers<'owner>
 ```
 
-Borrows a trailer view tied to this owner.
+Returns the trailers as a [`Trailers`](#Trailers) that borrows this value.
 
 ::Anchor{id="TrailerIterator"}
 
@@ -1361,7 +1540,7 @@ Borrows a trailer view tied to this owner.
 pub struct TrailerIterator<'owner>
 ```
 
-An ordered iterator borrowing one retained trailer section.
+An iterator over trailer fields, in order.
 
 ::Anchor{id="TrailerIterator.impl"}
 
@@ -1379,7 +1558,7 @@ impl<'owner> TrailerIterator<'owner>
 pub fn next(self: &mut Self) -> Option<Header<'owner>>
 ```
 
-Returns the next borrowed trailer field, or None after the final field.
+Returns the next trailer field, or `None` at the end.
 
 ::Anchor{id="Encoder"}
 
@@ -1389,7 +1568,7 @@ Returns the next borrowed trailer field, or None after the final field.
 pub struct Encoder
 ```
 
-Affine allocation-free incremental body encoder.
+Writes a body with its framing. Make it with [`Encoder.make`](#Encoder.impl.make).
 
 ::Anchor{id="Encoder.impl"}
 
@@ -1411,7 +1590,11 @@ pub effect fn make<'head>(
   ) -> Result<Encoder, BodyError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Acquires bounded chunk and finish-snapshot storage.
+Returns an encoder for the framing in `selection`, and allocates all its memory.
+
+#### Errors
+- `UnsupportedTunnelEncoding` for `Tunnel` framing.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="Encoder.impl.step"}
 
@@ -1421,7 +1604,10 @@ Acquires bounded chunk and finish-snapshot storage.
 pub fn step(self: &mut Self, input: &[u8], output: &mut [u8]) -> Result<Progress, BodyError>
 ```
 
-Accepts payload and emits as much framed output as fits.
+Takes payload bytes from `input`, and writes framed bytes to `output`.
+
+For chunked framing, the encoder writes a chunk for the bytes that it takes. With
+`NeedOutput`, send the output and call again.
 
 ::Anchor{id="Encoder.impl.beginFinish"}
 
@@ -1434,7 +1620,12 @@ pub fn beginFinish<'value>(
   ) -> Result<(), BodyError>
 ```
 
-Validates and snapshots all finish trailers before any finish byte is emitted.
+Starts the end of the body, with `trailers` for a chunked body. Then call
+[`Encoder.continueFinish`](#Encoder.impl.continueFinish).
+
+#### Errors
+- `FixedLengthUnderrun` if a fixed-length body did not get all its bytes.
+- `TrailerPolicy` or `TrailerSyntax` if a trailer is not valid. Nothing is written.
 
 ::Anchor{id="Encoder.impl.continueFinish"}
 
@@ -1444,7 +1635,8 @@ Validates and snapshots all finish trailers before any finish byte is emitted.
 pub fn continueFinish(self: &mut Self, output: &mut [u8]) -> Result<Progress, BodyError>
 ```
 
-Drains the immutable finish snapshot.
+Writes the end of the body, such as the last chunk and the trailers, to `output`. Call it
+again while the state is `NeedOutput`.
 
 ::Anchor{id="Encoder.impl.completion"}
 
@@ -1454,7 +1646,7 @@ Drains the immutable finish snapshot.
 pub fn completion<'owner>(self: &'owner Self) -> Option<Completion<'owner>>
 ```
 
-Borrows positive completion evidence only after successful encoder finalization.
+Returns proof that the whole body was written, or `None`.
 
 ::Anchor{id="Encoder.impl.abandon"}
 
@@ -1464,6 +1656,7 @@ Borrows positive completion evidence only after successful encoder finalization.
 pub fn abandon(self: &mut Self) -> ()
 ```
 
-Makes an unfinished encoder unusable without emitting additional bytes.
+Stops the encoder without writing more bytes. Later calls fail. The body on the wire is
+incomplete.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

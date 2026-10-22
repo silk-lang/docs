@@ -1,27 +1,69 @@
-The native provider for the `silk.http_client` service.
+The native provider for the `Http` service of `silk.http_client`.
 
 ## When to use
-
-Supply [`NativeHttp`](#NativeHttp) once, near `main`, with `Effect.provideMut<Http>(&mut http)`. Everything
-that requires `? &mut Http` then sends real requests over native sockets and TLS.
+Give [`NativeHttp`](#NativeHttp) one time, near `main`, with `Effect.provideMut<Http>(&mut http)`. All code
+that requires `? &mut Http` then sends real requests over sockets and TLS.
 
 ## Details
+The provider has its own clocks, random source, and trust store, so you give only an allocator.
+The defaults are a deadline of 30 seconds for each request, a response body of at most 16 MiB,
+up to 10 redirects, and the PEM bundle of the platform for HTTPS: `/etc/ssl/cert.pem` on macOS
+and `/etc/ssl/certs/ca-certificates.crt` on Linux. [`NativeHttp.fromEnvironment`](#NativeHttp.impl.fromEnvironment) uses the file
+in `SSL_CERT_FILE` when it is set. Each request opens a new HTTP/1.1 connection and sends
+`Accept-Encoding: identity`, so the body arrives as the server sent it.
 
-The provider owns its clocks, random source, and trust store, so callers only supply an
-allocator. Defaults: a 30 second deadline per request, a 16 MiB response body limit, up to 10
-redirects, and the platform PEM bundle (`/etc/ssl/cert.pem` on macOS,
-`/etc/ssl/certs/ca-certificates.crt` on Linux) for HTTPS. [`NativeHttp.fromEnvironment`](#NativeHttp.impl.fromEnvironment) uses
-`SSL_CERT_FILE` instead when it is set. Each request opens one fresh HTTP/1.1 connection and
-sends `Accept-Encoding: identity`, so bodies arrive exactly as the server encoded them.
-
-Redirects follow the fetch standard: 303, and 301 or 302 after POST, continue as GET without a
-body; 307 and 308 repeat the method and body. A redirect from HTTPS to HTTP fails, and a
-redirect to another origin drops `Authorization` and `Cookie`.
+Redirects follow the Fetch standard. After 303, and after 301 or 302 for a POST, the client
+sends a GET without a body. After 307 and 308, it sends the same method and body. A redirect
+from HTTPS to HTTP fails. A redirect to another origin does not send `Authorization` and
+`Cookie`.
 
 ## Gotchas
+The deadline covers the TLS handshake and the HTTP exchange, but not the name lookup and the TCP
+connect. The macOS keychain is not used, only the PEM bundle.
 
-The deadline covers the TLS handshake and the HTTP exchange. Native name resolution and the TCP
-connect are not bounded by it. The macOS keychain is not consulted; only the PEM bundle is.
+## Examples
+### Set up the client
+The request in this example fails before it connects, because `ftp` is not supported.
+
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http_client { Http, HttpError, HttpErrorKind, Request, Response }
+import silk.http_client_native { NativeHttp }
+import silk.result { Result }
+
+effect fn check() -> i32
+  ! OutOfMemoryError
+  ? &mut Http | &mut Allocator {
+  // A scheme other than http or https fails before any connection.
+  let sent = run Effect.result(Http.send(Request.get("ftp://example.com/version")))
+  return match move sent {
+    Result.Success { value: _ } => 1
+    Result.Failure { error } => match move error {
+      HttpError failure => {
+        if failure.kind == HttpErrorKind.InvalidUrl {
+          return 0
+        }
+        return 1
+      }
+      OutOfMemoryError allocation => {
+        fail move allocation
+      }
+    }
+  }
+}
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut http = NativeHttp.make().baseUrl("https://api.example.com").header(
+    "Accept",
+    "application/json"
+  ).timeoutSeconds(10)
+  return run check() |> Effect.provideMut<Http>(&mut http)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
 
 Import as `HttpClientNative` with `import silk.http_client_native as HttpClientNative`.
 
@@ -65,7 +107,7 @@ The default number of redirects followed.
 pub const MAX_DEFAULT_HEADERS: usize
 ```
 
-The maximum number of default headers one provider holds.
+The maximum number of headers that [`NativeHttp.header`](#NativeHttp.impl.header) adds.
 
 ::Anchor{id="NativeHttp"}
 
@@ -75,7 +117,8 @@ The maximum number of default headers one provider holds.
 pub struct NativeHttp<'config>
 ```
 
-A native HTTP client: sockets, TLS, redirects, and the defaults every request starts from.
+A native HTTP client. It holds the defaults for all requests: the base URL, headers, limits,
+and trust.
 
 ::Anchor{id="NativeHttp.impl"}
 
@@ -93,7 +136,8 @@ impl<'config> NativeHttp<'config>
 pub fn make() -> NativeHttp<'config>
 ```
 
-Makes a client with the default limits and the platform PEM bundle; nothing is read yet.
+Returns a client with the default limits and the PEM bundle of the platform. It reads
+nothing yet.
 
 ::Anchor{id="NativeHttp.impl.fromEnvironment"}
 
@@ -119,7 +163,7 @@ A relative path is resolved against the working directory. An empty value fails.
 pub fn baseUrl(self: Self, url: string<'config>) -> NativeHttp<'config>
 ```
 
-Prefixes every request URL that has no scheme, such as `"/repos"`, with `url`.
+Puts `url` before each request URL that has no scheme, such as `"/repos"`.
 
 ::Anchor{id="NativeHttp.impl.header"}
 
@@ -129,7 +173,7 @@ Prefixes every request URL that has no scheme, such as `"/repos"`, with `url`.
 pub fn header(self: Self, name: string<'config>, value: string<'config>) -> NativeHttp<'config>
 ```
 
-Adds a header to every request; a request header with the same name replaces it.
+Adds a header to each request. A header of the request with the same name replaces it.
 
 ::Anchor{id="NativeHttp.impl.timeoutSeconds"}
 
@@ -159,7 +203,8 @@ Sets the default response body limit.
 pub fn maxRedirects(self: Self, hops: usize) -> NativeHttp<'config>
 ```
 
-Sets how many redirects requests follow by default; zero returns redirects as responses.
+Sets how many redirects requests follow by default. With 0, a redirect response is returned
+as it is.
 
 ::Anchor{id="NativeHttp.impl.failOnStatus"}
 
@@ -169,7 +214,7 @@ Sets how many redirects requests follow by default; zero returns redirects as re
 pub fn failOnStatus(self: Self) -> NativeHttp<'config>
 ```
 
-Makes every non-2xx final response fail with an `HttpErrorKind.Status` error.
+Makes each final response with a status outside 200 to 299 fail with a `Status` error.
 
 ::Anchor{id="NativeHttp.impl.trustBundle"}
 

@@ -103,7 +103,7 @@ const header = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
             'Prefer a package manager? The install guide covers Homebrew and mise.',
             textLink(
               'Install guide',
-              docPageRouter({ directory: 'start', slug: 'install' }),
+              docPageRouter({ directory: 'get-started', slug: 'install' }),
               h,
             ),
             h,

@@ -1,14 +1,98 @@
-Ordered, bounded HTTP fields with borrowed iteration and explicit owned copies.
+An ordered list of HTTP header fields, with lookup by name, copies, and formatting.
 
 ## When to use
-
-Use [`Headers.make`](#Headers.impl.make) over validated borrowed fields, or [`Headers.copy`](#Headers.impl.copy) when the collection must
-outlive its source. Lookup is ASCII case-insensitive and never combines repeated values.
+Use [`Headers.make`](#Headers.impl.make) to put `Header` values from `silk.http` in a list without a copy. Use
+[`Headers.copy`](#Headers.impl.copy) when the list must live longer than its fields. Look up fields with
+[`Headers.getFirst`](#Headers.impl.getFirst), [`Headers.getUnique`](#Headers.impl.getUnique), or [`Headers.getAll`](#Headers.impl.getAll).
 
 ## Details
+Names are compared without case. Repeated fields stay separate, in their order, and are never
+joined into one value. [`Limits`](#Limits) sets the maximum sizes, and every function checks them before
+it allocates. [`Headers.formatInto`](#Headers.impl.formatInto) writes `name: value\r\n` for each field.
 
-Owned collections store payload bytes plus offsets rather than self-references. Formatting emits
-only `name: value\r\n` field lines and is mutation-atomic when caller output is too small.
+## Errors
+- `ValueError` with `LimitExceeded` if a list exceeds its [`Limits`](#Limits).
+- `ValueError` with `OutputTooSmall` if the output buffer is too small. Nothing is written.
+
+## Examples
+### Look up repeated fields
+```silk
+import silk.http { Header, ValueError }
+import silk.http_headers { HeaderIterator, Headers, Limits }
+import silk.option { Option }
+import silk.result { Result }
+
+fn limits() -> Limits {
+  return Limits {
+    maxMethodBytes: 64,
+    maxTargetBytes: 8192,
+    maxNameBytes: 256,
+    maxValueBytes: 8192,
+    maxFields: 16,
+    maxFieldBytes: 4096,
+    maxOwnedBytes: 8192,
+  }
+}
+
+fn field(name: string<'static>, bytes: &'static [u8]) -> Header<'static> {
+  return match Header.make(name, bytes, limits()) {
+    Result<Header, ValueError>.Success { value } => value
+    Result<Header, ValueError>.Failure { error: _ } => {
+      let invalid = 1 / 0
+      return field(name, bytes)
+    }
+  }
+}
+
+pub fn main() -> i32 {
+  let entries = [field("Accept", b"text/html"), field("Vary", b"Accept"), field("ACCEPT", b"*/*")]
+  let headers = match Headers.make(&entries, limits()) {
+    Result<Headers, ValueError>.Success { value } => value
+    Result<Headers, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // Both Accept fields match, in their order.
+  let mut accept = Headers.getAll(&headers, "accept")
+  let mut count = 0
+  while true {
+    match HeaderIterator.next(&mut accept) {
+      Option<Header>.Some { value: _ } => {
+        count = count + 1
+      }
+      Option<Header>.None => {
+        break
+      }
+    }
+  }
+  if count != 2 {
+    return 1
+  }
+
+  // getUnique fails, because Accept occurs two times.
+  let unique = match Headers.getUnique(&headers, "Accept") {
+    Result<Option<Header>, ValueError>.Success { value: _ } => true
+    Result<Option<Header>, ValueError>.Failure { error: _ } => false
+  }
+  if unique {
+    return 1
+  }
+  let mut output: [u8; 64] = [0; 64]
+  let length = match Headers.formatInto(&headers, &mut output) {
+    Result<usize, ValueError>.Success { value } => value
+    Result<usize, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // "Accept: text/html\r\nVary: Accept\r\nACCEPT: */*\r\n"
+  if length != 46 {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `Headers` with `import silk.http_headers { Headers }`.
 
@@ -22,7 +106,7 @@ Public declarations: 6.
 pub struct Limits
 ```
 
-Explicit finite limits for HTTP values, fields, and owned storage.
+Maximum sizes for HTTP values, header lists, and copies.
 
 ::Anchor{id="Limits.maxMethodBytes"}
 
@@ -32,7 +116,7 @@ Explicit finite limits for HTTP values, fields, and owned storage.
 pub maxMethodBytes: usize
 ```
 
-Maximum method bytes.
+The maximum length of a method, in bytes.
 
 ::Anchor{id="Limits.maxTargetBytes"}
 
@@ -42,7 +126,7 @@ Maximum method bytes.
 pub maxTargetBytes: usize
 ```
 
-Maximum request-target bytes.
+The maximum length of a request target, in bytes.
 
 ::Anchor{id="Limits.maxNameBytes"}
 
@@ -52,7 +136,7 @@ Maximum request-target bytes.
 pub maxNameBytes: usize
 ```
 
-Maximum field-name bytes.
+The maximum length of a field name, in bytes.
 
 ::Anchor{id="Limits.maxValueBytes"}
 
@@ -62,7 +146,7 @@ Maximum field-name bytes.
 pub maxValueBytes: usize
 ```
 
-Maximum field-value and reason bytes.
+The maximum length of a field value or a reason phrase, in bytes.
 
 ::Anchor{id="Limits.maxFields"}
 
@@ -72,7 +156,7 @@ Maximum field-value and reason bytes.
 pub maxFields: usize
 ```
 
-Maximum fields in a collection.
+The maximum number of fields in a list.
 
 ::Anchor{id="Limits.maxFieldBytes"}
 
@@ -82,7 +166,7 @@ Maximum fields in a collection.
 pub maxFieldBytes: usize
 ```
 
-Maximum aggregate name-plus-value bytes.
+The maximum total length of all names and values in a list, in bytes.
 
 ::Anchor{id="Limits.maxOwnedBytes"}
 
@@ -92,7 +176,8 @@ Maximum aggregate name-plus-value bytes.
 pub maxOwnedBytes: usize
 ```
 
-Maximum owned payload capacities plus index storage bytes.
+The maximum memory for a copy, in bytes, including its index. See
+[`Headers.requiredOwnedBytes`](#Headers.impl.requiredOwnedBytes).
 
 ::Anchor{id="Limits.impl.Copy"}
 
@@ -110,7 +195,7 @@ impl Copy for Limits
 pub struct Headers<'value>
 ```
 
-An ordered borrowed collection of validated HTTP fields.
+An ordered list of header fields that borrows its fields.
 
 ::Anchor{id="Headers.impl.Copy"}
 
@@ -139,7 +224,7 @@ pub fn make(
   ) -> Result<Headers<'value>, ValueError>
 ```
 
-Validates collection budgets and borrows an existing field slice without allocating.
+Checks `entries` against `limits` and returns a list that borrows them. It does not allocate.
 
 ::Anchor{id="Headers.impl.count"}
 
@@ -149,7 +234,7 @@ Validates collection budgets and borrows an existing field slice without allocat
 pub fn count(self: &Self) -> usize
 ```
 
-Returns the number of fields, including duplicates.
+Returns the number of fields, including repeated fields.
 
 ::Anchor{id="Headers.impl.fieldBytes"}
 
@@ -159,7 +244,7 @@ Returns the number of fields, including duplicates.
 pub fn fieldBytes(self: &Self) -> usize
 ```
 
-Returns aggregate field-name plus field-value bytes.
+Returns the total length of all names and values, in bytes.
 
 ::Anchor{id="Headers.impl.iter"}
 
@@ -169,7 +254,7 @@ Returns aggregate field-name plus field-value bytes.
 pub fn iter(self: &Self) -> HeaderIterator<'value>
 ```
 
-Iterates every field in insertion order.
+Returns an iterator over all fields, in order.
 
 ::Anchor{id="Headers.impl.getAll"}
 
@@ -179,7 +264,7 @@ Iterates every field in insertion order.
 pub fn getAll(self: &Self, name: string<'value>) -> HeaderIterator<'value>
 ```
 
-Iterates every field whose name matches `name` ASCII case-insensitively.
+Returns an iterator over the fields named `name`, compared without case, in order.
 
 ::Anchor{id="Headers.impl.getFirst"}
 
@@ -189,7 +274,7 @@ Iterates every field whose name matches `name` ASCII case-insensitively.
 pub fn getFirst(self: &Self, name: string) -> Option<Header<'value>>
 ```
 
-Returns the first matching field without combining duplicates.
+Returns the first field named `name`, compared without case, or `None`.
 
 ::Anchor{id="Headers.impl.getUnique"}
 
@@ -199,7 +284,10 @@ Returns the first matching field without combining duplicates.
 pub fn getUnique(self: &Self, name: string) -> Result<Option<Header<'value>>, ValueError>
 ```
 
-Returns an absent or unique matching field and rejects a second match.
+Returns the field named `name`, or `None` if there is no such field.
+
+#### Errors
+- `LimitExceeded` with `UniqueField` if there is more than one such field.
 
 ::Anchor{id="Headers.impl.copy"}
 
@@ -212,7 +300,11 @@ pub effect fn copy(
   ) -> Result<OwnedHeaders, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies fields into independent byte and index storage under `maxOwnedBytes`.
+Copies all fields into new memory, so that the copy does not borrow them.
+
+#### Errors
+- `LimitExceeded` if the list exceeds `limits`. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="Headers.impl.copyMatching"}
 
@@ -226,12 +318,11 @@ pub effect fn copyMatching(
   ) -> Result<OwnedHeaders, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies only case-insensitively matching fields in their original order.
+Copies only the fields named `name`, compared without case, into new memory.
 
 #### Details
-
-All selected-field and owned-capacity limits are checked before allocation. Duplicate fields
-remain distinct and retain their original relative order.
+Repeated fields stay separate, in their order. `limits` applies to the copied fields only, and
+is checked before allocation.
 
 ::Anchor{id="Headers.impl.requiredOwnedBytes"}
 
@@ -241,7 +332,8 @@ remain distinct and retain their original relative order.
 pub fn requiredOwnedBytes(self: &Self) -> Result<usize, ValueError>
 ```
 
-Computes the payload-plus-index bytes required by an owned copy without allocating.
+Returns the memory that [`Headers.copy`](#Headers.impl.copy) needs, to compare with `maxOwnedBytes`. It does not
+allocate.
 
 ::Anchor{id="Headers.impl.formatInto"}
 
@@ -251,7 +343,8 @@ Computes the payload-plus-index bytes required by an owned copy without allocati
 pub fn formatInto(self: &Self, output: &mut [u8]) -> Result<usize, ValueError>
 ```
 
-Formats only ordered field lines into caller storage after a complete sizing pass.
+Writes `name: value\r\n` for each field to the start of `output`, and returns the length. It
+writes no start line and no empty line at the end.
 
 ::Anchor{id="Headers.impl.connectionTokens"}
 
@@ -261,7 +354,8 @@ Formats only ordered field lines into caller storage after a complete sizing pas
 pub fn connectionTokens(self: &Self) -> MetadataIterator<'value>
 ```
 
-Iterates Connection field tokens while retaining extension spelling.
+Returns an iterator over the options in all `Connection` fields, such as `close` or
+`keep-alive`.
 
 ::Anchor{id="Headers.impl.contentCodings"}
 
@@ -271,7 +365,7 @@ Iterates Connection field tokens while retaining extension spelling.
 pub fn contentCodings(self: &Self) -> MetadataIterator<'value>
 ```
 
-Iterates Content-Encoding codings while retaining extensions.
+Returns an iterator over the codings in all `Content-Encoding` fields, such as `gzip`.
 
 ::Anchor{id="Headers.impl.transferCodings"}
 
@@ -281,7 +375,8 @@ Iterates Content-Encoding codings while retaining extensions.
 pub fn transferCodings(self: &Self) -> MetadataIterator<'value>
 ```
 
-Iterates Transfer-Encoding codings and validates transfer parameters.
+Returns an iterator over the codings in all `Transfer-Encoding` fields, such as `chunked`. It
+also checks the parameters of each coding.
 
 ::Anchor{id="OwnedHeaders"}
 
@@ -291,7 +386,7 @@ Iterates Transfer-Encoding codings and validates transfer parameters.
 pub struct OwnedHeaders
 ```
 
-Independently owned HTTP field payloads and offset records.
+A header list that owns its memory. Get a [`Headers`](#Headers) from it with [`OwnedHeaders.view`](#OwnedHeaders.impl.view).
 
 ::Anchor{id="OwnedHeaders.impl"}
 
@@ -309,7 +404,7 @@ impl OwnedHeaders
 pub fn view<'value>(self: &'value Self) -> Headers<'value>
 ```
 
-Borrows an ordered collection view tied to this owner.
+Returns the fields as a [`Headers`](#Headers) that borrows this value.
 
 ::Anchor{id="OwnedHeaders.impl.ownedBytes"}
 
@@ -319,7 +414,7 @@ Borrows an ordered collection view tied to this owner.
 pub fn ownedBytes(self: &Self) -> usize
 ```
 
-Returns accounted payload-capacity plus record-storage bytes.
+Returns the memory that this copy uses, in bytes, as counted against `maxOwnedBytes`.
 
 ::Anchor{id="HeaderIterator"}
 
@@ -329,7 +424,7 @@ Returns accounted payload-capacity plus record-storage bytes.
 pub struct HeaderIterator<'value>
 ```
 
-An insertion-order iterator over all fields or one case-insensitive name.
+An iterator over header fields, in order. Get it from [`Headers.iter`](#Headers.impl.iter) or [`Headers.getAll`](#Headers.impl.getAll).
 
 ::Anchor{id="HeaderIterator.impl"}
 
@@ -347,7 +442,7 @@ impl<'value> HeaderIterator<'value>
 pub fn next(self: &mut Self) -> Option<Header<'value>>
 ```
 
-Returns the next matching field, preserving original name and value bytes.
+Returns the next field, or `None` at the end.
 
 ::Anchor{id="HeaderIterator.impl.fieldIndex"}
 
@@ -357,7 +452,7 @@ Returns the next matching field, preserving original name and value bytes.
 pub fn fieldIndex(self: &Self) -> usize
 ```
 
-Returns the source field index of the last yielded entry.
+Returns the position in the list of the last field from [`HeaderIterator.next`](#HeaderIterator.impl.next), from 0.
 
 ::Anchor{id="MetadataToken"}
 
@@ -367,7 +462,7 @@ Returns the source field index of the last yielded entry.
 pub struct MetadataToken<'value>
 ```
 
-One parsed metadata token borrowed from its source field.
+One item of a list field, such as `gzip` in `Content-Encoding: gzip, br`.
 
 ::Anchor{id="MetadataToken.impl.Copy"}
 
@@ -393,7 +488,7 @@ impl<'value> MetadataToken<'value>
 pub fn token(self: &Self) -> &'value [u8]
 ```
 
-Borrows the coding or connection-option token without parameters.
+Returns the name of the item, without parameters.
 
 ::Anchor{id="MetadataToken.impl.raw"}
 
@@ -403,7 +498,7 @@ Borrows the coding or connection-option token without parameters.
 pub fn raw(self: &Self) -> &'value [u8]
 ```
 
-Borrows the complete list member, including validated transfer parameters.
+Returns the whole item, with its parameters.
 
 ::Anchor{id="MetadataToken.impl.fieldIndex"}
 
@@ -413,7 +508,7 @@ Borrows the complete list member, including validated transfer parameters.
 pub fn fieldIndex(self: &Self) -> usize
 ```
 
-Returns the source collection field index.
+Returns the position in the list of the field that holds this item, from 0.
 
 ::Anchor{id="MetadataToken.impl.offset"}
 
@@ -423,7 +518,7 @@ Returns the source collection field index.
 pub fn offset(self: &Self) -> usize
 ```
 
-Returns the token's byte offset within the source field value.
+Returns the byte offset of the item in the field value.
 
 ::Anchor{id="MetadataToken.impl.matches"}
 
@@ -433,7 +528,7 @@ Returns the token's byte offset within the source field value.
 pub fn matches(self: &Self, known: string) -> bool
 ```
 
-Recognizes a known token ASCII case-insensitively without erasing extensions.
+Returns `true` if the name of the item equals `known`, compared without case.
 
 ::Anchor{id="MetadataIterator"}
 
@@ -443,7 +538,7 @@ Recognizes a known token ASCII case-insensitively without erasing extensions.
 pub struct MetadataIterator<'value>
 ```
 
-A lazy ordered iterator over selected HTTP metadata fields.
+An iterator over the items of list fields, such as `Connection` or `Content-Encoding`.
 
 ::Anchor{id="MetadataIterator.impl"}
 
@@ -461,6 +556,9 @@ impl<'value> MetadataIterator<'value>
 pub fn next(self: &mut Self) -> Result<Option<MetadataToken<'value>>, ValueError>
 ```
 
-Parses and returns the next metadata token or a located grammar failure.
+Returns the next item, or `None` at the end.
+
+#### Errors
+- `ValueError` with the location of the problem, if the field value is not a valid list.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

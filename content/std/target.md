@@ -1,11 +1,35 @@
-Typed compile-time facts for the selected compilation profile.
+Facts about the target machine of the current compilation: architecture, operating system, ABI,
+and pointer width.
 
 ## When to use
-Use [`arch`](#Target.impl.arch) and [`operatingSystem`](#Target.impl.operatingSystem) to select source behavior for a machine. Use [`pointerBits`](#pointerBits)
-for pointer-sized arithmetic. Read logical artifact and runtime requests through `silk.compilation`.
+Use [`Target`](#Target) with `static if` to select code for a machine, such as a system call for Linux or
+Darwin. Use [`pointerBits`](#pointerBits), [`usizeMax`](#usizeMax), and the other constants for pointer-sized arithmetic.
+Use `silk.compilation` for build choices, such as the artifact kind or the safety policy.
 
 ## Details
-These facts are fixed before static evaluation. They have no runtime storage.
+The compiler fixes these facts before static evaluation, from the selected target. They do not
+depend on the host machine. They have no runtime storage, so a selection adds no runtime cost.
+
+## Examples
+### Select a value for the pointer width
+```silk
+import silk.target { Target, Arch }
+
+fn wordBytes() -> i32 {
+  static if Target.arch() == Arch.Wasm32 {
+    return 4
+  }
+  return 8
+}
+
+pub fn main() -> i32 {
+  let bytes = wordBytes()
+  if bytes != 4 && bytes != 8 {
+    return 1
+  }
+  return 0
+}
+```
 
 Import as `Target` with `import silk.target { Target }`.
 
@@ -19,7 +43,11 @@ Public declarations: 11.
 pub enum Arch
 ```
 
-The instruction-set architectures supported by the compiler.
+The instruction set architectures that the compiler supports.
+
+### Details
+
+Read the target value with [`Target.arch`](#Target.impl.arch).
 
 ::Anchor{id="Arch.Aarch64"}
 
@@ -29,7 +57,7 @@ The instruction-set architectures supported by the compiler.
 Aarch64
 ```
 
-The Aarch64 choice.
+64-bit Arm (AArch64).
 
 ::Anchor{id="Arch.Wasm32"}
 
@@ -39,7 +67,7 @@ The Aarch64 choice.
 Wasm32
 ```
 
-The Wasm32 choice.
+32-bit WebAssembly.
 
 ::Anchor{id="Arch.X86_64"}
 
@@ -49,7 +77,7 @@ The Wasm32 choice.
 X86_64
 ```
 
-The X86_64 choice.
+64-bit x86 (x86-64).
 
 ::Anchor{id="OperatingSystem"}
 
@@ -59,7 +87,11 @@ The X86_64 choice.
 pub enum OperatingSystem
 ```
 
-The operating systems supported by the compiler.
+The operating systems that the compiler supports.
+
+### Details
+
+Read the target value with [`Target.operatingSystem`](#Target.impl.operatingSystem).
 
 ::Anchor{id="OperatingSystem.Darwin"}
 
@@ -69,7 +101,7 @@ The operating systems supported by the compiler.
 Darwin
 ```
 
-The Darwin choice.
+Darwin (macOS).
 
 ::Anchor{id="OperatingSystem.Linux"}
 
@@ -79,7 +111,7 @@ The Darwin choice.
 Linux
 ```
 
-The Linux choice.
+Linux.
 
 ::Anchor{id="OperatingSystem.Freestanding"}
 
@@ -89,7 +121,7 @@ The Linux choice.
 Freestanding
 ```
 
-The Freestanding choice.
+No operating system, such as WebAssembly without a host interface.
 
 ::Anchor{id="Abi"}
 
@@ -99,7 +131,11 @@ The Freestanding choice.
 pub enum Abi
 ```
 
-The platform calling conventions supported by the compiler.
+The platform calling conventions that the compiler supports.
+
+### Details
+
+Read the target value with [`Target.abi`](#Target.impl.abi).
 
 ::Anchor{id="Abi.Apple"}
 
@@ -109,7 +145,7 @@ The platform calling conventions supported by the compiler.
 Apple
 ```
 
-The Apple choice.
+The Apple calling convention.
 
 ::Anchor{id="Abi.Gnu"}
 
@@ -119,7 +155,7 @@ The Apple choice.
 Gnu
 ```
 
-The Gnu choice.
+The GNU calling convention.
 
 ::Anchor{id="Abi.Wasm"}
 
@@ -129,7 +165,7 @@ The Gnu choice.
 Wasm
 ```
 
-The Wasm choice.
+The WebAssembly calling convention.
 
 ::Anchor{id="ObjectFormat"}
 
@@ -139,7 +175,11 @@ The Wasm choice.
 pub enum ObjectFormat
 ```
 
-The object-file formats supported by the compiler.
+The object file formats that the compiler supports.
+
+### Details
+
+Read the target value with [`Target.objectFormat`](#Target.impl.objectFormat).
 
 ::Anchor{id="ObjectFormat.MachO"}
 
@@ -149,7 +189,7 @@ The object-file formats supported by the compiler.
 MachO
 ```
 
-The MachO choice.
+Mach-O, the format of Darwin.
 
 ::Anchor{id="ObjectFormat.Elf"}
 
@@ -159,7 +199,7 @@ The MachO choice.
 Elf
 ```
 
-The Elf choice.
+ELF, the format of Linux.
 
 ::Anchor{id="ObjectFormat.Wasm"}
 
@@ -169,7 +209,7 @@ The Elf choice.
 Wasm
 ```
 
-The Wasm choice.
+The WebAssembly binary format.
 
 ::Anchor{id="Endianness"}
 
@@ -179,7 +219,11 @@ The Wasm choice.
 pub enum Endianness
 ```
 
-The byte orders supported by the compiler.
+The byte orders that the compiler supports.
+
+### Details
+
+Read the target value with [`Target.endianness`](#Target.impl.endianness).
 
 ::Anchor{id="Endianness.Little"}
 
@@ -189,7 +233,7 @@ The byte orders supported by the compiler.
 Little
 ```
 
-The Little choice.
+Little-endian. The least significant byte is at the lowest address.
 
 ::Anchor{id="pointerBits"}
 
@@ -199,7 +243,7 @@ The Little choice.
 pub const pointerBits: u32
 ```
 
-The pointer width of the selected compilation target, in bits.
+The width of a pointer on the target, in bits: 32 or 64.
 
 ::Anchor{id="usizeMax"}
 
@@ -209,7 +253,7 @@ The pointer width of the selected compilation target, in bits.
 pub const usizeMax: usize
 ```
 
-The greatest `usize` value supported by the selected compilation target.
+The maximum `usize` value on the target: `2^32 - 1` or `2^64 - 1`.
 
 ::Anchor{id="isizeMax"}
 
@@ -219,7 +263,7 @@ The greatest `usize` value supported by the selected compilation target.
 pub const isizeMax: isize
 ```
 
-The greatest `isize` value supported by the selected compilation target.
+The maximum `isize` value on the target: `2^31 - 1` or `2^63 - 1`.
 
 ::Anchor{id="isizeMin"}
 
@@ -229,7 +273,7 @@ The greatest `isize` value supported by the selected compilation target.
 pub const isizeMin: isize
 ```
 
-The least `isize` value supported by the selected compilation target.
+The minimum `isize` value on the target: `-2^31` or `-2^63`.
 
 ::Anchor{id="pointerAlignment"}
 
@@ -239,7 +283,7 @@ The least `isize` value supported by the selected compilation target.
 pub const pointerAlignment: u32
 ```
 
-The alignment of a data pointer, in bytes.
+The alignment of a data pointer on the target, in bytes.
 
 ::Anchor{id="Target"}
 
@@ -249,12 +293,11 @@ The alignment of a data pointer, in bytes.
 pub struct Target
 ```
 
-The scope for Target operations.
+The owner type of the target queries. It has no fields and is never constructed.
 
 ### Details
 
-This owner carries no data. Select it with `import silk.target { Target }`
-to access its inherent operations.
+Each operation is `static`. Use it in a `static if`, a `static fn`, or a `const` initializer.
 
 ::Anchor{id="Target.impl"}
 
@@ -272,7 +315,7 @@ impl Target
 pub static fn arch() -> Arch
 ```
 
-Returns the selected Arch during static evaluation.
+Returns the instruction set architecture of the target.
 
 ::Anchor{id="Target.impl.operatingSystem"}
 
@@ -282,7 +325,7 @@ Returns the selected Arch during static evaluation.
 pub static fn operatingSystem() -> OperatingSystem
 ```
 
-Returns the selected OperatingSystem during static evaluation.
+Returns the operating system of the target.
 
 ::Anchor{id="Target.impl.abi"}
 
@@ -292,7 +335,7 @@ Returns the selected OperatingSystem during static evaluation.
 pub static fn abi() -> Abi
 ```
 
-Returns the selected Abi during static evaluation.
+Returns the calling convention of the target.
 
 ::Anchor{id="Target.impl.objectFormat"}
 
@@ -302,7 +345,7 @@ Returns the selected Abi during static evaluation.
 pub static fn objectFormat() -> ObjectFormat
 ```
 
-Returns the selected ObjectFormat during static evaluation.
+Returns the object file format of the target.
 
 ::Anchor{id="Target.impl.endianness"}
 
@@ -312,7 +355,7 @@ Returns the selected ObjectFormat during static evaluation.
 pub static fn endianness() -> Endianness
 ```
 
-Returns the selected Endianness during static evaluation.
+Returns the byte order of the target.
 
 ::Anchor{id="Target.impl.cpu"}
 
@@ -322,7 +365,7 @@ Returns the selected Endianness during static evaluation.
 pub static fn cpu() -> string<'static>
 ```
 
-Returns the logical cpu selection.
+Returns the name of the CPU model that the build selects, as written in the compilation profile.
 
 ::Anchor{id="Target.impl.deployment"}
 
@@ -332,7 +375,8 @@ Returns the logical cpu selection.
 pub static fn deployment() -> string<'static>
 ```
 
-Returns the logical deployment selection.
+Returns the minimum platform version that the build selects, as written in the compilation
+profile.
 
 ::Anchor{id="Target.impl.hasCpuFeature"}
 
@@ -342,6 +386,10 @@ Returns the logical deployment selection.
 pub static fn hasCpuFeature(value: string<'static>) -> bool
 ```
 
-Whether a canonical CPU feature is enabled.
+Returns `true` if the build enables the CPU feature `value`.
+
+#### Details
+
+`value` is a canonical feature name of the target, as written in the compilation profile.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

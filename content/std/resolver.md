@@ -1,20 +1,151 @@
-Finite, provider-replaceable host resolution policy.
+Turn a host and a port into a list of endpoints to connect to.
 
 ## When to use
-
-Build a ResolveRequest from an owned Host and call Resolver.resolve. Numeric hosts are handled
-locally; domain hosts dispatch to the lexically supplied Resolver provider.
+Make a [`ResolveRequest`](#ResolveRequest) from a `Host` and a `Port`, and call [`Resolver.resolve`](#Resolver.impl.resolve). A numeric
+host gives one endpoint without a lookup. A domain name goes to the `Resolver` provider. Use
+`silk.native_resolver` in a native program, or give your own provider, for example in tests.
 
 ## Details
+The result keeps the order of the provider, removes exact duplicates, and keeps only the
+addresses of the [`FamilySelection`](#FamilySelection). It holds at most the `maxResults` of the request, and
+never more than 64.
 
-Results own at most 64 endpoints, preserve provider order, and deduplicate exact addresses.
-A deadline on a numeric host is checked against exactly one MonotonicClock sample. Domain
-providers either enforce their deadline with structured cancellation or reject it before work.
+## Errors
+- `NoAddress` if no address of the selected family remains.
+- `LimitExceeded` if there are more distinct endpoints than `maxResults`. The result is never
+  cut short.
+- `Timeout` if the deadline of a numeric request has passed.
+- Other [`ResolverError`](#ResolverError) values come from the provider.
 
 ## Gotchas
+For a domain name, the provider decides how to use the deadline. `NativeSystemResolver` cannot
+stop a lookup, so it returns `DeadlineUnsupported` for a domain request with a deadline.
+`maxResults` limits only the result, not the work of the provider.
 
-The result bound limits published endpoints only. It does not bound a provider's internal
-allocation, traversal, elapsed time, or host-scheduler blockage.
+## Examples
+### Resolve with a test provider
+This provider returns the same endpoints for every name. The duplicate and the IPv6 address are
+removed from the result.
+
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.monotonic_clock { MonotonicClock }
+import silk.network_address {
+  AddressError,
+  DomainHost,
+  Endpoint,
+  Host,
+  IpAddress,
+  Ipv4Address,
+  Ipv6Address,
+  Port
+}
+import silk.option { Option }
+import silk.result { Result }
+import silk.resolver { FamilySelection, ResolveRequest, ResolvedEndpoints, Resolver, ResolverError }
+import silk.system_clock { Instant, SystemClock }
+import silk.u64
+
+struct FixedResolver {}
+
+impl FixedResolver {
+  effect fn resolveDomain(
+    self: &mut Self,
+    request: &ResolveRequest,
+    domain: &DomainHost,
+  ) -> ResolvedEndpoints
+    ! ResolverError | OutOfMemoryError
+    ? &mut Allocator {
+    drop domain
+    let port = ResolveRequest.port(request)
+    let mut result = match ResolvedEndpoints.make(8) {
+      Result<ResolvedEndpoints, ResolverError>.Success { value } => move value
+      Result<ResolvedEndpoints, ResolverError>.Failure { error } => {
+        fail move error
+      }
+    }
+    let first = IpAddress.V4 { value: Ipv4Address.fromOctets([192, 0, 2, 1]) }
+    let second = IpAddress.V6 { value: Ipv6Address.fromOctets([0; 16]) }
+    let added = run ResolvedEndpoints.admit(&mut result, Endpoint.make(first, port))
+    let same = run ResolvedEndpoints.admit(&mut result, Endpoint.make(first, port))
+    let other = run ResolvedEndpoints.admit(&mut result, Endpoint.make(second, port))
+    return move result
+  }
+}
+
+impl Resolver for FixedResolver {
+  resolveDomain: FixedResolver.resolveDomain
+}
+
+struct FixedMonotonic {}
+
+impl MonotonicClock for FixedMonotonic {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return u64.toU64(1)
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    drop when
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    drop howLong
+    return ()
+  }
+}
+
+effect fn program() -> i32
+  ! ResolverError | OutOfMemoryError {
+  let host = match Host.parse(b"example.com") {
+    Result<Host, AddressError>.Success { value } => value
+    Result<Host, AddressError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let request = match ResolveRequest.make(
+    host,
+    Port.fromU16(443),
+    FamilySelection.V4,
+    4,
+    Option<Instant>.none(),
+  ) {
+    Result<ResolveRequest, ResolverError>.Success { value } => move value
+    Result<ResolveRequest, ResolverError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut resolver = FixedResolver {}
+  let mut clock = FixedMonotonic {}
+  let endpoints = run Resolver.resolve(&request) |> Effect.provideMut<Resolver>(&mut resolver)
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  if ResolvedEndpoints.length(&endpoints) != 1 {
+    return 1
+  }
+  let endpoint = ResolvedEndpoints.get(&endpoints, 0)
+  let address = Endpoint.address(&endpoint)
+  if !IpAddress.isV4(&address) || Port.value(&Endpoint.port(&endpoint)) != 443 {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
+```
 
 Import as `Resolver` with `import silk.resolver { Resolver }`.
 
@@ -28,7 +159,7 @@ Public declarations: 9.
 pub enum FamilySelection
 ```
 
-The admitted address families for one resolution.
+The address families to keep in a result.
 
 ::Anchor{id="FamilySelection.Any"}
 
@@ -38,7 +169,7 @@ The admitted address families for one resolution.
 Any
 ```
 
-Accepts both IPv4 and IPv6 results.
+Keep IPv4 and IPv6 addresses.
 
 ::Anchor{id="FamilySelection.V4"}
 
@@ -48,7 +179,7 @@ Accepts both IPv4 and IPv6 results.
 V4
 ```
 
-An IPv4 address.
+Keep only IPv4 addresses.
 
 ::Anchor{id="FamilySelection.V6"}
 
@@ -58,7 +189,7 @@ An IPv4 address.
 V6
 ```
 
-An IPv6 address.
+Keep only IPv6 addresses.
 
 ::Anchor{id="ResolverInputReason"}
 
@@ -68,7 +199,7 @@ An IPv6 address.
 pub enum ResolverInputReason
 ```
 
-The failed request admission rule.
+The reason that a `maxResults` value is not valid.
 
 ::Anchor{id="ResolverInputReason.ZeroResults"}
 
@@ -78,7 +209,7 @@ The failed request admission rule.
 ZeroResults
 ```
 
-The requested result limit is zero.
+`maxResults` is 0.
 
 ::Anchor{id="ResolverInputReason.TooManyResults"}
 
@@ -88,7 +219,7 @@ The requested result limit is zero.
 TooManyResults
 ```
 
-The requested result limit exceeds 64.
+`maxResults` is more than 64.
 
 ::Anchor{id="NativeResolverOperation"}
 
@@ -98,7 +229,7 @@ The requested result limit exceeds 64.
 pub enum NativeResolverOperation
 ```
 
-The native operation that produced a wrapped host failure.
+The system call that failed in a native provider.
 
 ::Anchor{id="NativeResolverOperation.GetAddrInfo"}
 
@@ -108,7 +239,7 @@ The native operation that produced a wrapped host failure.
 GetAddrInfo
 ```
 
-Native getaddrinfo host resolution.
+The `getaddrinfo` call.
 
 ::Anchor{id="NativeResultReason"}
 
@@ -118,7 +249,7 @@ Native getaddrinfo host resolution.
 pub enum NativeResultReason
 ```
 
-The reason a successful native result chain was rejected.
+The reason that a native provider rejected a successful `getaddrinfo` result.
 
 ::Anchor{id="NativeResultReason.NullChain"}
 
@@ -168,7 +299,7 @@ A native address is shorter than its family requires.
 pub union ResolverError
 ```
 
-A typed host-resolution failure.
+The error from a resolution.
 
 ::Anchor{id="ResolverError.InvalidInput"}
 
@@ -178,7 +309,7 @@ A typed host-resolution failure.
 InvalidInput
 ```
 
-The resolution request failed pure admission.
+The `maxResults` of the request is not valid.
 
 ::Anchor{id="ResolverError.InvalidInput.reason"}
 
@@ -188,7 +319,7 @@ The resolution request failed pure admission.
 pub reason: ResolverInputReason
 ```
 
-The admission rule that rejected the request or native result.
+The rule that failed.
 
 ::Anchor{id="ResolverError.InvalidInput.value"}
 
@@ -198,7 +329,7 @@ The admission rule that rejected the request or native result.
 pub value: usize
 ```
 
-The rejected result-count limit.
+The `maxResults` that you gave.
 
 ::Anchor{id="ResolverError.UnsupportedForm"}
 
@@ -208,7 +339,7 @@ The rejected result-count limit.
 UnsupportedForm
 ```
 
-The input uses an unsupported host form.
+The provider does not support this form of host.
 
 ::Anchor{id="ResolverError.Timeout"}
 
@@ -218,7 +349,7 @@ The input uses an unsupported host form.
 Timeout
 ```
 
-The supplied absolute deadline has been reached.
+The deadline of the request has passed.
 
 ::Anchor{id="ResolverError.DeadlineUnsupported"}
 
@@ -228,7 +359,7 @@ The supplied absolute deadline has been reached.
 DeadlineUnsupported
 ```
 
-The selected provider cannot enforce the supplied deadline.
+The provider cannot stop a lookup at a deadline, so it did not start.
 
 ::Anchor{id="ResolverError.NoAddress"}
 
@@ -238,7 +369,7 @@ The selected provider cannot enforce the supplied deadline.
 NoAddress
 ```
 
-No admitted address remains after selection.
+No address of the selected family was found.
 
 ::Anchor{id="ResolverError.NameNotFound"}
 
@@ -248,7 +379,7 @@ No admitted address remains after selection.
 NameNotFound
 ```
 
-The requested host name was not found.
+The name does not exist.
 
 ::Anchor{id="ResolverError.TemporaryFailure"}
 
@@ -258,7 +389,7 @@ The requested host name was not found.
 TemporaryFailure
 ```
 
-The host lookup reported a temporary failure.
+The lookup failed for a temporary reason, for example a DNS server timeout. Try again later.
 
 ::Anchor{id="ResolverError.FamilyUnsupported"}
 
@@ -268,7 +399,7 @@ The host lookup reported a temporary failure.
 FamilyUnsupported
 ```
 
-The requested address family is unsupported.
+The system does not support the selected family.
 
 ::Anchor{id="ResolverError.SystemResources"}
 
@@ -278,7 +409,7 @@ The requested address family is unsupported.
 SystemResources
 ```
 
-The operating system cannot supply the required resources.
+The system did not have the resources, such as memory, for the lookup.
 
 ::Anchor{id="ResolverError.LimitExceeded"}
 
@@ -288,7 +419,7 @@ The operating system cannot supply the required resources.
 LimitExceeded
 ```
 
-The distinct endpoint count exceeds the requested result limit.
+The lookup found more distinct endpoints than `maxResults`.
 
 ::Anchor{id="ResolverError.LimitExceeded.maximum"}
 
@@ -298,7 +429,7 @@ The distinct endpoint count exceeds the requested result limit.
 pub maximum: usize
 ```
 
-The maximum number of distinct endpoints allowed in the result.
+The `maxResults` of the request.
 
 ::Anchor{id="ResolverError.InvalidNativeResult"}
 
@@ -308,7 +439,7 @@ The maximum number of distinct endpoints allowed in the result.
 InvalidNativeResult
 ```
 
-A successful native result failed validation.
+The system returned a result that is not valid.
 
 ::Anchor{id="ResolverError.InvalidNativeResult.reason"}
 
@@ -318,7 +449,7 @@ A successful native result failed validation.
 pub reason: NativeResultReason
 ```
 
-The admission rule that rejected the request or native result.
+The problem in the result.
 
 ::Anchor{id="ResolverError.InvalidNativeResult.index"}
 
@@ -328,7 +459,7 @@ The admission rule that rejected the request or native result.
 pub index: usize
 ```
 
-The zero-based native result-chain index.
+The position of the bad entry in the result list, from 0.
 
 ::Anchor{id="ResolverError.NativeFailure"}
 
@@ -338,7 +469,7 @@ The zero-based native result-chain index.
 NativeFailure
 ```
 
-A native boundary failed with the retained operation and error number.
+The system lookup failed with a code that has no other variant.
 
 ::Anchor{id="ResolverError.NativeFailure.operation"}
 
@@ -348,7 +479,7 @@ A native boundary failed with the retained operation and error number.
 pub operation: NativeResolverOperation
 ```
 
-The native operation that reported this failure.
+The call that failed.
 
 ::Anchor{id="ResolverError.NativeFailure.eai"}
 
@@ -358,7 +489,7 @@ The native operation that reported this failure.
 pub eai: i32
 ```
 
-The exact getaddrinfo error code.
+The `EAI_*` code from `getaddrinfo`.
 
 ::Anchor{id="ResolverError.NativeFailure.errno"}
 
@@ -368,7 +499,7 @@ The exact getaddrinfo error code.
 pub errno: Option<i32>
 ```
 
-The system error number when getaddrinfo reports a system failure.
+The `errno` value, when the code is `EAI_SYSTEM`.
 
 ::Anchor{id="ResolveRequest"}
 
@@ -378,7 +509,8 @@ The system error number when getaddrinfo reports a system failure.
 pub struct ResolveRequest
 ```
 
-One finite owned resolution request.
+What to resolve: a host, a port, the families to keep, the maximum result count, and an optional
+deadline. Make it with [`ResolveRequest.make`](#ResolveRequest.impl.make).
 
 ::Anchor{id="ResolvedEndpoints"}
 
@@ -388,7 +520,7 @@ One finite owned resolution request.
 pub struct ResolvedEndpoints
 ```
 
-One finite owned sequence of resolved endpoints.
+The endpoints of a resolution, without duplicates, in the order of the provider.
 
 ::Anchor{id="Admission"}
 
@@ -398,7 +530,7 @@ One finite owned sequence of resolved endpoints.
 pub enum Admission
 ```
 
-Whether one candidate changed a result builder.
+The result of [`ResolvedEndpoints.admit`](#ResolvedEndpoints.impl.admit).
 
 ::Anchor{id="Admission.Added"}
 
@@ -408,7 +540,7 @@ Whether one candidate changed a result builder.
 Added
 ```
 
-The candidate was appended to the owned result.
+The endpoint was added.
 
 ::Anchor{id="Admission.Duplicate"}
 
@@ -418,7 +550,7 @@ The candidate was appended to the owned result.
 Duplicate
 ```
 
-An equal endpoint was already present.
+An equal endpoint is already in the list, so nothing changed.
 
 ::Anchor{id="ResolveRequest.impl"}
 
@@ -442,7 +574,12 @@ pub fn make(
   ) -> Result<ResolveRequest, ResolverError>
 ```
 
-Admits an owned host, checked port, finite capacity, family, and optional absolute deadline.
+Returns a request.
+
+`maxResults` is from 1 to 64. `deadline` is a time on the `MonotonicClock`.
+
+#### Errors
+- `InvalidInput` if `maxResults` is 0 or more than 64.
 
 ::Anchor{id="ResolveRequest.impl.host"}
 
@@ -452,7 +589,7 @@ Admits an owned host, checked port, finite capacity, family, and optional absolu
 pub fn host(self: &Self) -> Host
 ```
 
-Returns the owned host by value.
+Returns the host.
 
 ::Anchor{id="ResolveRequest.impl.port"}
 
@@ -462,7 +599,7 @@ Returns the owned host by value.
 pub fn port(self: &Self) -> Port
 ```
 
-Returns the checked port by value.
+Returns the port.
 
 ::Anchor{id="ResolveRequest.impl.family"}
 
@@ -472,7 +609,7 @@ Returns the checked port by value.
 pub fn family(self: &Self) -> FamilySelection
 ```
 
-Returns the selected address family.
+Returns the families to keep.
 
 ::Anchor{id="ResolveRequest.impl.maxResults"}
 
@@ -482,7 +619,7 @@ Returns the selected address family.
 pub fn maxResults(self: &Self) -> usize
 ```
 
-Returns the finite result capacity.
+Returns the maximum number of endpoints in the result.
 
 ::Anchor{id="ResolveRequest.impl.hasDeadline"}
 
@@ -492,7 +629,7 @@ Returns the finite result capacity.
 pub fn hasDeadline(self: &Self) -> bool
 ```
 
-Reports whether the request carries an absolute deadline.
+Returns `true` if the request has a deadline.
 
 ::Anchor{id="ResolveRequest.impl.deadline"}
 
@@ -502,7 +639,8 @@ Reports whether the request carries an absolute deadline.
 pub fn deadline(self: &Self) -> Option<Instant>
 ```
 
-Returns the optional absolute deadline for a provider that can enforce it.
+Returns the deadline, if there is one. A provider that cannot keep it returns
+`DeadlineUnsupported`.
 
 ::Anchor{id="ResolvedEndpoints.impl"}
 
@@ -520,7 +658,7 @@ impl ResolvedEndpoints
 pub fn make(maximum: usize) -> Result<ResolvedEndpoints, ResolverError>
 ```
 
-Creates an empty finite builder after validating its capacity.
+Returns an empty list that holds at most `maximum` endpoints, from 1 to 64.
 
 ::Anchor{id="ResolvedEndpoints.impl.length"}
 
@@ -530,7 +668,7 @@ Creates an empty finite builder after validating its capacity.
 pub fn length(self: &Self) -> usize
 ```
 
-Returns the number of admitted endpoints.
+Returns the number of endpoints.
 
 ::Anchor{id="ResolvedEndpoints.impl.get"}
 
@@ -540,7 +678,7 @@ Returns the number of admitted endpoints.
 pub fn get(self: &Self, index: usize) -> Endpoint
 ```
 
-Returns a copied endpoint at a valid index.
+Returns the endpoint at `index`. `index` must be less than [`ResolvedEndpoints.length`](#ResolvedEndpoints.impl.length).
 
 ::Anchor{id="ResolvedEndpoints.impl.asSlice"}
 
@@ -550,7 +688,7 @@ Returns a copied endpoint at a valid index.
 pub fn asSlice(self: &Self) -> &[Endpoint]
 ```
 
-Borrows the admitted endpoint prefix.
+Returns the endpoints as a slice.
 
 ::Anchor{id="ResolvedEndpoints.impl.admit"}
 
@@ -562,7 +700,10 @@ pub effect fn admit(self: &mut Self, endpoint: Endpoint) -> Admission
   ? &mut Allocator
 ```
 
-Adds one stable-distinct endpoint, or fails instead of truncating beyond the capacity.
+Adds `endpoint` to the end of the list, if it is not in the list yet.
+
+#### Errors
+- `LimitExceeded` if the list is full and `endpoint` is new.
 
 ::Anchor{id="Resolver"}
 
@@ -572,7 +713,7 @@ Adds one stable-distinct endpoint, or fails instead of truncating beyond the cap
 pub service Resolver
 ```
 
-A replaceable domain-only resolver provider.
+The service that looks up domain names. [`Resolver.resolve`](#Resolver.impl.resolve) calls it only for domain names.
 
 ::Anchor{id="Resolver.resolveDomain"}
 
@@ -587,7 +728,8 @@ effect fn resolveDomain(
   ? &mut Resolver | &mut Allocator
 ```
 
-Resolves one admitted domain request and owns all returned endpoint storage.
+Looks up `domain` and returns its endpoints, with the port of `request`. [`Resolver.resolve`](#Resolver.impl.resolve)
+filters the families and removes duplicates after this call.
 
 ::Anchor{id="Resolver.impl"}
 
@@ -607,6 +749,9 @@ pub effect fn resolve(request: &ResolveRequest) -> ResolvedEndpoints
   ? &mut Resolver | &mut Allocator | &mut MonotonicClock
 ```
 
-Resolves one owned host with finite results and exact numeric deadline preflight.
+Returns the endpoints for `request`.
+
+A numeric host gives one endpoint, without the provider. A domain name calls
+[`Resolver.resolveDomain`](#Resolver.resolveDomain) on the provider.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

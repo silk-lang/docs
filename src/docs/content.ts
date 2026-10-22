@@ -6,9 +6,15 @@ import { type DocPage, pageKey } from './catalog'
 
 // Each markdown file becomes its own chunk, so a page only downloads the
 // document it shows. The prerendered HTML carries the first document as Flags.
+// A position prefix in a file name is not part of the key, so
+// content/book/04-ownership.md is the page book/ownership.
 const loaders = Record.mapKeys(
   import.meta.glob<{ default: unknown }>('/content/**/*.md'),
-  path => path.replace(/^\/content\//, '').replace(/\.md$/, ''),
+  path =>
+    path
+      .replace(/^\/content\//, '')
+      .replace(/\/\d+-/, '/')
+      .replace(/\.md$/, ''),
 )
 
 export class MissingDocument extends Data.TaggedError('MissingDocument')<{

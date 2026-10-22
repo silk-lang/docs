@@ -81,6 +81,18 @@ export const tableOfContents = (
   )
 }
 
+// The page header already shows the title, so a hand-written page's own H1
+// is not rendered a second time.
+const withoutTitle = (
+  blocks: ReadonlyArray<Markdown.Block>,
+): ReadonlyArray<Markdown.Block> =>
+  pipe(
+    Array.head(blocks),
+    Option.exists(block => block._tag === 'Heading' && block.level === 1),
+  )
+    ? Array.drop(blocks, 1)
+    : blocks
+
 // The first paragraph of a page reads as its lede, like the design's article intro.
 export const splitLede = (
   document: Markdown.MarkdownDocument,
@@ -88,17 +100,19 @@ export const splitLede = (
   maybeLede: Option.Option<Markdown.Paragraph>
   body: Markdown.MarkdownDocument
 }> =>
-  pipe(
-    Array.head(document.blocks),
-    Option.filter(block => block._tag === 'Paragraph'),
-    Option.match({
-      onNone: () => ({ maybeLede: Option.none(), body: document }),
-      onSome: block => ({
-        maybeLede:
-          block._tag === 'Paragraph' ? Option.some(block) : Option.none(),
-        body: { blocks: Array.drop(document.blocks, 1) },
+  pipe(withoutTitle(document.blocks), blocks =>
+    pipe(
+      Array.head(blocks),
+      Option.filter(block => block._tag === 'Paragraph'),
+      Option.match({
+        onNone: () => ({ maybeLede: Option.none(), body: { blocks } }),
+        onSome: block => ({
+          maybeLede:
+            block._tag === 'Paragraph' ? Option.some(block) : Option.none(),
+          body: { blocks: Array.drop(blocks, 1) },
+        }),
       }),
-    }),
+    ),
   )
 
 // VIEW

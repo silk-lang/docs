@@ -1,5 +1,5 @@
 // Copies the language reference and the standard library API reference from a
-// silk-lang/silk checkout into content/, and writes the sidebar groups for
+// silk-lang/silk checkout into content/spec and content/std, and writes the sidebar groups for
 // them to src/docs/generated.ts.
 //
 //   pnpm sync-docs ../silk
@@ -31,8 +31,10 @@ const docsRoot = resolve(import.meta.dirname, '..')
 // GROUPS
 
 // The order of the language reference follows reference/index.md, regrouped
-// so the sidebar reads from the language core outward. Files that are not
-// listed here still sync, into a trailing group, with a warning.
+// so the sidebar reads from the language core outward. On the site it is the
+// specification (/docs/spec), next to the hand-written reference in
+// content/reference. Files that are not listed here still sync, into a
+// trailing group, with a warning.
 
 type GroupSpec = Readonly<{
   key: string
@@ -43,7 +45,7 @@ type GroupSpec = Readonly<{
 const referenceGroups: ReadonlyArray<GroupSpec> = [
   {
     key: 'language',
-    title: 'Language reference',
+    title: 'Spec: language',
     slugs: [
       'overview',
       'lexical-form',
@@ -67,7 +69,7 @@ const referenceGroups: ReadonlyArray<GroupSpec> = [
   },
   {
     key: 'effects',
-    title: 'Effects and services',
+    title: 'Spec: effects and services',
     slugs: [
       'effects-and-execution',
       'effect-contracts',
@@ -80,7 +82,7 @@ const referenceGroups: ReadonlyArray<GroupSpec> = [
   },
   {
     key: 'platform',
-    title: 'Platform and tooling',
+    title: 'Spec: platform and tooling',
     slugs: [
       'compilation-profiles',
       'selected-source-tooling',
@@ -104,7 +106,7 @@ const referenceGroups: ReadonlyArray<GroupSpec> = [
   },
   {
     key: 'library-contracts',
-    title: 'Library contracts',
+    title: 'Spec: library contracts',
     slugs: [
       'base64',
       'buffered-byte-io',
@@ -128,7 +130,7 @@ const referenceGroups: ReadonlyArray<GroupSpec> = [
   },
   {
     key: 'style',
-    title: 'Style guides',
+    title: 'Spec: style guides',
     slugs: ['style-guide', 'documentation-style-guide'],
   },
 ]
@@ -136,7 +138,7 @@ const referenceGroups: ReadonlyArray<GroupSpec> = [
 // SOURCE PAGES
 
 type SourcePage = Readonly<{
-  directory: 'reference' | 'std'
+  directory: 'spec' | 'std'
   slug: string
   sourcePath: string
 }>
@@ -154,7 +156,7 @@ const markdownFiles = (directory: string): ReadonlyArray<string> =>
 
 const sourcePages = (silkRoot: string): ReadonlyArray<SourcePage> => [
   ...markdownFiles(join(silkRoot, 'reference')).map(fileName => ({
-    directory: 'reference' as const,
+    directory: 'spec' as const,
     slug: fileName === 'index.md' ? 'overview' : basename(fileName, '.md'),
     sourcePath: `reference/${fileName}`,
   })),
@@ -179,8 +181,8 @@ const routeForSourcePath = (sourcePath: string): string | undefined => {
   const reference = sourcePath.match(/^reference\/([^/]+)\.md$/)
   if (reference) {
     return reference[1] === 'index'
-      ? '/docs/reference/overview'
-      : `/docs/reference/${reference[1]}`
+      ? '/docs/spec/overview'
+      : `/docs/spec/${reference[1]}`
   }
   return undefined
 }
@@ -414,7 +416,7 @@ const main = (): void => {
     }
   })
 
-  for (const directory of ['reference', 'std']) {
+  for (const directory of ['spec', 'std']) {
     rmSync(join(docsRoot, 'content', directory), {
       recursive: true,
       force: true,
@@ -430,7 +432,7 @@ const main = (): void => {
 
   const referencePages = new Map(
     synced
-      .filter(page => page.directory === 'reference')
+      .filter(page => page.directory === 'spec')
       .map(page => [page.slug, page]),
   )
   const listed = new Set(referenceGroups.flatMap(group => group.slugs))
@@ -439,7 +441,7 @@ const main = (): void => {
   )
   for (const page of unlisted) {
     console.warn(
-      `warning: ${page.sourcePath} is not in a sidebar group, adding it to "More reference"`,
+      `warning: ${page.sourcePath} is not in a sidebar group, adding it to "Spec: more"`,
     )
   }
   for (const slug of listed) {
@@ -465,7 +467,7 @@ const main = (): void => {
       groupEntry(group.key, group.title, true, presentPages(group.slugs)),
     ),
     ...(unlisted.length > 0
-      ? [groupEntry('more-reference', 'More reference', true, unlisted)]
+      ? [groupEntry('more-spec', 'Spec: more', true, unlisted)]
       : []),
     groupEntry('std', 'Standard library', true, [
       ...stdOverview,

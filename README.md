@@ -58,18 +58,42 @@ with sample data.
 
 ## Documentation content
 
-- `content/start/` holds the Get started pages, written here.
-- `content/reference/` and `content/std/` are synced from the silk repository's
-  `reference/` directory. Do not edit them here; change the source in silk-lang/silk and
-  sync again:
+Every page is a markdown file in `content/<section>/` and is served at
+`/docs/<section>/<slug>`.
+
+- Hand-written, edited here:
+  - `content/get-started/`: install Silk, write a first program and set up an editor.
+  - `content/book/`: learn the language by building one program, chapter by chapter.
+  - `content/reference/`: the rules of the language, one topic per page.
+  - `content/projects/`: manifests, modules, dependencies, workspaces and builds.
+  - `content/tools/`: the `silk` command, testing, formatting, diagnostics and releases.
+  - `content/guides/`: task-focused pages on the standard library.
+  - `content/appendix/`: keywords, operators, diagnostic codes, grammar and glossary.
+
+  A file name starts with its position in the sidebar, `NN-slug.md`, and the position is
+  not part of the URL: `content/book/04-ownership.md` is `/docs/book/ownership`. The
+  first `# ` heading is the page title, and `00-overview.md` opens each section. After
+  adding, renaming or retitling a page, regenerate the sidebar (CI checks it is current):
+
+  ```sh
+  pnpm catalog   # rewrites src/docs/written.ts
+  ```
+
+- Synced from silk-lang/silk, not edited here: `content/spec/` (the prescriptive
+  language specification, from the silk repository's `reference/`) and `content/std/`
+  (the standard library API, from `reference/stdlib/`). Change the source in
+  silk-lang/silk and sync again:
 
   ```sh
   pnpm sync-docs ../silk   # path to a silk-lang/silk checkout
   ```
 
   The script also rewrites `src/docs/generated.ts`, the sidebar groups for those pages.
-  The group order for the language reference lives at the top of
-  `scripts/sync-silk-docs.ts`; a new reference file that is not listed there lands in a
-  "More reference" group, with a warning.
+  The group order for the specification lives at the top of `scripts/sync-silk-docs.ts`;
+  a new file that is not listed there lands in a "Spec: more" group, with a warning.
+
+The site's markdown renderer does not accept raw HTML, frontmatter, task lists or text
+directives, so write `00\:00` for a colon followed by letters or digits in prose, or put
+it in code. `pnpm catalog` fails on a page that does not parse.
 
 See `AGENTS.md` for project conventions and `FOLDKIT.md` for Foldkit's.

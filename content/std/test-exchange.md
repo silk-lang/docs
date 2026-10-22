@@ -1,5 +1,28 @@
-Strict binary plans and receipts for private control of the ordinary Silk test runner.
-Test output uses inherited stdout and stderr and has no result authority.
+The binary plan and receipt formats that let `silk test` control the test runner.
+
+## When to use
+`silk.test_runner` uses this module. The host (the `silk test` driver) writes a plan file, and
+the runner writes a receipt file. You do not call it from normal code.
+
+## Details
+A plan starts with the magic `SLKTPLN1`, a version (`1`), a mode, and a 32-byte nonce. All
+integers are little-endian. There are two modes:
+
+- Per-test mode (`1`). The plan has the count of discovered tests, then one catalog entry per
+  test: ordinal, declaration name, execution identity, and action (`0` run, `1` cached). The
+  receipt has one result per selected test. Its disposition is `0` cached, `1` passed, or `2`
+  failed.
+- Uncached mode (`2`). The plan is exactly 256 bytes. It holds a SHA-256 digest of the catalog
+  (see [`updateCatalogDigest`](#updateCatalogDigest)) and the test count, then zero padding. The receipt is also
+  padded to 256 bytes.
+
+A receipt starts with the magic `SLKTRCP1`, the version, the mode, the nonce of the plan, and
+the SHA-256 of the complete plan. It ends with the counts and the status.
+
+## Gotchas
+- A [`Plan`](#Plan) does not stop at the first error. After a failure it reads as empty, and [`failed`](#failed)
+  stays true. Check [`failed`](#failed) or the `bool` results before a test body runs.
+- Test output goes to the inherited stdout and stderr. Only the receipt decides the result.
 
 Import as `TestExchange` with `import silk.test_exchange as TestExchange`.
 
@@ -13,7 +36,7 @@ Public declarations: 18.
 pub struct Plan<'a>
 ```
 
-A cursor over one borrowed host plan.
+A cursor over one borrowed plan.
 
 ::Anchor{id="Entry"}
 
@@ -23,7 +46,7 @@ A cursor over one borrowed host plan.
 pub struct Entry<'a>
 ```
 
-One borrowed per-test plan entry.
+One borrowed per-test catalog entry.
 
 ::Anchor{id="Receipt"}
 
@@ -33,7 +56,7 @@ One borrowed per-test plan entry.
 pub struct Receipt
 ```
 
-An owned receipt under construction.
+An owned receipt under construction. Start it with [`beginReceipt`](#beginReceipt).
 
 ::Anchor{id="openPlan"}
 
@@ -43,7 +66,9 @@ An owned receipt under construction.
 pub fn openPlan<'a>(bytes: &'a [u8]) -> Plan<'a>
 ```
 
-Opens a plan and validates its common magic, version, mode, and nonce framing.
+Opens a plan and checks its magic, version, mode and nonce framing.
+
+If a check fails, the returned plan is already rejected. See [`failed`](#failed).
 
 ::Anchor{id="isPerTest"}
 
@@ -53,7 +78,7 @@ Opens a plan and validates its common magic, version, mode, and nonce framing.
 pub fn isPerTest(plan: &Plan) -> bool
 ```
 
-Returns true when this is the bounded per-test mode.
+Returns true for a per-test plan (mode `1`).
 
 ::Anchor{id="isUncached"}
 
@@ -63,7 +88,7 @@ Returns true when this is the bounded per-test mode.
 pub fn isUncached(plan: &Plan) -> bool
 ```
 
-Returns true when this is the fixed-size uncached mode.
+Returns true for an uncached plan of 256 bytes (mode `2`).
 
 ::Anchor{id="failed"}
 
@@ -73,7 +98,7 @@ Returns true when this is the fixed-size uncached mode.
 pub fn failed(plan: &Plan) -> bool
 ```
 
-Returns whether parsing has rejected the plan.
+Returns true after a check on the plan fails. It does not become false again.
 
 ::Anchor{id="beginPerTest"}
 
@@ -83,7 +108,9 @@ Returns whether parsing has rejected the plan.
 pub fn beginPerTest(plan: &mut Plan, expectedDiscovered: u64) -> bool
 ```
 
-Validates the per-test count and complete-file bound before any test body may run.
+Reads the test count of a per-test plan, and checks it and the size bound of the file.
+
+The count must equal `expectedDiscovered`. Call it before any test body runs.
 
 ::Anchor{id="readEntry"}
 
@@ -97,7 +124,10 @@ pub fn readEntry<'a>(
 ) -> Entry<'a>
 ```
 
-Reads and validates the next canonical catalog entry.
+Reads and checks the next catalog entry.
+
+The ordinal and declaration name must match the expected values, and a cached entry must have an
+execution identity. For an uncached plan, it returns [`uncachedEntry`](#uncachedEntry) and reads nothing.
 
 ::Anchor{id="cached"}
 
@@ -107,7 +137,7 @@ Reads and validates the next canonical catalog entry.
 pub fn cached(entry: &Entry) -> bool
 ```
 
-Returns true when an entry is a validated cache hit.
+Returns true for a valid entry that the host marked as a cache hit.
 
 ::Anchor{id="executionIdentity"}
 
@@ -117,7 +147,7 @@ Returns true when an entry is a validated cache hit.
 pub fn executionIdentity<'a>(entry: &Entry<'a>) -> &'a [u8]
 ```
 
-Borrows the opaque execution identity carried by an entry.
+Borrows the opaque execution identity of an entry.
 
 ::Anchor{id="uncachedEntry"}
 
@@ -127,7 +157,7 @@ Borrows the opaque execution identity carried by an entry.
 pub fn uncachedEntry<'a>(bytes: &'a [u8]) -> Entry<'a>
 ```
 
-Returns the empty non-cached entry used by aggregate uncached execution.
+Returns the empty entry that is not cached, for uncached mode.
 
 ::Anchor{id="finishPerTest"}
 
@@ -137,7 +167,7 @@ Returns the empty non-cached entry used by aggregate uncached execution.
 pub fn finishPerTest(plan: &mut Plan) -> bool
 ```
 
-Requires the complete per-test plan to end exactly after the catalog.
+Checks that a per-test plan ends exactly after the catalog.
 
 ::Anchor{id="validateUncached"}
 
@@ -151,7 +181,8 @@ pub fn validateUncached(
 ) -> bool
 ```
 
-Validates an exact 256-byte compact plan, including catalog binding and zero padding.
+Checks an uncached plan: exactly 256 bytes, the catalog digest, the test count, and zero
+padding.
 
 ::Anchor{id="updateCatalogDigest"}
 
@@ -161,7 +192,9 @@ Validates an exact 256-byte compact plan, including catalog binding and zero pad
 pub fn updateCatalogDigest(state: &mut Sha256, ordinal: u64, identity: &[u8]) -> ()
 ```
 
-Frames one catalog identity into the compact-mode catalog digest.
+Adds one catalog identity to the digest of an uncached plan.
+
+It hashes the ordinal and the identity length as 8-byte little-endian values, then the identity.
 
 ::Anchor{id="beginReceipt"}
 
@@ -175,7 +208,9 @@ pub effect fn beginReceipt(
 ) -> Receipt ! OutOfMemoryError ? &mut Allocator
 ```
 
-Starts a receipt bound to the complete plan bytes and invocation nonce.
+Starts a receipt for `plan`. It copies the nonce and hashes the complete plan.
+
+`selected` is the number of results that follow in per-test mode.
 
 ::Anchor{id="appendResult"}
 
@@ -191,7 +226,10 @@ pub effect fn appendResult(
 ) -> () ! OutOfMemoryError ? &mut Allocator
 ```
 
-Appends one selected per-test result in canonical ordinal order.
+Appends one per-test result. Append results in ordinal order.
+
+### Gotchas
+It traps if the receipt is not per-test, or if `disposition` is more than `2`.
 
 ::Anchor{id="finishReceipt"}
 
@@ -210,6 +248,8 @@ pub effect fn finishReceipt(
 ) -> Bytes ! OutOfMemoryError ? &mut Allocator
 ```
 
-Finishes a complete receipt. Compact mode is padded to exactly 256 bytes.
+Appends the counts and the status, and returns the receipt bytes.
+
+In uncached mode the receipt is padded to exactly 256 bytes.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

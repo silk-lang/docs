@@ -1,34 +1,34 @@
-Authenticated TLS 1.3 with one owned partial-byte transport.
+An authenticated TLS 1.3 connection over a `ByteDuplex` transport, with timeouts and close
+handling.
 
 ## When to use
-
-Use [`authenticateOwned`](#authenticateOwned) when a caller must retain, move, pool, or explicitly close one
-authenticated provider owner. Use [`withClient`](#withClient) when the owner belongs to one lexical scope.
-Prepare the trust snapshot independently before transferring the provider to either operation.
+Use [`withClient`](#withClient) to authenticate a server, use the connection inside a callback, and close it
+when the callback returns. Use [`authenticateOwned`](#authenticateOwned) when the connection must live longer than
+one scope, for example in a connection pool. Then you must call [`OwnedConnection.close`](#OwnedConnection.impl.close). Load
+the trust snapshot before you call either one.
 
 ## Details
+Authentication reads the wall clock one time for certificate dates, makes a `Client`, and runs
+the handshake over the transport. [`ConnectionOptions`](#ConnectionOptions) sets the handshake timeout, and an
+optional external deadline. You get the connection only after authentication succeeds. Then use
+[`OwnedConnection.readSome`](#OwnedConnection.impl.readSome), [`OwnedConnection.writeSome`](#OwnedConnection.impl.writeSome), and [`OwnedConnection.flush`](#OwnedConnection.impl.flush).
 
-Authentication consumes one provider and one already-prepared trust snapshot, samples wall time
-once, constructs the TLS client, and drives its handshake through exact partial transfers. The
-earlier of the finite handshake-duration deadline and an optional external absolute deadline
-bounds all handshake transport work. Ownership is published only after authentication and a
-final deadline check.
+## Errors
+- [`ConnectionError`](#ConnectionError) for a TLS failure, a transport failure, or a timeout.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ## Gotchas
-
-Direct owned I/O is guarded: typed failure or structured cancellation closes the owner and its
-provider before an ambiguous buffer can be offered again. [`OwnedConnection.shutdownWrite`](#OwnedConnection.impl.shutdownWrite)
-performs TLS grace for the write direction; [`OwnedConnection.close`](#OwnedConnection.impl.close) immediately invalidates
-and terminally closes the provider. Scoped close failures are suppressed so they cannot replace
-the protected result. Fatal traps remain outside structured finalization guarantees.
+After an I/O error or a cancellation, the connection closes its transport, so that no partial
+buffer is sent again. [`OwnedConnection.shutdownWrite`](#OwnedConnection.impl.shutdownWrite) sends `close_notify` and closes the
+write direction. [`OwnedConnection.close`](#OwnedConnection.impl.close) closes at once, without `close_notify`.
+[`withClient`](#withClient) ignores errors from its own close, so that they do not hide the result of the
+callback.
 
 ## Examples
-
-### Supply every connection dependency explicitly
-
-This deterministic wiring example uses an empty transport and trust snapshot, so authentication
-fails and `main` returns `1`. A real application supplies authenticated peer bytes and selected
-trust through the same lexical boundaries.
+### Connect every dependency
+This example gives the client no server bytes and no trust, so the handshake fails. A real
+program provides a network transport, the system clocks, a secure `Random`, and loaded trust in
+the same places.
 
 ```silk
 import silk.allocator { Allocator, OutOfMemoryError }
@@ -49,65 +49,98 @@ import silk.usize
 import silk.list { List }
 
 struct FixedWall {}
+
 impl SystemClock for FixedWall {
-  effect fn now(self: &mut Self) -> Instant { return SystemClock.make(0, 0) }
-  effect fn getResolution(self: &mut Self) -> u64 { return u64.toU64(1) }
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return u64.toU64(1)
+  }
 }
 
 struct FixedMonotonic {}
+
 impl MonotonicClock for FixedMonotonic {
-  effect fn now(self: &mut Self) -> Instant { return SystemClock.make(0, 0) }
-  effect fn getResolution(self: &mut Self) -> u64 { return u64.toU64(1) }
-  effect fn waitUntil(self: &mut Self, when: Instant) -> () { drop when return () }
-  effect fn waitFor(self: &mut Self, howLong: u64) -> () { drop howLong return () }
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return u64.toU64(1)
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    drop when
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    drop howLong
+    return ()
+  }
 }
 
 struct ExampleRandom {}
+
 impl Random for ExampleRandom {
   effect fn fillBytes(self: &mut Self, output: &mut [u8]) -> () {
     let mut index = usize.ZERO
-    while index < output.length { output[index] = 1 index = index + usize.ONE }
+    while index < output.length {
+      output[index] = 1
+      index = index + usize.ONE
+    }
     return ()
   }
 }
 
 fn reference<'a>(host: &'a [u8]) -> ReferenceIdentity<'a> {
-  return match move HttpsIdentity.reference(OriginHost<'a>.Dns {bytes: host}) {
-    Result.Success {value} => value
-    Result.Failure {error} => { let invalid = 1 / 0 return reference(host) }
+  return match move HttpsIdentity.reference(OriginHost<'a>.Dns { bytes: host }) {
+    Result.Success { value } => value
+    Result.Failure { error } => {
+      let invalid = 1 / 0
+      return reference(host)
+    }
   }
 }
 
 fn emptyTrust() -> TrustSnapshot {
   return match move TrustSnapshot.fromAnchors(
     List<TrustAnchor>.make(),
-    SnapshotLimits {anchors: 0, encodedBytes: 0},
+    SnapshotLimits { anchors: 0, encodedBytes: 0 },
   ) {
-    Result.Success {value} => move value
-    Result.Failure {error} => { let invalid = 1 / 0 return emptyTrust() }
+    Result.Success { value } => move value
+    Result.Failure { error } => {
+      let invalid = 1 / 0
+      return emptyTrust()
+    }
   }
 }
 
-effect fn inspect(
-  connection: &mut OwnedConnection<MemoryByteDuplex>,
-) -> i32 {
+effect fn inspect(connection: &mut OwnedConnection<MemoryByteDuplex>) -> i32 {
+  // The handshake fails in this example, so reaching this point is unexpected.
   drop connection
+  return 1
+}
+
+effect<'env> fn expected<E: 'env, 'env>(error: E) -> i32 {
+  drop error
   return 0
 }
 
-effect<'env> fn failed<E: 'env, 'env>(error: E) -> i32 { drop error return 1 }
+effect<'env> fn failed<E: 'env, 'env>(error: E) -> i32 {
+  drop error
+  return 1
+}
 
-effect fn program() -> i32 ! OutOfMemoryError {
+effect fn program() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let reads = List<MemoryReadEvent>.make()
   let writes = List<MemoryWriteEvent>.make()
-  let mut transport = run MemoryByteDuplex.make(
-    move reads,
-    move writes,
-    256,
-    4,
-    Option<i32>.none(),
-  ) |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut transport = run MemoryByteDuplex.make(move reads, move writes, 256, 4, Option<i32>.none())
+    |> Effect.provideMut<Allocator>(&mut allocator)
   let trust = emptyTrust()
   let mut wall = FixedWall {}
   let mut monotonic = FixedMonotonic {}
@@ -129,10 +162,14 @@ effect fn program() -> i32 ! OutOfMemoryError {
     |> Effect.provideMut<MonotonicClock>(&mut monotonic)
     |> Effect.provideMut<Random>(&mut random)
     |> Effect.provideMut<Allocator>(&mut allocator)
-  return run Effect.catchAll(move attempt, failed)
+
+  // Without server bytes, authentication fails as expected.
+  return run Effect.catchAll(move attempt, expected)
 }
 
-pub fn main() -> i32 { return run Effect.catchAll(program(), failed) }
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
 ```
 
 Import as `OwnedConnection` with `import silk.tls_connection { OwnedConnection }`.
@@ -147,7 +184,7 @@ Public declarations: 6.
 pub enum ConnectionPhase
 ```
 
-The visible lifecycle of one authenticated connection.
+The state of an [`OwnedConnection`](#OwnedConnection). Read it with [`OwnedConnection.phase`](#OwnedConnection.impl.phase).
 
 ::Anchor{id="ConnectionPhase.Open"}
 
@@ -157,7 +194,7 @@ The visible lifecycle of one authenticated connection.
 Open
 ```
 
-Both authenticated directions remain available.
+You can read and write.
 
 ::Anchor{id="ConnectionPhase.PeerEnded"}
 
@@ -167,7 +204,7 @@ Both authenticated directions remain available.
 PeerEnded
 ```
 
-The peer sent authenticated `close_notify`; buffered plaintext may remain.
+The server sent `close_notify`. You can still read plaintext that is buffered.
 
 ::Anchor{id="ConnectionPhase.WriteShutdown"}
 
@@ -177,7 +214,7 @@ The peer sent authenticated `close_notify`; buffered plaintext may remain.
 WriteShutdown
 ```
 
-Local `close_notify` and transport write shutdown completed.
+You called [`OwnedConnection.shutdownWrite`](#OwnedConnection.impl.shutdownWrite). You can still read, but you cannot write.
 
 ::Anchor{id="ConnectionPhase.Invalid"}
 
@@ -187,7 +224,7 @@ Local `close_notify` and transport write shutdown completed.
 Invalid
 ```
 
-A protocol or transport failure made the lease unusable.
+A TLS or transport error occurred. Later I/O fails. Call [`OwnedConnection.close`](#OwnedConnection.impl.close).
 
 ::Anchor{id="ConnectionPhase.Closed"}
 
@@ -197,7 +234,7 @@ A protocol or transport failure made the lease unusable.
 Closed
 ```
 
-Terminal close consumed provider authority; later I/O cannot reach the provider.
+You called [`OwnedConnection.close`](#OwnedConnection.impl.close). All later I/O fails.
 
 ::Anchor{id="ConnectionError"}
 
@@ -207,7 +244,7 @@ Terminal close consumed provider authority; later I/O cannot reach the provider.
 pub union ConnectionError
 ```
 
-A scoped connection failure that preserves its originating boundary.
+The error from authentication and from connection I/O.
 
 ::Anchor{id="ConnectionError.Tls"}
 
@@ -217,7 +254,8 @@ A scoped connection failure that preserves its originating boundary.
 Tls
 ```
 
-The TLS state machine rejected peer input or caller state.
+The TLS client rejected the server or the operation. After this error, the connection stays
+failed.
 
 ::Anchor{id="ConnectionError.Tls.error"}
 
@@ -227,7 +265,7 @@ The TLS state machine rejected peer input or caller state.
 pub error: TlsError
 ```
 
-The complete sticky TLS failure.
+The TLS error.
 
 ::Anchor{id="ConnectionError.Io"}
 
@@ -237,7 +275,7 @@ The complete sticky TLS failure.
 Io
 ```
 
-The byte provider rejected a non-handshake operation.
+The transport failed. During the handshake, a transport timeout becomes `HandshakeTimeout`.
 
 ::Anchor{id="ConnectionError.Io.error"}
 
@@ -247,7 +285,7 @@ The byte provider rejected a non-handshake operation.
 pub error: ByteIoError
 ```
 
-The complete byte-I/O failure.
+The transport error.
 
 ::Anchor{id="ConnectionError.HandshakeTimeout"}
 
@@ -257,7 +295,7 @@ The complete byte-I/O failure.
 HandshakeTimeout
 ```
 
-The single absolute handshake deadline was reached.
+The handshake did not complete before its deadline.
 
 ::Anchor{id="ConnectionOptions"}
 
@@ -267,7 +305,7 @@ The single absolute handshake deadline was reached.
 pub struct ConnectionOptions
 ```
 
-Bounded policy copied for one owned client authentication.
+Timeouts for authentication. Start from [`ConnectionOptions.defaults`](#ConnectionOptions.impl.defaults).
 
 ::Anchor{id="ConnectionOptions.handshakeTimeoutNanoseconds"}
 
@@ -277,7 +315,7 @@ Bounded policy copied for one owned client authentication.
 pub handshakeTimeoutNanoseconds: u64
 ```
 
-Complete handshake duration on the active monotonic timeline.
+The maximum duration of the handshake, in nanoseconds, measured with the `MonotonicClock`.
 
 ::Anchor{id="ConnectionOptions.externalDeadline"}
 
@@ -287,7 +325,8 @@ Complete handshake duration on the active monotonic timeline.
 pub externalDeadline: Option<Instant>
 ```
 
-Optional caller-owned absolute deadline clamped against the handshake duration.
+An optional absolute deadline on the `MonotonicClock`. If it is earlier than the handshake
+timeout, the handshake stops at this deadline.
 
 ::Anchor{id="ConnectionOptions.impl"}
 
@@ -305,7 +344,7 @@ impl ConnectionOptions
 pub fn defaults() -> ConnectionOptions
 ```
 
-Returns the 30-second handshake timeout without an external deadline.
+Returns a 30-second handshake timeout and no external deadline.
 
 ::Anchor{id="OwnedConnection"}
 
@@ -315,7 +354,11 @@ Returns the 30-second handshake timeout without an external deadline.
 pub struct OwnedConnection<P>
 ```
 
-One affine authenticated TLS client owning its exact byte provider.
+An authenticated TLS client connection that owns its transport `P`.
+
+Get one from [`authenticateOwned`](#authenticateOwned), or borrow one in the [`withClient`](#withClient) callback. All I/O
+functions take an optional `deadline` on the `MonotonicClock`. Use `Option<Instant>.none()` to
+wait without a limit.
 
 ::Anchor{id="OwnedConnection.impl"}
 
@@ -333,7 +376,7 @@ impl<P> OwnedConnection<P>
 pub fn phase(self: &Self) -> ConnectionPhase
 ```
 
-Returns the current directional, invalid, or terminal phase.
+Returns the current [`ConnectionPhase`](#ConnectionPhase).
 
 ::Anchor{id="OwnedConnection.impl.authentication"}
 
@@ -343,7 +386,8 @@ Returns the current directional, invalid, or terminal phase.
 pub fn authentication<'a>(self: &'a Self) -> Option<Authentication<'a>>
 ```
 
-Borrows the authenticated session evidence retained by this connection.
+Returns the result of authentication: the cipher suite, the ALPN protocol, and the certificate
+details.
 
 ::Anchor{id="OwnedConnection.impl.readSome"}
 
@@ -362,11 +406,16 @@ pub effect fn readSome<'connection>(
     &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Reads one verified plaintext prefix or clean authenticated peer end.
+Reads decrypted application data into `output`, and returns how many bytes it read.
 
 #### Details
+The function first sends TLS output that is waiting. It returns at least one byte, or the end
+of input when the server sent `close_notify`.
 
-Mandatory TLS output is sent first. Underlying end without `close_notify` is truncation.
+#### Errors
+- `Tls` with `TruncatedAfterAuthentication` if the transport ends without `close_notify`.
+- `Tls` with `EmptyBuffer` if `output` is empty.
+- `Io` if the transport fails or the `deadline` passes.
 
 ::Anchor{id="OwnedConnection.impl.writeSome"}
 
@@ -385,7 +434,15 @@ pub effect fn writeSome<'connection>(
     &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Encrypts and transmits one positive application prefix.
+Encrypts and sends a prefix of `input`, and returns how many bytes it sent.
+
+#### Details
+One call encrypts at most one TLS record of 16384 bytes, and sends all of that record before
+it returns. Call it again with the rest of `input`.
+
+#### Errors
+- `Tls` if the connection cannot write, for example after [`OwnedConnection.shutdownWrite`](#OwnedConnection.impl.shutdownWrite).
+- `Io` if the transport fails, the server closed the connection, or the `deadline` passes.
 
 ::Anchor{id="OwnedConnection.impl.flush"}
 
@@ -400,7 +457,7 @@ pub effect fn flush<'connection>(self: &'connection mut Self, deadline: Option<I
     &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Drains mandatory TLS output and flushes the underlying byte boundary.
+Sends all TLS output that is waiting, then flushes the transport.
 
 ::Anchor{id="OwnedConnection.impl.shutdownWrite"}
 
@@ -415,7 +472,10 @@ pub effect fn shutdownWrite<'connection>(self: &'connection mut Self, deadline: 
     &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Sends and flushes TLS `close_notify`, then closes only the transport write direction.
+Sends `close_notify`, flushes, and closes the write direction of the transport.
+
+You can still read the response of the server after this call. Call [`OwnedConnection.close`](#OwnedConnection.impl.close)
+when you are done.
 
 ::Anchor{id="OwnedConnection.impl.close"}
 
@@ -428,12 +488,14 @@ pub effect fn close(self: &mut Self) -> ()
   where &mut P provides &ByteDuplex from &mut ByteDuplex
 ```
 
-Terminally closes the exact provider without TLS grace or retry.
+Closes the transport at once, without `close_notify`.
 
 #### Details
+The phase becomes `Closed` before the transport is closed. A second call does nothing and
+succeeds.
 
-The connection becomes `Closed` before provider dispatch. Repeated close is local and
-successful; a first provider close failure remains observable while later I/O stays closed.
+#### Errors
+- `Io` if the transport fails to close. The connection stays closed.
 
 ::Anchor{id="authenticateOwned"}
 
@@ -453,13 +515,17 @@ where
   &mut P provides &ByteDuplex from &mut ByteDuplex | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Consumes a provider and prepared trust snapshot and returns one authenticated affine owner.
+Runs the TLS handshake over `provider`, and returns the authenticated connection.
 
 ### Details
+The function reads the `SystemClock` one time to check certificate dates, and uses the
+`MonotonicClock` for the timeouts in `options`. You own the result. Call
+[`OwnedConnection.close`](#OwnedConnection.impl.close) when you are done.
 
-The provider enters a nonparking guard before time sampling, client construction, allocation,
-or transport work. Authentication publishes only after the final deadline check; typed failure
-and structured cancellation close an unpublished provider exactly once.
+### Errors
+- [`ConnectionError`](#ConnectionError) if the handshake fails or times out. The function closes `provider` before
+  it returns the error.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="withClient"}
 
@@ -481,6 +547,16 @@ where
   CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Authenticates, lends, and terminally closes the same authoritative owned connection.
+Authenticates like [`authenticateOwned`](#authenticateOwned), calls `callback` with the connection, and then closes
+it.
+
+### Details
+The connection closes when the callback returns, fails, or is cancelled. Errors from that close
+are ignored. Call [`OwnedConnection.shutdownWrite`](#OwnedConnection.impl.shutdownWrite) in the callback to send `close_notify`.
+
+### Errors
+- `E` from the callback.
+- [`ConnectionError`](#ConnectionError) if the handshake fails or times out.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

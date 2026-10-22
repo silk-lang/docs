@@ -1,21 +1,44 @@
-Bounded immutable owners for explicit trust-anchor sequences.
+A fixed list of trust anchors: the root CAs that certificate path validation starts from.
 
 ## When to use
-
-Use [`fromAnchors`](#TrustSnapshot.impl.fromAnchors) when the application already owns explicit authorities. Use [`fromPem`](#TrustSnapshot.impl.fromPem) to
-import strict certificate PEM as unconstrained anchors. Use [`copy`](#TrustSnapshot.impl.copy) or [`combine`](#TrustSnapshot.impl.combine) when a new
-owner must survive release of its source snapshots.
+Make a [`TrustSnapshot`](#TrustSnapshot) from your CA certificates with [`TrustSnapshot.fromPem`](#TrustSnapshot.impl.fromPem), or from
+anchors with limits with [`TrustSnapshot.fromAnchors`](#TrustSnapshot.impl.fromAnchors). Pass it to path validation or to a TLS
+client. Use [`TrustSnapshot.combine`](#TrustSnapshot.impl.combine) to add your own CAs to another snapshot.
 
 ## Details
+A snapshot keeps its anchors in input order, with duplicates, and does not change after you make
+it. [`SnapshotLimits`](#SnapshotLimits) and [`TrustLoadLimits`](#TrustLoadLimits) bound its size. An empty snapshot is valid: it
+trusts no certificate.
 
-A snapshot preserves every anchor, restriction, duplicate, and input position. All limits are
-inclusive. Zero permits no corresponding resource. An empty anchor list is valid explicit
-trust that authenticates no peer.
+## Errors
+- [`TrustSourceError`](#TrustSourceError) if a certificate is not valid, or a limit is exceeded.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ## Gotchas
+A snapshot is only a list of authorities. It does not check chains, names, dates, or revocation,
+and it is not the trust store of the operating system.
 
-A snapshot stores explicit authority only. It does not validate a path, identity, time,
-revocation state, or OS trust policy. Empty or whitespace-only PEM remains invalid.
+## Examples
+### Make an empty snapshot
+```silk
+import silk.list { List }
+import silk.result { Result }
+import silk.trust_anchor { TrustAnchor }
+import silk.trust_snapshot { SnapshotLimits, TrustSnapshot, TrustSourceError }
+
+pub fn main() -> i32 {
+  return match TrustSnapshot.fromAnchors(List<TrustAnchor>.make(), SnapshotLimits.defaults()) {
+    Result<TrustSnapshot, TrustSourceError>.Success { value } => {
+      // An empty snapshot is valid, but no certificate chains to it.
+      if TrustSnapshot.anchors(&value).length != 0 {
+        return 1
+      }
+      return 0
+    }
+    Result<TrustSnapshot, TrustSourceError>.Failure { error: _ } => 1
+  }
+}
+```
 
 Import as `TrustSnapshot` with `import silk.trust_snapshot { TrustSnapshot }`.
 
@@ -29,7 +52,7 @@ Public declarations: 7.
 pub struct SnapshotLimits
 ```
 
-Inclusive budgets for one complete trust snapshot.
+The limits for one snapshot. Each limit is inclusive, and 0 allows nothing.
 
 ::Anchor{id="SnapshotLimits.anchors"}
 
@@ -39,7 +62,7 @@ Inclusive budgets for one complete trust snapshot.
 pub anchors: usize
 ```
 
-Maximum anchor count, including duplicate certificate values.
+The maximum number of anchors, with duplicates.
 
 ::Anchor{id="SnapshotLimits.encodedBytes"}
 
@@ -49,7 +72,7 @@ Maximum anchor count, including duplicate certificate values.
 pub encodedBytes: usize
 ```
 
-Maximum aggregate certificate and configured-constraint bytes.
+The maximum size of all anchors, as [`TrustAnchor.encodedBytes`](/docs/std/trust-anchor#TrustAnchor.impl.encodedBytes) counts it.
 
 ::Anchor{id="SnapshotLimits.impl.Copy"}
 
@@ -75,7 +98,7 @@ impl SnapshotLimits
 pub fn defaults() -> SnapshotLimits
 ```
 
-Returns finite defaults of 1024 anchors and 8 MiB of retained encoded data.
+Returns the default limits: 1024 anchors and 8 MiB.
 
 ::Anchor{id="TrustLoadLimits"}
 
@@ -85,7 +108,7 @@ Returns finite defaults of 1024 anchors and 8 MiB of retained encoded data.
 pub struct TrustLoadLimits
 ```
 
-Inclusive strict-decoder and snapshot budgets for one trust-source load.
+The limits for loading trust: the certificate decoder limits and the snapshot limits.
 
 ::Anchor{id="TrustLoadLimits.decode"}
 
@@ -95,7 +118,7 @@ Inclusive strict-decoder and snapshot budgets for one trust-source load.
 pub decode: DecodeLimits
 ```
 
-Bounds used by strict PEM, DER, and certificate decoding.
+The limits for decoding PEM and certificates.
 
 ::Anchor{id="TrustLoadLimits.snapshot"}
 
@@ -105,7 +128,7 @@ Bounds used by strict PEM, DER, and certificate decoding.
 pub snapshot: SnapshotLimits
 ```
 
-Bounds used by the complete returned snapshot.
+The limits for the snapshot.
 
 ::Anchor{id="TrustLoadLimits.impl.Copy"}
 
@@ -131,7 +154,7 @@ impl TrustLoadLimits
 pub fn defaults() -> TrustLoadLimits
 ```
 
-Returns the finite certificate-decoder and snapshot defaults.
+Returns `DecodeLimits.defaults()` and [`SnapshotLimits.defaults`](#SnapshotLimits.impl.defaults).
 
 ::Anchor{id="TrustLimitKind"}
 
@@ -141,7 +164,7 @@ Returns the finite certificate-decoder and snapshot defaults.
 pub enum TrustLimitKind
 ```
 
-A bounded trust-source resource category.
+The limit that a trust load exceeded.
 
 ::Anchor{id="TrustLimitKind.AnchorCount"}
 
@@ -151,7 +174,7 @@ A bounded trust-source resource category.
 AnchorCount
 ```
 
-The complete snapshot has too many anchors, including duplicates.
+The number of anchors.
 
 ::Anchor{id="TrustLimitKind.EncodedBytes"}
 
@@ -161,7 +184,7 @@ The complete snapshot has too many anchors, including duplicates.
 EncodedBytes
 ```
 
-The aggregate certificate and configured-constraint bytes exceed the budget.
+The size of all anchors.
 
 ::Anchor{id="TrustLimitKind.InputBytes"}
 
@@ -171,7 +194,7 @@ The aggregate certificate and configured-constraint bytes exceed the budget.
 InputBytes
 ```
 
-A native provider input exceeds its acquisition budget.
+The size of a file that a native trust source reads.
 
 ::Anchor{id="TrustConfigurationReason"}
 
@@ -181,7 +204,7 @@ A native provider input exceeds its acquisition budget.
 pub enum TrustConfigurationReason
 ```
 
-A rejected native trust-source configuration rule.
+The reason that the configuration of a native trust source is not valid.
 
 ::Anchor{id="TrustConfigurationReason.EmptyRoot"}
 
@@ -191,7 +214,7 @@ A rejected native trust-source configuration rule.
 EmptyRoot
 ```
 
-An explicit native root path has no bytes.
+A root file path is empty.
 
 ::Anchor{id="TrustConfigurationReason.NonAbsoluteRoot"}
 
@@ -201,7 +224,7 @@ An explicit native root path has no bytes.
 NonAbsoluteRoot
 ```
 
-An explicit native root path is not absolute.
+A root file path is not absolute.
 
 ::Anchor{id="TrustConfigurationReason.NulRoot"}
 
@@ -211,7 +234,7 @@ An explicit native root path is not absolute.
 NulRoot
 ```
 
-An explicit native root path contains a zero byte.
+A root file path contains a zero byte.
 
 ::Anchor{id="TrustConfigurationReason.PathBytes"}
 
@@ -221,7 +244,7 @@ An explicit native root path contains a zero byte.
 PathBytes
 ```
 
-A native root path exceeds its byte budget.
+A root file path is too long.
 
 ::Anchor{id="TrustFileOperation"}
 
@@ -231,7 +254,7 @@ A native root path exceeds its byte budget.
 pub enum TrustFileOperation
 ```
 
-A native trust-source file stage.
+The file step that failed in a native trust source.
 
 ::Anchor{id="TrustFileOperation.Open"}
 
@@ -241,7 +264,7 @@ A native trust-source file stage.
 Open
 ```
 
-Opening the configured trust file failed.
+Opening the trust file.
 
 ::Anchor{id="TrustFileOperation.Read"}
 
@@ -251,7 +274,7 @@ Opening the configured trust file failed.
 Read
 ```
 
-Reading the configured trust file failed.
+Reading the trust file.
 
 ::Anchor{id="TrustFileOperation.Close"}
 
@@ -261,7 +284,7 @@ Reading the configured trust file failed.
 Close
 ```
 
-Closing the configured trust file failed.
+Closing the trust file.
 
 ::Anchor{id="TrustSourceError"}
 
@@ -271,7 +294,7 @@ Closing the configured trust file failed.
 pub union TrustSourceError
 ```
 
-A semantic trust-source failure that does not include allocation refusal.
+The reason that loading trust failed. An allocation failure is an `OutOfMemoryError` instead.
 
 ::Anchor{id="TrustSourceError.Decode"}
 
@@ -281,7 +304,7 @@ A semantic trust-source failure that does not include allocation refusal.
 Decode
 ```
 
-Strict PEM, DER, or certificate decoding failed at the retained decoder location.
+A certificate or its PEM is not valid.
 
 ::Anchor{id="TrustSourceError.Decode.error"}
 
@@ -291,7 +314,7 @@ Strict PEM, DER, or certificate decoding failed at the retained decoder location
 pub error: DecodeError
 ```
 
-The complete structured decoder failure.
+The decoder error, with its position.
 
 ::Anchor{id="TrustSourceError.LimitExceeded"}
 
@@ -301,7 +324,7 @@ The complete structured decoder failure.
 LimitExceeded
 ```
 
-A finite trust-source budget was exceeded.
+A limit was exceeded.
 
 ::Anchor{id="TrustSourceError.LimitExceeded.kind"}
 
@@ -311,7 +334,7 @@ A finite trust-source budget was exceeded.
 pub kind: TrustLimitKind
 ```
 
-The exhausted resource category.
+The limit.
 
 ::Anchor{id="TrustSourceError.LimitExceeded.limit"}
 
@@ -321,7 +344,7 @@ The exhausted resource category.
 pub limit: usize
 ```
 
-The inclusive configured budget.
+The value of the limit.
 
 ::Anchor{id="TrustSourceError.InvalidConfiguration"}
 
@@ -331,7 +354,7 @@ The inclusive configured budget.
 InvalidConfiguration
 ```
 
-A native provider configuration is invalid.
+The configuration of a native trust source is not valid.
 
 ::Anchor{id="TrustSourceError.InvalidConfiguration.reason"}
 
@@ -341,7 +364,7 @@ A native provider configuration is invalid.
 pub reason: TrustConfigurationReason
 ```
 
-The rejected configuration rule.
+The problem.
 
 ::Anchor{id="TrustSourceError.File"}
 
@@ -351,7 +374,7 @@ The rejected configuration rule.
 File
 ```
 
-A native provider file operation failed.
+A file operation of a native trust source failed.
 
 ::Anchor{id="TrustSourceError.File.operation"}
 
@@ -361,7 +384,7 @@ A native provider file operation failed.
 pub operation: TrustFileOperation
 ```
 
-The failed file stage.
+The step that failed.
 
 ::Anchor{id="TrustSourceError.File.error"}
 
@@ -371,7 +394,7 @@ The failed file stage.
 pub error: FileError
 ```
 
-The complete portable file failure with its provider code.
+The file error.
 
 ::Anchor{id="TrustSnapshot"}
 
@@ -381,12 +404,7 @@ The complete portable file failure with its provider code.
 pub struct TrustSnapshot
 ```
 
-One immutable independently owned sequence of explicit trust authorities.
-
-### Details
-
-The snapshot preserves input order and duplicates. Each borrowed anchor remains valid only
-while this snapshot remains valid. Construction does not inspect certificate semantics.
+A list of trust anchors that does not change. It owns them and keeps their order and duplicates.
 
 ::Anchor{id="TrustSnapshot.impl"}
 
@@ -407,12 +425,12 @@ pub fn fromAnchors(
   ) -> Result<TrustSnapshot, TrustSourceError>
 ```
 
-Consumes a complete anchor list after allocation-free count and byte-budget validation.
+Returns a snapshot with `anchors`, in their order. It does not copy them.
 
-#### Details
+An empty list is valid.
 
-Success preserves the list allocation, order, duplicates, and configured restrictions.
-Failure releases the consumed input and publishes no snapshot. Empty explicit trust is valid.
+#### Errors
+- `LimitExceeded` if `anchors` goes over `limits`. The anchors are dropped.
 
 ::Anchor{id="TrustSnapshot.impl.fromPem"}
 
@@ -427,18 +445,13 @@ pub effect fn fromPem(
   ? &mut Allocator
 ```
 
-Strictly decodes certificate PEM and moves each certificate into an unconstrained anchor.
+Returns a snapshot with one anchor without limits for each `CERTIFICATE` block of `input`.
 
-#### Details
-
-The result preserves order and duplicates. It reparses no DER and copies no certificate after
-decoding. Decoder failures retain their structured locations. Allocation refusal remains an
-`OutOfMemoryError` Effect failure. Every failure publishes no snapshot.
-
-#### Gotchas
-
-Empty or whitespace-only PEM is invalid. Import assigns explicit authority but does not
-authenticate a path or reproduce OS trust policy.
+#### Errors
+- `Failure` with `Decode` if the PEM or a certificate is not valid. The decoder is strict, and
+  an empty file is an error.
+- `Failure` with `LimitExceeded` if a limit is exceeded.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="TrustSnapshot.impl.fromAnnotatedPem"}
 
@@ -449,17 +462,16 @@ pub effect fn fromAnnotatedPem(input: &[u8], limits: TrustLoadLimits) -> Result<
   ! OutOfMemoryError ? &mut Allocator
 ```
 
-Imports configured platform authorities from an annotated certificate PEM document.
+Returns a snapshot from a CA file that has comment lines between the blocks.
 
-#### Details
+It uses `CertificateBundle.decodeAnnotatedPem`. A certificate that is not valid fails the
+whole call. None are skipped.
 
-Uses [`CertificateBundle.decodeAnnotatedPem`](/docs/std/certificate-bundle#CertificateBundle.impl.decodeAnnotatedPem), retaining all certificates, duplicates, limits,
-and rejection locations. Malformed certificates fail atomically; none are skipped.
+#### Errors
+- The same errors as [`TrustSnapshot.fromPem`](#TrustSnapshot.impl.fromPem).
 
 #### Gotchas
-
-Call only with explicitly trusted configuration, never peer-supplied authority. This does
-not import keychain settings or validate a certificate path. [`fromPem`](#TrustSnapshot.impl.fromPem) remains strict.
+Use it only for a CA file that you configured and trust, never for data from a peer.
 
 ::Anchor{id="TrustSnapshot.impl.anchors"}
 
@@ -469,7 +481,7 @@ not import keychain settings or validate a certificate path. [`fromPem`](#TrustS
 pub fn anchors(self: &Self) -> &[TrustAnchor]
 ```
 
-Borrows all anchors in their original order, including every duplicate.
+Returns the anchors in their order, with duplicates.
 
 ::Anchor{id="TrustSnapshot.impl.copy"}
 
@@ -484,12 +496,11 @@ pub effect fn copy(
   ? &mut Allocator
 ```
 
-Creates an independently owned copy under the supplied inclusive limits.
+Returns a copy of the snapshot that is checked against `limits`.
 
-#### Details
-
-Every certificate and configured constraint is copied. Allocation refusal releases partial
-output and leaves this snapshot unchanged.
+#### Errors
+- `Failure` with `LimitExceeded` if the snapshot goes over `limits`.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="TrustSnapshot.impl.combine"}
 
@@ -505,11 +516,16 @@ pub effect fn combine(
   ? &mut Allocator
 ```
 
-Copies `primary` anchors, then `additional` anchors, into one independent owner.
+Returns a new snapshot with the anchors of `primary` and then those of `additional`.
 
-#### Details
+Duplicates are kept. Equal certificates are not merged.
 
-The operation preserves every duplicate and configured restriction. It does not merge equal
-certificate DER. A less-restricted additional authority can therefore widen trust.
+#### Errors
+- `Failure` with `LimitExceeded` if the result goes over `limits`.
+- `OutOfMemoryError` if the `Allocator` fails.
+
+#### Gotchas
+An anchor in `additional` with fewer limits than the same certificate in `primary` makes the
+trust wider.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

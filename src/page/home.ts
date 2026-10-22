@@ -6,7 +6,7 @@ import { type CopiedCodeIds, copyButtonFor } from '../copy'
 import * as Icon from '../icon'
 import * as Layout from '../layout'
 import { type Message } from '../message'
-import { docPageRouter, docsRouter, releasesRouter } from '../route'
+import { docPageRouter, releasesRouter } from '../route'
 
 // CONTENT
 
@@ -248,13 +248,16 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
             [
               buttonLink(
                 'Take the tour',
-                docPageRouter({ directory: 'start', slug: 'tour' }),
+                docPageRouter({
+                  directory: 'get-started',
+                  slug: 'a-tour-of-silk',
+                }),
                 'Primary',
                 h,
               ),
               buttonLink(
-                'Read the reference',
-                docPageRouter({ directory: 'reference', slug: 'overview' }),
+                'Read the book',
+                docPageRouter({ directory: 'book', slug: 'overview' }),
                 'Secondary',
                 h,
               ),
@@ -406,8 +409,8 @@ const servicesSpotlight = (
           textLink(
             'Testing with providers',
             docPageRouter({
-              directory: 'reference',
-              slug: 'requirements-and-services',
+              directory: 'guides',
+              slug: 'testing-with-providers',
             }),
             h,
           ),
@@ -492,7 +495,11 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
                       h.li([], [tag(topic, h)]),
                     ),
                   ),
-                  textLink('Browse the guides', docsRouter(), h),
+                  textLink(
+                    'Browse the guides',
+                    docPageRouter({ directory: 'guides', slug: 'overview' }),
+                    h,
+                  ),
                 ],
               ),
               h.div(
@@ -618,7 +625,7 @@ const closingCta = (h: HtmlBuilder<Message>): Html =>
           ),
           h.p(
             [h.Class('text-lg leading-prose text-muted')],
-            ['Start with the tour, or go all the way with the reference.'],
+            ['Start with the tour, or go all the way with the book.'],
           ),
         ],
       ),
@@ -627,8 +634,8 @@ const closingCta = (h: HtmlBuilder<Message>): Html =>
         [
           buttonLink('Install', releasesRouter(), 'Primary', h),
           buttonLink(
-            'Read the reference',
-            docPageRouter({ directory: 'reference', slug: 'overview' }),
+            'Read the book',
+            docPageRouter({ directory: 'book', slug: 'overview' }),
             'Secondary',
             h,
           ),

@@ -1,13 +1,61 @@
-Byte percent coding with explicit ownership and caller-controlled storage.
+Percent-encode bytes for a URI component, and decode `%XX` escapes.
 
 ## When to use
-Use `encodeInto` and `decodeInto` to reuse a byte buffer, or `encodeToWriter` to stream output.
-Use `encodeOwned` and `decodeOwned` when the result needs independent storage.
+Use [`UriPercent.encodeOwned`](#UriPercent.impl.encodeOwned) to put data, such as a search term or a file name, into a
+component of a URI. Use [`UriPercent.decodeOwned`](#UriPercent.impl.decodeOwned) or [`UriPercent.decodeOrBorrow`](#UriPercent.impl.decodeOrBorrow) to get the
+bytes back. The `...Into`, `appendEncoded`, and `decodeInPlace` functions reuse storage that you
+already have, and [`UriPercent.encodeToWriter`](#UriPercent.impl.encodeToWriter) writes to a `Writer`.
 
 ## Details
-Encoding creates uppercase escapes and treats every input percent sign as data.
-Decoding preserves plus signs and arbitrary bytes. Validate UTF-8 separately with `String.fromUtf8`.
-Query coding follows generic URI syntax, not HTML form rules.
+The [`PercentComponent`](#PercentComponent) selects which bytes stay as they are. All other bytes become `%XX` with
+uppercase hexadecimal digits. A `%` in the input is always encoded, so the input must be raw
+data, not text that is already encoded. Decoding is strict: each `%` must start a valid escape.
+The decoded bytes are not always valid UTF-8. Check them with `String.fromUtf8` if you need
+text.
+
+## Errors
+- [`DecodeError`](#DecodeError) if the text has a `%` without two hexadecimal digits after it. `offset` is the
+  position of the `%`.
+- `OutOfMemoryError` from the functions that allocate.
+- `WriterError` from [`UriPercent.encodeToWriter`](#UriPercent.impl.encodeToWriter).
+
+## Gotchas
+This is generic URI encoding, not HTML form encoding. A `+` is not decoded to a space, and a
+space is encoded as `%20`. `Query` keeps `&`, `=`, and `+`, so use `Unreserved` to encode one
+key or value of a query string.
+
+## Examples
+### Encode a query value and decode it again
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.result { Result }
+import silk.string { String }
+import silk.uri_percent { DecodeError, PercentComponent, UriPercent }
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let encoded = run UriPercent.encodeOwned(b"tea & cake", PercentComponent.Unreserved)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  if String.view(&encoded) != "tea%20%26%20cake" {
+    return 1
+  }
+  let decoded = run UriPercent.decodeOwned(String.view(&encoded))
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  return match move decoded {
+    Result<Bytes, DecodeError>.Success { value } => {
+      let bytes = Bytes.asSlice(&value)
+      if bytes.length != 10 || bytes[4] != 38 {
+        return 1
+      }
+      return 0
+    }
+    Result<Bytes, DecodeError>.Failure { error: _ } => 1
+  }
+}
+```
 
 Import as `UriPercent` with `import silk.uri_percent { UriPercent }`.
 
@@ -21,7 +69,10 @@ Public declarations: 4.
 pub enum PercentComponent
 ```
 
-The grammar context of raw bytes supplied to percent encoding.
+The URI component that the encoded bytes go into. It selects the bytes that stay as they are.
+
+All components keep ASCII letters, digits, `-`, `.`, `_`, and `~`. The other components also
+keep the sub-delimiters `!$&'()*+,;=`, except where the variant says otherwise.
 
 ::Anchor{id="PercentComponent.Userinfo"}
 
@@ -31,7 +82,7 @@ The grammar context of raw bytes supplied to percent encoding.
 Userinfo
 ```
 
-User information; an at sign is escaped and a colon is retained.
+User information. It keeps `:` and encodes `@`.
 
 ::Anchor{id="PercentComponent.RegName"}
 
@@ -41,7 +92,7 @@ User information; an at sign is escaped and a colon is retained.
 RegName
 ```
 
-A registered host name; authority delimiters are escaped.
+A registered host name. It encodes `:` and `@`.
 
 ::Anchor{id="PercentComponent.PathSegment"}
 
@@ -51,7 +102,7 @@ A registered host name; authority delimiters are escaped.
 PathSegment
 ```
 
-One path segment; slash is escaped and colon is retained.
+One path segment. It keeps `:` and `@`, and encodes `/`.
 
 ::Anchor{id="PercentComponent.FirstPathSegment"}
 
@@ -61,7 +112,8 @@ One path segment; slash is escaped and colon is retained.
 FirstPathSegment
 ```
 
-The first relative path segment; slash and colon are escaped.
+The first segment of a relative path. It encodes `:` and `/`, so the segment cannot look like
+a scheme.
 
 ::Anchor{id="PercentComponent.Path"}
 
@@ -71,7 +123,7 @@ The first relative path segment; slash and colon are escaped.
 Path
 ```
 
-A whole path; slash is retained, but question mark and number sign are escaped.
+A full path. It keeps `/`, `:`, and `@`, and encodes `?` and `#`.
 
 ::Anchor{id="PercentComponent.Unreserved"}
 
@@ -81,7 +133,8 @@ A whole path; slash is retained, but question mark and number sign are escaped.
 Unreserved
 ```
 
-Only ASCII letters, digits, hyphen, period, underscore, and tilde are retained.
+Only the unreserved bytes. It encodes all sub-delimiters. Use it for one key or value of a
+query string.
 
 ::Anchor{id="PercentComponent.Query"}
 
@@ -91,7 +144,7 @@ Only ASCII letters, digits, hyphen, period, underscore, and tilde are retained.
 Query
 ```
 
-A complete generic query; slash and question mark are retained.
+A full query. It keeps `/`, `?`, `:`, `@`, `&`, and `=`.
 
 ::Anchor{id="PercentComponent.Fragment"}
 
@@ -101,7 +154,7 @@ A complete generic query; slash and question mark are retained.
 Fragment
 ```
 
-A complete fragment; slash and question mark are retained.
+A full fragment. It keeps `/`, `?`, `:`, and `@`.
 
 ::Anchor{id="DecodeError"}
 
@@ -111,7 +164,7 @@ A complete fragment; slash and question mark are retained.
 pub struct DecodeError
 ```
 
-The position of a malformed percent escape in the supplied text or bytes.
+A `%` that does not start a valid escape.
 
 ::Anchor{id="DecodeError.offset"}
 
@@ -121,7 +174,7 @@ The position of a malformed percent escape in the supplied text or bytes.
 pub offset: usize
 ```
 
-The zero-based byte offset of the percent sign that starts the malformed escape.
+The position of the `%`, from the start of the input.
 
 ::Anchor{id="Decoded"}
 
@@ -131,10 +184,9 @@ The zero-based byte offset of the percent sign that starts the malformed escape.
 pub union Decoded<'input>
 ```
 
-Decoded bytes that borrow unchanged input or own the result of expanding escapes.
+The result of [`UriPercent.decodeOrBorrow`](#UriPercent.impl.decodeOrBorrow): the input itself, or new decoded bytes.
 
-### Details
-The borrowed variant cannot outlive its input. Neither variant guarantees valid UTF-8.
+The bytes are not always valid UTF-8.
 
 ::Anchor{id="Decoded.Borrowed"}
 
@@ -144,7 +196,7 @@ The borrowed variant cannot outlive its input. Neither variant guarantees valid 
 Borrowed
 ```
 
-Unchanged input without percent signs, requiring no allocation or copy.
+The input has no `%`, so it is returned as it is. Nothing is allocated.
 
 ::Anchor{id="Decoded.Borrowed.values"}
 
@@ -154,7 +206,7 @@ Unchanged input without percent signs, requiring no allocation or copy.
 pub values: &'input [u8]
 ```
 
-The original byte view, including any literal plus signs.
+The input bytes.
 
 ::Anchor{id="Decoded.Owned"}
 
@@ -164,7 +216,7 @@ The original byte view, including any literal plus signs.
 Owned
 ```
 
-Independently owned bytes after percent escapes have been decoded.
+The input has escapes. The decoded bytes are in new storage.
 
 ::Anchor{id="Decoded.Owned.value"}
 
@@ -174,7 +226,7 @@ Independently owned bytes after percent escapes have been decoded.
 pub value: Bytes
 ```
 
-The decoded bytes, which may contain invalid UTF-8.
+The decoded bytes.
 
 ::Anchor{id="UriPercent"}
 
@@ -184,7 +236,7 @@ The decoded bytes, which may contain invalid UTF-8.
 pub struct UriPercent
 ```
 
-The owner of byte percent encoding and decoding operations for URI components.
+Functions that percent-encode and decode URI components.
 
 ::Anchor{id="UriPercent.impl"}
 
@@ -204,15 +256,16 @@ pub effect fn encodeOwned(values: &[u8], component: PercentComponent) -> String
   ? &mut Allocator
 ```
 
-Encodes raw bytes into independently owned ASCII text with one exact backing allocation.
+Returns `values` encoded for `component`, in a new string.
 
-#### Details
-Empty output does not allocate. Percent signs are always escaped using uppercase hexadecimal.
-Allocation or size overflow fails with `OutOfMemoryError`.
+It allocates exactly the needed size, and nothing for an empty result.
+
+#### Errors
+- `OutOfMemoryError` if the `Allocator` fails or the size does not fit in `usize`.
 
 #### Gotchas
-Supply raw data, not already escaped text. Whole-path encoding retains slash and colon;
-use `FirstPathSegment` for data that must not become a relative reference's scheme.
+`Path` keeps `:`. If the path of a relative reference can start with a segment that contains
+`:`, encode that segment with `FirstPathSegment`.
 
 ::Anchor{id="UriPercent.impl.encodeInto"}
 
@@ -224,11 +277,13 @@ pub effect fn encodeInto(output: &mut Bytes, values: &[u8], component: PercentCo
   ? &mut Allocator
 ```
 
-Replaces a reusable byte buffer with percent-encoded ASCII component data.
+Replaces the contents of `output` with `values` encoded for `component`.
 
-#### Details
-Computes the size and reserves exact required capacity before changing the contents.
-Existing sufficient capacity requires no allocation. Failure leaves the original contents intact.
+If `output` has enough capacity, it does not allocate.
+
+#### Errors
+- `OutOfMemoryError` if the `Allocator` fails or the size does not fit in `usize`. `output`
+  does not change.
 
 ::Anchor{id="UriPercent.impl.encodedLength"}
 
@@ -238,11 +293,11 @@ Existing sufficient capacity requires no allocation. Failure leaves the original
 pub fn encodedLength(values: &[u8], component: PercentComponent) -> Option<usize>
 ```
 
-Returns the encoded byte count without allocating, or `None` when the size exceeds `usize`.
+Returns the length of `values` encoded for `component`, or `None` if it does not fit in
+`usize`.
 
-#### Details
-Counts raw data under the selected grammar context, including three bytes for each escape.
-Use this to reserve a combined serialization before appending its individual components.
+Each encoded byte counts as 3. Use it to reserve space for a URI that you build from more than
+one component.
 
 ::Anchor{id="UriPercent.impl.appendEncoded"}
 
@@ -254,11 +309,14 @@ pub effect fn appendEncoded(output: &mut Bytes, values: &[u8], component: Percen
   ? &mut Allocator
 ```
 
-Appends encoded component data while retaining all existing destination bytes.
+Adds `values` encoded for `component` to the end of `output`.
 
-#### Details
-Computes the additional byte count and reserves exact capacity before mutation. Sufficient
-capacity requires no allocation. Size overflow or allocation failure leaves the output intact.
+The existing bytes of `output` do not change. If `output` has enough capacity, it does not
+allocate.
+
+#### Errors
+- `OutOfMemoryError` if the `Allocator` fails or the size does not fit in `usize`. `output`
+  does not change.
 
 ::Anchor{id="UriPercent.impl.encodeToWriter"}
 
@@ -270,14 +328,13 @@ pub effect fn encodeToWriter(values: &[u8], component: PercentComponent) -> ()
   ? &mut Writer
 ```
 
-Streams percent encoding to a Writer without allocating intermediate output storage.
+Writes `values` encoded for `component` to the ambient `Writer`. It does not allocate.
 
-#### Details
-Writes unchanged ASCII runs directly from input and each escape from a three-byte stack array.
-The Writer provider may allocate independently.
+#### Errors
+- `WriterError` if the `Writer` fails. The bytes that it accepted stay written.
 
 #### Gotchas
-Writer failure may leave partial output. This operation does not flush the provider.
+It does not flush the `Writer`.
 
 ::Anchor{id="UriPercent.impl.decodeOwned"}
 
@@ -289,11 +346,13 @@ pub effect fn decodeOwned(text: string) -> Result<Bytes, DecodeError>
   ? &mut Allocator
 ```
 
-Decodes percent escapes into owned arbitrary bytes with one exact backing allocation.
+Returns the bytes of `text` with each `%XX` escape decoded, in new storage.
 
-#### Details
-Malformed escapes fail before allocation. Empty output does not allocate. No bytes are
-zero-filled before being overwritten, and plus signs remain literal bytes.
+A `+` stays a `+`. It allocates exactly the needed size, and nothing for an empty result.
+
+#### Errors
+- `Failure` with a [`DecodeError`](#DecodeError) if an escape is not valid. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="UriPercent.impl.decodeInto"}
 
@@ -305,11 +364,13 @@ pub effect fn decodeInto(output: &mut Bytes, text: string) -> Result<(), DecodeE
   ? &mut Allocator
 ```
 
-Replaces reusable byte storage with strictly decoded bytes, preserving literal plus signs.
+Replaces the contents of `output` with the decoded bytes of `text`.
 
-#### Details
-Validates all escapes and reserves exact capacity before mutation. Malformed input and allocation
-failure leave existing contents intact. Sufficient capacity requires no allocation.
+A `+` stays a `+`. If `output` has enough capacity, it does not allocate.
+
+#### Errors
+- `Failure` with a [`DecodeError`](#DecodeError) if an escape is not valid. `output` does not change.
+- `OutOfMemoryError` if the `Allocator` fails. `output` does not change.
 
 ::Anchor{id="UriPercent.impl.decodeInPlace"}
 
@@ -319,14 +380,16 @@ failure leave existing contents intact. Sufficient capacity requires no allocati
 pub fn decodeInPlace(values: &mut [u8]) -> Result<usize, DecodeError>
 ```
 
-Strictly decodes a mutable byte slice in place and returns its initialized output-prefix length.
+Decodes the escapes of `values` in place, and returns the length of the decoded bytes.
 
-#### Details
-Validates every escape before mutation, so malformed input leaves the slice unchanged.
-The operation allocates nothing. Output may contain arbitrary bytes, including invalid UTF-8.
+The decoded bytes are at the start of `values`. It does not allocate.
+
+#### Errors
+- `Failure` with a [`DecodeError`](#DecodeError) if an escape is not valid. `values` does not change.
 
 #### Gotchas
-Bytes after the returned prefix are unspecified; the slice's physical length does not change.
+The bytes after the returned length are not specified. The length of the slice does not
+change.
 
 ::Anchor{id="UriPercent.impl.decodeOrBorrow"}
 
@@ -338,10 +401,12 @@ pub effect fn decodeOrBorrow<'input>(text: string<'input>) -> Result<Decoded<'in
   ? &mut Allocator
 ```
 
-Borrows unchanged input bytes when no percent escapes occur, otherwise returns owned decoded bytes.
+Returns `text` as it is if it has no `%`, or else the decoded bytes in new storage.
 
-#### Details
-The borrowed fast path performs no allocation or copy. Escaped input follows `decodeOwned`,
-including strict validation before allocation and preservation of literal plus signs.
+Use it when most input has no escapes, to skip the allocation and the copy.
+
+#### Errors
+- `Failure` with a [`DecodeError`](#DecodeError) if an escape is not valid. Nothing is allocated.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

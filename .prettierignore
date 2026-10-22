@@ -1,3 +1,3 @@
-# Synced from silk-lang/silk by scripts/sync-silk-docs.ts, kept byte for byte.
-content/reference/
-content/std/
+# Markdown content is kept as written: spec/ and std/ are synced byte for byte
+# from silk-lang/silk by scripts/sync-silk-docs.ts, the rest is hand-written.
+content/

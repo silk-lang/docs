@@ -1,22 +1,104 @@
-Bounded incremental HTTP/1.0 and HTTP/1.1 head parsing and atomic serialization.
+Parse and write the head of an HTTP/1.0 or HTTP/1.1 message: the start line and the header
+fields.
 
 ## When to use
-
-Use [`RequestParser`](#RequestParser) or [`ResponseParser`](#ResponseParser) at a buffered transport boundary. Each parser owns
-all byte and field-index storage up front, reports exactly how much of the current input it
-consumed, and stops after the terminating empty line so body or next-message bytes stay with
-the caller.
+Use [`RequestParser`](#RequestParser) or [`ResponseParser`](#ResponseParser) to parse a head as its bytes arrive from a
+transport. Use [`parseRequest`](#parseRequest) or [`parseResponse`](#parseResponse) when you have all the bytes. Use
+[`writeRequestInto`](#writeRequestInto) and [`writeResponseInto`](#writeResponseInto) to write a head from `silk.http`.
 
 ## Details
+A parser allocates all its memory in `make`. After that, `feed`, `head`, `reset`, and the write
+functions do not allocate. `feed` returns how many bytes of the input it used, and stops after
+the empty line that ends the head. The bytes after the head, such as the body, stay with you.
+The head and its fields borrow the parser. Call `copy` to keep them after a `reset`.
 
-The accepted profile requires CRLF, exact single-SP start-line separators, and field names
-immediately followed by `:`. It rejects leading blank lines, bare LF, obs-fold, HTTP/0.9, ICY,
-and historical whitespace recovery. Completed heads and their field iterators borrow the parser;
-use [`RequestHead.copy`](#RequestHead.impl.copy) or [`ResponseHead.copy`](#ResponseHead.impl.copy) for independent ownership.
+`maxOwnedBytes` must hold `maxHeadBytes` plus 32 bytes for each field in `maxFields`. Check a
+[`Limits`](#Limits) value with [`validateLimits`](#validateLimits).
 
-Construction accounts for the configured head-byte backing plus 32 bytes of portable offset
-metadata per field against `maxOwnedBytes`. Parser scalar and allocator bookkeeping are not part
-of that caller-visible capacity. Feed, head access, reset, and serialization allocate nothing.
+## Errors
+- [`ParseError`](#ParseError) tells which rule failed, the part, the byte offset in the head, and how many
+  bytes of the current call were used.
+- After an error, the parser stays failed until [`RequestParser.reset`](#RequestParser.impl.reset).
+- `OutOfMemoryError` from `make` if the `Allocator` fails.
+
+## Gotchas
+The parser is strict. Lines must end with CRLF, and the start line uses one space between its
+parts. These fail: a bare LF, a space before `:` in a field, a folded line, empty lines before
+the start line, and HTTP/0.9.
+
+## Examples
+### Parse a response head
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.effect { Effect }
+import silk.http { Status }
+import silk.http_head {
+  Limits,
+  ParseError,
+  ParsedResponse,
+  ProgressState,
+  ResponseHead,
+  ResponseParser,
+  parseResponse
+}
+import silk.http_headers { Limits as ValueLimits }
+import silk.result { Result }
+
+fn limits() -> Limits {
+  return Limits {
+    maxHeadBytes: 4096,
+    maxStartLineBytes: 1024,
+    maxFieldLineBytes: 1024,
+    maxOwnedBytes: 8192,
+    values: ValueLimits {
+      maxMethodBytes: 16,
+      maxTargetBytes: 1024,
+      maxNameBytes: 64,
+      maxValueBytes: 1024,
+      maxFields: 32,
+      maxFieldBytes: 4096,
+      maxOwnedBytes: 8192,
+    },
+  }
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let wire = b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"
+  let parsed = run parseResponse(&wire, limits()) |> Effect.provideMut<Allocator>(&mut allocator)
+  let result = match move parsed {
+    Result<ParsedResponse, ParseError>.Success { value } => move value
+    Result<ParsedResponse, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+
+  // The parser stops after the head. The body "hello" starts at byte 38.
+  if result.progress.consumed != 38 || result.progress.state != ProgressState.Complete {
+    return 1
+  }
+  let head = match ResponseParser.head(&result.parser) {
+    Result<ResponseHead, ParseError>.Success { value } => value
+    Result<ResponseHead, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  if Status.code(&ResponseHead.status(&head)) != 200 || ResponseHead.fieldCount(&head) != 1 {
+    return 1
+  }
+  return 0
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
+```
 
 Import as `RequestParser` with `import silk.http_head { RequestParser }`.
 
@@ -30,7 +112,7 @@ Public declarations: 22.
 pub struct Limits
 ```
 
-Explicit finite parser, line, field, value, and owned-storage limits.
+The maximum sizes for a parser. The `values` limits also apply to each part of the head.
 
 ::Anchor{id="Limits.maxHeadBytes"}
 
@@ -40,7 +122,7 @@ Explicit finite parser, line, field, value, and owned-storage limits.
 pub maxHeadBytes: usize
 ```
 
-Maximum complete head bytes, including every CRLF and the terminating empty line.
+The maximum size of the head, including every CRLF and the empty line at the end.
 
 ::Anchor{id="Limits.maxStartLineBytes"}
 
@@ -50,7 +132,7 @@ Maximum complete head bytes, including every CRLF and the terminating empty line
 pub maxStartLineBytes: usize
 ```
 
-Maximum request/status line bytes, including its CRLF.
+The maximum size of the request line or status line, including its CRLF.
 
 ::Anchor{id="Limits.maxFieldLineBytes"}
 
@@ -60,7 +142,7 @@ Maximum request/status line bytes, including its CRLF.
 pub maxFieldLineBytes: usize
 ```
 
-Maximum field-line bytes, including its CRLF.
+The maximum size of one field line, including its CRLF.
 
 ::Anchor{id="Limits.maxOwnedBytes"}
 
@@ -70,7 +152,8 @@ Maximum field-line bytes, including its CRLF.
 pub maxOwnedBytes: usize
 ```
 
-Maximum parser byte backing plus field-offset metadata bytes.
+The maximum memory of the parser: `maxHeadBytes` plus 32 bytes for each field in
+`values.maxFields`.
 
 ::Anchor{id="Limits.values"}
 
@@ -80,7 +163,7 @@ Maximum parser byte backing plus field-offset metadata bytes.
 pub values: ValueLimits
 ```
 
-Shared method, target, name, value, field-count, and aggregate field limits.
+The limits for the method, target, names, values, and field count.
 
 ::Anchor{id="Limits.impl.Copy"}
 
@@ -98,7 +181,7 @@ impl Copy for Limits
 pub enum ProgressState
 ```
 
-The outcome of one successful incremental feed.
+Whether a head is complete after a `feed`.
 
 ::Anchor{id="ProgressState.NeedInput"}
 
@@ -108,7 +191,7 @@ The outcome of one successful incremental feed.
 NeedInput
 ```
 
-More bytes are required to complete the head.
+The head is not complete. Feed more bytes.
 
 ::Anchor{id="ProgressState.Complete"}
 
@@ -118,7 +201,7 @@ More bytes are required to complete the head.
 Complete
 ```
 
-The terminating empty line was consumed and the parser now publishes a head.
+The empty line at the end was read. Get the head with `head`.
 
 ::Anchor{id="Progress"}
 
@@ -128,7 +211,7 @@ The terminating empty line was consumed and the parser now publishes a head.
 pub struct Progress
 ```
 
-Exact progress through the current caller input.
+The result of a successful `feed`.
 
 ::Anchor{id="Progress.consumed"}
 
@@ -138,7 +221,8 @@ Exact progress through the current caller input.
 pub consumed: usize
 ```
 
-Bytes consumed from this call only.
+The number of bytes from the start of this input that the parser used. Give the rest again in
+the next call, or keep it if the head is complete.
 
 ::Anchor{id="Progress.state"}
 
@@ -148,7 +232,7 @@ Bytes consumed from this call only.
 pub state: ProgressState
 ```
 
-Whether one complete head is now available.
+Whether the head is complete.
 
 ::Anchor{id="Progress.impl.Copy"}
 
@@ -166,7 +250,7 @@ impl Copy for Progress
 pub enum ParserState
 ```
 
-The externally visible parser lifecycle.
+The state of a parser.
 
 ::Anchor{id="ParserState.Active"}
 
@@ -176,7 +260,7 @@ The externally visible parser lifecycle.
 Active
 ```
 
-The parser can accept more input.
+The parser takes more input.
 
 ::Anchor{id="ParserState.Complete"}
 
@@ -186,7 +270,7 @@ The parser can accept more input.
 Complete
 ```
 
-One complete head is available and the parser cannot be fed again before reset.
+A head is complete. Call `reset` before you parse the next head.
 
 ::Anchor{id="ParserState.Failed"}
 
@@ -196,7 +280,7 @@ One complete head is available and the parser cannot be fed again before reset.
 Failed
 ```
 
-A syntax, limit, or truncation failure poisoned the parser until reset.
+A parse failed. Get the error with `failure`, and call `reset` to use the parser again.
 
 ::Anchor{id="ParseComponent"}
 
@@ -206,7 +290,7 @@ A syntax, limit, or truncation failure poisoned the parser until reset.
 pub enum ParseComponent
 ```
 
-The syntactic or semantic component associated with a parser failure.
+The part of a head where a parse failed.
 
 ::Anchor{id="ParseComponent.Parser"}
 
@@ -216,7 +300,7 @@ The syntactic or semantic component associated with a parser failure.
 Parser
 ```
 
-Parser construction, lifecycle, or complete-head state.
+The parser itself, for example its limits or its state.
 
 ::Anchor{id="ParseComponent.StartLine"}
 
@@ -296,7 +380,7 @@ Field name.
 HeaderValue
 ```
 
-Field value after surrounding OWS removal.
+A field value, without the spaces around it.
 
 ::Anchor{id="ParseComponent.Host"}
 
@@ -306,7 +390,7 @@ Field value after surrounding OWS removal.
 Host
 ```
 
-HTTP Host field requirement or authority.
+The `Host` field.
 
 ::Anchor{id="ParseComponent.LineEnding"}
 
@@ -316,7 +400,7 @@ HTTP Host field requirement or authority.
 LineEnding
 ```
 
-Line delimiter syntax.
+A line ending.
 
 ::Anchor{id="ParseLimitKind"}
 
@@ -326,7 +410,7 @@ Line delimiter syntax.
 pub enum ParseLimitKind
 ```
 
-The finite parser budget that was exceeded.
+The limit that a head exceeded. See [`ParseReason.LimitExceeded`](#ParseReason.LimitExceeded).
 
 ::Anchor{id="ParseLimitKind.HeadBytes"}
 
@@ -336,7 +420,7 @@ The finite parser budget that was exceeded.
 HeadBytes
 ```
 
-Complete stored head bytes.
+`maxHeadBytes`.
 
 ::Anchor{id="ParseLimitKind.StartLineBytes"}
 
@@ -346,7 +430,7 @@ Complete stored head bytes.
 StartLineBytes
 ```
 
-Request or response start-line bytes, including CRLF.
+`maxStartLineBytes`.
 
 ::Anchor{id="ParseLimitKind.FieldLineBytes"}
 
@@ -356,7 +440,7 @@ Request or response start-line bytes, including CRLF.
 FieldLineBytes
 ```
 
-One field-line bytes, including CRLF.
+`maxFieldLineBytes`.
 
 ::Anchor{id="ParseLimitKind.Fields"}
 
@@ -366,7 +450,7 @@ One field-line bytes, including CRLF.
 Fields
 ```
 
-Number of fields, including duplicates and unknown names.
+`maxFields`: the number of fields, including repeated fields.
 
 ::Anchor{id="ParseLimitKind.MethodBytes"}
 
@@ -376,7 +460,7 @@ Number of fields, including duplicates and unknown names.
 MethodBytes
 ```
 
-Method bytes from the shared HTTP value contract.
+`maxMethodBytes`.
 
 ::Anchor{id="ParseLimitKind.TargetBytes"}
 
@@ -386,7 +470,7 @@ Method bytes from the shared HTTP value contract.
 TargetBytes
 ```
 
-Request-target bytes from the shared HTTP value contract.
+`maxTargetBytes`.
 
 ::Anchor{id="ParseLimitKind.NameBytes"}
 
@@ -396,7 +480,7 @@ Request-target bytes from the shared HTTP value contract.
 NameBytes
 ```
 
-Field-name bytes from the shared HTTP value contract.
+`maxNameBytes`.
 
 ::Anchor{id="ParseLimitKind.ValueBytes"}
 
@@ -406,7 +490,7 @@ Field-name bytes from the shared HTTP value contract.
 ValueBytes
 ```
 
-Field-value or reason bytes from the shared HTTP value contract.
+`maxValueBytes`, for a field value or the reason phrase.
 
 ::Anchor{id="ParseLimitKind.FieldBytes"}
 
@@ -416,7 +500,7 @@ Field-value or reason bytes from the shared HTTP value contract.
 FieldBytes
 ```
 
-Aggregate field-name plus field-value bytes.
+`maxFieldBytes`: the total length of all names and values.
 
 ::Anchor{id="ParseLimitKind.OwnedBytes"}
 
@@ -426,7 +510,7 @@ Aggregate field-name plus field-value bytes.
 OwnedBytes
 ```
 
-Parser-owned byte backing and field-offset storage.
+`maxOwnedBytes`: the memory of the parser.
 
 ::Anchor{id="ParseReason"}
 
@@ -436,7 +520,7 @@ Parser-owned byte backing and field-offset storage.
 pub union ParseReason
 ```
 
-Closed parser and serializer failure reasons.
+The rule that a parse or a write failed.
 
 ::Anchor{id="ParseReason.InvalidStartLine"}
 
@@ -446,7 +530,8 @@ Closed parser and serializer failure reasons.
 InvalidStartLine
 ```
 
-A start line does not match the selected strict grammar.
+The start line does not have the form `METHOD SP target SP version` or `version SP status SP
+reason`.
 
 ::Anchor{id="ParseReason.UnsupportedVersion"}
 
@@ -476,7 +561,7 @@ A request method is not a nonempty HTTP token.
 InvalidTarget
 ```
 
-A request target is invalid for its method or target form.
+The request target is not valid, or its form does not fit the method.
 
 ::Anchor{id="ParseReason.InvalidStatus"}
 
@@ -486,7 +571,7 @@ A request target is invalid for its method or target form.
 InvalidStatus
 ```
 
-A response status is not exactly three digits in the range 100 through 599.
+The status is not three digits from 100 to 599.
 
 ::Anchor{id="ParseReason.InvalidReasonPhrase"}
 
@@ -496,7 +581,7 @@ A response status is not exactly three digits in the range 100 through 599.
 InvalidReasonPhrase
 ```
 
-A reason phrase contains a forbidden control octet or DEL.
+The reason phrase has a control byte or DEL.
 
 ::Anchor{id="ParseReason.InvalidFieldName"}
 
@@ -506,7 +591,7 @@ A reason phrase contains a forbidden control octet or DEL.
 InvalidFieldName
 ```
 
-A field name is empty or contains a byte outside `tchar`.
+A field name is empty, or has a byte that is not allowed in a token.
 
 ::Anchor{id="ParseReason.InvalidFieldValue"}
 
@@ -516,7 +601,7 @@ A field name is empty or contains a byte outside `tchar`.
 InvalidFieldValue
 ```
 
-A trimmed field value contains a forbidden octet.
+A field value has a byte that is not allowed.
 
 ::Anchor{id="ParseReason.BareLf"}
 
@@ -526,7 +611,7 @@ A trimmed field value contains a forbidden octet.
 BareLf
 ```
 
-LF appeared without a preceding CR.
+A line ends with LF without CR.
 
 ::Anchor{id="ParseReason.InvalidLineEnding"}
 
@@ -536,7 +621,7 @@ LF appeared without a preceding CR.
 InvalidLineEnding
 ```
 
-A CR was not followed by LF.
+A CR is not followed by LF.
 
 ::Anchor{id="ParseReason.WhitespaceBeforeColon"}
 
@@ -546,7 +631,7 @@ A CR was not followed by LF.
 WhitespaceBeforeColon
 ```
 
-SP or HTAB appeared between a field name and its colon.
+A field has a space or a tab between its name and the `:`.
 
 ::Anchor{id="ParseReason.ObsFold"}
 
@@ -556,7 +641,7 @@ SP or HTAB appeared between a field name and its colon.
 ObsFold
 ```
 
-A field line began with SP or HTAB, which this profile never unfolds.
+A field line starts with a space or a tab. Folded lines are not accepted.
 
 ::Anchor{id="ParseReason.MissingHost"}
 
@@ -566,7 +651,7 @@ A field line began with SP or HTAB, which this profile never unfolds.
 MissingHost
 ```
 
-HTTP/1.1 had no Host field.
+An HTTP/1.1 request has no `Host` field.
 
 ::Anchor{id="ParseReason.DuplicateHost"}
 
@@ -576,7 +661,7 @@ HTTP/1.1 had no Host field.
 DuplicateHost
 ```
 
-More than one Host field was present.
+A request has more than one `Host` field.
 
 ::Anchor{id="ParseReason.InvalidHost"}
 
@@ -586,7 +671,7 @@ More than one Host field was present.
 InvalidHost
 ```
 
-A supplied Host field was not a valid authority.
+The `Host` field is not a valid authority.
 
 ::Anchor{id="ParseReason.LimitExceeded"}
 
@@ -596,7 +681,7 @@ A supplied Host field was not a valid authority.
 LimitExceeded
 ```
 
-One explicit finite limit was exceeded.
+The head exceeded a limit.
 
 ::Anchor{id="ParseReason.LimitExceeded.limit"}
 
@@ -606,7 +691,7 @@ One explicit finite limit was exceeded.
 pub limit: ParseLimitKind
 ```
 
-The rejected budget.
+The limit that was exceeded.
 
 ::Anchor{id="ParseReason.LimitExceeded.allowed"}
 
@@ -616,7 +701,7 @@ The rejected budget.
 pub allowed: usize
 ```
 
-Configured maximum.
+The value of the limit.
 
 ::Anchor{id="ParseReason.LimitExceeded.attempted"}
 
@@ -626,7 +711,7 @@ Configured maximum.
 pub attempted: usize
 ```
 
-Attempted count.
+The size that was found.
 
 ::Anchor{id="ParseReason.SizeOverflow"}
 
@@ -636,7 +721,7 @@ Attempted count.
 SizeOverflow
 ```
 
-Checked capacity or serialized-size arithmetic overflowed `usize`.
+A size calculation overflowed `usize`.
 
 ::Anchor{id="ParseReason.Truncated"}
 
@@ -646,7 +731,7 @@ Checked capacity or serialized-size arithmetic overflowed `usize`.
 Truncated
 ```
 
-Final input ended before the terminating empty line.
+The input ended, with `final` set to `true`, before the head was complete.
 
 ::Anchor{id="ParseReason.InvalidState"}
 
@@ -656,7 +741,8 @@ Final input ended before the terminating empty line.
 InvalidState
 ```
 
-The operation is not valid for the parser's current lifecycle.
+The call is not valid in the current [`ParserState`](#ParserState), for example `feed` after a complete
+head.
 
 ::Anchor{id="ParseReason.impl.Copy"}
 
@@ -674,7 +760,7 @@ impl Copy for ParseReason
 pub struct ParseError
 ```
 
-A precise parser failure with per-call progress and absolute head location.
+The error from a parse. It tells which rule failed, and where.
 
 ::Anchor{id="ParseError.reason"}
 
@@ -684,7 +770,7 @@ A precise parser failure with per-call progress and absolute head location.
 pub reason: ParseReason
 ```
 
-Recovery-oriented failure category.
+The rule that failed.
 
 ::Anchor{id="ParseError.component"}
 
@@ -694,7 +780,7 @@ Recovery-oriented failure category.
 pub component: ParseComponent
 ```
 
-Component that failed.
+The part of the head that failed.
 
 ::Anchor{id="ParseError.consumed"}
 
@@ -704,7 +790,7 @@ Component that failed.
 pub consumed: usize
 ```
 
-Valid prefix consumed from the call that produced this error.
+The number of bytes of this call that were valid before the error.
 
 ::Anchor{id="ParseError.offset"}
 
@@ -714,7 +800,7 @@ Valid prefix consumed from the call that produced this error.
 pub offset: usize
 ```
 
-Zero-based absolute byte offset in the head.
+The byte offset in the head where the error is, from the start of the head.
 
 ::Anchor{id="ParseError.fieldIndex"}
 
@@ -724,7 +810,7 @@ Zero-based absolute byte offset in the head.
 pub fieldIndex: Option<usize>
 ```
 
-Field ordinal when the failure belongs to one field.
+The position of the field, from 0, when the error is in a field.
 
 ::Anchor{id="validateLimits"}
 
@@ -734,12 +820,12 @@ Field ordinal when the failure belongs to one field.
 pub fn validateLimits(limits: &Limits) -> Result<(), ParseError>
 ```
 
-Validates parser storage arithmetic and the owned-storage limit without allocation or input.
+Checks that `limits` are consistent, without allocation.
 
-### Details
-
-The required storage contains `maxHeadBytes` plus fixed field metadata for `maxFields`.
-Arithmetic overflow returns `SizeOverflow`. Excess storage returns the exact `OwnedBytes` limit.
+### Errors
+- `LimitExceeded` with `OwnedBytes` if `maxOwnedBytes` is less than `maxHeadBytes` plus 32 bytes
+  for each field.
+- `SizeOverflow` if that sum does not fit in `usize`.
 
 ::Anchor{id="RequestParser"}
 
@@ -749,7 +835,7 @@ Arithmetic overflow returns `SizeOverflow`. Excess storage returns the exact `Ow
 pub struct RequestParser
 ```
 
-An affine owner of one bounded incremental request-head parse.
+A parser for request heads that you feed in parts. Make it with [`RequestParser.make`](#RequestParser.impl.make).
 
 ::Anchor{id="ResponseParser"}
 
@@ -759,7 +845,7 @@ An affine owner of one bounded incremental request-head parse.
 pub struct ResponseParser
 ```
 
-An affine owner of one bounded incremental response-head parse.
+A parser for response heads that you feed in parts. Make it with [`ResponseParser.make`](#ResponseParser.impl.make).
 
 ::Anchor{id="RequestHead"}
 
@@ -769,7 +855,7 @@ An affine owner of one bounded incremental response-head parse.
 pub struct RequestHead<'owner>
 ```
 
-A completed request head whose values and fields borrow its parser.
+A parsed request head. It borrows its parser.
 
 ::Anchor{id="RequestHead.impl.Copy"}
 
@@ -787,7 +873,7 @@ impl<'owner> Copy for RequestHead<'owner>
 pub struct ResponseHead<'owner>
 ```
 
-A completed response head whose values and fields borrow its parser.
+A parsed response head. It borrows its parser.
 
 ::Anchor{id="ResponseHead.impl.Copy"}
 
@@ -805,7 +891,7 @@ impl<'owner> Copy for ResponseHead<'owner>
 pub struct HeaderIterator<'owner>
 ```
 
-An insertion-order iterator over validated fields borrowed from a completed parser.
+An iterator over the fields of a parsed head, in order.
 
 ::Anchor{id="ParsedRequest"}
 
@@ -815,7 +901,7 @@ An insertion-order iterator over validated fields borrowed from a completed pars
 pub struct ParsedRequest
 ```
 
-Whole-slice request parsing result, retaining both the parser and exact suffix boundary.
+The result of [`parseRequest`](#parseRequest).
 
 ::Anchor{id="ParsedRequest.parser"}
 
@@ -825,7 +911,7 @@ Whole-slice request parsing result, retaining both the parser and exact suffix b
 pub parser: RequestParser
 ```
 
-Completed parser. Borrow it with [`RequestParser.head`](#RequestParser.impl.head).
+The parser that holds the head. Get the head with [`RequestParser.head`](#RequestParser.impl.head).
 
 ::Anchor{id="ParsedRequest.progress"}
 
@@ -835,7 +921,8 @@ Completed parser. Borrow it with [`RequestParser.head`](#RequestParser.impl.head
 pub progress: Progress
 ```
 
-Exact progress through the supplied whole slice.
+How many bytes the head used. The bytes after it, such as the body, start at
+`progress.consumed`.
 
 ::Anchor{id="ParsedResponse"}
 
@@ -845,7 +932,7 @@ Exact progress through the supplied whole slice.
 pub struct ParsedResponse
 ```
 
-Whole-slice response parsing result, retaining both the parser and exact suffix boundary.
+The result of [`parseResponse`](#parseResponse).
 
 ::Anchor{id="ParsedResponse.parser"}
 
@@ -855,7 +942,7 @@ Whole-slice response parsing result, retaining both the parser and exact suffix 
 pub parser: ResponseParser
 ```
 
-Completed parser. Borrow it with [`ResponseParser.head`](#ResponseParser.impl.head).
+The parser that holds the head. Get the head with [`ResponseParser.head`](#ResponseParser.impl.head).
 
 ::Anchor{id="ParsedResponse.progress"}
 
@@ -865,7 +952,8 @@ Completed parser. Borrow it with [`ResponseParser.head`](#ResponseParser.impl.he
 pub progress: Progress
 ```
 
-Exact progress through the supplied whole slice.
+How many bytes the head used. The bytes after it, such as the body, start at
+`progress.consumed`.
 
 ::Anchor{id="RequestParser.impl"}
 
@@ -885,7 +973,11 @@ pub effect fn make(limits: Limits) -> Result<RequestParser, ParseError>
   ? &mut Allocator
 ```
 
-Validates capacity arithmetic and acquires all parser storage before publishing the parser.
+Returns a parser, and allocates all its memory.
+
+#### Errors
+- `ParseError` if [`validateLimits`](#validateLimits) fails.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="RequestParser.impl.feed"}
 
@@ -895,7 +987,11 @@ Validates capacity arithmetic and acquires all parser storage before publishing 
 pub fn feed(self: &mut Self, input: &[u8], final: bool) -> Result<Progress, ParseError>
 ```
 
-Consumes an exact prefix, never crossing the terminating empty line.
+Parses the start of `input`, and returns how many bytes it used.
+
+#### Details
+The parser keeps the bytes that it used. It stops after the empty line that ends the head. Set
+`final` to `true` when no more input comes, so that an incomplete head fails with `Truncated`.
 
 ::Anchor{id="RequestParser.impl.state"}
 
@@ -905,7 +1001,7 @@ Consumes an exact prefix, never crossing the terminating empty line.
 pub fn state(self: &Self) -> ParserState
 ```
 
-Returns the current parser lifecycle.
+Returns the state of the parser.
 
 ::Anchor{id="RequestParser.impl.failure"}
 
@@ -915,7 +1011,7 @@ Returns the current parser lifecycle.
 pub fn failure(self: &Self) -> Option<ParseError>
 ```
 
-Returns the original poisoning failure, if one exists.
+Returns the error that made the parser fail, or `None`.
 
 ::Anchor{id="RequestParser.impl.head"}
 
@@ -925,7 +1021,7 @@ Returns the original poisoning failure, if one exists.
 pub fn head<'owner>(self: &'owner Self) -> Result<RequestHead<'owner>, ParseError>
 ```
 
-Borrows the completed request head and its ordered fields.
+Returns the parsed head. Returns `InvalidState` if the head is not complete.
 
 ::Anchor{id="RequestParser.impl.reset"}
 
@@ -935,8 +1031,8 @@ Borrows the completed request head and its ordered fields.
 pub fn reset(self: &mut Self) -> Result<(), ParseError>
 ```
 
-Restores fresh active state while retaining the original allocations.
-A live head borrow statically prevents this exclusive operation.
+Makes the parser ready for a new head, and keeps its memory. You cannot call it while you
+borrow a head from the parser.
 
 ::Anchor{id="ResponseParser.impl"}
 
@@ -956,7 +1052,11 @@ pub effect fn make(limits: Limits) -> Result<ResponseParser, ParseError>
   ? &mut Allocator
 ```
 
-Validates capacity arithmetic and acquires all parser storage before publishing the parser.
+Returns a parser, and allocates all its memory.
+
+#### Errors
+- `ParseError` if [`validateLimits`](#validateLimits) fails.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="ResponseParser.impl.feed"}
 
@@ -966,7 +1066,11 @@ Validates capacity arithmetic and acquires all parser storage before publishing 
 pub fn feed(self: &mut Self, input: &[u8], final: bool) -> Result<Progress, ParseError>
 ```
 
-Consumes an exact prefix, never crossing the terminating empty line.
+Parses the start of `input`, and returns how many bytes it used.
+
+#### Details
+The parser keeps the bytes that it used. It stops after the empty line that ends the head. Set
+`final` to `true` when no more input comes, so that an incomplete head fails with `Truncated`.
 
 ::Anchor{id="ResponseParser.impl.state"}
 
@@ -976,7 +1080,7 @@ Consumes an exact prefix, never crossing the terminating empty line.
 pub fn state(self: &Self) -> ParserState
 ```
 
-Returns the current parser lifecycle.
+Returns the state of the parser.
 
 ::Anchor{id="ResponseParser.impl.failure"}
 
@@ -986,7 +1090,7 @@ Returns the current parser lifecycle.
 pub fn failure(self: &Self) -> Option<ParseError>
 ```
 
-Returns the original poisoning failure, if one exists.
+Returns the error that made the parser fail, or `None`.
 
 ::Anchor{id="ResponseParser.impl.head"}
 
@@ -996,7 +1100,7 @@ Returns the original poisoning failure, if one exists.
 pub fn head<'owner>(self: &'owner Self) -> Result<ResponseHead<'owner>, ParseError>
 ```
 
-Borrows the completed response head and its ordered fields.
+Returns the parsed head. Returns `InvalidState` if the head is not complete.
 
 ::Anchor{id="ResponseParser.impl.reset"}
 
@@ -1006,8 +1110,8 @@ Borrows the completed response head and its ordered fields.
 pub fn reset(self: &mut Self) -> Result<(), ParseError>
 ```
 
-Restores fresh active state while retaining the original allocations.
-A live head borrow statically prevents this exclusive operation.
+Makes the parser ready for a new head, and keeps its memory. You cannot call it while you
+borrow a head from the parser.
 
 ::Anchor{id="RequestHead.impl"}
 
@@ -1035,7 +1139,7 @@ Returns the parsed protocol version.
 pub fn method(self: &Self) -> Method<'owner>
 ```
 
-Returns the validated case-sensitive method token.
+Returns the method, spelled as received.
 
 ::Anchor{id="RequestHead.impl.target"}
 
@@ -1045,7 +1149,7 @@ Returns the validated case-sensitive method token.
 pub fn target(self: &Self) -> RequestTarget<'owner>
 ```
 
-Returns the validated request target.
+Returns the request target.
 
 ::Anchor{id="RequestHead.impl.fieldCount"}
 
@@ -1065,7 +1169,7 @@ Returns the number of fields, including duplicates.
 pub fn fields(self: &Self) -> HeaderIterator<'owner>
 ```
 
-Iterates fields in original order without combining duplicate names.
+Returns an iterator over the fields, in order. Repeated fields stay separate.
 
 ::Anchor{id="RequestHead.impl.copy"}
 
@@ -1078,7 +1182,11 @@ pub effect fn copy(
   ) -> Result<OwnedRequestHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies this head into the shared independently owned HTTP head representation.
+Copies the head into new memory, as an owned head from `silk.http`.
+
+#### Errors
+- `ValueError` if the head exceeds `limits`.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="ResponseHead.impl"}
 
@@ -1106,7 +1214,7 @@ Returns the parsed protocol version.
 pub fn status(self: &Self) -> Status
 ```
 
-Returns the parsed response status.
+Returns the status.
 
 ::Anchor{id="ResponseHead.impl.reason"}
 
@@ -1116,7 +1224,7 @@ Returns the parsed response status.
 pub fn reason(self: &Self) -> &'owner [u8]
 ```
 
-Borrows the exact reason octets, which may be empty and need not be UTF-8.
+Returns the reason phrase bytes. They can be empty, and are not always UTF-8.
 
 ::Anchor{id="ResponseHead.impl.fieldCount"}
 
@@ -1136,7 +1244,7 @@ Returns the number of fields, including duplicates.
 pub fn fields(self: &Self) -> HeaderIterator<'owner>
 ```
 
-Iterates fields in original order without combining duplicate names.
+Returns an iterator over the fields, in order. Repeated fields stay separate.
 
 ::Anchor{id="ResponseHead.impl.copy"}
 
@@ -1149,7 +1257,11 @@ pub effect fn copy(
   ) -> Result<OwnedResponseHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies this head into the shared independently owned HTTP head representation.
+Copies the head into new memory, as an owned head from `silk.http`.
+
+#### Errors
+- `ValueError` if the head exceeds `limits`.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="ResponseHead.impl.copyMatchingHeaders"}
 
@@ -1163,13 +1275,11 @@ pub effect fn copyMatchingHeaders<'name>(
   ) -> Result<OwnedResponseHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies the status, reason, and only matching fields into independent storage.
+Copies the status, the reason, and only the fields named `name`, into new memory.
 
 #### Details
-
-Matching is ASCII case-insensitive. Duplicate matches remain distinct and preserve wire order.
-The supplied limits apply to the selected fields and complete owned result, not unrelated
-fields retained by the parser.
+Names are compared without case. Repeated fields stay separate, in their order. `limits`
+applies to the copied parts only.
 
 ::Anchor{id="HeaderIterator.impl"}
 
@@ -1197,7 +1307,7 @@ Returns the next validated field, or `None` after the final field.
 pub fn fieldIndex(self: &Self) -> usize
 ```
 
-Returns the source field ordinal yielded by the most recent successful call.
+Returns the position of the last field from [`HeaderIterator.next`](#HeaderIterator.impl.next), from 0.
 
 ::Anchor{id="parseRequest"}
 
@@ -1210,8 +1320,8 @@ pub effect fn parseRequest(
 ) -> Result<ParsedRequest, ParseError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Parses one request head from a whole slice through the same incremental core.
-The returned progress retains the exact suffix boundary when additional bytes follow the head.
+Parses a request head from the start of `input`. The bytes after the head start at
+`progress.consumed` in the result.
 
 ::Anchor{id="parseResponse"}
 
@@ -1224,8 +1334,8 @@ pub effect fn parseResponse(
 ) -> Result<ParsedResponse, ParseError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Parses one response head from a whole slice through the same incremental core.
-The returned progress retains the exact suffix boundary when additional bytes follow the head.
+Parses a response head from the start of `input`. The bytes after the head start at
+`progress.consumed` in the result.
 
 ::Anchor{id="requestSerializedSize"}
 
@@ -1238,7 +1348,7 @@ pub fn requestSerializedSize<'value>(
 ) -> Result<usize, ValueError>
 ```
 
-Computes the exact canonical request-head size without mutating output.
+Returns the number of bytes that [`writeRequestInto`](#writeRequestInto) writes for `head`.
 
 ::Anchor{id="responseSerializedSize"}
 
@@ -1251,7 +1361,7 @@ pub fn responseSerializedSize<'value>(
 ) -> Result<usize, ValueError>
 ```
 
-Computes the exact canonical response-head size without mutating output.
+Returns the number of bytes that [`writeResponseInto`](#writeResponseInto) writes for `head`.
 
 ::Anchor{id="writeRequestInto"}
 
@@ -1265,7 +1375,8 @@ pub fn writeRequestInto<'value>(
 ) -> Result<usize, ValueError>
 ```
 
-Writes one validated request head atomically with canonical SP and CRLF separators.
+Writes `head` with single spaces and CRLF line endings, and the empty line at the end, to the
+start of `output`. Returns the length. If `output` is too small, it writes nothing.
 
 ::Anchor{id="writeResponseInto"}
 
@@ -1279,6 +1390,7 @@ pub fn writeResponseInto<'value>(
 ) -> Result<usize, ValueError>
 ```
 
-Writes one validated response head atomically with canonical SP and CRLF separators.
+Writes `head` with single spaces and CRLF line endings, and the empty line at the end, to the
+start of `output`. Returns the length. If `output` is too small, it writes nothing.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

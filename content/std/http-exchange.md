@@ -1,9 +1,262 @@
-Scoped incremental HTTP/1 client exchanges over an explicit transport loan.
+Run HTTP/1 requests over a connection step by step: send the head, stream the body, and read the
+response.
+
+## When to use
+Use this module to stream a request or a response body, or to reuse a connection. Make a
+[`Connection`](#Connection) around a transport with [`makeOwned`](#makeOwned), [`withOwned`](#withOwned), or [`withConnected`](#withConnected), or
+let [`withRoute`](#withRoute) connect through a proxy route. Then call [`withExchange`](#withExchange) for each request.
+Most programs use `silk.http_client` or `silk.http_fetch`, which call this module.
 
 ## Details
+A connection runs one exchange at a time. In the callback of [`withExchange`](#withExchange), call the steps in
+order:
+1. [`send`](#send) sends the head of a `PreparedRequest` from `silk.http_request`.
+2. [`writeSome`](#writeSome) sends the body, and [`finishRequest`](#finishRequest) ends it. Call [`finishRequest`](#finishRequest) also when
+   there is no body.
+3. [`receive`](#receive) or [`receiveFinal`](#receiveFinal) reads a response head. Then [`readSome`](#readSome) reads the body, or
+   [`beginContent`](#beginContent) and [`readContentSome`](#readContentSome) decode it.
+4. [`finishResponse`](#finishResponse) ends the response. The connection can then run the next exchange.
 
-A connection admits one exchange at a time. Complete request and response framing are required
-before reuse. Cleanup closes terminally without a hidden flush, body drain, retry, or replay.
+[`Exchange.phase`](#Exchange.impl.phase) tells which step is next. A deadline in [`RequestOptions`](#RequestOptions) covers the whole
+exchange, and is never restarted.
+
+## Errors
+- [`ExchangeError`](#ExchangeError) keeps the error from the lower module: the head parser, the body framing,
+  content decoding, or the transport. A step out of order fails with `InvalidState`.
+- `OutOfMemoryError` if the `Allocator` fails.
+
+## Gotchas
+If the callback fails or returns before the response is complete, the connection closes and is
+not used again. Nothing is flushed, drained, or sent again for you. A 4xx or 5xx status is not
+an error.
+
+## Examples
+### Send a GET request and read the body
+This example uses a transport with a fixed response in place of a network connection.
+
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+import silk.byte_duplex { ByteDuplex, ReadTransfer }
+import silk.bytes { Bytes }
+import silk.effect { Effect }
+import silk.http { Header, Method, ValueError, Version }
+import silk.http_exchange { Connection, Exchange, ExchangeError, Limits, RequestOptions }
+import silk.http_exchange as Client
+import silk.http_headers { Headers, Limits as ValueLimits }
+import silk.http_origin { Origin, OriginError }
+import silk.http_request { BodyMode, HeaderPolicy, PreparedRequest, RequestError, fromUri }
+import silk.http_transport { HttpTransport, TransportError }
+import silk.list { List }
+import silk.memory_byte_duplex {
+  MemoryByteDuplex,
+  MemoryReadEvent,
+  MemoryWriteAction,
+  MemoryWriteEvent
+}
+import silk.monotonic_clock { MonotonicClock }
+import silk.option { Option }
+import silk.random { Random }
+import silk.result { Result }
+import silk.system_clock { Instant, SystemClock }
+import silk.u64
+import silk.uri { Uri }
+import silk.uri_reference { ParseError }
+
+// A transport that answers with fixed bytes and accepts all writes.
+struct ScriptedTransport {
+  memory: MemoryByteDuplex
+}
+
+impl HttpTransport for ScriptedTransport {
+  effect fn readSomeRaw(
+    self: &mut Self,
+    output: &mut [u8],
+    deadline: Option<Instant>
+  ) -> ReadTransfer
+    ! TransportError | OutOfMemoryError
+    ? &mut MonotonicClock | &mut Allocator | &mut Random {
+    let attempted = run Effect.result(ByteDuplex.readSome(&mut output, move deadline))
+      |> Effect.provideMut<ByteDuplex>(&mut self.memory)
+    return match move attempted {
+      Result.Success { value } => move value
+      Result.Failure { error } => {
+        fail TransportError.Plain { error: move error }
+      }
+    }
+  }
+
+  effect fn writeSomeRaw(self: &mut Self, input: &[u8], deadline: Option<Instant>) -> usize
+    ! TransportError | OutOfMemoryError
+    ? &mut MonotonicClock | &mut Allocator | &mut Random {
+    let attempted = run Effect.result(ByteDuplex.writeSome(input, move deadline))
+      |> Effect.provideMut<ByteDuplex>(&mut self.memory)
+    return match move attempted {
+      Result.Success { value } => value
+      Result.Failure { error } => {
+        fail TransportError.Plain { error: move error }
+      }
+    }
+  }
+
+  effect fn flush(self: &mut Self, deadline: Option<Instant>) -> ()
+    ! TransportError | OutOfMemoryError
+    ? &mut MonotonicClock | &mut Allocator | &mut Random {
+    drop deadline
+    return ()
+  }
+
+  effect fn close(self: &mut Self) -> ()
+    ! TransportError {
+    return ()
+  }
+}
+
+struct FixedClock {}
+
+impl MonotonicClock for FixedClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(0, 0)
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return u64.toU64(1)
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    drop when
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    drop howLong
+    return ()
+  }
+}
+
+struct ZeroRandom {}
+
+impl Random for ZeroRandom {
+  effect fn fillBytes(self: &mut Self, output: &mut [u8]) -> () {
+    drop output
+    return ()
+  }
+}
+
+fn valueLimits() -> ValueLimits {
+  return Limits.defaults().head.values
+}
+
+// Sends the request and reads the body of the response.
+effect<'call> fn readBody<'call, 'exchange: 'call>(
+  exchange: &'call mut Exchange<'exchange, ScriptedTransport>,
+) -> i32
+  ! ExchangeError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock | &mut Random {
+  run Client.send(&mut exchange.*)
+
+  // The request has no body, so it ends with no trailers.
+  let entries: [Header<'static>; 0] = []
+  let trailers = match Headers.make(&entries, valueLimits()) {
+    Result<Headers, ValueError>.Success { value } => value
+    Result<Headers, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  run Client.finishRequest(&mut exchange.*, &trailers)
+  let status = run Client.receiveFinal(&mut exchange.*)
+  if status != 200 {
+    return 1
+  }
+  let mut body: [u8; 16] = [0; 16]
+  let count = run Client.readSome(&mut exchange.*, &mut body)
+  if count != 5 || body[0] != 104 {
+    return 1
+  }
+  run Client.finishResponse(&mut exchange.*)
+  return 0
+}
+
+effect fn program() -> i32
+  ! ExchangeError | RequestError | OutOfMemoryError
+  ? &mut Allocator | &mut MonotonicClock | &mut Random {
+  let uri = match Uri.parse("http://example.com/") {
+    Result<Uri, ParseError>.Success { value } => value
+    Result<Uri, ParseError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let origin = match Origin.fromUri(&uri) {
+    Result<Origin, OriginError>.Success { value } => value
+    Result<Origin, OriginError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let entries: [Header<'static>; 0] = []
+  let headers = match Headers.make(&entries, valueLimits()) {
+    Result<Headers, ValueError>.Success { value } => value
+    Result<Headers, ValueError>.Failure { error: _ } => {
+      return 1
+    }
+  }
+  let policy = HeaderPolicy.defaults()
+  let request = run fromUri(
+    &uri,
+    Version.Http11,
+    Method.get(),
+    &headers,
+    &policy,
+    BodyMode.Empty,
+    false,
+    valueLimits(),
+    4096,
+    128,
+  )
+  let response = run Bytes.copy(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello")
+  let mut reads = List<MemoryReadEvent>.make()
+  run List.append(
+    &mut reads,
+    MemoryReadEvent.Data { readyAt: SystemClock.make(0, 0), bytes: move response }
+  )
+  let mut writes = List<MemoryWriteEvent>.make()
+  run List.append(
+    &mut writes,
+    MemoryWriteEvent {
+      readyAt: SystemClock.make(0, 0),
+      action: MemoryWriteAction.Accept { count: 4096 }
+    },
+  )
+  let memory = run MemoryByteDuplex.make(move reads, move writes, 4096, 4, Option<i32>.none())
+  let mut connection = run Client.makeOwned(
+    ScriptedTransport { memory: move memory },
+    origin,
+    Version.Http11,
+    Limits.defaults(),
+    Option<Instant>.none(),
+  )
+  let result = run Client.withExchange(
+    &mut connection,
+    &request,
+    RequestOptions.defaults(),
+    readBody
+  )
+  run Client.close(&mut connection)
+  return result
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut clock = FixedClock {}
+  let mut random = ZeroRandom {}
+  return run Effect.catchAll(program(), failed) |> Effect.provideMut<Random>(&mut random)
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
 
 Import as `Exchange` with `import silk.http_exchange { Exchange }`.
 
@@ -17,7 +270,7 @@ Public declarations: 44.
 pub enum ConnectionPhase
 ```
 
-The exclusive connection state.
+The state of a [`Connection`](#Connection).
 
 ::Anchor{id="ConnectionPhase.Ready"}
 
@@ -27,7 +280,7 @@ The exclusive connection state.
 Ready
 ```
 
-Admits one new exchange.
+The connection can start a new exchange.
 
 ::Anchor{id="ConnectionPhase.Active"}
 
@@ -37,7 +290,7 @@ Admits one new exchange.
 Active
 ```
 
-Has an active exchange.
+An exchange is running.
 
 ::Anchor{id="ConnectionPhase.Closed"}
 
@@ -47,7 +300,7 @@ Has an active exchange.
 Closed
 ```
 
-Cannot perform another HTTP exchange.
+The connection cannot run more exchanges.
 
 ::Anchor{id="ExchangePhase"}
 
@@ -57,7 +310,7 @@ Cannot perform another HTTP exchange.
 pub enum ExchangePhase
 ```
 
-The next permitted exchange operation.
+The next step of an [`Exchange`](#Exchange).
 
 ::Anchor{id="ExchangePhase.Prepared"}
 
@@ -67,7 +320,7 @@ The next permitted exchange operation.
 Prepared
 ```
 
-Permits sending the validated request head.
+Call [`send`](#send).
 
 ::Anchor{id="ExchangePhase.AwaitContinue"}
 
@@ -77,7 +330,8 @@ Permits sending the validated request head.
 AwaitContinue
 ```
 
-Requires response heads until 100 or an early final response.
+The request has `Expect: 100-continue`. Call [`receive`](#receive) to wait for 100 Continue or an early
+final response.
 
 ::Anchor{id="ExchangePhase.Upload"}
 
@@ -87,7 +341,7 @@ Requires response heads until 100 or an early final response.
 Upload
 ```
 
-Permits request body writes and request finish.
+Call [`writeSome`](#writeSome) for the body, then [`finishRequest`](#finishRequest).
 
 ::Anchor{id="ExchangePhase.AwaitResponse"}
 
@@ -97,7 +351,7 @@ Permits request body writes and request finish.
 AwaitResponse
 ```
 
-Permits receiving response heads.
+Call [`receive`](#receive) or [`receiveFinal`](#receiveFinal).
 
 ::Anchor{id="ExchangePhase.Response"}
 
@@ -107,7 +361,7 @@ Permits receiving response heads.
 Response
 ```
 
-Permits response body reads.
+Read the body with [`readSome`](#readSome) or [`readContentSome`](#readContentSome), then call [`finishResponse`](#finishResponse).
 
 ::Anchor{id="ExchangePhase.Tunnel"}
 
@@ -117,7 +371,7 @@ Permits response body reads.
 Tunnel
 ```
 
-Permits an exclusive tunnel handoff.
+A `CONNECT` succeeded. Call [`withTunnel`](#withTunnel).
 
 ::Anchor{id="ExchangePhase.Finished"}
 
@@ -127,7 +381,7 @@ Permits an exclusive tunnel handoff.
 Finished
 ```
 
-Records complete message boundaries.
+The request and the response are complete.
 
 ::Anchor{id="ExchangePhase.Aborted"}
 
@@ -137,7 +391,7 @@ Records complete message boundaries.
 Aborted
 ```
 
-Forbids further exchange operations.
+The exchange stopped. No more steps are possible.
 
 ::Anchor{id="ContinuePolicy"}
 
@@ -147,7 +401,7 @@ Forbids further exchange operations.
 pub union ContinuePolicy
 ```
 
-The explicit upload admission policy.
+Whether the client waits for 100 Continue before it sends the body.
 
 ::Anchor{id="ContinuePolicy.Disabled"}
 
@@ -157,7 +411,7 @@ The explicit upload admission policy.
 Disabled
 ```
 
-Completes upload before receiving response heads.
+Send the whole body before the response is read.
 
 ::Anchor{id="ContinuePolicy.Require100"}
 
@@ -167,7 +421,8 @@ Completes upload before receiving response heads.
 Require100
 ```
 
-Waits for 100 under a finite absolute deadline, without fallback.
+Wait for 100 Continue until a deadline. If it does not come, fail with `ContinueTimeout`. The
+request needs `Expect: 100-continue`.
 
 ::Anchor{id="ContinuePolicy.Require100.deadline"}
 
@@ -177,7 +432,7 @@ Waits for 100 under a finite absolute deadline, without fallback.
 pub deadline: Instant
 ```
 
-The absolute monotonic continue deadline, clamped to the overall deadline.
+The deadline on the `MonotonicClock`. The deadline of the exchange also applies.
 
 ::Anchor{id="RequestOptions"}
 
@@ -187,7 +442,7 @@ The absolute monotonic continue deadline, clamped to the overall deadline.
 pub struct RequestOptions
 ```
 
-Deadlines for one exchange. They are never restarted between operations.
+The deadlines of one exchange. They are never restarted between steps.
 
 ::Anchor{id="RequestOptions.deadline"}
 
@@ -197,7 +452,7 @@ Deadlines for one exchange. They are never restarted between operations.
 pub deadline: Option<Instant>
 ```
 
-The overall absolute monotonic deadline; None is unbounded.
+The deadline of the whole exchange on the `MonotonicClock`, or `None` for no deadline.
 
 ::Anchor{id="RequestOptions.continuePolicy"}
 
@@ -207,7 +462,7 @@ The overall absolute monotonic deadline; None is unbounded.
 pub continuePolicy: ContinuePolicy
 ```
 
-The selected expectation policy, matching the prepared request.
+Whether to wait for 100 Continue. It must match the `PreparedRequest`.
 
 ::Anchor{id="Limits"}
 
@@ -217,7 +472,8 @@ The selected expectation policy, matching the prepared request.
 pub struct Limits
 ```
 
-Finite connection and message storage and wire budgets.
+The limits of a connection: buffers, heads, bodies, and request counts. Start from
+[`Limits.defaults`](#Limits.impl.defaults).
 
 ::Anchor{id="Limits.head"}
 
@@ -227,7 +483,7 @@ Finite connection and message storage and wire budgets.
 pub head: HeadLimits
 ```
 
-Parser limits for request and response heads.
+The limits for response heads.
 
 ::Anchor{id="Limits.requestBody"}
 
@@ -237,7 +493,7 @@ Parser limits for request and response heads.
 pub requestBody: BodyLimits
 ```
 
-Independent request body limits.
+The limits for request bodies.
 
 ::Anchor{id="Limits.responseBody"}
 
@@ -247,7 +503,7 @@ Independent request body limits.
 pub responseBody: BodyLimits
 ```
 
-Independent response body limits.
+The limits for response bodies.
 
 ::Anchor{id="Limits.readCapacity"}
 
@@ -257,7 +513,7 @@ Independent response body limits.
 pub readCapacity: usize
 ```
 
-Positive input buffer capacity.
+The size of the read buffer. It must not be 0.
 
 ::Anchor{id="Limits.writeCapacity"}
 
@@ -267,7 +523,7 @@ Positive input buffer capacity.
 pub writeCapacity: usize
 ```
 
-Positive framing output scratch capacity.
+The size of the write buffer for framing. It must not be 0.
 
 ::Anchor{id="Limits.maxRequests"}
 
@@ -277,7 +533,7 @@ Positive framing output scratch capacity.
 pub maxRequests: usize
 ```
 
-Maximum requests admitted on this connection.
+The maximum number of requests on one connection.
 
 ::Anchor{id="Limits.maxInformationalResponses"}
 
@@ -287,7 +543,7 @@ Maximum requests admitted on this connection.
 pub maxInformationalResponses: usize
 ```
 
-Maximum informational heads per exchange; use 16 for the standard default.
+The maximum number of 1xx responses in one exchange. The default is 16.
 
 ::Anchor{id="Limits.maxInformationalWireBytes"}
 
@@ -297,7 +553,7 @@ Maximum informational heads per exchange; use 16 for the standard default.
 pub maxInformationalWireBytes: u64
 ```
 
-Maximum aggregate informational head wire bytes; use 65536 for the standard default.
+The maximum total size of the 1xx responses in one exchange. The default is 65536.
 
 ::Anchor{id="Limits.maxDiscardWireBytes"}
 
@@ -307,7 +563,7 @@ Maximum aggregate informational head wire bytes; use 65536 for the standard defa
 pub maxDiscardWireBytes: u64
 ```
 
-Maximum wire bytes consumed by one explicit discard or drain operation; at most 1048576.
+The maximum bytes that one discard or drain call reads. It is at most 1048576.
 
 ::Anchor{id="Limits.impl.Copy"}
 
@@ -333,7 +589,7 @@ impl Limits
 pub fn defaults() -> Limits
 ```
 
-Returns finite standard limits, including 16 informational heads and 65536 informational wire bytes.
+Returns the default limits: 16 MiB bodies, 64 KiB heads, and 128 requests for each connection.
 
 ::Anchor{id="RequestOptions.impl"}
 
@@ -351,7 +607,7 @@ impl RequestOptions
 pub fn defaults() -> RequestOptions
 ```
 
-Returns an unbounded overall request deadline with upload-before-response behavior.
+Returns options with no deadline that do not wait for 100 Continue.
 
 ::Anchor{id="ExchangeError"}
 
@@ -361,7 +617,7 @@ Returns an unbounded overall request deadline with upload-before-response behavi
 pub union ExchangeError
 ```
 
-A typed protocol, stage, budget, or transport failure.
+The error from a connection or an exchange.
 
 ::Anchor{id="ExchangeError.Content"}
 
@@ -371,7 +627,7 @@ A typed protocol, stage, budget, or transport failure.
 Content
 ```
 
-Preserves a content decoding failure and its exact output coordinates.
+Content decoding failed.
 
 ::Anchor{id="ExchangeError.Content.error"}
 
@@ -381,7 +637,7 @@ Preserves a content decoding failure and its exact output coordinates.
 pub error: ContentError<'static>
 ```
 
-The owned runtime content, checksum, or framing failure.
+The error from `silk.http_content`.
 
 ::Anchor{id="ExchangeError.Head"}
 
@@ -391,7 +647,7 @@ The owned runtime content, checksum, or framing failure.
 Head
 ```
 
-Preserves a head parser failure.
+A response head is not valid, or the head limits are not valid.
 
 ::Anchor{id="ExchangeError.Head.error"}
 
@@ -401,7 +657,7 @@ Preserves a head parser failure.
 pub error: ParseError
 ```
 
-The underlying head failure.
+The error from `silk.http_head`.
 
 ::Anchor{id="ExchangeError.Body"}
 
@@ -411,7 +667,7 @@ The underlying head failure.
 Body
 ```
 
-Preserves framing failure and exact committed coordinates.
+The body framing failed.
 
 ::Anchor{id="ExchangeError.Body.error"}
 
@@ -421,7 +677,7 @@ Preserves framing failure and exact committed coordinates.
 pub error: BodyError
 ```
 
-The underlying body failure.
+The error from `silk.http_body`.
 
 ::Anchor{id="ExchangeError.Transport"}
 
@@ -431,7 +687,7 @@ The underlying body failure.
 Transport
 ```
 
-Preserves plain or secured transport failure.
+The transport failed.
 
 ::Anchor{id="ExchangeError.Transport.error"}
 
@@ -441,7 +697,7 @@ Preserves plain or secured transport failure.
 pub error: TransportError
 ```
 
-The underlying transport failure.
+The error from `silk.http_transport`.
 
 ::Anchor{id="ExchangeError.Output"}
 
@@ -451,7 +707,7 @@ The underlying transport failure.
 Output
 ```
 
-Records framed output accepted before the transport failed.
+The transport failed during a write. `progress` tells what was already accepted and sent.
 
 ::Anchor{id="ExchangeError.Output.error"}
 
@@ -461,7 +717,7 @@ Records framed output accepted before the transport failed.
 pub error: TransportError
 ```
 
-The underlying transport failure.
+The error from `silk.http_transport`.
 
 ::Anchor{id="ExchangeError.Output.progress"}
 
@@ -471,7 +727,7 @@ The underlying transport failure.
 pub progress: WriteProgress
 ```
 
-Payload and wire progress for the failed call.
+The bytes accepted and sent by the call before the error.
 
 ::Anchor{id="ExchangeError.OutputTimeout"}
 
@@ -481,7 +737,7 @@ Payload and wire progress for the failed call.
 OutputTimeout
 ```
 
-Records a client deadline expiring after payload or wire progress.
+The deadline passed during a write.
 
 ::Anchor{id="ExchangeError.OutputTimeout.progress"}
 
@@ -491,7 +747,7 @@ Records a client deadline expiring after payload or wire progress.
 pub progress: WriteProgress
 ```
 
-The exact accepted payload and committed wire coordinates.
+The bytes accepted and sent by the call before the deadline.
 
 ::Anchor{id="ExchangeError.OutputAllocation"}
 
@@ -501,7 +757,7 @@ The exact accepted payload and committed wire coordinates.
 OutputAllocation
 ```
 
-Records payload accepted by framing before a transport allocation failed.
+The transport could not allocate during a write.
 
 ::Anchor{id="ExchangeError.OutputAllocation.error"}
 
@@ -511,7 +767,7 @@ Records payload accepted by framing before a transport allocation failed.
 pub error: OutOfMemoryError
 ```
 
-The allocator failure from the transport.
+The allocation error.
 
 ::Anchor{id="ExchangeError.OutputAllocation.progress"}
 
@@ -521,7 +777,7 @@ The allocator failure from the transport.
 pub progress: WriteProgress
 ```
 
-The exact payload and committed wire coordinates.
+The bytes accepted and sent by the call before the error.
 
 ::Anchor{id="ExchangeError.InvalidState"}
 
@@ -531,7 +787,7 @@ The exact payload and committed wire coordinates.
 InvalidState
 ```
 
-Rejects an operation before I/O when its stage is invalid.
+The step is not valid in the current phase. Nothing was sent or read.
 
 ::Anchor{id="ExchangeError.InvalidRequest"}
 
@@ -541,7 +797,8 @@ Rejects an operation before I/O when its stage is invalid.
 InvalidRequest
 ```
 
-Rejects incompatible body framing or expectation policy before I/O.
+The request does not fit the connection, for example another version or another server, or its
+body framing does not fit the options.
 
 ::Anchor{id="ExchangeError.InvalidLimits"}
 
@@ -551,7 +808,7 @@ Rejects incompatible body framing or expectation policy before I/O.
 InvalidLimits
 ```
 
-Rejects zero buffer capacities before allocation.
+A buffer size in the limits is 0.
 
 ::Anchor{id="ExchangeError.LimitExceeded"}
 
@@ -561,7 +818,7 @@ Rejects zero buffer capacities before allocation.
 LimitExceeded
 ```
 
-Reports a finite informational or connection budget exhaustion.
+Too many 1xx responses, or too many requests on the connection.
 
 ::Anchor{id="ExchangeError.TruncatedHead"}
 
@@ -571,7 +828,7 @@ Reports a finite informational or connection budget exhaustion.
 TruncatedHead
 ```
 
-Reports response input ending before a complete head.
+The connection ended before a complete response head.
 
 ::Anchor{id="ExchangeError.UnsupportedUpgrade"}
 
@@ -581,7 +838,7 @@ Reports response input ending before a complete head.
 UnsupportedUpgrade
 ```
 
-Rejects status 101 without protocol handoff.
+The server sent 101 Switching Protocols, which this module does not support.
 
 ::Anchor{id="ExchangeError.ContinueTimeout"}
 
@@ -591,7 +848,7 @@ Rejects status 101 without protocol handoff.
 ContinueTimeout
 ```
 
-Reports expiry while waiting for permission to upload.
+The deadline of `Require100` passed without 100 Continue.
 
 ::Anchor{id="ExchangeError.Timeout"}
 
@@ -601,7 +858,7 @@ Reports expiry while waiting for permission to upload.
 Timeout
 ```
 
-Reports the overall absolute deadline expiring.
+The deadline of the exchange passed.
 
 ::Anchor{id="validateLimits"}
 
@@ -611,13 +868,11 @@ Reports the overall absolute deadline expiring.
 pub fn validateLimits(limits: &Limits) -> Result<(), ExchangeError>
 ```
 
-Validates connection limits without allocation, transport contact, or parser construction.
+Checks `limits` without allocation or I/O.
 
 ### Details
-
-Read and write capacities must be positive. The discard limit must not exceed 1,048,576 wire
-bytes. Head parser storage must have representable metadata and fit its owned-storage limit.
-Head storage failures retain the exact parser error in `ExchangeError.Head`.
+The buffer sizes must not be 0, and `maxDiscardWireBytes` must be at most 1048576. The head
+limits must pass `validateLimits` of `silk.http_head`. That error is returned in `Head`.
 
 ::Anchor{id="DiscardOutcome"}
 
@@ -627,7 +882,7 @@ Head storage failures retain the exact parser error in `ExchangeError.Head`.
 pub enum DiscardOutcome
 ```
 
-The result of a bounded response-framing discard.
+The result of a discard or a drain.
 
 ::Anchor{id="DiscardOutcome.Completed"}
 
@@ -637,7 +892,7 @@ The result of a bounded response-framing discard.
 Completed
 ```
 
-The complete response boundary was reached within the limit.
+The whole response was read within the limit.
 
 ::Anchor{id="DiscardOutcome.CapReached"}
 
@@ -647,7 +902,7 @@ The complete response boundary was reached within the limit.
 CapReached
 ```
 
-The next response-framing byte would exceed the limit.
+The limit was reached before the end of the response. The connection cannot be used again.
 
 ::Anchor{id="ReuseEligibility"}
 
@@ -657,7 +912,7 @@ The next response-framing byte would exceed the limit.
 pub union ReuseEligibility
 ```
 
-Whether one owned connection can return to an idle pool.
+Whether a connection can go back to a pool. See [`reuseEligibility`](#reuseEligibility).
 
 ::Anchor{id="ReuseEligibility.Eligible"}
 
@@ -667,7 +922,7 @@ Whether one owned connection can return to an idle pool.
 Eligible
 ```
 
-The connection has complete persistent boundaries and can return to an idle pool.
+The connection can go back to a pool.
 
 ::Anchor{id="ReuseEligibility.NotReady"}
 
@@ -677,7 +932,7 @@ The connection has complete persistent boundaries and can return to an idle pool
 NotReady
 ```
 
-The connection is not ready after one complete reusable exchange.
+The last exchange did not complete.
 
 ::Anchor{id="ReuseEligibility.NotOwned"}
 
@@ -687,7 +942,7 @@ The connection is not ready after one complete reusable exchange.
 NotOwned
 ```
 
-The connection no longer owns armed physical close authority.
+The connection does not own its transport, so it cannot close it later.
 
 ::Anchor{id="ReuseEligibility.RequestLimit"}
 
@@ -697,7 +952,7 @@ The connection no longer owns armed physical close authority.
 RequestLimit
 ```
 
-The connection has reached its finite request-count limit.
+The connection has reached `maxRequests`.
 
 ::Anchor{id="ReuseEligibility.RetainedInput"}
 
@@ -707,7 +962,7 @@ The connection has reached its finite request-count limit.
 RetainedInput
 ```
 
-The connection retains bytes after the complete response boundary.
+The server sent bytes after the end of the response.
 
 ::Anchor{id="ReuseEligibility.RetainedInput.bytes"}
 
@@ -717,7 +972,7 @@ The connection retains bytes after the complete response boundary.
 pub bytes: usize
 ```
 
-The exact retained byte count.
+The number of extra bytes.
 
 ::Anchor{id="ReuseEligibility.impl.Copy"}
 
@@ -735,7 +990,7 @@ impl Copy for ReuseEligibility
 pub struct WriteProgress
 ```
 
-Exact accepted payload and transport wire prefixes for one write call.
+The progress of one write call.
 
 ::Anchor{id="WriteProgress.consumed"}
 
@@ -745,7 +1000,7 @@ Exact accepted payload and transport wire prefixes for one write call.
 pub consumed: usize
 ```
 
-Payload prefix accepted by the framing encoder.
+The bytes of your input that the call accepted.
 
 ::Anchor{id="WriteProgress.written"}
 
@@ -755,7 +1010,7 @@ Payload prefix accepted by the framing encoder.
 pub written: usize
 ```
 
-Framed prefix committed to the transport in this call.
+The framed bytes that the call sent to the transport.
 
 ::Anchor{id="WriteProgress.totalPayload"}
 
@@ -765,7 +1020,7 @@ Framed prefix committed to the transport in this call.
 pub totalPayload: u64
 ```
 
-Cumulative encoded payload bytes.
+The total body bytes accepted so far.
 
 ::Anchor{id="WriteProgress.totalWire"}
 
@@ -775,7 +1030,7 @@ Cumulative encoded payload bytes.
 pub totalWire: u64
 ```
 
-Cumulative encoded wire bytes.
+The total framed bytes sent so far.
 
 ::Anchor{id="WriteProgress.impl.Copy"}
 
@@ -793,7 +1048,8 @@ impl Copy for WriteProgress
 pub struct Connection<P>
 ```
 
-An affine owned connection retaining the transport, bounded storage, and next input suffix.
+An HTTP/1 connection over the transport `P`. It keeps its buffers and the bytes that it read
+after the last response.
 
 ::Anchor{id="Connection.impl"}
 
@@ -811,7 +1067,7 @@ impl<P> Connection<P>
 pub fn phase(self: &Self) -> ConnectionPhase
 ```
 
-Returns the current logical connection phase.
+Returns the state of the connection.
 
 ::Anchor{id="Connection.impl.unread"}
 
@@ -821,7 +1077,7 @@ Returns the current logical connection phase.
 pub fn unread(self: &Self) -> usize
 ```
 
-Returns the exact retained input suffix length.
+Returns the number of bytes that were read after the last response.
 
 ::Anchor{id="reuseEligibility"}
 
@@ -831,12 +1087,10 @@ Returns the exact retained input suffix length.
 pub fn reuseEligibility<P>(connection: &Connection<P>) -> ReuseEligibility
 ```
 
-Returns whether an owned connection can return to an idle pool without resetting client state.
+Returns whether the connection can go back to a pool.
 
-### Details
-
-`Eligible` requires Ready phase, armed physical ownership, request-budget headroom, and no
-retained input. Other results identify the first failed condition without exposing counters.
+`Eligible` needs a `Ready` connection that owns its transport, has requests left, and has no
+extra bytes. Other values tell the first check that failed.
 
 ::Anchor{id="TransportContext"}
 
@@ -846,7 +1100,7 @@ retained input. Other results identify the first failed condition without exposi
 pub struct TransportContext<'view, P>
 ```
 
-Shared inspection of retained route context without mutable transport authority.
+A shared view of the transport of a connection, to inspect its route.
 
 ::Anchor{id="TransportContext.transport"}
 
@@ -856,7 +1110,7 @@ Shared inspection of retained route context without mutable transport authority.
 pub transport: &'view P
 ```
 
-The immutable exact provider retained by the owned connection.
+The transport.
 
 ::Anchor{id="Connection.impl-2"}
 
@@ -874,7 +1128,7 @@ impl<P> Connection<P>
 pub fn transportContext<'view>(self: &'view Self) -> TransportContext<'view, P>
 ```
 
-Borrows the provider for immutable route and connection-context inspection.
+Returns a shared view of the transport.
 
 ::Anchor{id="Exchange"}
 
@@ -884,7 +1138,7 @@ Borrows the provider for immutable route and connection-context inspection.
 pub struct Exchange<'exchange, P>
 ```
 
-One exclusive callback-scoped request and response lifecycle.
+One request and its response on a connection. You get it in the callback of [`withExchange`](#withExchange).
 
 ::Anchor{id="Exchange.impl"}
 
@@ -902,7 +1156,7 @@ impl<'exchange, P> Exchange<'exchange, P>
 pub fn phase(self: &Self) -> ExchangePhase
 ```
 
-Returns the next permitted stage.
+Returns the next step.
 
 ::Anchor{id="Exchange.impl.head"}
 
@@ -912,8 +1166,7 @@ Returns the next permitted stage.
 pub effect fn head<'head>(self: &'head Self) -> ResponseHead<'head> ! ExchangeError
 ```
 
-Borrows the most recently received head until the exchange is mutably used again.
-Use `ResponseHead.copy` with explicit value limits to retain an owned copy.
+Returns the last response head that was received. Copy it with `ResponseHead.copy` to keep it.
 
 ::Anchor{id="ConnectionHandler"}
 
@@ -923,7 +1176,8 @@ Use `ResponseHead.copy` with explicit value limits to retain an owned copy.
 pub interface ConnectionHandler<P, A, E, ?R>
 ```
 
-A higher-ranked callback that cannot return its connection loan.
+The code that uses a connection in [`withOwned`](#withOwned) or [`withConnected`](#withConnected). It cannot keep the
+connection.
 
 ::Anchor{id="ConnectionHandler.handle"}
 
@@ -935,7 +1189,7 @@ effect<'call> fn handle<'call>(handler: Self, connection: &'call mut Connection<
     &mut P provides &HttpTransport from &mut HttpTransport
 ```
 
-Runs inside an exclusive connection scope and preserves caller channels.
+Uses the connection. The connection is closed or kept after this call returns.
 
 ::Anchor{id="RouteProtocol"}
 
@@ -945,7 +1199,7 @@ Runs inside an exclusive connection scope and preserves caller channels.
 pub enum RouteProtocol
 ```
 
-The HTTP version and TLS application-protocol policy for one routed scope.
+The HTTP version, and the ALPN that TLS sends, for a route.
 
 ::Anchor{id="RouteProtocol.Http10"}
 
@@ -955,7 +1209,7 @@ The HTTP version and TLS application-protocol policy for one routed scope.
 Http10
 ```
 
-Uses HTTP/1.0 and sends no TLS application-protocol extension.
+Use HTTP/1.0, and send no ALPN.
 
 ::Anchor{id="RouteProtocol.OptionalHttp11"}
 
@@ -965,7 +1219,7 @@ Uses HTTP/1.0 and sends no TLS application-protocol extension.
 OptionalHttp11
 ```
 
-Uses HTTP/1.1 and permits the TLS peer to omit application-protocol selection.
+Use HTTP/1.1. The TLS server can choose no ALPN protocol.
 
 ::Anchor{id="RouteProtocol.RequiredHttp11"}
 
@@ -975,7 +1229,7 @@ Uses HTTP/1.1 and permits the TLS peer to omit application-protocol selection.
 RequiredHttp11
 ```
 
-Uses HTTP/1.1 and requires the TLS peer to select `http/1.1`.
+Use HTTP/1.1. The TLS server must choose `http/1.1`.
 
 ::Anchor{id="RouteSettings"}
 
@@ -985,7 +1239,7 @@ Uses HTTP/1.1 and requires the TLS peer to select `http/1.1`.
 pub struct RouteSettings
 ```
 
-Complete finite settings for one target-neutral routed HTTP scope.
+The settings for [`withRoute`](#withRoute).
 
 ::Anchor{id="RouteSettings.http"}
 
@@ -995,7 +1249,7 @@ Complete finite settings for one target-neutral routed HTTP scope.
 pub http: Limits
 ```
 
-Connection, parser, buffering, and message limits.
+The limits of the connection.
 
 ::Anchor{id="RouteSettings.request"}
 
@@ -1005,7 +1259,7 @@ Connection, parser, buffering, and message limits.
 pub request: HeaderLimits
 ```
 
-Request-head value limits used for the generated CONNECT request.
+The value limits for the `CONNECT` request to a proxy.
 
 ::Anchor{id="RouteSettings.maxRequestHeadBytes"}
 
@@ -1015,7 +1269,7 @@ Request-head value limits used for the generated CONNECT request.
 pub maxRequestHeadBytes: usize
 ```
 
-Maximum owned bytes in the generated CONNECT head.
+The maximum size of the `CONNECT` head.
 
 ::Anchor{id="RouteSettings.maxProxyCredentialBytes"}
 
@@ -1025,7 +1279,7 @@ Maximum owned bytes in the generated CONNECT head.
 pub maxProxyCredentialBytes: usize
 ```
 
-Maximum owned proxy-credential bytes in the generated CONNECT head.
+The maximum size of the proxy credentials in the `CONNECT` head.
 
 ::Anchor{id="RouteSettings.protocol"}
 
@@ -1035,7 +1289,7 @@ Maximum owned proxy-credential bytes in the generated CONNECT head.
 pub protocol: RouteProtocol
 ```
 
-HTTP version and TLS application-protocol policy.
+The HTTP version and ALPN.
 
 ::Anchor{id="RouteSettings.tls"}
 
@@ -1045,7 +1299,7 @@ HTTP version and TLS application-protocol policy.
 pub tls: ClientLimits
 ```
 
-TLS client protocol limits.
+The limits of the TLS client.
 
 ::Anchor{id="RouteSettings.handshakeDurationNanoseconds"}
 
@@ -1055,7 +1309,7 @@ TLS client protocol limits.
 pub handshakeDurationNanoseconds: u64
 ```
 
-Finite TLS handshake duration in nanoseconds.
+The maximum duration of the TLS handshake, in nanoseconds.
 
 ::Anchor{id="RouteSettings.impl.Copy"}
 
@@ -1073,7 +1327,7 @@ impl Copy for RouteSettings
 pub service AcquiredRouteContext<P, A, E, ?R>
 ```
 
-Lexical consumer of one plain provider supplied to a target-neutral route acquisition scope.
+The service that a [`RouteClient`](#RouteClient) calls with the transport that it opened.
 
 ::Anchor{id="AcquiredRouteContext.use"}
 
@@ -1089,7 +1343,7 @@ effect<'env> fn use<'env>(provider: P) -> A ! E ? R | &mut AcquiredRouteContext<
     R in Without<R, HttpTransport>
 ```
 
-Consumes the exact provider selected for the requested physical peer.
+Uses `provider`, the transport to the server that the route selected.
 
 ::Anchor{id="RouteClient"}
 
@@ -1099,7 +1353,7 @@ Consumes the exact provider selected for the requested physical peer.
 pub interface RouteClient<P, A, E, AcquisitionError, ?AcquisitionRequirements, ?R>
 ```
 
-A target-neutral owner that acquires one exact physical peer for a routed scope.
+Opens transports for [`withRoute`](#withRoute): a direct connection or a connection to a proxy.
 
 ::Anchor{id="RouteClient.settings"}
 
@@ -1109,7 +1363,7 @@ A target-neutral owner that acquires one exact physical peer for a routed scope.
 fn settings(client: &Self) -> RouteSettings
 ```
 
-Returns all HTTP and TLS settings without applying hidden defaults.
+Returns the HTTP and TLS settings. No default is added.
 
 ::Anchor{id="RouteClient.acquire"}
 
@@ -1124,7 +1378,7 @@ effect<'env> fn acquire<'env>(client: Self, peer: Origin, deadline: Option<Insta
   > where R in Without<R, ByteDuplex>, R in Without<R, HttpTransport>
 ```
 
-Acquires one owned plain provider for `peer` under the unchanged absolute `deadline`.
+Opens a transport to `peer` before `deadline`, and gives it to [`AcquiredRouteContext.use`](#AcquiredRouteContext.use).
 
 ::Anchor{id="RouteTransport"}
 
@@ -1134,7 +1388,7 @@ Acquires one owned plain provider for `peer` under the unchanged absolute `deadl
 pub struct RouteTransport<'transport, 'provider: 'transport, 'tunnel: 'provider, P>
 ```
 
-The uniform final HTTP transport lent to a routed callback.
+The transport that [`withRoute`](#withRoute) gives to your handler.
 
 ::Anchor{id="RouteHandler"}
 
@@ -1144,7 +1398,7 @@ The uniform final HTTP transport lent to a routed callback.
 pub interface RouteHandler<'configuration, P, A, E, ?R>
 ```
 
-A higher-ranked callback for one selected route and its final HTTP connection.
+The code that uses the connection of [`withRoute`](#withRoute).
 
 ::Anchor{id="RouteHandler.handle"}
 
@@ -1162,7 +1416,7 @@ effect<'call> fn handle<'call, 'transport: 'call, 'provider: 'transport, 'tunnel
     &mut P provides &ByteDuplex from &mut ByteDuplex
 ```
 
-Runs after route acquisition and required origin authentication complete.
+Uses the connection after it is open, and after TLS checked the origin.
 
 ::Anchor{id="RouteTransport.impl"}
 
@@ -1261,12 +1515,12 @@ where
   R in Without<R, HttpTransport>
 ```
 
-Acquires and lends one route-selected HTTP connection under one unchanged absolute deadline.
+Opens a connection for `route`, gives it to `handler`, and closes it.
 
 ### Details
-
-Trust presence is validated before acquisition. Forward uses the plain proxy connection. A
-Tunnel sends CONNECT before it authenticates the original origin and lends the secured channel.
+The trust for TLS is checked before the connection opens. A `Forward` route uses the plain
+connection to the proxy. A `Tunnel` route sends `CONNECT`, then does TLS with the origin through
+the tunnel. One deadline covers all steps.
 
 ::Anchor{id="makeOwned"}
 
@@ -1285,8 +1539,8 @@ pub effect<'env> fn makeOwned<P: 'env, 'env>(
 where &mut P provides &HttpTransport from &mut HttpTransport
 ```
 
-Owns the transport and bounded parser state so a completed connection can be retained for later exchanges.
-Allocation failure terminally closes the supplied transport without a hidden flush.
+Returns a connection that owns `transport`, so that you can keep it for more exchanges. If
+allocation fails, `transport` is closed.
 
 ::Anchor{id="withOwned"}
 
@@ -1308,7 +1562,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport
 ```
 
-Lends an owned connection for a callback, then closes it on every exit.
+Makes a connection that owns `transport`, gives it to `handler`, and closes it when `handler`
+returns or fails.
 
 ::Anchor{id="withConnected"}
 
@@ -1330,7 +1585,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport
 ```
 
-Lends an explicit transport through one terminal connection scope while its physical owner stays outside.
+Gives a connection over a borrowed `transport` to `handler`. The connection closes when
+`handler` returns, but you still own `transport`.
 
 ::Anchor{id="close"}
 
@@ -1342,7 +1598,7 @@ pub effect fn close<P>(connection: &mut Connection<P>) -> ()
 where &mut P provides &HttpTransport from &mut HttpTransport
 ```
 
-Closes an owned connection terminally without flushing or draining; repeated closure is local.
+Closes the connection and its transport, without a flush or a drain. A second call does nothing.
 
 ::Anchor{id="withExchange"}
 
@@ -1359,7 +1615,10 @@ pub effect fn withExchange<'exchange, 'callback, P, A, E, ?R>(
 ) -> A ! E | ExchangeError | OutOfMemoryError ? R | &mut Allocator
 ```
 
-Lends one prepared exchange. Incomplete or failed callbacks permanently remove reuse authority.
+Runs one exchange of `request` on the connection, in `callback`.
+
+If the callback fails, or returns before the response is complete, the connection cannot run
+another exchange.
 
 ::Anchor{id="send"}
 
@@ -1373,7 +1632,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Sends the prepared head once; Require100 also flushes before waiting for response heads.
+Sends the request head. With `Require100`, it also flushes, so that the server can answer before
+the body.
 
 ::Anchor{id="writeSome"}
 
@@ -1387,7 +1647,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Accepts one payload prefix and preserves exact payload and transport progress on failure.
+Sends a prefix of `input` as body, and returns the progress. On an error, the error keeps the
+progress.
 
 ::Anchor{id="finishRequest"}
 
@@ -1401,7 +1662,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Completes bounded request trailers and flushes before response reads are permitted.
+Ends the request body with `trailers`, and flushes. Call it also when there is no body. Then
+read the response.
 
 ::Anchor{id="receive"}
 
@@ -1415,7 +1677,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Receives one bounded head; informational and final error statuses remain ordinary response values.
+Reads one response head, and returns its status. A 1xx status is also returned. A 4xx or 5xx
+status is not an error.
 
 ::Anchor{id="receiveFinal"}
 
@@ -1429,12 +1692,10 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Receives bounded informational heads until the shared parser reaches one final response.
+Reads response heads until one is not 1xx, and returns its status.
 
 ### Details
-
-Parser, head, informational-budget, 101-upgrade, transport, and deadline failures remain the
-original `ExchangeError`. This operation does not copy response metadata or consume a body.
+It does not copy the head and does not read the body. Get the head with [`Exchange.head`](#Exchange.impl.head).
 
 ::Anchor{id="readSome"}
 
@@ -1448,7 +1709,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Reads one framed payload prefix without consuming the next message suffix.
+Reads body bytes into `output`, and returns how many. It returns 0 at the end of the body. It
+never reads past the end of the response.
 
 ::Anchor{id="discardRemainingAtMost"}
 
@@ -1466,22 +1728,18 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Discards response framing up to one aggregate wire-byte limit and reports whether it completed.
+Reads and drops the rest of the response body, up to `maxWireBytes` bytes on the wire.
 
 ### When to use
-
-Use this operation when a caller can continue after the discard reaches its cap.
+Use it when you can continue if the limit is reached.
 
 ### Details
-
-The operation uses the smaller caller limit and `Limits.maxDiscardWireBytes`. The limit
-includes payload and framing bytes. Its explicit cleanup deadline is clamped to the exchange's
-unchanged operation deadline. `Completed` permits a later [`finishResponse`](#finishResponse) call. `CapReached`
-leaves the exchange incomplete and removes reuse authority.
+The limit is the smaller of `maxWireBytes` and `Limits.maxDiscardWireBytes`, and counts the body
+and its framing. `deadline` cannot be later than the deadline of the exchange. After
+`Completed`, call [`finishResponse`](#finishResponse). After `CapReached`, the connection cannot be used again.
 
 ### Gotchas
-
-Malformed framing and read, deadline, allocation, or transport failures remain typed failures.
+Bad framing, a read error, the deadline, and the allocator still fail with their errors.
 
 ::Anchor{id="drainAndFinishAtMost"}
 
@@ -1499,23 +1757,19 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Drains and finishes the selected response under one finite aggregate wire-byte limit.
+Reads and drops the rest of the response, then calls [`finishResponse`](#finishResponse).
 
 ### When to use
-
-Use this operation inside the live exchange when a response must complete before connection
-reuse. The standard client limit is 65536 bytes, and the maximum admitted limit is 1048576.
+Use it when the response must complete so that the connection can be used again. A good limit is
+65536 bytes. The maximum is 1048576.
 
 ### Details
-
-The operation uses the smaller caller limit and `Limits.maxDiscardWireBytes`. The limit counts
-payload, framing, and trailers. The finite deadline is clamped to the request deadline. If a
-content decoder was selected, the operation validates it before it calls [`finishResponse`](#finishResponse).
+The limit is the smaller of `maxWireBytes` and `Limits.maxDiscardWireBytes`, and counts the
+body, the framing, and the trailers. `deadline` cannot be later than the deadline of the
+exchange. If a content decoder was selected, it is checked too.
 
 ### Gotchas
-
-`CapReached` leaves the exchange incomplete. Timeout, malformed framing, read, allocation,
-transport, and content-decoder failures remain their original typed failures.
+After `CapReached`, the response is not complete. Errors keep their original types.
 
 ::Anchor{id="discardRemaining"}
 
@@ -1532,8 +1786,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Discards response framing under the smaller caller and client wire budget, without consuming a subsequent message.
-A deadline, limit, framing, or transport failure permanently removes reuse authority.
+Reads and drops the rest of the response body, up to the smaller of `maxWireBytes` and the limit
+of the client. On an error or at the limit, the connection cannot be used again.
 
 ::Anchor{id="trailers"}
 
@@ -1545,7 +1799,7 @@ pub effect fn trailers<'head, 'exchange, P>(exchange: &'head Exchange<'exchange,
 > ! ExchangeError
 ```
 
-Returns completed chunk trailers borrowed exclusively from the active exchange.
+Returns the trailers of a complete chunked response, or `None`.
 
 ::Anchor{id="finishResponse"}
 
@@ -1556,7 +1810,8 @@ pub effect fn finishResponse<'exchange, P>(exchange: &mut Exchange<'exchange, P>
 ! ExchangeError
 ```
 
-Completes the response only after framing proves its boundary; never drains unread bytes.
+Ends the response. The body must be complete. This function does not read the rest of the body
+for you.
 
 ::Anchor{id="abort"}
 
@@ -1566,7 +1821,7 @@ Completes the response only after framing proves its boundary; never drains unre
 pub fn abort<'exchange, P>(exchange: &mut Exchange<'exchange, P>) -> ()
 ```
 
-Removes reuse authority immediately without transport output or a hidden drain.
+Stops the exchange. The connection cannot be used again. Nothing is sent or read.
 
 ::Anchor{id="Tunnel"}
 
@@ -1576,7 +1831,8 @@ Removes reuse authority immediately without transport output or a hidden drain.
 pub struct Tunnel<'tunnel, P>
 ```
 
-An exclusive non-HTTP channel that reads the buffered response suffix first.
+The connection after a successful `CONNECT`. Reads first return the bytes that came after the
+response head.
 
 ::Anchor{id="TransferredTunnel"}
 
@@ -1586,12 +1842,11 @@ An exclusive non-HTTP channel that reads the buffered response suffix first.
 pub struct TransferredTunnel<'tunnel, P>
 ```
 
-One transferred tunnel that owns the connection's byte transport and retained input suffix.
+A tunnel that owns the transport of the connection.
 
 ### Details
-
-Reads use the retained suffix before the provider. All deadlines are clamped to the exchange
-deadline. Complete close is terminal and attempts the concrete provider close at most one time.
+Reads first return the bytes that came after the response head. The deadline of the exchange
+also applies. Closing it closes the transport one time.
 
 ::Anchor{id="withTunnel"}
 
@@ -1604,7 +1859,7 @@ pub effect fn withTunnel<'tunnel, 'exchange: 'tunnel, 'callback, P, A, E, ?R>(
 ) -> A ! E | ExchangeError ? R
 ```
 
-Hands successful CONNECT to one scoped tunnel callback and permanently consumes HTTP reuse authority.
+Gives the tunnel of a successful `CONNECT` to `callback`. The connection cannot run HTTP again.
 
 ::Anchor{id="Tunnel.impl"}
 
@@ -1632,18 +1887,13 @@ pub effect fn transferByteDuplex<'transfer, 'callback, A, E, ?CallbackRequiremen
     CallbackRequirements in Without<CallbackRequirements, ByteDuplex>
 ```
 
-Transfers the exact tunnel provider and retained input suffix to one scoped byte duplex.
+Gives the tunnel to `callback` as a byte duplex, for example for TLS.
 
 #### Details
-
-This operation allocates no memory. It constructs the complete duplex before the HTTP owner
-transfers its physical close authority. The callback owns that authority until cleanup.
-Cleanup closes the duplex after success, typed failure, or structured cancellation.
+This does not allocate. The duplex closes after the callback returns, fails, or is cancelled.
 
 #### Gotchas
-
-After scoped finalization, a repeated transfer returns `InvalidState` and leaves the existing
-Closed authority unchanged.
+A second call returns `InvalidState`.
 
 ::Anchor{id="Tunnel.impl.readSome"}
 
@@ -1657,7 +1907,7 @@ pub effect fn readSome(self: &mut Self, output: &mut [u8], requestedDeadline: Op
     &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Reads the retained tunnel suffix before asking the underlying transport for more input.
+Reads bytes. It returns the bytes that came after the response head first.
 
 ::Anchor{id="Tunnel.impl.writeSome"}
 
@@ -1671,7 +1921,7 @@ pub effect fn writeSome(self: &mut Self, input: &[u8], requestedDeadline: Option
     &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Writes one tunnel prefix under the caller's absolute deadline.
+Writes a prefix of `input`, and returns its length.
 
 ::Anchor{id="TransferredTunnel.impl"}
 
@@ -1746,12 +1996,11 @@ pub effect fn beginContent<'head, 'exchange: 'head, P>(
 ? &mut Allocator | &mut MonotonicClock
 ```
 
-Selects one content pipeline from this exchange's current head before a nonempty raw read or a discard.
+Selects how to decode the response body, from its head and `mode`, before you read it.
 
 ### Details
-
-Planning errors borrow the head and must be handled before the exchange is used again.
-The returned copy records the applied representation policy without exposing the affine decoder.
+Handle a planning error before you use the exchange again, because the error borrows the head.
+The result tells which decoding was selected.
 
 ::Anchor{id="readContentSome"}
 
@@ -1768,7 +2017,7 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Reads content-decoded bytes through the same rich transport and absolute deadline as the exchange.
-Returned bytes remain provisional until successful content and framing completion.
+Reads decoded body bytes into `output`. The bytes are final only after the content and the
+framing complete.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

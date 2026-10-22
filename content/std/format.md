@@ -1,56 +1,94 @@
-Writer-backed value presentation, statically validated templates, and complete decimal parsing.
+Text output for values through the ambient `Writer`, compile-time checked templates, and decimal
+parsing.
 
 ## When to use
+Use [`Format.display`](#Format.impl.display) to write one value with default options. Use [`Format.displayWith`](#Format.impl.displayWith) to
+write one value with a width, fill, sign, or precision. Use [`Format.format`](#Format.impl.format) to write a
+template such as `"{name} has {count}"` with values from a tuple or record. Implement
+[`Display`](#Display) to make your own type usable with all three. Implement [`Debug`](#Debug) to show a value
+for a programmer with `{:?}`, [`Format.debug`](#Format.impl.debug), and [`Format.debugWith`](#Format.impl.debugWith).
 
-Use [`display`](#Format.impl.display) for one value. Use [`format`](#Format.impl.format) for a static template and a borrowed argument
-pack. Use [`displayWith`](#Format.impl.displayWith) when presentation needs explicit options. Integer `parse` operations
-and [`f64Value`](#Format.impl.f64Value)/[`f32Value`](#Format.impl.f32Value) are allocation-free inverses of their default presentation.
+Use [`Format.i32Value`](#Format.impl.i32Value), [`Format.f64Value`](#Format.impl.f64Value), and the other `...Value` functions to read decimal
+text back into a number. They accept the default output of `Display` for the same type.
 
 ## Details
+Output goes to the ambient `Writer` effect. A [`Formatter`](#Formatter) holds only the options. No operation
+in this module allocates, and none makes an intermediate `String`.
 
-A [`Formatter`](#Formatter) carries presentation policy while the ambient [`Writer`](/docs/std/writer#Writer) owns byte transport.
-Formatter and the shipped numeric presentations do not allocate an intermediate `String`.
-Finite floats use the shortest decimal significand that parses back to identical IEEE bits,
-preserving negative zero as `-0`. Supplying `precision` replaces that default with exactly
-that many fractional digits, rounded ties-to-even against the value's exact decimal
-expansion; a fixed presentation is therefore not required to round-trip.
-Nonfinite floats display as `NaN` or `Infinity`; formats requiring finite values must check
-with `f64.isFinite` or `f32.isFinite` before display.
-Width counts Unicode scalars rather than UTF-8 bytes or terminal cells. A Writer failure
-preserves any prefix that the provider accepted. Formatter does not roll output back.
-Template parsing, field selection, and `Display` selection occur during compilation.
+Integers display in decimal, or in hexadecimal, octal, or binary with a [`Style`](#Style). Finite
+floats display as the shortest decimal that parses back to the same bits, and negative zero
+displays as `-0`. If you set a precision, a float displays with exactly that many fractional
+digits, rounded half to even. That output does not always parse back to the same bits.
+
+Width counts Unicode scalars, not UTF-8 bytes and not terminal columns. The compiler parses and
+checks templates, selects fields, and selects `Display` implementations, so a bad template is a
+compile error, not a runtime error.
+
+## Errors
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. This module does not roll output back.
+- [`ParseError`](#ParseError) from the `...Value` parse functions, with the reason [`NotANumber`](#NotANumber) or
+  [`OutOfRange`](#OutOfRange).
+
+Numbers align to the right by default. Text, `bool`, and `char` align to the left by default.
+
+## Gotchas
+`NaN` and `Infinity` ignore precision and zero padding. To check that a float is finite before
+you display it, use `f64.isFinite` or `f32.isFinite`.
 
 ## Examples
-
-### Display with defaults and explicit options
-
-This program formats `42..+42` through a portable discard writer. Supply a native
-`silk.os_writer.StdoutWriter` at an application edge to send the bytes to stdout.
-
+### Write a padded number and a template into a buffer
 ```silk
 import silk.effect { Effect }
-
-import silk.format { Alignment, Format, FormatOptions, Sign }
-
+import silk.format { Alignment, Format, FormatOptions, Sign, Style }
 import silk.option { Option }
-
 import silk.writer { Writer, WriterError }
 
-struct DiscardWriter {}
-impl Writer for DiscardWriter {
-  effect fn writeAll(self: &mut Self, val: &[u8]) -> () ! WriterError ? &mut Writer {
+struct CaptureWriter {
+  bytes: [u8; 64]
+  length: usize
+}
+
+impl Writer for CaptureWriter {
+  effect fn writeAll(self: &mut Self, value: &[u8]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    let mut index: usize = 0
+    while index < value.length {
+      self.bytes[self.length] = value[index]
+      self.length = self.length + 1
+      index = index + 1
+    }
     return ()
   }
-  effect fn flush(self: &mut Self) -> () ! WriterError ? &mut Writer {
+
+  effect fn flush(self: &mut Self) -> ()
+    ! WriterError
+    ? &mut Writer {
     return ()
   }
 }
 
-effect fn render() -> () ! WriterError ? &mut Writer {
+fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
+  if writer.length != expected.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < expected.length {
+    if writer.bytes[index] != expected[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
+}
+
+effect fn render() -> ()
+  ! WriterError
+  ? &mut Writer {
   let value = 42
-  run Format.display(&value)
   let options = FormatOptions {
-    width: Option<usize>.some(5),
+    width: Option<usize>.some(6),
     alignment: Alignment.Right,
     fill: '.',
     sign: Sign.Always,
@@ -58,30 +96,54 @@ effect fn render() -> () ! WriterError ? &mut Writer {
     zeroPad: false,
     precision: Option<usize>.none(),
     color: false,
+    style: Style.Default,
   }
-  return run Format.displayWith(&value, move options)
+  run Format.displayWith(&value, move options)
+  let args = .{ name: "Ada", count: 3 }
+  return run Format.format(" {name} has {count}", &args)
 }
 
-effect fn writeExample() -> () ! WriterError {
-  let mut writer = DiscardWriter {}
-  let completed = run render()
-    |> Effect.provideMut<Writer>(&mut writer)
-  return completed
-}
-
-effect fn ignoreWriteFailure(error: WriterError) -> () {
-  return ()
-}
-
-pub fn main() -> i32 {
-  run Effect.catchAll(writeExample(), ignoreWriteFailure)
+pub effect fn main() -> i32
+  ! WriterError {
+  let mut writer = CaptureWriter { bytes: [0; 64], length: 0 }
+  run render() |> Effect.provideMut<Writer>(&mut writer)
+  if !holds(&writer, b"...+42 Ada has 3") {
+    return 1
+  }
   return 0
 }
 ```
 
+### Read a number from text
+```silk
+import silk.format { Format, NotANumber, OutOfRange, ParseError }
+import silk.result { Result }
+
+fn read(text: string) -> i32 {
+  return match move Format.i32Value(text) {
+    Result<i32, ParseError>.Success { value } => value
+    Result<i32, ParseError>.Failure { error } => match move error.reason {
+      NotANumber { offset } => -1
+      OutOfRange {} => -2
+    }
+  }
+}
+
+pub fn main() -> i32 {
+  if read("-17") != -17 || read("12x") != -1 || read("3000000000") != -2 {
+    return 1
+  }
+  return 0
+}
+```
+
+## See also
+- `silk.writer` for the `Writer` effect that receives the output.
+- `silk.output` and `silk.buffered_output` for writers to standard output.
+
 Import as `Format` with `import silk.format { Format }`.
 
-Public declarations: 9.
+Public declarations: 13.
 
 ::Anchor{id="Format"}
 
@@ -91,12 +153,8 @@ Public declarations: 9.
 pub struct Format
 ```
 
-The owner of the parsing and rendering operations.
-
-### Details
-
-This struct carries no data and is never constructed by the library. Every operation is an
-inherent member declared in `impl Format`, reached through `import silk.format { Format }`.
+The owner type of the formatting and parsing operations. It has no fields and is never
+constructed.
 
 ::Anchor{id="Format.impl"}
 
@@ -114,12 +172,13 @@ impl Format
 pub fn defaultOptions() -> FormatOptions
 ```
 
-Returns the canonical formatting defaults.
+Returns the default [`FormatOptions`](#FormatOptions).
 
 #### Details
 
-The result has no width, default alignment, a space fill, negative-only signs, no alternate
-form, no zero padding, no precision, and no color permission.
+The defaults are: no width, `Alignment.Default`, a space as fill, `Sign.NegativeOnly`, no
+alternate form, no zero padding, no precision, no color, and `Style.Default`. [`Format.display`](#Format.impl.display) uses these
+options.
 
 ::Anchor{id="Format.impl.make"}
 
@@ -129,7 +188,11 @@ form, no zero padding, no precision, and no color permission.
 pub fn make(options: FormatOptions) -> Formatter
 ```
 
-Starts a Formatter session with explicit options.
+Returns a [`Formatter`](#Formatter) that uses `options`.
+
+#### When to use
+
+Use `make` when you call `Display.display` directly. [`Format.displayWith`](#Format.impl.displayWith) calls it for you.
 
 ::Anchor{id="Format.impl.makeDefault"}
 
@@ -139,7 +202,7 @@ Starts a Formatter session with explicit options.
 pub fn makeDefault() -> Formatter
 ```
 
-Starts a Formatter session with [`defaultOptions`](#Format.impl.defaultOptions).
+Returns a [`Formatter`](#Formatter) that uses [`Format.defaultOptions`](#Format.impl.defaultOptions).
 
 ::Anchor{id="Format.impl.hasWidth"}
 
@@ -149,7 +212,7 @@ Starts a Formatter session with [`defaultOptions`](#Format.impl.defaultOptions).
 pub fn hasWidth(self: &Formatter) -> bool
 ```
 
-Reports whether a minimum width was supplied.
+Returns `true` if the options set a minimum width.
 
 ::Anchor{id="Format.impl.width"}
 
@@ -159,8 +222,7 @@ Reports whether a minimum width was supplied.
 pub fn width(self: &Formatter) -> usize
 ```
 
-Returns the requested minimum width in Unicode scalars, not UTF-8 bytes or terminal cells, or
-zero when no width was supplied.
+Returns the minimum width in Unicode scalars. Returns 0 if the options set no width.
 
 ::Anchor{id="Format.impl.alignment"}
 
@@ -170,7 +232,7 @@ zero when no width was supplied.
 pub fn alignment(self: &Formatter) -> Alignment
 ```
 
-Returns the requested alignment.
+Returns the alignment of the content inside the width.
 
 ::Anchor{id="Format.impl.fill"}
 
@@ -180,7 +242,7 @@ Returns the requested alignment.
 pub fn fill(self: &Formatter) -> char
 ```
 
-Returns the requested fill scalar.
+Returns the character that fills the space up to the width.
 
 ::Anchor{id="Format.impl.sign"}
 
@@ -190,7 +252,17 @@ Returns the requested fill scalar.
 pub fn sign(self: &Formatter) -> Sign
 ```
 
-Returns the requested sign policy.
+Returns the sign rule for numbers.
+
+::Anchor{id="Format.impl.style"}
+
+### Method `style`
+
+```silk
+pub fn style(self: &Formatter) -> Style
+```
+
+Returns the style that selects the number base or notation.
 
 ::Anchor{id="Format.impl.alternate"}
 
@@ -200,7 +272,13 @@ Returns the requested sign policy.
 pub fn alternate(self: &Formatter) -> bool
 ```
 
-Reports whether alternate presentation is requested.
+Returns `true` if the options ask for the alternate form.
+
+#### Details
+
+The standard integers write a base prefix (`0x`, `0o`, `0b`) in the alternate form of a
+[`Style`](#Style) other than `Style.Default`. A `Display` implementation that you write can use the
+flag and must document what it changes.
 
 ::Anchor{id="Format.impl.zeroPad"}
 
@@ -210,12 +288,13 @@ Reports whether alternate presentation is requested.
 pub fn zeroPad(self: &Formatter) -> bool
 ```
 
-Reports whether integer width padding with zeroes is requested.
+Returns `true` if the options ask to pad numbers with zeros up to the width.
 
 #### Details
 
-A supplied precision disables this padding for integers. Float presentations use the fill
-scalar for width padding and never use zeroes.
+The zeros go after the sign, so `-7` with width 4 displays as `-007`. A precision turns off
+this padding for integers but not for floats. `NaN` and `Infinity` pad with the fill
+character.
 
 ::Anchor{id="Format.impl.hasPrecision"}
 
@@ -225,7 +304,7 @@ scalar for width padding and never use zeroes.
 pub fn hasPrecision(self: &Formatter) -> bool
 ```
 
-Reports whether a numeric precision was supplied.
+Returns `true` if the options set a precision.
 
 ::Anchor{id="Format.impl.precision"}
 
@@ -235,12 +314,13 @@ Reports whether a numeric precision was supplied.
 pub fn precision(self: &Formatter) -> usize
 ```
 
-Returns the requested digit count, or zero when no numeric precision was supplied.
+Returns the precision. Returns 0 if the options set no precision.
 
 #### Details
 
-For integers this is a minimum digit count and disables width-driven zero padding. For floats
-it is the exact number of fractional digits.
+For integers, the precision is the minimum number of digits, with leading zeros. For floats,
+it is the exact number of digits after the decimal point. For text, it is the maximum number
+of Unicode scalars.
 
 ::Anchor{id="Format.impl.color"}
 
@@ -250,7 +330,12 @@ it is the exact number of fractional digits.
 pub fn color(self: &Formatter) -> bool
 ```
 
-Reports whether a presentation may emit balanced ANSI styling.
+Returns `true` if the output can contain ANSI color codes.
+
+#### Details
+
+This is a permission, not a request. The standard `Display` implementations never write color
+codes.
 
 ::Anchor{id="Format.impl.write"}
 
@@ -263,12 +348,12 @@ pub effect fn write(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Writes one byte sequence through the ambient Writer.
+Writes `bytes` to the ambient `Writer` as they are. It does not apply width or other options.
 
-#### Gotchas
+#### Errors
 
-If Writer fails, this returns the original `WriterError`; any prefix accepted before the failure
-remains written.
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="Format.impl.writeText"}
 
@@ -281,12 +366,13 @@ pub effect fn writeText(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Writes valid UTF-8 content without applying width policy.
+Writes the UTF-8 bytes of `text` to the ambient `Writer`. It does not apply width or other
+options.
 
-#### Gotchas
+#### Errors
 
-If Writer fails, this returns the original `WriterError`; any prefix accepted before the failure
-remains written.
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="Format.impl.writePadding"}
 
@@ -299,12 +385,12 @@ pub effect fn writePadding(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Writes `count` copies of the session's fill scalar in bounded chunks.
+Writes the fill character `count` times.
 
-#### Gotchas
+#### Errors
 
-If Writer fails, this returns the original `WriterError`; any fill accepted before the failure
-remains written.
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="Format.impl.leadingPadding"}
 
@@ -314,16 +400,20 @@ remains written.
 pub fn leadingPadding(self: &Formatter, contentWidth: usize) -> usize
 ```
 
-Returns the number of fill scalars before content with this visible width.
+Returns how many fill characters go before content that is `contentWidth` scalars wide.
+
+#### When to use
+
+Use it in a `Display` implementation to align content whose byte length is not its visible
+width, for example content with ANSI color codes. Pair it with [`Format.trailingPadding`](#Format.impl.trailingPadding), or
+use [`Format.writeLeadingPadding`](#Format.impl.writeLeadingPadding) to write the fill.
 
 #### Details
 
-A user-defined Display can use this together with [`writeLeadingPadding`](#Format.impl.writeLeadingPadding) and
-[`writeTrailingPadding`](#Format.impl.writeTrailingPadding) so ANSI control bytes never count toward the visible content width.
-`Alignment.Default` and `Alignment.Right` put all extra fill before the content;
-`Alignment.Left` puts Option.none there. `Alignment.Center` puts half there, rounding an odd extra
-scalar down so the trailing side receives the remainder. No padding is returned when the
-requested width does not exceed `contentWidth`.
+The result is 0 if the width is not more than `contentWidth`. Otherwise the extra space is the
+width minus `contentWidth`. `Alignment.Default` and `Alignment.Right` put all of it before the
+content. `Alignment.Left` puts none of it there. `Alignment.Center` puts half of it there,
+rounded down.
 
 ::Anchor{id="Format.impl.trailingPadding"}
 
@@ -333,14 +423,14 @@ requested width does not exceed `contentWidth`.
 pub fn trailingPadding(self: &Formatter, contentWidth: usize) -> usize
 ```
 
-Returns the number of fill scalars after content with this visible width.
+Returns how many fill characters go after content that is `contentWidth` scalars wide.
 
 #### Details
 
-`Alignment.Default` and `Alignment.Right` put no extra fill after the content;
-`Alignment.Left` puts all extra fill there. `Alignment.Center` puts half there, rounding an odd
-extra scalar up. No padding is returned when the requested width does not exceed
-`contentWidth`.
+The result is 0 if the width is not more than `contentWidth`. `Alignment.Left` puts all extra
+space after the content. `Alignment.Default` and `Alignment.Right` put none of it there.
+`Alignment.Center` puts half of it there, rounded up, so the two sides add up to the extra
+space.
 
 ::Anchor{id="Format.impl.writeLeadingPadding"}
 
@@ -353,13 +443,13 @@ pub effect fn writeLeadingPadding(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Emits all fill required before content whose width is the supplied Unicode-scalar count, not a
-byte or terminal-cell count.
+Writes the fill that goes before content that is `contentWidth` scalars wide. The count comes
+from [`Format.leadingPadding`](#Format.impl.leadingPadding).
 
-#### Gotchas
+#### Errors
 
-If Writer fails, this returns the original `WriterError`; any leading fill accepted before the
-failure remains written.
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="Format.impl.writeTrailingPadding"}
 
@@ -372,13 +462,75 @@ pub effect fn writeTrailingPadding(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Emits all fill required after content whose width is the supplied Unicode-scalar count, not a
-byte or terminal-cell count.
+Writes the fill that goes after content that is `contentWidth` scalars wide. The count comes
+from [`Format.trailingPadding`](#Format.impl.trailingPadding).
 
-#### Gotchas
+#### Errors
 
-If Writer fails, this returns the original `WriterError`; any trailing fill accepted before the
-failure remains written.
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="Format.impl.padText"}
+
+### Method `padText`
+
+```silk
+pub effect fn padText(
+    self: &mut Formatter,
+    text: string
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes `text` with the width, fill, alignment, and precision of the options.
+
+#### When to use
+
+Use it in a `Display` implementation that writes one piece of text, so that your type pads
+and cuts like a string does. The `Display` implementation for `string` calls it.
+
+#### Details
+
+The precision is the maximum number of Unicode scalars to write, and the rest is cut. The
+width counts the scalars that are written. `Alignment.Default` puts the content on the left.
+The sign, zero padding, and alternate options do not apply.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="Format.impl.padNumber"}
+
+### Method `padNumber`
+
+```silk
+pub effect fn padNumber(
+    self: &mut Formatter,
+    negative: bool,
+    prefix: string,
+    digits: string
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes the digits of a number with the sign, width, fill, alignment, and zero padding of the
+options.
+
+#### When to use
+
+Use it in a `Display` implementation for a number type, so that your type pads like the
+standard integers. Calculate the digits yourself, without a sign.
+
+#### Details
+
+The output is the sign, then `prefix`, then `digits`. The sign comes from `negative` and the
+sign rule. `prefix` is text such as `0x` that goes before the digits; use `""` for none. Zero
+padding puts the zeros between `prefix` and `digits`. `Alignment.Default` puts the content on
+the right. This operation ignores the precision.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="Format.impl.display"}
 
@@ -388,12 +540,17 @@ failure remains written.
 pub effect fn display<T: Display>(value: &T) -> () ! WriterError ? &mut Writer
 ```
 
-Displays one value with canonical defaults through the ambient mutable Writer.
+Writes `value` to the ambient `Writer` with [`Format.defaultOptions`](#Format.impl.defaultOptions).
 
-#### Details
+#### When to use
 
-This operation uses [`defaultOptions`](#Format.impl.defaultOptions) and does not require Allocator. If Writer fails, an
-accepted prefix remains written and the original `WriterError` is preserved.
+Use `display` to write one value. Use [`Format.displayWith`](#Format.impl.displayWith) to set a width, fill, sign, or
+precision. Use [`Format.format`](#Format.impl.format) to write several values in a template.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="Format.impl.displayWith"}
 
@@ -406,16 +563,123 @@ pub effect fn displayWith<T: Display>(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Displays one value with explicit options through the ambient mutable Writer.
+Writes `value` to the ambient `Writer` with `options`.
 
 #### Details
 
-Width counts Unicode scalars. For integers, precision is a minimum digit count and disables
-width-driven zero padding. For floats, precision is the exact number of fractional digits
-rounded ties-to-even, replacing the shortest round-tripping default; float padding always
-uses the fill scalar. Alternate form and color do not change numeric output. This operation
-does not require Allocator. If Writer fails, an accepted prefix remains written and the
-original `WriterError` is preserved.
+For integers, the precision is a minimum digit count and turns off zero padding. For floats,
+the precision is the exact number of fractional digits, rounded half to even. For text, the
+precision is the maximum number of Unicode scalars, and the rest is cut. Integers use
+`style` for the base and `alternate` for the base prefix. The standard implementations ignore
+`color`.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="Format.impl.debug"}
+
+### Associated function `debug`
+
+```silk
+pub effect fn debug<T: Debug>(value: &T) -> () ! WriterError ? &mut Writer
+```
+
+Writes the [`Debug`](#Debug) form of `value` to the ambient `Writer` with
+[`Format.defaultOptions`](#Format.impl.defaultOptions).
+
+#### When to use
+
+Use it to show a value to a programmer, for example in a log or a test failure. Strings show
+with quotes and escapes, so you can see spaces and control characters.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="Format.impl.debugWith"}
+
+### Associated function `debugWith`
+
+```silk
+pub effect fn debugWith<T: Debug>(
+    value: &T,
+    options: FormatOptions
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes the [`Debug`](#Debug) form of `value` to the ambient `Writer` with `options`.
+
+#### Details
+
+`alternate` selects the pretty form, with one field or element on each line and four spaces
+of indentation for each level. Numbers apply the other options as `Display` does.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="Format.impl.debugFields"}
+
+### Associated function `debugFields`
+
+```silk
+pub effect fn debugFields<T>(
+    value: &T,
+    static name: string<'static>,
+    formatter: &mut Formatter
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes the visible fields of `value` in the [`Debug`](#Debug) form, after `name`.
+
+#### When to use
+
+Use it to implement `Debug` for your struct in one line:
+`return run Format.debugFields(self, "Point", &mut formatter)`.
+
+#### Details
+
+A struct with labeled fields writes `Point { x: 1, y: 2 }`. A struct with positional fields
+writes `Pair(1, 2)`. With no visible field, only `name` is written. The pretty form
+([`Format.alternate`](#Format.impl.alternate)) puts each field on its own line. Every field must implement `Debug`;
+the compiler checks this for each type that you call it with.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+#### Gotchas
+
+Reflection sees fields from this module, so it shows only the `pub` fields of your type. To
+show private fields, write the `Debug` implementation by hand.
+
+::Anchor{id="Format.impl.debugList"}
+
+### Associated function `debugList`
+
+```silk
+pub effect fn debugList<T: Debug>(
+    values: &[T],
+    formatter: &mut Formatter
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes the elements of `values` in the [`Debug`](#Debug) form, as `[1, 2, 3]`.
+
+#### When to use
+
+Use it to implement `Debug` for a type that holds a sequence. The pretty form
+([`Format.alternate`](#Format.impl.alternate)) puts each element on its own line.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="Format.impl.format"}
 
@@ -428,64 +692,117 @@ pub effect fn format<Args>(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Writes a statically validated template with values from one borrowed tuple or record.
+Writes `template` to the ambient `Writer` and replaces each placeholder with a value from
+`args`.
 
 #### When to use
 
-Use when the template is static and each replacement value has a `Display` implementation.
+Use `format` when the text is known at compile time and each value implements [`Display`](#Display).
 
 #### Details
 
-`{}` selects tuple fields in order. `{name}` selects visible record fields. `{{` and `}}`
-write literal braces. The operation borrows `args` and does not allocate an intermediate
-`String`.
+- `{}` takes the next field of a tuple, in order.
+- `{name}` takes the record field `name`.
+- `{{` writes `{` and `}}` writes `}`.
+
+A placeholder can set options after a colon, as in Rust: `{:>8}`, `{name:*^10.2}`. The
+options are, in this order and each optional:
+
+- A fill character and an alignment: `<` left, `^` center, `>` right. The fill needs an
+  alignment after it, so `{:*<6}` pads with `*`. Without a fill, the fill is a space.
+- `+` for `Sign.Always`. `-` is the default and changes nothing.
+- `#` for the alternate form.
+- `0` for zero padding.
+- A width in decimal digits.
+- `.` and a precision in decimal digits.
+- A type: `x` lowercase hexadecimal, `X` uppercase hexadecimal, `o` octal, `b` binary. These
+  need an integer, and `#` adds the prefix `0x`, `0o`, or `0b`. `e` and `E` write a float in
+  scientific notation, such as `1.25e3`; these need a float. `?` writes the [`Debug`](#Debug)
+  form, and `#?` the pretty `Debug` form.
+
+The compiler parses the options and checks the template and the fields. A placeholder without
+options uses [`Format.defaultOptions`](#Format.impl.defaultOptions). `format` borrows `args`.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 #### Gotchas
 
-A template cannot mix positional and named placeholders. A positional template must use every
-tuple field one time. Malformed templates and unavailable fields stop compilation. A Writer
-failure preserves the prefix that the provider accepted.
+One template cannot mix `{}` and `{name}`. A template with `{}` must use each tuple field
+exactly one time. A malformed template, a malformed option, a field that does not exist, or
+a type such as `x` on a value that it does not apply to is a compile error. The width and the precision are fixed in the template; to take them
+from a value, use [`Format.displayWith`](#Format.impl.displayWith). `Sign.Space` and `color` are available only
+through [`FormatOptions`](#FormatOptions).
 
 #### Examples
 
-##### Write a named argument pack
-
-This program formats `Hello, Julia. Age: 31` through a portable discard writer.
+##### Write a tuple and a record
 
 ```silk
 import silk.effect { Effect }
-
 import silk.format { Format }
-
 import silk.writer { Writer, WriterError }
 
-struct DiscardWriter {}
-impl Writer for DiscardWriter {
-  effect fn writeAll(self: &mut Self, val: &[u8]) -> () ! WriterError ? &mut Writer {
+struct CaptureWriter {
+  bytes: [u8; 64]
+  length: usize
+}
+
+impl Writer for CaptureWriter {
+  effect fn writeAll(self: &mut Self, value: &[u8]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    let mut index: usize = 0
+    while index < value.length {
+      self.bytes[self.length] = value[index]
+      self.length = self.length + 1
+      index = index + 1
+    }
     return ()
   }
-  effect fn flush(self: &mut Self) -> () ! WriterError ? &mut Writer {
+
+  effect fn flush(self: &mut Self) -> ()
+    ! WriterError
+    ? &mut Writer {
     return ()
   }
 }
 
-effect fn render() -> () ! WriterError ? &mut Writer {
-  let args = .{name: "Julia", age: 31}
-  return run Format.format("Hello, {name}. Age: {age}", &args)
+fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
+  if writer.length != expected.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < expected.length {
+    if writer.bytes[index] != expected[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
 }
 
-effect fn writeExample() -> () ! WriterError {
-  let mut writer = DiscardWriter {}
-  return run render()
-    |> Effect.provideMut<Writer>(&mut writer)
+effect fn render() -> ()
+  ! WriterError
+  ? &mut Writer {
+  let pair = (3, 4)
+  run Format.format("{} + {} = 7. ", &pair)
+  let user = .{ name: "Ada", age: 36 }
+  run Format.format("{name} is {age} {{years}}. ", &user)
+  let price = .{ item: "tea", cost: 2.5 }
+  run Format.format("[{item:.<6}{cost:>6.2}] ", &price)
+  return run Format.format("{:#06x} {:b} {:.2e}", &(255, 5, 1234.5))
 }
 
-effect fn ignoreWriteFailure(error: WriterError) -> () {
-  return ()
-}
-
-pub fn main() -> i32 {
-  run Effect.catchAll(writeExample(), ignoreWriteFailure)
+pub effect fn main() -> i32
+  ! WriterError {
+  let mut writer = CaptureWriter { bytes: [0; 64], length: 0 }
+  run render() |> Effect.provideMut<Writer>(&mut writer)
+  if !holds(&writer, b"3 + 4 = 7. Ada is 36 {years}. [tea...  2.50] 0x00ff 101 1.23e3") {
+    return 1
+  }
   return 0
 }
 ```
@@ -498,13 +815,19 @@ pub fn main() -> i32 {
 pub fn unsignedValue(text: string) -> Result<u64, ParseError>
 ```
 
-Reads complete decimal text as an unsigned value.
+Reads all of `text` as a decimal `u64`.
 
 #### Details
 
-Empty text, a leading sign, and any byte outside `0`–`9` are `NotANumber` at the offset that
-stopped the read. A value above `u64.MAX` is `OutOfRange`, detected before the overflow rather
-than after it.
+`text` must contain only the digits `0` to `9`. Signs, spaces, and separators are not
+accepted. Leading zeros are accepted.
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is more than `u64.MAX`.
 
 ::Anchor{id="Format.impl.signedValue"}
 
@@ -514,12 +837,18 @@ than after it.
 pub fn signedValue(text: string) -> Result<i64, ParseError>
 ```
 
-Reads complete decimal text as a signed value, accepting one leading `-`.
+Reads all of `text` as a decimal `i64`. One leading `-` is accepted.
 
 #### Details
 
-Digits accumulate negatively, so text naming `i64.MIN` reads like any other value. A leading `+`
-is not accepted. A value outside `i64.MIN`–`i64.MAX` is `OutOfRange`.
+`i64.MIN` reads correctly. A leading `+`, spaces, and separators are not accepted.
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is less than `i64.MIN` or more than `i64.MAX`.
 
 ::Anchor{id="Format.impl.f64Value"}
 
@@ -529,14 +858,26 @@ is not accepted. A value outside `i64.MIN`–`i64.MAX` is `OutOfRange`.
 pub fn f64Value(text: string) -> Result<f64, ParseError>
 ```
 
-Reads a complete finite decimal spelling, rounding directly to IEEE binary64.
+Reads all of `text` as a decimal `f64`.
 
 #### Details
 
-An optional sign, decimal point, and `e` exponent are accepted. `NaN` and `Infinity` are
-rejected. Overflow rounds to infinity and underflow rounds to signed zero. The fallback
-compares exact decimal values with binary64 rounding boundaries, including subnormals and
-ties to even; no intermediate floating-point multiplication decides the result.
+The accepted form is an optional `+` or `-`, digits with an optional `.` and fraction, and an
+optional exponent `e` or `E` with an optional sign. There must be at least one digit before or
+after the `.`. The value is rounded correctly to the nearest `f64`, with ties to even. A value
+too large for `f64` becomes infinity with the same sign. A value too small becomes zero with
+the same sign. The result does not depend on floating-point arithmetic of the target.
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+
+#### Gotchas
+
+`NaN`, `Infinity`, and `inf` are not accepted, so the output of `Display` for a value that is
+not finite does not parse back.
 
 ::Anchor{id="Format.impl.f32Value"}
 
@@ -546,12 +887,27 @@ ties to even; no intermediate floating-point multiplication decides the result.
 pub fn f32Value(text: string) -> Result<f32, ParseError>
 ```
 
-Reads a complete finite decimal spelling, rounding directly to IEEE binary32.
+Reads all of `text` as a decimal `f32`.
 
 #### Details
 
-The decimal is never rounded through binary64, avoiding double rounding. Overflow produces
-infinity and underflow preserves the sign of zero.
+The accepted form is an optional `+` or `-`, digits with an optional `.` and fraction, and an
+optional exponent `e` or `E` with an optional sign. There must be at least one digit before or
+after the `.`. The value is rounded correctly to the nearest `f32`, with ties to even. A value
+too large for `f32` becomes infinity with the same sign. A value too small becomes zero with
+the same sign. The text is rounded to `f32` directly, not through `f64`, so there is no double
+rounding.
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+
+#### Gotchas
+
+`NaN`, `Infinity`, and `inf` are not accepted, so the output of `Display` for a value that is
+not finite does not parse back.
 
 ::Anchor{id="Format.impl.u8Value"}
 
@@ -561,7 +917,18 @@ infinity and underflow preserves the sign of zero.
 pub fn u8Value(text: string) -> Result<u8, ParseError>
 ```
 
-Reads complete decimal text as a `u8`, rejecting a value above `u8.MAX`.
+Reads all of `text` as a decimal `u8`.
+
+#### Details
+
+The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is more than `u8.MAX`.
 
 ::Anchor{id="Format.impl.u16Value"}
 
@@ -571,7 +938,18 @@ Reads complete decimal text as a `u8`, rejecting a value above `u8.MAX`.
 pub fn u16Value(text: string) -> Result<u16, ParseError>
 ```
 
-Reads complete decimal text as a `u16`, rejecting a value above `u16.MAX`.
+Reads all of `text` as a decimal `u16`.
+
+#### Details
+
+The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is more than `u16.MAX`.
 
 ::Anchor{id="Format.impl.u32Value"}
 
@@ -581,7 +959,18 @@ Reads complete decimal text as a `u16`, rejecting a value above `u16.MAX`.
 pub fn u32Value(text: string) -> Result<u32, ParseError>
 ```
 
-Reads complete decimal text as a `u32`, rejecting a value above `u32.MAX`.
+Reads all of `text` as a decimal `u32`.
+
+#### Details
+
+The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is more than `u32.MAX`.
 
 ::Anchor{id="Format.impl.u64Value"}
 
@@ -591,7 +980,18 @@ Reads complete decimal text as a `u32`, rejecting a value above `u32.MAX`.
 pub fn u64Value(text: string) -> Result<u64, ParseError>
 ```
 
-Reads complete decimal text as a `u64`, rejecting a value above `u64.MAX`.
+Reads all of `text` as a decimal `u64`.
+
+#### Details
+
+The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is more than `u64.MAX`.
 
 ::Anchor{id="Format.impl.usizeValue"}
 
@@ -601,8 +1001,18 @@ Reads complete decimal text as a `u64`, rejecting a value above `u64.MAX`.
 pub fn usizeValue(text: string) -> Result<usize, ParseError>
 ```
 
-Reads complete decimal text as a `usize`, rejecting a value the target's pointer width cannot
-hold.
+Reads all of `text` as a decimal `usize`.
+
+#### Details
+
+The rules are the same as for [`Format.unsignedValue`](#Format.impl.unsignedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is more than `usize.MAX`.
 
 ::Anchor{id="Format.impl.i8Value"}
 
@@ -612,7 +1022,18 @@ hold.
 pub fn i8Value(text: string) -> Result<i8, ParseError>
 ```
 
-Reads complete decimal text as an `i8`, rejecting a value outside `i8.MIN`–`i8.MAX`.
+Reads all of `text` as a decimal `i8`. One leading `-` is accepted.
+
+#### Details
+
+The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is less than `i8.MIN` or more than `i8.MAX`.
 
 ::Anchor{id="Format.impl.i16Value"}
 
@@ -622,7 +1043,18 @@ Reads complete decimal text as an `i8`, rejecting a value outside `i8.MIN`–`i8
 pub fn i16Value(text: string) -> Result<i16, ParseError>
 ```
 
-Reads complete decimal text as an `i16`, rejecting a value outside `i16.MIN`–`i16.MAX`.
+Reads all of `text` as a decimal `i16`. One leading `-` is accepted.
+
+#### Details
+
+The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is less than `i16.MIN` or more than `i16.MAX`.
 
 ::Anchor{id="Format.impl.i32Value"}
 
@@ -632,7 +1064,18 @@ Reads complete decimal text as an `i16`, rejecting a value outside `i16.MIN`–`
 pub fn i32Value(text: string) -> Result<i32, ParseError>
 ```
 
-Reads complete decimal text as an `i32`, rejecting a value outside `i32.MIN`–`i32.MAX`.
+Reads all of `text` as a decimal `i32`. One leading `-` is accepted.
+
+#### Details
+
+The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is less than `i32.MIN` or more than `i32.MAX`.
 
 ::Anchor{id="Format.impl.i64Value"}
 
@@ -642,7 +1085,18 @@ Reads complete decimal text as an `i32`, rejecting a value outside `i32.MIN`–`
 pub fn i64Value(text: string) -> Result<i64, ParseError>
 ```
 
-Reads complete decimal text as an `i64`, rejecting a value outside `i64.MIN`–`i64.MAX`.
+Reads all of `text` as a decimal `i64`. One leading `-` is accepted.
+
+#### Details
+
+The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is less than `i64.MIN` or more than `i64.MAX`.
 
 ::Anchor{id="Format.impl.isizeValue"}
 
@@ -652,8 +1106,18 @@ Reads complete decimal text as an `i64`, rejecting a value outside `i64.MIN`–`
 pub fn isizeValue(text: string) -> Result<isize, ParseError>
 ```
 
-Reads complete decimal text as an `isize`, rejecting a value the target's pointer width cannot
-hold.
+Reads all of `text` as a decimal `isize`. One leading `-` is accepted.
+
+#### Details
+
+The rules are the same as for [`Format.signedValue`](#Format.impl.signedValue).
+
+#### Errors
+
+- [`NotANumber`](#NotANumber) if `text` is empty or has a character that is not part of the number. The
+  offset is the position of that character, or the length of `text` if a digit is missing at
+  the end.
+- [`OutOfRange`](#OutOfRange) if the value is less than `isize.MIN` or more than `isize.MAX`.
 
 ::Anchor{id="Alignment"}
 
@@ -663,7 +1127,12 @@ hold.
 pub enum Alignment
 ```
 
-Alignment of content within a requested minimum width.
+Where content goes inside a width that is larger than the content.
+
+### Details
+
+For the standard `Display` implementations, `Default` is `Right` for numbers and `Left` for
+text, `bool`, and `char`.
 
 ::Anchor{id="Alignment.Default"}
 
@@ -673,7 +1142,8 @@ Alignment of content within a requested minimum width.
 Default
 ```
 
-Requests default alignment. The shared padding helpers and integers use right alignment.
+Uses the default of the `Display` implementation. The standard implementations align numbers
+to the right and text to the left.
 
 ::Anchor{id="Alignment.Left"}
 
@@ -683,7 +1153,7 @@ Requests default alignment. The shared padding helpers and integers use right al
 Left
 ```
 
-Emits all required fill after the content.
+Puts the content first and all fill after it.
 
 ::Anchor{id="Alignment.Center"}
 
@@ -693,7 +1163,8 @@ Emits all required fill after the content.
 Center
 ```
 
-Splits fill around the content, placing an odd remainder on the right.
+Puts half of the fill before the content and half after it. An odd extra fill character goes
+after it.
 
 ::Anchor{id="Alignment.Right"}
 
@@ -703,7 +1174,7 @@ Splits fill around the content, placing an odd remainder on the right.
 Right
 ```
 
-Emits all required fill before the content.
+Puts all fill before the content.
 
 ::Anchor{id="Sign"}
 
@@ -713,7 +1184,7 @@ Emits all required fill before the content.
 pub enum Sign
 ```
 
-Sign policy available to numeric presentation implementations.
+How numbers that are not negative show a sign.
 
 ::Anchor{id="Sign.NegativeOnly"}
 
@@ -723,7 +1194,7 @@ Sign policy available to numeric presentation implementations.
 NegativeOnly
 ```
 
-Emits a sign only for negative values.
+Writes `-` for negative numbers and no sign for other numbers.
 
 ::Anchor{id="Sign.Always"}
 
@@ -733,7 +1204,7 @@ Emits a sign only for negative values.
 Always
 ```
 
-Emits `-` for negative values and `+` otherwise.
+Writes `-` for negative numbers and `+` for other numbers, including zero.
 
 ::Anchor{id="Sign.Space"}
 
@@ -743,7 +1214,100 @@ Emits `-` for negative values and `+` otherwise.
 Space
 ```
 
-Emits `-` for negative values and one space otherwise.
+Writes `-` for negative numbers and one space for other numbers, so columns of numbers align.
+
+::Anchor{id="Style"}
+
+## `Style`
+
+```silk
+pub enum Style
+```
+
+The base or notation that a number displays in.
+
+### Details
+
+The standard integers use the base styles: `LowerHex`, `UpperHex`, `Octal`, and `Binary`. With
+the alternate form, they write the prefix `0x`, `0o`, or `0b` before the digits. The standard
+floats use `LowerExp` and `UpperExp`. Each standard type ignores the other styles.
+
+### Gotchas
+
+A negative integer in a base other than decimal displays as its two's complement bits at the
+width of its type, with no sign, as in Rust: `-1` as `i8` in `LowerHex` is `ff`.
+
+::Anchor{id="Style.Default"}
+
+### `Default`
+
+```silk
+Default
+```
+
+Decimal for integers, and the normal form of other types.
+
+::Anchor{id="Style.LowerHex"}
+
+### `LowerHex`
+
+```silk
+LowerHex
+```
+
+Base 16 with the digits `0` to `9` and `a` to `f`.
+
+::Anchor{id="Style.UpperHex"}
+
+### `UpperHex`
+
+```silk
+UpperHex
+```
+
+Base 16 with the digits `0` to `9` and `A` to `F`.
+
+::Anchor{id="Style.Octal"}
+
+### `Octal`
+
+```silk
+Octal
+```
+
+Base 8.
+
+::Anchor{id="Style.Binary"}
+
+### `Binary`
+
+```silk
+Binary
+```
+
+Base 2.
+
+::Anchor{id="Style.LowerExp"}
+
+### `LowerExp`
+
+```silk
+LowerExp
+```
+
+Scientific notation with a lowercase `e`, such as `1.25e3`. The significand has one digit
+before the point. Without a precision, its digits are the shortest that parse back to the
+same bits. With a precision, it has that many fractional digits, rounded half to even.
+
+::Anchor{id="Style.UpperExp"}
+
+### `UpperExp`
+
+```silk
+UpperExp
+```
+
+Scientific notation with an uppercase `E`, such as `1.25E3`.
 
 ::Anchor{id="FormatOptions"}
 
@@ -753,15 +1317,12 @@ Emits `-` for negative values and one space otherwise.
 pub struct FormatOptions
 ```
 
-Explicit policy for one formatting session.
+The options that control how a value displays.
 
 ### Details
 
-[`defaultOptions`](#Format.impl.defaultOptions) uses no width, default alignment, a space fill, negative-only signs, no
-alternate form, no zero padding, no precision, and no color. Width counts Unicode scalars.
-For integers, precision disables width-driven zero padding. For floats, precision selects
-fixed fractional digits instead of the shortest round-tripping form. Alternate form and color
-do not change numeric output.
+[`Format.defaultOptions`](#Format.impl.defaultOptions) returns the defaults. To change some options, start from the defaults
+and set the fields you need. The standard `Display` implementations ignore `color`.
 
 ::Anchor{id="FormatOptions.width"}
 
@@ -771,7 +1332,8 @@ do not change numeric output.
 pub width: Option<usize>
 ```
 
-Optional minimum visible width in Unicode scalars, not UTF-8 bytes or terminal cells.
+The minimum width in Unicode scalars, not UTF-8 bytes or terminal columns. Content that is
+wider is not cut.
 
 ::Anchor{id="FormatOptions.alignment"}
 
@@ -781,8 +1343,7 @@ Optional minimum visible width in Unicode scalars, not UTF-8 bytes or terminal c
 pub alignment: Alignment
 ```
 
-Alignment inside the requested minimum width. `Default` is right alignment for the shared
-padding helpers and shipped integer presentations.
+Where the content goes inside the width.
 
 ::Anchor{id="FormatOptions.fill"}
 
@@ -792,7 +1353,7 @@ padding helpers and shipped integer presentations.
 pub fill: char
 ```
 
-One Unicode scalar repeated for ordinary padding.
+The character that fills the space up to the width.
 
 ::Anchor{id="FormatOptions.sign"}
 
@@ -802,7 +1363,7 @@ One Unicode scalar repeated for ordinary padding.
 pub sign: Sign
 ```
 
-Numeric sign policy.
+How numbers that are not negative show a sign.
 
 ::Anchor{id="FormatOptions.alternate"}
 
@@ -812,7 +1373,8 @@ Numeric sign policy.
 pub alternate: bool
 ```
 
-Permission for a separately documented presentation to use an alternate form.
+Permission for a `Display` implementation to use its alternate form. The standard integers
+use it to write a base prefix such as `0x`.
 
 ::Anchor{id="FormatOptions.zeroPad"}
 
@@ -822,8 +1384,8 @@ Permission for a separately documented presentation to use an alternate form.
 pub zeroPad: bool
 ```
 
-Whether integer width padding uses zeroes after the sign. A supplied precision disables this
-width-driven zero padding.
+If `true`, numbers pad to the width with zeros after the sign instead of the fill. A
+precision turns this off for integers but not for floats.
 
 ::Anchor{id="FormatOptions.precision"}
 
@@ -833,14 +1395,14 @@ width-driven zero padding.
 pub precision: Option<usize>
 ```
 
-Optional digit count for numeric presentations.
+The number of digits for numbers.
 
 #### Details
 
-For integers, this is a minimum digit count and disables width-driven zero padding. For floats,
-it is the exact number of fractional digits, rounded ties-to-even. This replaces the shortest
-round-tripping default, so the output may not parse back to the original bits. Nonfinite floats
-ignore it.
+For integers, it is the minimum number of digits, with leading zeros. For floats, it is the
+exact number of fractional digits, rounded half to even. The result then does not always parse
+back to the same bits. `NaN` and `Infinity` ignore it. For text, it is the maximum number of
+Unicode scalars to write.
 
 ::Anchor{id="FormatOptions.color"}
 
@@ -850,7 +1412,18 @@ ignore it.
 pub color: bool
 ```
 
-Permission, not a requirement, to emit balanced ANSI styling.
+Permission, not a request, to write ANSI color codes. The standard implementations never write
+them.
+
+::Anchor{id="FormatOptions.style"}
+
+### Field `style`
+
+```silk
+pub style: Style
+```
+
+The base or notation for numbers.
 
 ::Anchor{id="Formatter"}
 
@@ -860,7 +1433,12 @@ Permission, not a requirement, to emit balanced ANSI styling.
 pub struct Formatter
 ```
 
-Mutable presentation policy that does not store, select, or replace a Writer provider.
+The options for one `Display` call.
+
+### Details
+
+A `Formatter` holds options only. The output goes to the ambient `Writer`, not to the formatter.
+Read the options with [`Format.width`](#Format.impl.width), [`Format.sign`](#Format.impl.sign), and the other accessors.
 
 ::Anchor{id="Display"}
 
@@ -870,13 +1448,97 @@ Mutable presentation policy that does not store, select, or replace a Writer pro
 pub interface Display
 ```
 
-Static human-readable presentation contract for Writer-backed output.
+A type that can write itself as text for people to read.
+
+### When to use
+
+Implement `Display` for your type to use it with [`Format.display`](#Format.impl.display), [`Format.displayWith`](#Format.impl.displayWith), and
+[`Format.format`](#Format.impl.format).
 
 ### Details
 
-An implementation reads presentation policy from [`Formatter`](#Formatter) and writes through the ambient
-mutable Writer. The contract does not require Allocator. If Writer fails, an accepted prefix
-remains written and the original `WriterError` is preserved.
+The implementation reads the options from the [`Formatter`](#Formatter) and writes through the ambient
+`Writer`. It must not allocate. To apply the width, compute the visible width of your output and
+use [`Format.writeLeadingPadding`](#Format.impl.writeLeadingPadding) and [`Format.writeTrailingPadding`](#Format.impl.writeTrailingPadding).
+
+### Examples
+
+#### Display a point as `(x, y)`
+
+```silk
+import silk.effect { Effect }
+import silk.format { Display, Format, Formatter }
+import silk.writer { Writer, WriterError }
+
+struct CaptureWriter {
+  bytes: [u8; 64]
+  length: usize
+}
+
+impl Writer for CaptureWriter {
+  effect fn writeAll(self: &mut Self, value: &[u8]) -> ()
+    ! WriterError
+    ? &mut Writer {
+    let mut index: usize = 0
+    while index < value.length {
+      self.bytes[self.length] = value[index]
+      self.length = self.length + 1
+      index = index + 1
+    }
+    return ()
+  }
+
+  effect fn flush(self: &mut Self) -> ()
+    ! WriterError
+    ? &mut Writer {
+    return ()
+  }
+}
+
+fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
+  if writer.length != expected.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < expected.length {
+    if writer.bytes[index] != expected[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
+}
+
+struct Point {
+  x: i32
+  y: i32
+}
+
+effect fn showPoint(self: &Point, formatter: &mut Formatter) -> ()
+  ! WriterError
+  ? &mut Writer {
+  run Format.writeText(&mut formatter, "(")
+  run Format.display(&self.x)
+  run Format.writeText(&mut formatter, ", ")
+  run Format.display(&self.y)
+  return run Format.writeText(&mut formatter, ")")
+}
+
+impl Display for Point {
+  display: Point.showPoint
+}
+
+pub effect fn main() -> i32
+  ! WriterError {
+  let mut writer = CaptureWriter { bytes: [0; 64], length: 0 }
+  let point = Point { x: 3, y: -4 }
+  run Format.display(&point) |> Effect.provideMut<Writer>(&mut writer)
+  if !holds(&writer, b"(3, -4)") {
+    return 1
+  }
+  return 0
+}
+```
 
 ::Anchor{id="Display.display"}
 
@@ -889,12 +1551,123 @@ effect fn display(
   ) -> () ! WriterError ? &mut Writer
 ```
 
-Emits one presentation through the ambient mutable Writer.
+Writes `self` to the ambient `Writer` with the options in `formatter`.
 
-#### Details
+#### Errors
 
-This operation reads policy from `formatter`. It does not require Allocator. If Writer fails,
-an accepted prefix remains written and the original `WriterError` is preserved.
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="RadixDisplay"}
+
+## `RadixDisplay`
+
+```silk
+pub interface RadixDisplay
+```
+
+An integer type that can display in a base other than decimal.
+
+### When to use
+
+Implement it for your own integer type to use it with the `x`, `X`, `o`, and `b` types in
+[`Format.format`](#Format.impl.format). The standard integers implement it.
+
+### Details
+
+[`Format.format`](#Format.impl.format) calls `displayRadix` for a placeholder with a base type, so a base type on a
+value that is not an integer is a compile error. The options carry the base in
+[`FormatOptions.style`](#FormatOptions.style). A style that is not a base, such as `Style.LowerExp`, is decimal.
+
+::Anchor{id="RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(
+    self: &Self,
+    formatter: &mut Formatter
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes the value in the base that [`Format.style`](#Format.impl.style) selects. A style that is not a base is
+decimal.
+
+::Anchor{id="ExponentDisplay"}
+
+## `ExponentDisplay`
+
+```silk
+pub interface ExponentDisplay
+```
+
+A float type that can display in scientific notation.
+
+### When to use
+
+Implement it for your own float type to use it with the `e` and `E` types in
+[`Format.format`](#Format.impl.format). `f32` and `f64` implement it.
+
+### Details
+
+[`Format.format`](#Format.impl.format) calls `displayExponent` for a placeholder with `e` or `E`, so these types on a
+value that is not a float are a compile error.
+
+::Anchor{id="ExponentDisplay.displayExponent"}
+
+### Operation `displayExponent`
+
+```silk
+effect fn displayExponent(
+    self: &Self,
+    formatter: &mut Formatter
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes the value in the notation that [`Format.style`](#Format.impl.style) selects. A style that is not
+`Style.LowerExp` or `Style.UpperExp` writes the normal form.
+
+::Anchor{id="Debug"}
+
+## `Debug`
+
+```silk
+pub interface Debug
+```
+
+A type that can write itself for a programmer to read, as `{:?}` in [`Format.format`](#Format.impl.format).
+
+### When to use
+
+Implement `Debug` to show a value in logs, test failures, and assertions. Unlike `Display`, the
+output shows the structure of the value: strings are quoted and escaped, and a struct shows
+its fields. For a struct, call [`Format.debugFields`](#Format.impl.debugFields); for a sequence, call
+[`Format.debugList`](#Format.impl.debugList).
+
+### Details
+
+The standard integers, floats, and `bool` write the same text as `Display`. `string` and
+`char` write quotes and escapes. `Option` and `Result` write the variant and its value, such as
+`Some(3)`. [`Format.alternate`](#Format.impl.alternate) selects the pretty form, which puts each field on its own
+line. Nested values share the formatter, so the pretty form indents at each level.
+
+::Anchor{id="Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(
+    self: &Self,
+    formatter: &mut Formatter
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes the `Debug` form of the value through the ambient mutable Writer.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
 
 ::Anchor{id="NotANumber"}
 
@@ -904,7 +1677,7 @@ an accepted prefix remains written and the original `WriterError` is preserved.
 pub struct NotANumber
 ```
 
-The byte offset where complete decimal parsing cannot continue.
+The reason for a [`ParseError`](#ParseError) when the text is not a number of the expected form.
 
 ::Anchor{id="NotANumber.offset"}
 
@@ -914,7 +1687,8 @@ The byte offset where complete decimal parsing cannot continue.
 pub offset: usize
 ```
 
-The offset where reading stopped. It can equal the byte length when a digit was required.
+The byte offset of the first character that is not accepted. It is the length of the text if a
+digit is missing at the end.
 
 ::Anchor{id="OutOfRange"}
 
@@ -924,7 +1698,8 @@ The offset where reading stopped. It can equal the byte length when a digit was 
 pub struct OutOfRange
 ```
 
-A well-formed decimal number whose value does not fit the requested type.
+The reason for a [`ParseError`](#ParseError) when the text is a number but the value does not fit the target
+type.
 
 ::Anchor{id="ParseError"}
 
@@ -934,7 +1709,11 @@ A well-formed decimal number whose value does not fit the requested type.
 pub struct ParseError
 ```
 
-Why decimal text did not produce a value, narrowed with `match`.
+The error from the `...Value` parse functions.
+
+### Details
+
+Use `match` on `reason` to get [`NotANumber`](#NotANumber) or [`OutOfRange`](#OutOfRange).
 
 ::Anchor{id="ParseError.reason"}
 
@@ -944,7 +1723,7 @@ Why decimal text did not produce a value, narrowed with `match`.
 pub reason: NotANumber | OutOfRange
 ```
 
-The reason the text was rejected.
+Why the text was not accepted.
 
 ::Anchor{id="u8.impl.Display"}
 
@@ -960,6 +1739,31 @@ impl Display for u8
 
 ```silk
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="u8.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for u8`
+
+```silk
+impl RadixDisplay for u8
+```
+
+::Anchor{id="u8.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
 ::Anchor{id="u16.impl.Display"}
@@ -978,6 +1782,31 @@ impl Display for u16
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="u16.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for u16`
+
+```silk
+impl RadixDisplay for u16
+```
+
+::Anchor{id="u16.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
 ::Anchor{id="u32.impl.Display"}
 
 ## Implementation `Display for u32`
@@ -992,6 +1821,31 @@ impl Display for u32
 
 ```silk
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="u32.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for u32`
+
+```silk
+impl RadixDisplay for u32
+```
+
+::Anchor{id="u32.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
 ::Anchor{id="u64.impl.Display"}
@@ -1010,6 +1864,31 @@ impl Display for u64
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="u64.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for u64`
+
+```silk
+impl RadixDisplay for u64
+```
+
+::Anchor{id="u64.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
 ::Anchor{id="usize.impl.Display"}
 
 ## Implementation `Display for usize`
@@ -1024,6 +1903,31 @@ impl Display for usize
 
 ```silk
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="usize.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for usize`
+
+```silk
+impl RadixDisplay for usize
+```
+
+::Anchor{id="usize.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
 ::Anchor{id="i8.impl.Display"}
@@ -1042,6 +1946,31 @@ impl Display for i8
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="i8.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for i8`
+
+```silk
+impl RadixDisplay for i8
+```
+
+::Anchor{id="i8.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
 ::Anchor{id="i16.impl.Display"}
 
 ## Implementation `Display for i16`
@@ -1056,6 +1985,31 @@ impl Display for i16
 
 ```silk
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="i16.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for i16`
+
+```silk
+impl RadixDisplay for i16
+```
+
+::Anchor{id="i16.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
 ::Anchor{id="i32.impl.Display"}
@@ -1074,6 +2028,31 @@ impl Display for i32
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="i32.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for i32`
+
+```silk
+impl RadixDisplay for i32
+```
+
+::Anchor{id="i32.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
 ::Anchor{id="i64.impl.Display"}
 
 ## Implementation `Display for i64`
@@ -1088,6 +2067,31 @@ impl Display for i64
 
 ```silk
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="i64.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for i64`
+
+```silk
+impl RadixDisplay for i64
+```
+
+::Anchor{id="i64.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
 ::Anchor{id="isize.impl.Display"}
@@ -1106,6 +2110,31 @@ impl Display for isize
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
+Writes the value in the base of [`Format.style`](#Format.impl.style), decimal by default. Sign, precision, zero
+padding, width, fill, and alignment apply.
+
+#### Details
+
+The order is: leading fill, sign, base prefix, zeros from the precision or from `zeroPad`,
+digits, trailing fill. Only the alternate form writes a base prefix. A base other than
+decimal writes no sign; see [`Style`](#Style).
+
+::Anchor{id="isize.impl.RadixDisplay"}
+
+## Implementation `RadixDisplay for isize`
+
+```silk
+impl RadixDisplay for isize
+```
+
+::Anchor{id="isize.impl.RadixDisplay.displayRadix"}
+
+### Operation `displayRadix`
+
+```silk
+effect fn displayRadix(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
 ::Anchor{id="f64.impl.Display"}
 
 ## Implementation `Display for f64`
@@ -1122,20 +2151,35 @@ impl Display for f64
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the shortest decimal that parses back to these exact bits, or fixed fractional digits
-when precision is supplied.
+Writes the shortest decimal that parses back to the same bits. If the options set a precision,
+writes exactly that many fractional digits instead.
 
 #### Details
 
-The default presentation is the shortest significand whose correctly rounded parse returns
-the original bits, so `f64Value` recovers the value exactly. Negative zero displays as `-0`.
-A supplied precision instead emits exactly that many fractional digits, rounded ties-to-even
-against the value's exact decimal expansion, which is not required to round-trip.
+The default output parses back to the same value with [`Format.f64Value`](#Format.impl.f64Value). Negative zero
+displays as `-0`. `Style.LowerExp` and `Style.UpperExp` write scientific notation, such as
+`1.25e3`. Sign, width, fill, alignment, and zero padding apply.
 
 #### Gotchas
 
-`NaN` and `Infinity` ignore precision and width-driven zero padding; only the sign policy
-applies, and it applies to `Infinity` alone. Float padding always uses the fill scalar.
+`NaN` displays as `NaN`, and infinity displays as `Infinity` with a sign from the sign rule,
+in every style. Both ignore precision and pad with the fill character, never with zeros.
+
+::Anchor{id="f64.impl.ExponentDisplay"}
+
+## Implementation `ExponentDisplay for f64`
+
+```silk
+impl ExponentDisplay for f64
+```
+
+::Anchor{id="f64.impl.ExponentDisplay.displayExponent"}
+
+### Operation `displayExponent`
+
+```silk
+effect fn displayExponent(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
 
 ::Anchor{id="f32.impl.Display"}
 
@@ -1153,19 +2197,36 @@ impl Display for f32
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the shortest decimal that parses back to these exact bits, or fixed fractional digits
-when precision is supplied.
+Writes the shortest decimal that parses back to the same bits. If the options set a precision,
+writes exactly that many fractional digits instead.
 
 #### Details
 
-Rounding reads the binary32 expansion, so the result can differ from the binary64 nearest to
-the same literal. Negative zero displays as `-0`. A supplied precision emits exactly that
-many fractional digits, rounded ties-to-even, which is not required to round-trip.
+The default output parses back to the same value with [`Format.f32Value`](#Format.impl.f32Value). Negative zero
+displays as `-0`. `Style.LowerExp` and `Style.UpperExp` write scientific notation, such as
+`1.25e3`. Sign, width, fill, alignment, and zero padding apply. The digits come from
+the `f32` value, so they can differ from the digits of the nearest `f64`.
 
 #### Gotchas
 
-`NaN` and `Infinity` ignore precision and width-driven zero padding; only the sign policy
-applies, and it applies to `Infinity` alone. Float padding always uses the fill scalar.
+`NaN` displays as `NaN`, and infinity displays as `Infinity` with a sign from the sign rule,
+in every style. Both ignore precision and pad with the fill character, never with zeros.
+
+::Anchor{id="f32.impl.ExponentDisplay"}
+
+## Implementation `ExponentDisplay for f32`
+
+```silk
+impl ExponentDisplay for f32
+```
+
+::Anchor{id="f32.impl.ExponentDisplay.displayExponent"}
+
+### Operation `displayExponent`
+
+```silk
+effect fn displayExponent(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
 
 ::Anchor{id="string.impl.Display"}
 
@@ -1183,12 +2244,12 @@ impl<'text> Display for string<'text>
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the string's UTF-8 bytes through the ambient mutable Writer.
+Writes the string with the width, fill, alignment, and precision of the options. See
+[`Format.padText`](#Format.impl.padText).
 
 #### Details
 
-This operation borrows the string and does not allocate an intermediate `String`. If Writer
-fails, an accepted prefix remains written and the original `WriterError` is preserved.
+The default alignment is left. A precision cuts the string to that many Unicode scalars.
 
 ::Anchor{id="bool.impl.Display"}
 
@@ -1206,7 +2267,7 @@ impl Display for bool
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes `true` or `false`, padded to the requested width like the other primitives.
+Writes `true` or `false` as text, like a string. See [`Format.padText`](#Format.impl.padText).
 
 ::Anchor{id="char.impl.Display"}
 
@@ -1224,7 +2285,317 @@ impl Display for char
 effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
 ```
 
-Writes the character's UTF-8 encoding, padded to the requested width like the other
-primitives.
+Writes the character as text, like a one-scalar string. See [`Format.padText`](#Format.impl.padText).
+
+::Anchor{id="string.impl.Debug"}
+
+## Implementation `Debug for string<'text>`
+
+```silk
+impl<'text> Debug for string<'text>
+```
+
+::Anchor{id="string.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the string in double quotes, with `\"`, `\\`, `\n`, `\r`, `\t`, `\0`, and
+`\u{..}` escapes, as Rust does. Characters above ASCII are written as they are.
+
+#### Gotchas
+
+The width, fill, and precision do not apply.
+
+::Anchor{id="char.impl.Debug"}
+
+## Implementation `Debug for char`
+
+```silk
+impl Debug for char
+```
+
+::Anchor{id="char.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the character in single quotes, with the escapes of `string` and `\'`.
+
+::Anchor{id="Option.impl.Debug"}
+
+## Implementation `Debug for Option<T>`
+
+```silk
+impl<T: Debug> Debug for Option<T>
+```
+
+::Anchor{id="Option.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `None`, or `Some(` and the `Debug` form of the value and `)`.
+
+::Anchor{id="Result.impl.Debug"}
+
+## Implementation `Debug for Result<T, E>`
+
+```silk
+impl<T: Debug, E: Debug> Debug for Result<T, E>
+```
+
+::Anchor{id="Result.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `Success(` or `Failure(`, the `Debug` form of the payload, and `)`.
+
+::Anchor{id="bool.impl.Debug"}
+
+## Implementation `Debug for bool`
+
+```silk
+impl Debug for bool
+```
+
+::Anchor{id="bool.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="u8.impl.Debug"}
+
+## Implementation `Debug for u8`
+
+```silk
+impl Debug for u8
+```
+
+::Anchor{id="u8.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="u16.impl.Debug"}
+
+## Implementation `Debug for u16`
+
+```silk
+impl Debug for u16
+```
+
+::Anchor{id="u16.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="u32.impl.Debug"}
+
+## Implementation `Debug for u32`
+
+```silk
+impl Debug for u32
+```
+
+::Anchor{id="u32.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="u64.impl.Debug"}
+
+## Implementation `Debug for u64`
+
+```silk
+impl Debug for u64
+```
+
+::Anchor{id="u64.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="usize.impl.Debug"}
+
+## Implementation `Debug for usize`
+
+```silk
+impl Debug for usize
+```
+
+::Anchor{id="usize.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="i8.impl.Debug"}
+
+## Implementation `Debug for i8`
+
+```silk
+impl Debug for i8
+```
+
+::Anchor{id="i8.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="i16.impl.Debug"}
+
+## Implementation `Debug for i16`
+
+```silk
+impl Debug for i16
+```
+
+::Anchor{id="i16.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="i32.impl.Debug"}
+
+## Implementation `Debug for i32`
+
+```silk
+impl Debug for i32
+```
+
+::Anchor{id="i32.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="i64.impl.Debug"}
+
+## Implementation `Debug for i64`
+
+```silk
+impl Debug for i64
+```
+
+::Anchor{id="i64.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="isize.impl.Debug"}
+
+## Implementation `Debug for isize`
+
+```silk
+impl Debug for isize
+```
+
+::Anchor{id="isize.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="f32.impl.Debug"}
+
+## Implementation `Debug for f32`
+
+```silk
+impl Debug for f32
+```
+
+::Anchor{id="f32.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
+
+::Anchor{id="f64.impl.Debug"}
+
+## Implementation `Debug for f64`
+
+```silk
+impl Debug for f64
+```
+
+::Anchor{id="f64.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the same text as `Display`.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
