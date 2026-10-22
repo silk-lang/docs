@@ -27,19 +27,22 @@ It applies to every `.silk` file. Besides highlighting, it gives you:
 - Doc comments that continue: press Enter on a `///` or `//!` line and the next line starts with the same marker.
 - From version 0.1.0, the language server: see **The language server** below. The **Silk: Restart Language Server** command restarts it.
 
-The extension is not on Open VSX, so editors that use that registry (VSCodium, for example) can't find it by search. Build the package from the silk-lang/silk-vscode repository and install the file:
+The extension is not on Open VSX, so editors that use that registry (VSCodium, for example) can't find it by search. Build the package from the silk-lang/silk-vscode repository and install the file. The repository uses [Bun](https://bun.sh): `bun run package` bundles the language client into `dist/extension.js` and then packages it.
 
 ```sh
 git clone https://github.com/silk-lang/silk-vscode
 cd silk-vscode
-npx @vscode/vsce package --no-dependencies
+bun install --frozen-lockfile
+bun run package
 ```
 
+The output ends with:
+
 ```
- DONE  Packaged: /home/you/silk-vscode/silk-0.0.1.vsix (9 files, 26.49 KB)
+ DONE  Packaged: /home/you/silk-vscode/silk-0.1.0.vsix (11 files, 103.08 KB)
 ```
 
-Then install `silk-0.0.1.vsix` with your editor's "Install from VSIX" command.
+Then install `silk-0.1.0.vsix` with your editor's "Install from VSIX" command.
 
 ## Zed
 
@@ -112,7 +115,7 @@ const html = highlighter.highlightToHtml('let mut sum = 0', { lang: 'silk' })
 
 ## The language server
 
-`silk lsp` speaks the Language Server Protocol over standard input and output. The VS Code extension, from version 0.1.0, starts it for Silk files; the `silk.path` setting names the `silk` command it runs. In another editor, register `silk lsp` as the language server command for `.silk` files, with no arguments.
+`silk lsp` speaks the Language Server Protocol over standard input and output. The VS Code extension, from version 0.1.0, starts it for Silk files; the `silk.path` setting names the `silk` command it runs. It starts one server per workspace folder, in that folder. When the folder's `silk.toml` pins a toolchain that is not installed, the extension offers to install it with `silk toolchain install` instead of failing. In another editor, register `silk lsp` as the language server command for `.silk` files, with no arguments.
 
 | Feature | State in this release |
 | --- | --- |

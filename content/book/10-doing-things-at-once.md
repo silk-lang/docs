@@ -12,12 +12,16 @@ Fibers add no new syntax. They are library operations from `silk/fiber`, `silk/s
 
 ## Two waits that overlap
 
-Try the idea in a scratch copy of your project first, so the real program stays untouched:
+Try the idea in a scratch copy of your project first, so the real program stays untouched. The copy replaces the small scratch project from chapter 2. Without the `rm`, `cp -r` would put the copy inside the old `scratch` folder instead. From the `tasks` folder:
 
 ```sh
+cd ..
+rm -rf scratch
 cp -r tasks scratch
 cd scratch
 ```
+
+The copy keeps the name `tasks` in its `silk.toml`, so `silk check` there prints `Checking tasks`.
 
 Replace `src/main.silk` with this. Each `estimate` pretends to need a slow 300 ms lookup:
 
@@ -249,7 +253,13 @@ That leaves a puzzle. How do fibers report back if they cannot borrow? With `Sha
 
 ## Planning the reminders
 
-Back in the real `tasks` project. Here is the plan for `tasks remind`:
+Back in the real `tasks` project:
+
+```sh
+cd ../tasks
+```
+
+Here is the plan for `tasks remind`:
 
 - One fiber per open task, at most eight.
 - Each fiber sleeps by priority: 100 ms for high, 200 for normal, 400 for low. Then it records its task id.
