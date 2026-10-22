@@ -27,6 +27,7 @@ PropertyClause  = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Na
 | --- | --: | --- |
 | Scalar operations | 618 | `<scalar><Operation>`, see below |
 | Pointers | 19 | `pointerFromRef`, `pointerFromMutRef`, `pointerFromSlice`, `pointerFromMutSlice`, `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerAddress`, `pointerIsNull`, `pointerNull`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut` |
+| SIMD vectors | 46 | `simdSplat`, `simdFromArray`, `simdToArray`, `simdExtract`, `simdInsert`, `simdLoad`, `simdStore`, `simdPointerLoad`, `simdPointerStore`, `simdLanesEqual` and the other `simdLanes*` comparisons, `simdSelect`, `simdMinimum`, `simdMaximum`, `simdShuffle`, `simdWrapping*`, `simdSaturating*`, `simdShift*`, `simdRotate*`, `simdSqrt`, `simdMulAdd`, `simdReduce*`, `simdMask*`, `simdConvert`, `simdBitcast` |
 | Atomics | 13 | `atomicLoad`, `atomicStore`, `atomicSwap`, `atomicCompareExchange`, `atomicCompareExchangeWeak`, `atomicFetchAdd`, `atomicFetchSubtract`, `atomicFetchBitAnd`, `atomicFetchBitOr`, `atomicFetchBitXor`, `atomicFetchMinimum`, `atomicFetchMaximum`, `atomicFence` |
 | Allocation and raw storage | 16 | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
 | Shared ownership | 4 | `sharedLayout`, `sharedFromAllocation`, `sharedClone`, `sharedWithMut` |
@@ -67,6 +68,14 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 - A checked member takes the result type `R` as its one type argument. After the operands it takes two functions that build `R` on success and on failure: `Intrinsic.i32CheckedAdd<Option<i32>>(a, b, Option.some, Option.none)`.
 - Each integer module (`silk/i32`, `silk/u64`, ...) wraps these as ordinary functions such as `i32.checkedAdd` and `i32.toU8`.
 
+## SIMD members
+
+- Each takes the vector or mask type as its first type argument: `Intrinsic.simdSplat<simd<u32, 4>>(10)`. `simdShuffle`, `simdConvert` and `simdBitcast` take a second, the result type: `Intrinsic.simdShuffle<simd<u32, 4>, simd<u32, 2>>(a, a, [0, 1])`.
+- `simdShuffle` may change the lane count: four-lane operands can give two or eight lanes. Its indices are static (SEM0176 otherwise) and below twice the operand lane count.
+- `simdConvert` keeps the lane count; `simdBitcast` keeps the total width.
+- A member used with a lane type it does not take, such as `simdSqrt` on integers or `simdMaskAny` on a vector, is SEM0239.
+- The `silk/simd` modules wrap these for the 128-bit and 256-bit shapes. Other admitted shapes, such as `simd<u8, 64>` or `simd<u32, 2>`, are reachable only here. The types, operators and modules are in Values and primitive types, under SIMD vectors and masks.
+
 ## Type and property members
 
 | Category | Members |
@@ -89,11 +98,11 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 
 ## Unsafe members
 
-- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `assembly`.
+- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `simdPointerLoad`, `simdPointerStore`, `assembly`.
 - Every atomic member except `atomicFence` is unsafe. Each takes its memory order as a static string, such as `"acquire"`; an order or element type the operation does not admit is SEM0237.
 - So are these storage members: `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `sharedFromAllocation`, `stringFromUtf8Unchecked`, `executionFromAllocation`.
 - Call them inside `unsafe { }` or as `unsafe Intrinsic.member(...)`. Otherwise SEM0082.
-- No other member is unsafe. Scalar operations, target queries and reflection are safe.
+- No other member is unsafe. Scalar operations, the other SIMD members, target queries and reflection are safe.
 - `allocationAdopt(base: *mut u8, layout: Layout, reclaim: extern "C" fn(?*mut u8) -> (), context: ?*mut u8)` returns an `Allocation` over storage that the caller manages. Dropping it calls `reclaim(context)` instead of returning memory to the system. `Arena` in `silk/arena` uses it for each allocation it hands out.
 
 ## Static-only members
@@ -118,6 +127,7 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 | Operator interfaces | `silk/ops`, `silk/equal`, `silk/order` |
 | Pointers | `silk/pointer` |
 | Atomics | `silk/atomic` |
+| SIMD vectors | `silk/simd` and one module per shape, such as `silk/simd/u8x16` and `silk/simd/mask16` |
 | Allocation, raw storage | `silk/allocator`, `silk/arena`, `silk/layout`, `silk/raw_buffer`, `silk/slot`, `silk/box`, `silk/list` |
 | Shared ownership | `silk/shared` |
 | Execution | `silk/execution` |
@@ -197,6 +207,22 @@ pub fn main() -> i32 {
 }
 ```
 
+SIMD members on shapes that have no `silk/simd` module, a 64-lane byte vector and a two-lane result:
+
+```silk
+pub fn main() -> i32 {
+  let a = Intrinsic.simdFromArray<simd<u32, 4>>([1, 2, 3, 4])
+  let pair = Intrinsic.simdShuffle<simd<u32, 4>, simd<u32, 2>>(a, a, [3, 0])
+  if pair != Intrinsic.simdFromArray<simd<u32, 2>>([4, 1]) { return 1 }
+  let bytes = Intrinsic.simdSplat<simd<u8, 64>>(3)
+  if Intrinsic.simdReduceAdd<simd<u8, 64>>(bytes) != 192 { return 2 }
+  let floats = Intrinsic.simdConvert<simd<u32, 4>, simd<f32, 4>>(a)
+  let bits = Intrinsic.simdBitcast<simd<f32, 4>, simd<u32, 4>>(floats)
+  if Intrinsic.simdExtract<simd<u32, 4>>(bits, 0) != 0x3F800000 { return 3 }
+  return 0
+}
+```
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -211,10 +237,11 @@ pub fn main() -> i32 {
 | SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause, such as `with Intrinsic.detached()` |
 | SEM0236 | Known property on a declaration that does not take it, such as `Intrinsic.machine(...)` on a plain function |
 | SEM0237 | An atomic member with a memory order or element type it does not admit, such as `atomicStore` with `"acquire"` |
+| SEM0239 | A SIMD member with a vector shape or lane type it does not admit, such as `simdSqrt<simd<u8, 16>>` |
 
 ## See also
 
-Values and primitive types · Interfaces and impls · Ownership and moves · Unsafe code and C interop · Allocation and shared ownership · Static evaluation · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/ownership`, `silk/pointer`, `silk/reflect`, `silk/target`, `silk/compilation`, `silk/effect`
+Values and primitive types · Interfaces and impls · Ownership and moves · Unsafe code and C interop · Allocation and shared ownership · Static evaluation · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/ownership`, `silk/pointer`, `silk/simd`, `silk/reflect`, `silk/target`, `silk/compilation`, `silk/effect`
 
 ## Open questions
 

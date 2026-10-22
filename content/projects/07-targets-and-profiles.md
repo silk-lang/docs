@@ -151,14 +151,22 @@ The manifest page lists every field and its values. The native build applies the
 | `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. `"default"` and `"none"` take no other key, so `{ kind = "default", name = "x" }` is refused as `profiles.u.runtime.name is not a supported field`. See Build outputs and native linking. |
 | `relocation` | `pic` or `static` code for object, archive and IR output. |
 | `deployment` | macOS minimum version for the link. Only `aarch64-apple-darwin` takes it. |
-| `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts only the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere. |
+| `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere; x86-64 Linux also takes the levels `x86-64-v2`, `x86-64-v3` and `x86-64-v4`. |
 | `codeModel` | `large` passes `-mcmodel=large`. x86-64 targets only. |
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
 | `artifact` | Must name the same form as `[build].artifact`. Set the output form there. |
 | `threading` | `multi` on wasm32 builds with atomics and a shared memory (see below). Refused on other targets. |
 | `maxMemory` | wasm32 only: the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
 
-`cpu.features` takes `aes`, `avx`, `avx2`, `sse2` and `sse4.2` on x86-64 Linux, and `crc`, `crypto`, `fp-armv8`, `lse` and `neon` on the arm64 targets. Code can test them with `Target.hasCpuFeature`. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
+`cpu.features` takes these names:
+
+| Target | Features |
+| --- | --- |
+| x86-64 Linux | `aes`, `avx`, `avx2`, `avx512bw`, `avx512cd`, `avx512dq`, `avx512f`, `avx512vbmi`, `avx512vl`, `bmi`, `bmi2`, `cx16`, `f16c`, `fma`, `lzcnt`, `movbe`, `pclmul`, `popcnt`, `sse2`, `sse3`, `sse4.1`, `sse4.2`, `ssse3`, `xsave` |
+| arm64 | `aes`, `crc`, `crypto`, `dotprod`, `fp-armv8`, `fullfp16`, `i8mm`, `lse`, `neon`, `rdm`, `sha2`, `sha3` |
+| wasm32 | `atomics`, `bulk-memory`, `mutable-globals`, `relaxed-simd`, `sign-ext`, `simd128` |
+
+A feature also turns on the features it implies, so `avx2` brings `avx` and the SSE levels below it. A level model brings its features: `x86-64-v3` includes `avx2`, `fma` and `bmi2`, and `x86-64-v4` the AVX-512 set. SSE2 on x86-64 and NEON on arm64 are always on. Code can test any of them with `Target.hasCpuFeature`, and `silk/simd` uses them to pick a vector width (see SIMD vectors and masks in Values and primitive types). With this profile, `Target.hasCpuFeature("avx2")` is `true`:
 
 ```toml
 [profiles.fast]

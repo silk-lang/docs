@@ -4901,7 +4901,7 @@ Fix: Import the type by name and use it directly: `import silk.inflate { Format 
 
 ### SEM0239
 
-A SIMD vector or mask type whose lane type or lane count is not admitted.
+A SIMD vector or mask type whose lane type or lane count is not admitted, or a SIMD operation used on a shape it does not take.
 
 ```silk
 fn take(value: simd<bool, 4>) -> i32 {
@@ -4921,7 +4921,9 @@ pub fn main() -> i32 {
 
 The column is the type. `simd<i32, 3>` is refused the same way, because 3 is not a power of two.
 
-Fix: Use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes.
+The same message is printed for an `Intrinsic.simd*` member used on a lane type it does not take, such as `Intrinsic.simdSqrt<simd<u8, 16>>`, a `simdShuffle` index that is not below twice the lane count, and a `simdConvert` between different lane counts. There the shape itself may be valid. A mask also needs a power-of-two lane count, so `mask<3>` is refused even though the message only says 2 to 64.
+
+Fix: Use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
 
 ### SEM0240
 
