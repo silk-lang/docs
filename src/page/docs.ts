@@ -135,13 +135,13 @@ const sidebar = (
   })
 
   return h.nav(
-    [h.AriaLabel('Documentation'), h.Class('flex flex-col gap-5')],
     [
-      // The sidebar scrolls on its own; the search stays at its top.
-      h.div(
-        [h.Class('bg-paper md:sticky md:top-0 md:z-10 md:pb-1')],
-        [searchBox(query, h)],
-      ),
+      h.AriaLabel('Documentation'),
+      h.Class('flex flex-col gap-5 md:max-h-screen md:py-1'),
+    ],
+    [
+      // Only the page list scrolls, so the search stays put above it.
+      searchBox(query, h),
       Array.match(visibleGroups, {
         onEmpty: () =>
           h.p(
@@ -150,7 +150,11 @@ const sidebar = (
           ),
         onNonEmpty: nonEmptyGroups =>
           h.ul(
-            [h.Class('flex flex-col border-t border-rule pt-2')],
+            [
+              h.Class(
+                'flex flex-col border-t border-rule pt-2 md:min-h-0 md:scrollbar-none md:overflow-y-auto md:overscroll-contain',
+              ),
+            ],
             Array.map(nonEmptyGroups, ({ group, pages }) =>
               sidebarGroup(
                 group,
@@ -356,7 +360,7 @@ const docsLayout = (
             [
               h.Open(true),
               h.Class(
-                'group md:sticky md:top-0 md:max-h-screen md:self-start md:overflow-y-auto md:py-1 [&>summary]:md:hidden',
+                'group md:sticky md:top-0 md:self-start [&>summary]:md:hidden',
               ),
             ],
             [
@@ -375,7 +379,7 @@ const docsLayout = (
           h.aside(
             [
               h.Class(
-                'hidden xl:sticky xl:top-0 xl:block xl:max-h-screen xl:self-start xl:overflow-y-auto xl:py-1',
+                'hidden xl:sticky xl:top-0 xl:block xl:max-h-screen xl:self-start xl:scrollbar-none xl:overflow-y-auto xl:overscroll-contain xl:py-1',
               ),
             ],
             [aside],
