@@ -21,6 +21,31 @@ pnpm build      # writes the static site to dist/client
 pnpm preview    # serves dist/client
 ```
 
+## Deploy
+
+The site deploys to Cloudflare as an assets-only Worker with
+[Alchemy](https://alchemy.run) (`alchemy.run.ts`). Alchemy needs Node 24.11 or newer.
+
+`.github/workflows/deploy.yml` deploys on every push to `main`, once a day, on demand,
+and on a `silk-release` repository dispatch, so new silk releases reach the releases
+page. It reads:
+
+- `CLOUDFLARE_API_TOKEN` (secret) and `CLOUDFLARE_ACCOUNT_ID` (variable).
+- `SILK_DOCS_DOMAIN` (variable, optional): a hostname whose zone is in the same Cloudflare
+  account. Without it the site is served from `workers.dev`.
+
+The first deploy also creates Alchemy's state store Worker in the account.
+
+To deploy from a machine instead:
+
+```sh
+pnpm alchemy profile edit --add Cloudflare   # once
+pnpm run deploy
+```
+
+Builds fetch the silk releases from GitHub. Set `SILK_RELEASES=fixture` to build offline
+with sample data.
+
 ## Layout
 
 - `src/main.ts` is the application: Model, Messages, update and the routed view.
