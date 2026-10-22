@@ -1,4 +1,3 @@
-import { HashSet } from 'effect'
 import {
   Command,
   all,
@@ -12,14 +11,12 @@ import {
 } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
-import { CopyCode, Model, WaitBeforeHidingCopied, update, view } from '../main'
+import { CopyCode, WaitBeforeHidingCopied, update, view } from '../main'
 import { Message } from '../message'
 import { AppRoute } from '../route'
+import { testModel } from '../testModel'
 
-const homeModel = Model.make({
-  route: AppRoute.Home(),
-  copiedCodeIds: HashSet.empty(),
-})
+const homeModel = testModel(AppRoute.Home())
 
 describe('landing page', () => {
   test('shows the hero and the calls to action', () => {
