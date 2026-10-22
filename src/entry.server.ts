@@ -25,6 +25,8 @@ export const prerenderPaths: ReadonlyArray<string> = [
   '/',
   '/docs',
   '/releases',
+  // Copied to 404.html by `pnpm build:site` for Cloudflare's 404 handling.
+  '/404',
   ...Catalog.allPages.map(Catalog.pagePath),
 ]
 

@@ -1,0 +1,448 @@
+Growable owned sequences with allocation-aware mutation, stable sorting, and checked indexing.
+
+## When to use
+Use [`List`](#List) when a sequence must grow or own a runtime-determined number of values. Use a
+fixed array when the length is part of the type, and `silk.bytes.Bytes` for bulk byte storage.
+
+## Details
+[`make`](#List.impl.make) is allocation-free. The first growth reserves four elements and later growth doubles
+capacity; [`reserve`](#List.impl.reserve) can move that cost ahead of mutation. Growth completes in replacement
+storage before committing, so [`append`](#List.impl.append) and [`reserve`](#List.impl.reserve) leave the list unchanged on
+[`OutOfMemoryError`](/docs/std/allocator#OutOfMemoryError). Removing, clearing, and truncating drop exactly the elements they discard
+while retaining capacity.
+
+[`sort`](#List.impl.sort) is stable, deterministic, and supports move-only elements, but allocates scratch space.
+[`binarySearch`](#List.impl.binarySearch) requires an already sorted list and returns the lowest index among equal
+matches.
+
+## Gotchas
+[`get`](#List.impl.get), [`set`](#List.impl.set), and [`remove`](#List.impl.remove) trap on an out-of-range index. An [`insert`](#List.impl.insert) position must be at
+or before the current length. Use [`asSlice`](#List.impl.asSlice) to borrow move-only elements because [`get`](#List.impl.get)
+produces a copied value.
+
+## Examples
+### Grow and edit an owned sequence
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+
+import silk.effect { Effect }
+
+import silk.list { List }
+
+effect fn build() -> i32
+! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut values = List<i32>.make()
+  let first = run List<i32>.append(&mut values, 10)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let second = run List<i32>.append(&mut values, 30)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let middle = run List<i32>.insert(&mut values, 1, 20)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let changed = List<i32>.set(&mut values, 2, 22)
+  let removed = List<i32>.remove(&mut values, 0)
+  return List<i32>.get(&values, 0) + List<i32>.get(&values, 1)
+}
+
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(build(), recover)
+}
+```
+
+### Sort values and find the first equal value
+```silk
+import silk.allocator { Allocator, OutOfMemoryError }
+
+import silk.effect { Effect }
+
+import silk.option { Option }
+
+import silk.usize
+
+import silk.list { List }
+
+effect fn search() -> i32
+! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut values = List<i32>.make()
+  let first = run List<i32>.append(&mut values, 3)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let second = run List<i32>.append(&mut values, 36)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let third = run List<i32>.append(&mut values, 3)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut sorting = List<i32>.sort(&mut values)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let sorted = run sorting
+  let found = List<i32>.binarySearch(&values, 3)
+    |> Option<usize>.unwrapOr(99)
+  if found != usize.ZERO {
+    return 0
+  }
+  return List<i32>.get(&values, 0) + List<i32>.get(&values, 1) + List<i32>.get(&values, 2)
+}
+
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 0
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(search(), recover)
+}
+```
+
+Import as `List` with `import silk.list { List }`.
+
+Public declarations: 3.
+
+::Anchor{id="Empty"}
+
+## `Empty`
+
+```silk
+pub struct Empty<T>
+```
+
+The allocation-free storage state of an empty [`List`](#List).
+
+::Anchor{id="Full"}
+
+## `Full`
+
+```silk
+pub struct Full<T>
+```
+
+The allocated storage state of a non-empty or reserved [`List`](#List).
+
+::Anchor{id="List"}
+
+## `List`
+
+```silk
+pub struct List<T>
+```
+
+Owns an initialized prefix of a growable contiguous allocation.
+
+### Details
+
+The list releases each initialized element and its storage on drop. Length counts initialized
+elements. Capacity counts elements that fit without growth. Borrowed elements retain their
+referent lifetimes through replacement, extraction, and required cleanup. An allocation does
+not make its payload detached.
+
+::Anchor{id="List.impl"}
+
+## Implementation `List<T>`
+
+```silk
+impl<T> List<T>
+```
+
+::Anchor{id="List.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> List<T>
+```
+
+Creates an empty list with zero capacity and no allocation.
+
+::Anchor{id="List.impl.length"}
+
+### Method `length`
+
+```silk
+pub fn length(self: &Self) -> usize
+```
+
+Returns the number of initialized elements.
+
+::Anchor{id="List.impl.capacity"}
+
+### Method `capacity`
+
+```silk
+pub fn capacity(self: &Self) -> usize
+```
+
+Returns the total number of elements that fit without another growth allocation.
+
+::Anchor{id="List.impl.asSlice"}
+
+### Method `asSlice`
+
+```silk
+pub fn asSlice(self: &Self) -> &[T]
+```
+
+Borrows the initialized elements as one shared lexical slice.
+
+#### Gotchas
+
+Do not retain this slice across an operation that can grow the list.
+
+::Anchor{id="List.impl.asMutSlice"}
+
+### Method `asMutSlice`
+
+```silk
+pub fn asMutSlice(self: &mut Self) -> &mut [T]
+```
+
+Borrows all initialized elements as one exclusive lexical slice.
+
+#### Gotchas
+
+Do not retain this slice across an operation that can grow the list.
+
+::Anchor{id="List.impl.append"}
+
+### Method `append`
+
+```silk
+pub effect<'env> fn append<'env>(self: &mut Self, value: T) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Appends one owned value, growing geometrically when capacity is exhausted.
+
+#### Details
+
+The list takes ownership of `value`. If growth fails, the list keeps its prior contents,
+length, and capacity.
+
+::Anchor{id="List.impl.insert"}
+
+### Method `insert`
+
+```silk
+pub effect<'env> fn insert<'env>(self: &mut Self, index: usize, value: T) -> ()
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Inserts one owned value at an index, shifting later elements without requiring T to be Copy.
+
+#### Details
+
+Existing elements from `index` onward move one position to the right. If growth fails, the
+list keeps its prior contents, length, and capacity.
+
+#### Gotchas
+
+`index` must be less than or equal to [`length`](#List.impl.length).
+
+::Anchor{id="List.impl.get"}
+
+### Method `get`
+
+```silk
+pub fn get<T: Copy>(self: &Self, index: usize) -> T
+```
+
+Copies the element at one index and traps when the index is out of range.
+
+#### When to use
+
+Use this function for a `Copy` element. Use [`asSlice`](#List.impl.asSlice) to borrow a move-only element.
+
+::Anchor{id="List.impl.pop"}
+
+### Method `pop`
+
+```silk
+pub fn pop(self: &mut Self) -> Option<T>
+```
+
+Removes the last element and returns it. Returns an absent value for an empty list.
+
+#### Details
+
+A present result transfers ownership of the removed element. Capacity does not change.
+
+::Anchor{id="List.impl.remove"}
+
+### Method `remove`
+
+```silk
+pub fn remove(self: &mut Self, index: usize) -> T
+```
+
+Removes the element at one index, shifting the later elements down. Traps out of range.
+
+#### Details
+
+Ownership of the removed element passes to the caller. Capacity does not change.
+
+::Anchor{id="List.impl.clear"}
+
+### Method `clear`
+
+```silk
+pub fn clear(self: &mut Self) -> ()
+```
+
+Drops every initialized element and sets the length to zero, keeping the capacity.
+
+::Anchor{id="List.impl.truncate"}
+
+### Method `truncate`
+
+```silk
+pub fn truncate(self: &mut Self, length: usize) -> ()
+```
+
+Drops every element past one length, keeping the capacity. Shorter lengths are left alone.
+
+#### Details
+
+If `length` is not less than the current length, this function does nothing.
+
+::Anchor{id="List.impl.set"}
+
+### Method `set`
+
+```silk
+pub fn set(self: &mut Self, index: usize, value: T) -> ()
+```
+
+Overwrites the element at one index, dropping the old element first. Traps out of range.
+
+::Anchor{id="List.impl.reserve"}
+
+### Method `reserve`
+
+```silk
+pub effect fn reserve(self: &mut Self, additional: usize) -> ()
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Grows capacity to hold at least `additional` more elements without another allocation.
+
+#### Details
+
+This function does not change the length. If allocation fails, contents, length, and capacity
+remain unchanged.
+
+::Anchor{id="List.impl.reserveExact"}
+
+### Method `reserveExact`
+
+```silk
+pub effect fn reserveExact(self: &mut Self, additional: usize) -> ()
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Reserves space for `additional` elements without geometric capacity growth.
+
+#### When to use
+
+Use when the complete output length is known. Use [`reserve`](#List.impl.reserve) for repeated growth.
+
+#### Details
+
+If the current capacity is sufficient, this function does not allocate or shrink storage.
+Otherwise, one allocation sets capacity to the current length plus `additional`.
+The length stays unchanged. Size overflow or allocation failure leaves all existing state unchanged.
+
+::Anchor{id="List.impl.sort"}
+
+### Method `sort`
+
+```silk
+pub effect fn sort<T: Order>(self: &mut Self) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Orders the elements in place. Equal elements keep their input order.
+
+#### Details
+
+The sort is stable and deterministic. It supports move-only elements and allocates scratch
+storage. If allocation fails, the list remains unchanged.
+
+::Anchor{id="List.impl.binarySearch"}
+
+### Method `binarySearch`
+
+```silk
+pub fn binarySearch<T: Order>(self: &Self, target: T) -> Option<usize>
+```
+
+Returns the index of a matching element in a sorted list, or an absent value when Option.none matches.
+
+#### Details
+
+Returns the lowest matching index when a list holds several equal elements, so a repeated
+search over one list always answers with the same index.
+This function consumes `target` and does not change the list.
+
+#### Gotchas
+
+The list must already be ordered by the same `Order` witness.
+
+::Anchor{id="List.impl.Drop"}
+
+## Implementation `Drop for List<T>`
+
+```silk
+impl<T> Drop for List<T>
+```
+
+::Anchor{id="List.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut List<T>) -> ()
+```
+
+::Anchor{id="List.impl-2"}
+
+## Implementation `List<T>`
+
+```silk
+impl<T> List<T>
+```
+
+::Anchor{id="List.impl.appendBytes"}
+
+### Method `appendBytes`
+
+```silk
+pub effect fn appendBytes(self: &mut List<u8>, values: &[u8]) -> ()
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Appends every byte of one borrowed sequence in source order with one bulk copy.
+
+#### Details
+
+If growth fails, the list keeps its prior contents, length, and capacity.
+
+::Anchor{id="List.impl.appendRepeated"}
+
+### Method `appendRepeated`
+
+```silk
+pub effect fn appendRepeated(self: &mut List<u8>, byte: u8, count: usize) -> ()
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Appends `count` copies of `byte` with one bulk fill.
+
+#### Details
+
+A zero count does not allocate. If growth fails, the list keeps its prior contents, length,
+and capacity.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

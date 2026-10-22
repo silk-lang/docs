@@ -1,0 +1,336 @@
+Portable fixed-output SHA-3 digests with allocation-free streaming states.
+
+## When to use
+Use [`Sha3_224`](#Sha3_224), [`Sha3_256`](#Sha3_256), [`Sha3_384`](#Sha3_384), or [`Sha3_512`](#Sha3_512) when a protocol
+requires the related fixed-output SHA-3 algorithm. Use `silk.hash` for collection keys.
+
+## Details
+The actors return 28-byte, 32-byte, 48-byte, and 64-byte digests. Each actor supports
+incremental `update`, consuming `finish`, and one-shot `hash` operations without allocation.
+
+## Gotchas
+These actors implement fixed-output SHA-3. They do not implement SHAKE or another
+extendable-output function.
+
+## Examples
+### Compare segmented and one-shot SHA3-256 input
+```silk
+import silk.sha3 {Sha3_256}
+
+pub fn main() -> i32 {
+  let mut state = Sha3_256.make()
+  state.update(b"a")
+  state.update(b"bc")
+  let segmented = state.finish()
+  let oneShot = Sha3_256.hash(b"abc")
+  let mut index: usize = 0
+  while index < 32 {
+    if segmented[index] != oneShot[index] {
+      return 1
+    }
+    index = index + 1
+  }
+  if segmented[0] != 58 {
+    return 2
+  }
+  return 0
+}
+```
+
+Import as `Sha3_256` with `import silk.sha3 { Sha3_256 }`.
+
+Public declarations: 4.
+
+::Anchor{id="Sha3_224"}
+
+## `Sha3_224`
+
+```silk
+pub struct Sha3_224
+```
+
+An allocation-free streaming SHA3-224 state with a 28-byte fixed digest.
+
+### Details
+
+Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
+borrowed byte sequence. Finalization consumes the state.
+
+::Anchor{id="Sha3_224.impl"}
+
+## Implementation `Sha3_224`
+
+```silk
+impl Sha3_224
+```
+
+::Anchor{id="Sha3_224.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha3_224
+```
+
+Creates an empty SHA3-224 streaming state without allocation.
+
+::Anchor{id="Sha3_224.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Absorbs `bytes` in order into this SHA3-224 state.
+
+#### Details
+
+An empty slice does not change the digest. Any chunking of the same byte sequence gives the
+same digest.
+
+::Anchor{id="Sha3_224.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 28]
+```
+
+Consumes this state and returns its standardized 28-byte SHA3-224 digest.
+
+::Anchor{id="Sha3_224.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 28]
+```
+
+Returns the standardized 28-byte SHA3-224 digest of `bytes`.
+
+#### Details
+
+This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
+use. It does not allocate.
+
+::Anchor{id="Sha3_256"}
+
+## `Sha3_256`
+
+```silk
+pub struct Sha3_256
+```
+
+An allocation-free streaming SHA3-256 state with a 32-byte fixed digest.
+
+### Details
+
+Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
+borrowed byte sequence. Finalization consumes the state.
+
+::Anchor{id="Sha3_256.impl"}
+
+## Implementation `Sha3_256`
+
+```silk
+impl Sha3_256
+```
+
+::Anchor{id="Sha3_256.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha3_256
+```
+
+Creates an empty SHA3-256 streaming state without allocation.
+
+::Anchor{id="Sha3_256.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Absorbs `bytes` in order into this SHA3-256 state.
+
+#### Details
+
+An empty slice does not change the digest. Any chunking of the same byte sequence gives the
+same digest.
+
+::Anchor{id="Sha3_256.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 32]
+```
+
+Consumes this state and returns its standardized 32-byte SHA3-256 digest.
+
+::Anchor{id="Sha3_256.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 32]
+```
+
+Returns the standardized 32-byte SHA3-256 digest of `bytes`.
+
+#### Details
+
+This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
+use. It does not allocate.
+
+::Anchor{id="Sha3_384"}
+
+## `Sha3_384`
+
+```silk
+pub struct Sha3_384
+```
+
+An allocation-free streaming SHA3-384 state with a 48-byte fixed digest.
+
+### Details
+
+Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
+borrowed byte sequence. Finalization consumes the state.
+
+::Anchor{id="Sha3_384.impl"}
+
+## Implementation `Sha3_384`
+
+```silk
+impl Sha3_384
+```
+
+::Anchor{id="Sha3_384.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha3_384
+```
+
+Creates an empty SHA3-384 streaming state without allocation.
+
+::Anchor{id="Sha3_384.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Absorbs `bytes` in order into this SHA3-384 state.
+
+#### Details
+
+An empty slice does not change the digest. Any chunking of the same byte sequence gives the
+same digest.
+
+::Anchor{id="Sha3_384.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 48]
+```
+
+Consumes this state and returns its standardized 48-byte SHA3-384 digest.
+
+::Anchor{id="Sha3_384.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 48]
+```
+
+Returns the standardized 48-byte SHA3-384 digest of `bytes`.
+
+#### Details
+
+This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
+use. It does not allocate.
+
+::Anchor{id="Sha3_512"}
+
+## `Sha3_512`
+
+```silk
+pub struct Sha3_512
+```
+
+An allocation-free streaming SHA3-512 state with a 64-byte fixed digest.
+
+### Details
+
+Call `update` zero or more times, then call `finish` one time. Use `hash` for one complete
+borrowed byte sequence. Finalization consumes the state.
+
+::Anchor{id="Sha3_512.impl"}
+
+## Implementation `Sha3_512`
+
+```silk
+impl Sha3_512
+```
+
+::Anchor{id="Sha3_512.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha3_512
+```
+
+Creates an empty SHA3-512 streaming state without allocation.
+
+::Anchor{id="Sha3_512.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Absorbs `bytes` in order into this SHA3-512 state.
+
+#### Details
+
+An empty slice does not change the digest. Any chunking of the same byte sequence gives the
+same digest.
+
+::Anchor{id="Sha3_512.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 64]
+```
+
+Consumes this state and returns its standardized 64-byte SHA3-512 digest.
+
+::Anchor{id="Sha3_512.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 64]
+```
+
+Returns the standardized 64-byte SHA3-512 digest of `bytes`.
+
+#### Details
+
+This function uses the same `make`, `update`, and consuming `finish` lifecycle as streaming
+use. It does not allocate.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

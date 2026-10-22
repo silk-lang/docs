@@ -1,4 +1,4 @@
-import { Array, Match, Option, String, pipe } from 'effect'
+import { Array, Match, Option, Record, String, pipe } from 'effect'
 import { type Html, type HtmlBuilder } from 'foldkit/html'
 
 import * as Markdown from '@foldkit/markdown'
@@ -40,16 +40,46 @@ export const headingSlug = (text: string): string =>
 export const headingText = (heading: Markdown.Heading): string =>
   inlineText(heading.content)
 
+// Like GitHub, a repeated slug gets a numeric suffix (`details`, `details-1`),
+// so generated reference pages with many "Details" sections keep unique ids.
+const headingIds = (
+  document: Markdown.MarkdownDocument,
+): ReadonlyMap<Markdown.Heading, string> => {
+  const headings = Array.flatMap(document.blocks, block =>
+    block._tag === 'Heading' ? [block] : [],
+  )
+  const [, ids] = Array.mapAccum(
+    headings,
+    Record.empty<string, number>(),
+    (seen, heading) => {
+      const slug = headingSlug(headingText(heading))
+      const count = Option.getOrElse(Record.get(seen, slug), () => 0)
+      return [
+        Record.set(seen, slug, count + 1),
+        [heading, count === 0 ? slug : `${slug}-${count}`] as const,
+      ]
+    },
+  )
+  return new Map(ids)
+}
+
+const headingId = (
+  ids: ReadonlyMap<Markdown.Heading, string>,
+  heading: Markdown.Heading,
+): string => ids.get(heading) ?? headingSlug(headingText(heading))
+
 export type TocEntry = Readonly<{ id: string; text: string }>
 
 export const tableOfContents = (
   document: Markdown.MarkdownDocument,
-): ReadonlyArray<TocEntry> =>
-  Array.flatMap(document.blocks, block =>
+): ReadonlyArray<TocEntry> => {
+  const ids = headingIds(document)
+  return Array.flatMap(document.blocks, block =>
     block._tag === 'Heading' && block.level === 2
-      ? [{ id: headingSlug(headingText(block)), text: headingText(block) }]
+      ? [{ id: headingId(ids, block), text: headingText(block) }]
       : [],
   )
+}
 
 // The first paragraph of a page reads as its lede, like the design's article intro.
 export const splitLede = (
@@ -97,14 +127,18 @@ export const view = (
   documentKey: string,
   copiedCodeIds: CopiedCodeIds,
   h: HtmlBuilder<Message>,
-): Html =>
-  Markdown.view(document, {
+): Html => {
+  const ids = headingIds(document)
+  return Markdown.view(document, {
     islands: Markdown.islandsFor(islandAttributes, {
-      Anchor: ({ id }) => h.span([h.Id(id), h.Class('block scroll-mt-8')]),
+      // The negative margin cancels the article's block gap, so an anchor
+      // placed before a heading adds no space of its own.
+      Anchor: ({ id }) =>
+        h.span([h.Id(id), h.Class('-mt-5 block scroll-mt-8')]),
     }),
     views: {
       Heading: (heading, content) => {
-        const id = headingSlug(headingText(heading))
+        const id = headingId(ids, heading)
         const tag =
           heading.level <= 2 ? h.h2 : heading.level === 3 ? h.h3 : h.h4
         return tag(
@@ -211,6 +245,7 @@ export const view = (
         ),
     },
   })
+}
 
 export const ledeView = (
   paragraph: Markdown.Paragraph,

@@ -307,7 +307,7 @@ const articleBody = (
             onSome: lede => DocsMarkdown.ledeView(lede, h),
           }),
           h.div(
-            [h.Class('flex min-w-0 flex-col gap-6')],
+            [h.Class('min-w-0 *:flex *:flex-col *:gap-5')],
             [DocsMarkdown.view(body, key, model.copiedCodeIds, h)],
           ),
         ],

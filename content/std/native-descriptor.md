@@ -1,0 +1,126 @@
+Borrowed native descriptor transfers through selected libc declarations.
+
+## When to use
+Use [`NativeDescriptor`](#NativeDescriptor) to build native byte-stream providers without owning the descriptor.
+Use `silk.writer.Writer` and `silk.standard_input.StandardInput` for replaceable portable services.
+
+## Details
+The selected Darwin and GNU providers use 32-bit descriptors and pointer-width transfer counts.
+Transfers are bounded to 0x7ffff000 bytes per call. Interrupted calls retry without advancing;
+only a failed call reads native error state. Empty operations make no foreign call.
+
+## Gotchas
+The caller controls descriptor lifetime and synchronization. These operations never close it.
+Native declarations are absent on WebAssembly and no-libc profiles. A failed complete write may
+already have committed a prefix; failure does not roll it back.
+
+## Examples
+### Complete an empty write without touching standard output
+```silk
+import silk.native_descriptor { NativeDescriptor }
+pub fn main() -> i32 {
+  let mut nativeError = 0
+  let completed = run NativeDescriptor.writeAll(1, b"", &mut nativeError)
+  if completed { return 42 }
+  return 1
+}
+```
+
+Import as `NativeDescriptor` with `import silk.native_descriptor { NativeDescriptor }`.
+
+Public declarations: 4.
+
+::Anchor{id="read"}
+
+## `read`
+
+```silk
+pub unsafe extern "C" fn read(fd: i32, buffer: ?[*]mut u8, count: usize) -> isize with Intrinsic.foreign(noCapture: ("buffer",))
+```
+
+Reads at most `count` bytes through a borrowed process descriptor.
+
+### Gotchas
+
+The caller must keep `count` writable bytes live for the call. A negative result requires
+immediate native error capture; a nonnegative result is the initialized prefix length.
+
+::Anchor{id="write"}
+
+## `write`
+
+```silk
+pub unsafe extern "C" fn write(fd: i32, buffer: ?[*]const u8, count: usize) -> isize with Intrinsic.foreign(noCapture: ("buffer",))
+```
+
+Writes at most `count` readable bytes through a borrowed process descriptor.
+
+### Gotchas
+
+The caller must keep `count` readable bytes live for the call. A negative result requires
+immediate native error capture. A positive result may be shorter than `count`.
+
+::Anchor{id="__error"}
+
+## `__error`
+
+```silk
+pub unsafe extern "C" fn __error() -> *mut i32
+```
+
+Returns the current thread's Darwin error slot; read it immediately after a failed call.
+
+::Anchor{id="NativeDescriptor"}
+
+## `NativeDescriptor`
+
+```silk
+pub struct NativeDescriptor
+```
+
+Byte-transfer policy for borrowed native descriptors with no resource ownership.
+
+::Anchor{id="NativeDescriptor.impl"}
+
+## Implementation `NativeDescriptor`
+
+```silk
+impl NativeDescriptor
+```
+
+::Anchor{id="NativeDescriptor.impl.read"}
+
+### Associated function `read`
+
+```silk
+pub effect fn read(fd: i32, buffer: &mut [u8], count: &mut usize, error: &mut i32) -> bool
+```
+
+Reads one committed prefix, retrying interrupted calls without advancing the buffer.
+
+#### Details
+
+Success stores the exact prefix length in `count`; zero capacity succeeds with zero bytes.
+Failure stores zero in `count` and captures a native error in `error`, or zero for an invalid
+transfer count. Bytes beyond a successful prefix retain their initial values.
+
+::Anchor{id="NativeDescriptor.impl.writeAll"}
+
+### Associated function `writeAll`
+
+```silk
+pub effect fn writeAll(fd: i32, buffer: &[u8], error: &mut i32) -> bool
+```
+
+Completes a byte sequence by advancing only after positive transfers.
+
+#### Details
+
+Success leaves `error` zero. Failure stores the native error, or zero for zero progress or an
+invalid transfer count. Empty input succeeds without a call.
+
+#### Gotchas
+
+Failure can follow a committed prefix. The caller must not retry the whole message blindly.
+
+Profiles: `aarch64-apple-darwin`.

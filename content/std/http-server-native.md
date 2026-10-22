@@ -1,0 +1,48 @@
+Serial native admission for one scoped HTTP server connection.
+
+## Details
+
+`serveNext` accepts exactly one connection and lends the portable server actor inside the same
+accepted-owner scope. Applications repeat the operation explicitly; this module creates no
+background queue, router, supervisor, or detached task.
+
+Import as `HttpServerNative` with `import silk.http_server_native { HttpServerNative }`.
+
+Public declarations: 2.
+
+::Anchor{id="HttpServerNative"}
+
+## `HttpServerNative`
+
+```silk
+pub struct HttpServerNative
+```
+
+Namespace anchor for native HTTP admission.
+
+::Anchor{id="serveNext"}
+
+## `serveNext`
+
+```silk
+pub effect<'env> fn serveNext<
+    'listener,
+    A,
+    E,
+    ?HandlerRequirements,
+    H: ConnectionHandler<NativeConnection, A, E ? HandlerRequirements> + 'env,
+    'env,
+  >(
+    listener: &'listener mut Listener,
+    limits: Limits,
+    acceptDeadline: Option<Instant>,
+    handler: H,
+  ) -> A
+  ! E | NativeSocketError | ServerError | BufferError | OutOfMemoryError
+  ? HandlerRequirements | &mut Allocator | &mut MonotonicClock
+  where HandlerRequirements in Without<HandlerRequirements, ByteDuplex>
+```
+
+Accepts and serves exactly one connection inside the listener's accepted-owner scope.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.

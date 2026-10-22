@@ -1,0 +1,454 @@
+Raw data pointers with explicit nullability, element extent, and minimum alignment.
+
+## When to use
+
+Use these operations for foreign calls and storage that native code owns.
+
+## Details
+
+A pointer is `Copy`. It holds no ownership or loan and keeps no storage alive.
+`*const T` and `*mut T` are non-null single-element pointers. `[*]` denotes many elements.
+A `?` prefix permits null. A many-element pointer carries no length.
+
+## Gotchas
+
+A non-null address does not prove that storage is live or initialized.
+Each unsafe memory operation requires the caller to prove its storage contract.
+
+Import as `Pointer` with `import silk.pointer { Pointer }`.
+
+Public declarations: 1.
+
+::Anchor{id="Pointer"}
+
+## `Pointer`
+
+```silk
+pub struct Pointer
+```
+
+The operations for data pointers, which hold no ownership or loan.
+
+::Anchor{id="Pointer.impl"}
+
+## Implementation `Pointer`
+
+```silk
+impl Pointer
+```
+
+::Anchor{id="Pointer.impl.bytes"}
+
+### Associated function `bytes`
+
+```silk
+pub unsafe fn bytes<T>(pointer: ?*const T) -> ?[*]const u8
+```
+
+Projects a typed raw pointer as a readonly byte address without reading storage.
+
+#### Gotchas
+
+The result preserves null and the address but grants no ownership or readable extent.
+Every later access must independently address initialized readable bytes. This permits
+inspection of a valid prefix of a variable-sized external record without loading the
+nominal record. It does not keep the allocation alive.
+
+::Anchor{id="Pointer.impl.address"}
+
+### Associated function `address`
+
+```silk
+pub fn address<T>(pointer: ?*const T) -> usize
+```
+
+Returns the unsigned numeric address of a raw data pointer.
+
+#### Details
+
+Null has address zero. Observation does not read memory or keep storage alive.
+The result has the selected target's pointer width and cannot reconstruct a pointer.
+
+::Anchor{id="Pointer.impl.addressMany"}
+
+### Associated function `addressMany`
+
+```silk
+pub fn addressMany<T>(pointer: ?[*]const T) -> usize
+```
+
+Returns the unsigned numeric address of a many-element data pointer.
+
+#### Details
+
+Null has address zero. Observation does not read memory or keep storage alive.
+The result has the selected target's pointer width and cannot reconstruct a pointer.
+
+::Anchor{id="Pointer.impl.null"}
+
+### Associated function `null`
+
+```silk
+pub fn null<T>() -> ?*mut T
+```
+
+Returns a null single-element pointer.
+
+::Anchor{id="Pointer.impl.isNull"}
+
+### Associated function `isNull`
+
+```silk
+pub fn isNull<T>(pointer: ?*const T) -> bool
+```
+
+Reports whether a nullable single-element pointer is null.
+
+::Anchor{id="Pointer.impl.isNullMany"}
+
+### Associated function `isNullMany`
+
+```silk
+pub fn isNullMany<T>(pointer: ?[*]const T) -> bool
+```
+
+Reports whether a nullable many-element pointer is null.
+
+::Anchor{id="Pointer.impl.nonNull"}
+
+### Associated function `nonNull`
+
+```silk
+pub fn nonNull<T>(pointer: ?*const T) -> Option<*const T>
+```
+
+Returns a non-null shared pointer when the address is not zero.
+
+#### Gotchas
+
+A present result does not prove that the addressed storage is live or initialized.
+
+::Anchor{id="Pointer.impl.nonNullMut"}
+
+### Associated function `nonNullMut`
+
+```silk
+pub fn nonNullMut<T>(pointer: ?*mut T) -> Option<*mut T>
+```
+
+Returns a non-null writable pointer when the address is not zero.
+
+#### Gotchas
+
+A present result does not prove that the addressed storage is live or initialized.
+
+::Anchor{id="Pointer.impl.nonNullMany"}
+
+### Associated function `nonNullMany`
+
+```silk
+pub fn nonNullMany<T>(pointer: ?[*]const T) -> Option<[*]const T>
+```
+
+Returns a non-null shared many-element pointer when the address is not zero.
+
+#### Gotchas
+
+The result carries no length and proves no storage validity.
+
+::Anchor{id="Pointer.impl.nonNullManyMut"}
+
+### Associated function `nonNullManyMut`
+
+```silk
+pub fn nonNullManyMut<T>(pointer: ?[*]mut T) -> Option<[*]mut T>
+```
+
+Returns a non-null writable many-element pointer when the address is not zero.
+
+#### Gotchas
+
+The result carries no length and proves no storage validity.
+
+::Anchor{id="Pointer.impl.fromRef"}
+
+### Associated function `fromRef`
+
+```silk
+pub fn fromRef<T>(value: &T) -> *const T
+```
+
+Forms a non-null shared pointer without extending the reference's loan.
+
+#### Gotchas
+
+The pointer keeps no storage alive. A later access must prove that the storage remains live.
+
+::Anchor{id="Pointer.impl.fromMutRef"}
+
+### Associated function `fromMutRef`
+
+```silk
+pub fn fromMutRef<T>(value: &mut T) -> *mut T
+```
+
+Forms a non-null writable pointer without extending the reference's loan.
+
+#### Gotchas
+
+The pointer keeps no storage alive. A later access must prove that the storage remains live.
+
+::Anchor{id="Pointer.impl.fromSlice"}
+
+### Associated function `fromSlice`
+
+```silk
+pub fn fromSlice<T>(values: &[T]) -> ?[*]const T
+```
+
+Forms a nullable shared many-element pointer from a slice address.
+
+#### Gotchas
+
+The pointer carries no length or loan. Pass the length separately and keep the storage live.
+
+::Anchor{id="Pointer.impl.fromMutSlice"}
+
+### Associated function `fromMutSlice`
+
+```silk
+pub fn fromMutSlice<T>(values: &mut [T]) -> ?[*]mut T
+```
+
+Forms a nullable writable many-element pointer from a slice address.
+
+#### Gotchas
+
+The pointer carries no length or loan. Pass the length separately and keep the storage live.
+
+::Anchor{id="Pointer.impl.at"}
+
+### Associated function `at`
+
+```silk
+pub unsafe fn at<T>(pointer: [*]const T, index: usize) -> *const T
+```
+
+Returns a shared pointer to one element of a many-element pointer.
+
+#### Gotchas
+
+The caller must prove that `index` selects an element within the same live allocation.
+
+::Anchor{id="Pointer.impl.atMut"}
+
+### Associated function `atMut`
+
+```silk
+pub unsafe fn atMut<T>(pointer: [*]mut T, index: usize) -> *mut T
+```
+
+Returns a writable pointer to one element of a many-element pointer.
+
+#### Gotchas
+
+The caller must prove that `index` selects an element within the same live writable allocation.
+
+::Anchor{id="Pointer.impl.read"}
+
+### Associated function `read`
+
+```silk
+pub unsafe fn read<T: Copy>(pointer: *const T) -> T
+```
+
+Copies one initialized value from naturally aligned storage.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses a live, readable, initialized `T`.
+
+::Anchor{id="Pointer.impl.write"}
+
+### Associated function `write`
+
+```silk
+pub unsafe fn write<T: Copy>(pointer: *mut T, value: T) -> ()
+```
+
+Writes one value into naturally aligned storage.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses live writable storage for `T`.
+
+::Anchor{id="Pointer.impl.take"}
+
+### Associated function `take`
+
+```silk
+pub unsafe fn take<T>(pointer: *mut T) -> T
+```
+
+Moves one initialized value out of naturally aligned storage.
+
+#### Details
+
+Unlike [`read`](#Pointer.impl.read), `T` need not be `Copy`. The caller owns the returned value, and the storage
+is logically uninitialized afterwards: it must be refilled with [`put`](#Pointer.impl.put) or never read again.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses a live, initialized `T` that nothing else
+will take or drop.
+
+::Anchor{id="Pointer.impl.put"}
+
+### Associated function `put`
+
+```silk
+pub unsafe fn put<T>(pointer: *mut T, value: T) -> ()
+```
+
+Moves one value into naturally aligned storage without dropping what it held.
+
+#### Details
+
+Unlike [`write`](#Pointer.impl.write), `T` need not be `Copy`. The storage takes ownership of `value`.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses live writable storage for `T`. A value
+still initialized there is overwritten without being dropped.
+
+::Anchor{id="Pointer.impl.borrow"}
+
+### Associated function `borrow`
+
+```silk
+pub unsafe fn borrow<'a, A, T>(anchor: &'a A, pointer: *const T) -> &'a T
+```
+
+Borrows the referent of a pointer for as long as the caller's loan of `anchor`.
+
+#### Details
+
+The result has the anchor's lifetime, so the referent stays borrowed, by the ordinary rules,
+exactly while the anchor is. A handle that owns shared storage through a pointer passes
+itself as the anchor, as `Arc.get` does.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses an initialized `T` that stays valid for the
+anchor's loan and that nothing mutates during it except through atomic operations.
+
+::Anchor{id="Pointer.impl.borrowMut"}
+
+### Associated function `borrowMut`
+
+```silk
+pub unsafe fn borrowMut<'a, A, T>(anchor: &'a mut A, pointer: *mut T) -> &'a mut T
+```
+
+Borrows the referent of a pointer exclusively for as long as the caller's exclusive loan of
+`anchor`.
+
+#### Details
+
+A guard that holds a lock passes itself as the anchor, as `MutexGuard.get` does, so the
+reference cannot outlive the lock.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses an initialized `T` that stays valid for the
+anchor's loan and that nothing else reads or writes during it.
+
+::Anchor{id="Pointer.impl.readUnaligned"}
+
+### Associated function `readUnaligned`
+
+```silk
+pub unsafe fn readUnaligned<T: Copy>(pointer: *const align(1) T) -> T
+```
+
+Copies one initialized value from storage with byte alignment.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses a live, readable, initialized `T`.
+
+::Anchor{id="Pointer.impl.writeUnaligned"}
+
+### Associated function `writeUnaligned`
+
+```silk
+pub unsafe fn writeUnaligned<T: Copy>(pointer: *mut align(1) T, value: T) -> ()
+```
+
+Writes one value into storage with byte alignment.
+
+#### Gotchas
+
+The caller must prove that the pointer addresses live writable storage for `T`.
+
+::Anchor{id="Pointer.impl.assumeAligned"}
+
+### Associated function `assumeAligned`
+
+```silk
+pub unsafe fn assumeAligned<T>(pointer: *const align(1) T) -> *const T
+```
+
+Returns a pointer with the natural alignment of its pointee.
+
+#### Gotchas
+
+The caller must prove that the address satisfies the target alignment of `T`.
+The result holds no loan and keeps no storage alive.
+
+::Anchor{id="Pointer.impl.assumeMany"}
+
+### Associated function `assumeMany`
+
+```silk
+pub unsafe fn assumeMany<T>(pointer: *const T) -> [*]const T
+```
+
+Returns a many-element pointer without a length.
+
+#### Gotchas
+
+The caller must prove the element range separately before each indexed access.
+The result holds no loan and keeps no storage alive.
+
+::Anchor{id="Pointer.impl.assumeAlignedMut"}
+
+### Associated function `assumeAlignedMut`
+
+```silk
+pub unsafe fn assumeAlignedMut<T>(pointer: *mut align(1) T) -> *mut T
+```
+
+Returns a pointer with the natural alignment of its pointee.
+
+#### Gotchas
+
+The caller must prove that the address satisfies the target alignment of `T`.
+The result holds no loan and keeps no storage alive.
+
+::Anchor{id="Pointer.impl.assumeManyMut"}
+
+### Associated function `assumeManyMut`
+
+```silk
+pub unsafe fn assumeManyMut<T>(pointer: *mut T) -> [*]mut T
+```
+
+Returns a many-element pointer without a length.
+
+#### Gotchas
+
+The caller must prove the element range separately before each indexed access.
+The result holds no loan and keeps no storage alive.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
