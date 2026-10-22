@@ -34,6 +34,7 @@ To bring in a package that already exists, move it into the folder and add it to
 | --- | --- |
 | `members` | Required. Member directories, relative to the workspace manifest. `"apps/*"` adds every child directory of `apps`. |
 | `output-dir` | Shared output directory. Default `"build"`. |
+| `silk-version` | The Silk toolchain for the workspace and every member it lists. Overrides the members' own `silk-version`. Must be a semantic version. |
 
 - Every member directory must hold a `silk.toml` with a `[package]` name, and no two members may share a name.
 - Entries must stay inside the workspace.

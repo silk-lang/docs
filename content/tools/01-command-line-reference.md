@@ -20,6 +20,8 @@ Every `silk` command, its options and its exit status. `silk --help` prints the 
 | `silk doctest` | Type-check the Silk examples in documentation comments |
 | `silk doc-reference` | Generate the Markdown std lib reference |
 | `silk changes <subcommand>` | Record changes, version and release the package |
+| `silk toolchain <subcommand>` | List, install, pin and remove Silk toolchains |
+| `silk +<version> <command>` | Run the command with that installed toolchain |
 | `silk --help`, `-h` | Print the synopsis and exit 0 |
 | `silk <command> --help`, `-h` | Print that command's usage lines and exit 0 |
 | `silk --version`, `-v` | Print `silk v0.1.0` and exit 0 |
@@ -234,6 +236,130 @@ silk changes [--dir <path>] recover
 
 `silk changes --help` prints the full usage with notes. See **Changesets and releases**.
 
+## toolchain
+
+```
+silk toolchain list [--json]
+silk toolchain which [--json]
+silk toolchain install [version] [--json]
+silk toolchain use <version> [--json]
+silk toolchain default <version>
+silk toolchain uninstall <version>
+```
+
+Manages the Silk versions installed side by side in `$SILK_HOME/toolchains/<version>` (`SILK_HOME` defaults to `~/.silk`). Each toolchain is a release archive unpacked as is: `bin/silk` beside `lib/silk/stdlib`. No subcommand prompts. Results go to standard output, and `--json` prints one JSON object instead. `silk toolchain help` prints the usage above with notes; `silk toolchain --help` prints only the synopsis line.
+
+| Subcommand | What it does |
+| --- | --- |
+| `list` | Every installed toolchain, newest first, and the running compiler. `*` marks the one selected here; tags say `pinned here`, `default` and `running` |
+| `which` | The selected version, why it was selected, and the path of its `silk`. Exits 3 when it is not installed |
+| `install [version]` | Download, verify and install a release. Without a version, installs the selected one |
+| `use <version>` | Install a release, then pin the project to it in `silk.toml` |
+| `default <version>` | Write `default = "<version>"` to `$SILK_HOME/settings.toml` |
+| `uninstall <version>` | Delete that toolchain's directory |
+
+```
+$ silk toolchain list
+  0.2.0  /home/you/.silk/toolchains/0.2.0/bin/silk
+* 0.1.0  (pinned here, default)  /home/you/.silk/toolchains/0.1.0/bin/silk
+  0.0.0  (running)  /home/you/silk/bin/silk
+$ silk toolchain which
+0.1.0 (package silk-version in /home/you/app/silk.toml)
+/home/you/.silk/toolchains/0.1.0/bin/silk
+$ silk toolchain which --json
+{"version":"0.1.0","origin":"package","manifest":"/home/you/app/silk.toml","installed":true,"path":"/home/you/.silk/toolchains/0.1.0/bin/silk","running":false,"install":"silk toolchain install 0.1.0"}
+```
+
+Here `silk` itself is a compiler built from source, which reports version 0.0.0. A compiler that is not in the toolchain store, such as a local build, shows in `list` as an extra row tagged `running`. When the running compiler is one of the installed toolchains, its row carries the `running` tag instead.
+
+### Which version a command runs
+
+`silk` picks a version before every command. The first of these that is set wins:
+
+| Origin | `which` says | JSON `origin` |
+| --- | --- | --- |
+| `silk +<version> <command>` | `selected with +<version>` | `command-line` |
+| `SILK_TOOLCHAIN` | `selected by SILK_TOOLCHAIN` | `environment` |
+| `[workspace].silk-version` of a workspace that lists the package | `workspace silk-version in <manifest>` | `workspace` |
+| `[package].silk-version` of the nearest `silk.toml` | `package silk-version in <manifest>` | `package` |
+| `default` in `$SILK_HOME/settings.toml` | `default in settings.toml` | `default` |
+| the running compiler | `the running compiler` | `running` |
+
+`silk-version = "0.0.0"` pins nothing. A version without build metadata, such as `0.1.0-dev.6`, matches the newest installed build of it, such as `0.1.0-dev.6+1aed5da1a342`.
+
+When the selected version is not the running compiler, `silk` sets `SILK_TOOLCHAIN` to the toolchain's full version and replaces itself with that toolchain's `silk`, which runs the command. `silk toolchain` itself always runs in the compiler you started. `SILK_TOOLCHAIN=local` keeps the running compiler. A compiler built from source reports version 0.0.0 and follows only `+<version>`.
+
+When the selected toolchain is not installed, the command does not run. It exits 3:
+
+```
+$ silk +0.3.0 build
+silk: Silk 0.3.0 (selected with +<version>) is not installed.
+Install it with: silk toolchain install 0.3.0
+```
+
+With `SILK_AUTO_INSTALL=1` in the environment, or `auto-install = true` in `$SILK_HOME/settings.toml`, a missing toolchain is installed first, with the notice `silk: installing Silk <version> (auto-install is on)` and the install output on standard error, so the command's own output stays alone on standard output.
+
+`silk lsp` behaves differently, because an editor starts it. When its toolchain is missing, it prints the same lines on standard error and then serves a minimal language server: it answers `initialize` with no capabilities, shows the message in the editor with `window/showMessage`, answers other requests with a `MethodNotFound` error, and exits 0 after `shutdown` and `exit`.
+
+### install and use
+
+`install` downloads `silk-<version>-<target>.tar.gz`, its `.minisig` signature and `native-seed.json` from the silk-lang/silk GitHub releases, over HTTPS. Before installing, it checks:
+
+- the archive is signed by the Silk release key, and the trusted comment reads `silk v<version> <archive name>`;
+- `bin/silk` has the SHA-256 that `native-seed.json` names for the host target;
+- the archive holds `bin/silk` and `lib/silk/stdlib` and no path outside its top folder.
+
+It unpacks into a hidden staging folder in `$SILK_HOME/toolchains` and renames it into place only when every check passes, so a failed or interrupted install leaves nothing. Installing a toolchain that is already there changes nothing:
+
+```
+$ silk toolchain install 0.1.0-dev.6+1aed5da1a342
+Installed Silk 0.1.0-dev.6+1aed5da1a342 in /home/you/.silk/toolchains/0.1.0-dev.6+1aed5da1a342
+$ silk toolchain install 0.1.0-dev.6+1aed5da1a342 --json
+{"version":"0.1.0-dev.6+1aed5da1a342","path":"/home/you/.silk/toolchains/0.1.0-dev.6+1aed5da1a342","changed":false}
+```
+
+A version without build metadata is resolved to its newest published build, which needs the GitHub release listing. A full version does not. `install` does not change the default toolchain or `$SILK_HOME/bin/silk`; `default` and the installer do.
+
+`SILK_TOOLCHAIN_MIRROR` names an absolute directory to install from instead of GitHub, for machines without access to it. It holds one `v<version>` folder of release assets per release, and the same checks apply. A tampered archive is refused with exit status 5:
+
+```
+silk toolchain: silk-0.1.0-dev.6+1aed5da1a342-x86_64-unknown-linux-gnu.tar.gz is not signed by the Silk release key: the signature does not match the file
+```
+
+`use` installs first, so a version that cannot be installed is never pinned. Then it writes `silk-version` into the `[workspace]` table of the workspace that lists the package, or into the package's own `[package]` table:
+
+```
+$ silk toolchain use 0.1.0-dev.6+1aed5da1a342
+Pinned Silk 0.1.0-dev.6+1aed5da1a342 in /home/you/app/silk.toml ([package].silk-version)
+Was 0.1.0-dev.5. See what changed since then: silk changes since 0.1.0-dev.5
+```
+
+The second line, on standard error, appears when the pin changed from another version. Outside a project, `use` exits 1 with `` silk toolchain: no silk.toml here or above; run `silk init` first ``. `use` refuses `0.0.0`.
+
+### default and uninstall
+
+```
+$ silk toolchain default 0.1.0
+Default toolchain: 0.1.0
+$ silk toolchain uninstall 0.2.0
+Removed 0.2.0
+$ silk toolchain uninstall 0.5.0
+0.5.0 is not installed; nothing to remove
+```
+
+`default` accepts a version that is not installed yet and adds a note on standard error naming the install command. `uninstall` refuses, with exit status 1, the toolchain that `$SILK_HOME/bin/silk` links to, so that `silk` keeps working.
+
+### Exit status of toolchain commands
+
+| Status | Meaning |
+| --- | --- |
+| 0 | Success, including a command that changed nothing |
+| 1 | Failure: no home directory, no `silk.toml` for `use`, a mirror that cannot be read, a toolchain that cannot be removed |
+| 2 | Usage error: unknown subcommand or option, a version that is not a semantic version, `install` with nothing selected |
+| 3 | The selected toolchain is not installed. Any command can exit 3 this way |
+| 4 | A download failed |
+| 5 | A release failed verification |
+
 ## Single-file forms
 
 Two lower-level forms compile one root module directly. They still need a `silk.toml` in the source file's directory or above it, which supplies the package context. Without one, both stop with exit status 2:
@@ -265,6 +391,7 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | 0 | Success. For `format --check`: every file is already formatted |
 | 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, a source file or folder named `silk` or `Intrinsic`, any `silk changes` error including a malformed `silk changes` command line |
 | 2 | The command could not start: a malformed command line (it prints the synopsis), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, conflicting options, `test` without `--no-cache`, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
+| 3, 4, 5 | The selected toolchain is not installed, a toolchain download failed, or a release failed verification. See "Exit status of toolchain commands" |
 | other | `silk run` only: the program's own status |
 
 In a workspace, each member gets a status and the command exits with the worst one: 2 over 1 over 0.
@@ -282,10 +409,14 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
 | `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
-| `SSL_CERT_FILE` | The certificate bundle for `silk changes since` when it fetches releases over HTTPS |
+| `SSL_CERT_FILE` | The certificate bundle for `silk changes since` and `silk toolchain install` when they fetch releases over HTTPS |
+| `SILK_HOME` | Where toolchains and `settings.toml` live; default `~/.silk`. Must be an absolute path |
+| `SILK_TOOLCHAIN` | The toolchain version to run, overriding the project's pin; `local` keeps the running compiler |
+| `SILK_AUTO_INSTALL` | `1` installs a missing selected toolchain before running the command |
+| `SILK_TOOLCHAIN_MIRROR` | An absolute directory of release assets to install toolchains from instead of GitHub |
 | `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE` | Passed through to Clang; no other variable is |
 
-The installer reads `SILK_INSTALL`, `SILK_RELEASE` and `SILK_CHANNEL`; see **Install**. The std lib is found at `lib/silk/stdlib` beside the `bin` directory that holds `silk`, following symbolic links.
+The installer reads `SILK_HOME`, `SILK_RELEASE` and `SILK_CHANNEL`; see **Install**. The std lib is found at `lib/silk/stdlib` beside the `bin` directory that holds `silk`, following symbolic links.
 
 ## Output streams
 

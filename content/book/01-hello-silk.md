@@ -58,7 +58,7 @@ silk-version = "0.1.0"
 root = "src/main.silk"
 ```
 
-The `name` is the package name, and it also names the program you build. `version` is your package's own version. `silk-version` is the language version the code was written for. `root` is the root module, the file where the compiler starts reading. Every other file in the package is found by following imports from there.
+The `name` is the package name, and it also names the program you build. `version` is your package's own version. `silk-version` is the Silk release the package runs with: an installed `silk` hands every command here to that version. `root` is the root module, the file where the compiler starts reading. Every other file in the package is found by following imports from there.
 
 `.gitignore` holds one line, `/build/`. The build folder is where compiled output goes, and you never commit it.
 

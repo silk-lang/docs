@@ -505,6 +505,8 @@ reminder: Call the plumber
 
 The exit status is 2: the second run went to `Counting`, which saw two reminders and printed nothing. `remindAll` never knew the difference.
 
+Some services are optional. Tracing or metrics, for example, should run when a caller provides them and be skipped otherwise. Write such a requirement as `? &Option<&Tracer>` and choose between the two paths with `withSome` from `silk/option`. **Services and providers** in the reference shows how.
+
 ## Testing with fake providers
 
 That last trick is how you test `tasks`. A test should not depend on today's date or leave files on your disk. So the test gives `execute` a fixed clock and a file system that lives in memory.

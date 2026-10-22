@@ -44,7 +44,7 @@ root = "src/main.silk"
 | --- | --- |
 | `name` | The package name. The executable gets this name too. |
 | `version` | Your package's own version. |
-| `silk-version` | The Silk version the code was written for. `silk init` writes the version of the compiler that made it. |
+| `silk-version` | The Silk toolchain the package runs with. `silk init` writes the version of the compiler that made it. |
 | `root` | The root module. The compiler starts reading here and finds other files through imports. |
 
 `.gitignore` holds one line, `/build/`. Compiled output goes to `build/`, and you don't commit it.

@@ -180,5 +180,4 @@ Lexical structure · Expressions and operators · Bindings and statements · Str
 
 ## Open questions
 
-- Catalog code LAY0001 describes a `usize` or `isize` literal outside the target word. On `wasm32-unknown-unknown`, `let x: usize = 4294967296` reports SEM0002 instead, so it's unclear when LAY0001 fires.
 - `f64 + 1` reports SEM0012 ("Expected f64 but received i32", an argument-mismatch code) where SEM0135 might be expected.
