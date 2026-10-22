@@ -1,0 +1,142 @@
+Checked size-and-alignment descriptions used to request storage from an allocator.
+
+## When to use
+Prefer [`of`](#Layout.impl.of) when storage will hold a known Silk type. Use [`make`](#Layout.impl.make) only at an untyped boundary
+that already knows a byte size and alignment, and [`repeat`](#Layout.impl.repeat) when sizing contiguous elements.
+
+## Details
+Alignments are non-zero powers of two. [`repeat`](#Layout.impl.repeat) preserves the element alignment and reports
+[`LayoutOverflow`](#LayoutOverflow) instead of wrapping the aggregate byte size. A [`Layout`](#Layout) describes storage;
+it does not allocate or initialize it.
+
+## Examples
+### Size storage for repeated values
+```silk
+import silk.layout { Layout, LayoutOverflow }
+
+import silk.usize
+
+pub fn main() -> i32 {
+  let element = Layout.of<i32>()
+  return match move Layout.repeat(move element, 3) {
+    Layout {bytes, alignment} => usize.toI32(bytes) + 30
+    LayoutOverflow {} => 0
+  }
+}
+```
+
+Import as `Layout` with `import silk.layout { Layout }`.
+
+Public declarations: 3.
+
+::Anchor{id="Layout"}
+
+## `Layout`
+
+```silk
+pub struct Layout
+```
+
+A byte size paired with a non-zero power-of-two alignment.
+
+::Anchor{id="Layout.bytes"}
+
+### Field `bytes`
+
+```silk
+pub bytes: usize
+```
+
+The number of addressable bytes required by the described storage.
+
+::Anchor{id="Layout.alignment"}
+
+### Field `alignment`
+
+```silk
+pub alignment: usize
+```
+
+The required non-zero power-of-two byte alignment.
+
+::Anchor{id="Layout.impl"}
+
+## Implementation `Layout`
+
+```silk
+impl Layout
+```
+
+::Anchor{id="Layout.impl.of"}
+
+### Associated function `of`
+
+```silk
+pub fn of<T>() -> Layout
+```
+
+Returns the byte size and alignment required to store one value of `T`.
+
+::Anchor{id="Layout.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make(size: usize, alignment: usize) -> Layout | InvalidAlignment
+```
+
+Creates a layout from an explicit byte size and alignment.
+
+#### Gotchas
+
+If `alignment` is zero or is not a power of two, returns `InvalidAlignment` with that value.
+
+::Anchor{id="Layout.impl.repeat"}
+
+### Associated function `repeat`
+
+```silk
+pub fn repeat(layout: Layout, count: usize) -> Layout | LayoutOverflow
+```
+
+Returns a layout for `count` contiguous instances without wrapping the total byte size.
+
+#### Details
+
+The result keeps the input alignment and multiplies its byte size by `count`.
+
+#### Gotchas
+
+If the total byte size does not fit in `usize`, returns `LayoutOverflow`.
+
+::Anchor{id="InvalidAlignment"}
+
+## `InvalidAlignment`
+
+```silk
+pub struct InvalidAlignment
+```
+
+Reports the rejected alignment supplied to [`make`](#Layout.impl.make).
+
+::Anchor{id="InvalidAlignment.alignment"}
+
+### Field `alignment`
+
+```silk
+pub alignment: usize
+```
+
+The zero or non-power-of-two alignment that was rejected.
+
+::Anchor{id="LayoutOverflow"}
+
+## `LayoutOverflow`
+
+```silk
+pub struct LayoutOverflow
+```
+
+Reports that [`repeat`](#Layout.impl.repeat) could not represent the aggregate byte size as `usize`.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

@@ -1,0 +1,668 @@
+Pointer-width unsigned integers for lengths, indices, capacities, and allocation sizes.
+
+## When to use
+Use `usize` for values that index target memory or describe its layout. Use a fixed-width
+integer for serialized data, protocols, and persistent identifiers whose range must not change
+between 32-bit and 64-bit targets.
+
+## Details
+[`BITS`](#BITS) and [`MAX`](#MAX) follow the selected target. Ordinary arithmetic, narrowing conversions,
+division by zero, and invalid shift counts trap. `checked*` returns [`Option`](/docs/std/option#Option), `wrapping*`
+computes modulo the target width, and `saturating*` clamps at [`MIN`](#MIN) or [`MAX`](#MAX).
+
+[`ZERO`](#ZERO) and [`ONE`](#ONE) provide typed values where an uncontextualized literal would be `i32`.
+Decimal [`parse`](#parse) uses the target's range. Use [`Format`](/docs/std/format#Format) with `Format.display` for defaults or
+`Format.displayWith` for explicit options. Both operations stream through a mutable `Writer`
+without `Allocator`.
+
+## Gotchas
+A value valid as usize on a 64-bit target can be out of range on a 32-bit target.
+
+## Examples
+### Keep a count within the target range
+```silk
+import silk.option { Option }
+
+import silk.usize
+
+pub fn main() -> i32 {
+  let next = usize.checkedAdd(usize.MAX, usize.ONE)
+  let recovered = move next
+    |> Option<usize>.unwrapOr(42)
+  return usize.toI32(recovered)
+}
+```
+
+Import as `usize` with `import silk.usize`.
+
+Public declarations: 58.
+
+::Anchor{id="MAX"}
+
+## `MAX`
+
+```silk
+pub const MAX: usize
+```
+
+The largest `usize` value for the compilation target.
+
+### Details
+
+This is 4294967295 on a 32-bit target and 18446744073709551615 on a 64-bit target. Checked
+arithmetic rejects results above it.
+
+::Anchor{id="MIN"}
+
+## `MIN`
+
+```silk
+pub const MIN: usize
+```
+
+The smallest `usize` value, which is zero at each pointer width.
+
+::Anchor{id="BITS"}
+
+## `BITS`
+
+```silk
+pub const BITS: u32
+```
+
+The width of `usize` in bits, which is the compilation target's pointer width.
+
+::Anchor{id="ZERO"}
+
+## `ZERO`
+
+```silk
+pub const ZERO: usize
+```
+
+The `usize` zero value for a count without a typed context.
+
+::Anchor{id="ONE"}
+
+## `ONE`
+
+```silk
+pub const ONE: usize
+```
+
+The `usize` value one for a step or count that has no other type context.
+
+::Anchor{id="toU8"}
+
+## `toU8`
+
+```silk
+pub fn toU8(value: usize) -> u8
+```
+
+Converts `value` to `u8`. Traps if `value` is outside the `u8` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToU8"}
+
+## `checkedToU8`
+
+```silk
+pub fn checkedToU8(value: usize) -> Option<u8>
+```
+
+Converts `value` to `u8`, or returns `None` if `value` is outside the `u8`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toU16"}
+
+## `toU16`
+
+```silk
+pub fn toU16(value: usize) -> u16
+```
+
+Converts `value` to `u16`. Traps if `value` is outside the `u16` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToU16"}
+
+## `checkedToU16`
+
+```silk
+pub fn checkedToU16(value: usize) -> Option<u16>
+```
+
+Converts `value` to `u16`, or returns `None` if `value` is outside the `u16`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toU32"}
+
+## `toU32`
+
+```silk
+pub fn toU32(value: usize) -> u32
+```
+
+Converts `value` to `u32`. Traps if `value` is outside the `u32` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToU32"}
+
+## `checkedToU32`
+
+```silk
+pub fn checkedToU32(value: usize) -> Option<u32>
+```
+
+Converts `value` to `u32`, or returns `None` if `value` is outside the `u32`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toU64"}
+
+## `toU64`
+
+```silk
+pub fn toU64(value: usize) -> u64
+```
+
+Converts `value` exactly to `u64`. Every `usize` value is representable.
+
+::Anchor{id="checkedToU64"}
+
+## `checkedToU64`
+
+```silk
+pub fn checkedToU64(value: usize) -> Option<u64>
+```
+
+Converts `value` exactly to `u64` and returns `Some`. Every `usize` value is
+representable.
+
+::Anchor{id="toUsize"}
+
+## `toUsize`
+
+```silk
+pub fn toUsize(value: usize) -> usize
+```
+
+Returns `value` unchanged as `usize`. Use this function when generic conversion code
+can select `usize` as both source and destination.
+
+::Anchor{id="checkedToUsize"}
+
+## `checkedToUsize`
+
+```silk
+pub fn checkedToUsize(value: usize) -> Option<usize>
+```
+
+Returns `Some` with `value` unchanged as `usize`. Use this function when generic
+checked-conversion code can select the same source and destination type.
+
+::Anchor{id="toI8"}
+
+## `toI8`
+
+```silk
+pub fn toI8(value: usize) -> i8
+```
+
+Converts `value` to `i8`. Traps if `value` is outside the `i8` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToI8"}
+
+## `checkedToI8`
+
+```silk
+pub fn checkedToI8(value: usize) -> Option<i8>
+```
+
+Converts `value` to `i8`, or returns `None` if `value` is outside the `i8`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toI16"}
+
+## `toI16`
+
+```silk
+pub fn toI16(value: usize) -> i16
+```
+
+Converts `value` to `i16`. Traps if `value` is outside the `i16` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToI16"}
+
+## `checkedToI16`
+
+```silk
+pub fn checkedToI16(value: usize) -> Option<i16>
+```
+
+Converts `value` to `i16`, or returns `None` if `value` is outside the `i16`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toI32"}
+
+## `toI32`
+
+```silk
+pub fn toI32(value: usize) -> i32
+```
+
+Converts `value` to `i32`. Traps if `value` is outside the `i32` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToI32"}
+
+## `checkedToI32`
+
+```silk
+pub fn checkedToI32(value: usize) -> Option<i32>
+```
+
+Converts `value` to `i32`, or returns `None` if `value` is outside the `i32`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toI64"}
+
+## `toI64`
+
+```silk
+pub fn toI64(value: usize) -> i64
+```
+
+Converts `value` to `i64`. Traps if `value` is outside the `i64` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToI64"}
+
+## `checkedToI64`
+
+```silk
+pub fn checkedToI64(value: usize) -> Option<i64>
+```
+
+Converts `value` to `i64`, or returns `None` if `value` is outside the `i64`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toIsize"}
+
+## `toIsize`
+
+```silk
+pub fn toIsize(value: usize) -> isize
+```
+
+Converts `value` to `isize`. Traps if `value` is outside the `isize` range. Use
+this function when an out-of-range value is a program error.
+
+::Anchor{id="checkedToIsize"}
+
+## `checkedToIsize`
+
+```silk
+pub fn checkedToIsize(value: usize) -> Option<isize>
+```
+
+Converts `value` to `isize`, or returns `None` if `value` is outside the `isize`
+range. Use this function when an out-of-range value is input data.
+
+::Anchor{id="toF32"}
+
+## `toF32`
+
+```silk
+pub fn toF32(value: usize) -> f32
+```
+
+Converts `value` to the nearest `f32` value, with ties to even. Only magnitudes below `2^24` are
+exactly representable, so a larger `usize` rounds.
+
+::Anchor{id="toF64"}
+
+## `toF64`
+
+```silk
+pub fn toF64(value: usize) -> f64
+```
+
+Converts `value` to the nearest `f64` value, with ties to even. Only magnitudes below `2^53` are
+exactly representable, so a larger `usize` rounds. Every `usize` is exact on a 32-bit target.
+
+::Anchor{id="add"}
+
+## `add`
+
+```silk
+pub fn add(left: usize, right: usize) -> usize
+```
+
+Returns `left + right` and traps if the result is outside the `usize` range. Use this function
+when overflow is a program error.
+
+::Anchor{id="subtract"}
+
+## `subtract`
+
+```silk
+pub fn subtract(left: usize, right: usize) -> usize
+```
+
+Returns `left - right` and traps if the result is outside the `usize` range. Use this function
+when overflow is a program error.
+
+::Anchor{id="multiply"}
+
+## `multiply`
+
+```silk
+pub fn multiply(left: usize, right: usize) -> usize
+```
+
+Returns `left * right` and traps if the result is outside the `usize` range. Use this function
+when overflow is a program error.
+
+::Anchor{id="divide"}
+
+## `divide`
+
+```silk
+pub fn divide(left: usize, right: usize) -> usize
+```
+
+Returns `left / right`. Traps if `right` is zero. Use this function when a zero
+divisor is a program error.
+
+::Anchor{id="remainder"}
+
+## `remainder`
+
+```silk
+pub fn remainder(left: usize, right: usize) -> usize
+```
+
+Returns the remainder of `left / right`. Traps if `right` is zero. Use this function
+when a zero divisor is a program error.
+
+::Anchor{id="bitAnd"}
+
+## `bitAnd`
+
+```silk
+pub fn bitAnd(left: usize, right: usize) -> usize
+```
+
+Returns the bitwise AND of `left` and `right`.
+
+::Anchor{id="bitOr"}
+
+## `bitOr`
+
+```silk
+pub fn bitOr(left: usize, right: usize) -> usize
+```
+
+Returns the bitwise OR of `left` and `right`.
+
+::Anchor{id="bitXor"}
+
+## `bitXor`
+
+```silk
+pub fn bitXor(left: usize, right: usize) -> usize
+```
+
+Returns the bitwise exclusive OR of `left` and `right`.
+
+::Anchor{id="bitNot"}
+
+## `bitNot`
+
+```silk
+pub fn bitNot(value: usize) -> usize
+```
+
+Returns `value` with each bit inverted.
+
+::Anchor{id="shiftLeft"}
+
+## `shiftLeft`
+
+```silk
+pub fn shiftLeft(left: usize, right: usize) -> usize
+```
+
+Shifts `left` bits left by `right` positions. Traps if `right` is not less than [`BITS`](#BITS).
+
+::Anchor{id="shiftRight"}
+
+## `shiftRight`
+
+```silk
+pub fn shiftRight(left: usize, right: usize) -> usize
+```
+
+Shifts `left` bits right by `right` positions and inserts zero bits. Traps if `right` is
+not less than [`BITS`](#BITS).
+
+::Anchor{id="rotateLeft"}
+
+## `rotateLeft`
+
+```silk
+pub fn rotateLeft(left: usize, right: usize) -> usize
+```
+
+Rotates the bits of `left` left by `right` positions.
+
+::Anchor{id="rotateRight"}
+
+## `rotateRight`
+
+```silk
+pub fn rotateRight(left: usize, right: usize) -> usize
+```
+
+Rotates the bits of `left` right by `right` positions.
+
+::Anchor{id="wrappingAdd"}
+
+## `wrappingAdd`
+
+```silk
+pub fn wrappingAdd(left: usize, right: usize) -> usize
+```
+
+Returns `left + right`, wrapped to the `usize` range. Use this function for
+deliberate modulo arithmetic.
+
+::Anchor{id="wrappingSubtract"}
+
+## `wrappingSubtract`
+
+```silk
+pub fn wrappingSubtract(left: usize, right: usize) -> usize
+```
+
+Returns `left - right`, wrapped to the `usize` range. Use this function for
+deliberate modulo arithmetic.
+
+::Anchor{id="wrappingMultiply"}
+
+## `wrappingMultiply`
+
+```silk
+pub fn wrappingMultiply(left: usize, right: usize) -> usize
+```
+
+Returns `left * right`, wrapped to the `usize` range. Use this function for
+deliberate modulo arithmetic.
+
+::Anchor{id="saturatingAdd"}
+
+## `saturatingAdd`
+
+```silk
+pub fn saturatingAdd(left: usize, right: usize) -> usize
+```
+
+Returns `left + right`, clamped to [`MIN`](#MIN) or [`MAX`](#MAX). Use this function when a
+boundary value is the required overflow result.
+
+::Anchor{id="saturatingSubtract"}
+
+## `saturatingSubtract`
+
+```silk
+pub fn saturatingSubtract(left: usize, right: usize) -> usize
+```
+
+Returns `left - right`, clamped to [`MIN`](#MIN) or [`MAX`](#MAX). Use this function when a
+boundary value is the required overflow result.
+
+::Anchor{id="saturatingMultiply"}
+
+## `saturatingMultiply`
+
+```silk
+pub fn saturatingMultiply(left: usize, right: usize) -> usize
+```
+
+Returns `left * right`, clamped to [`MIN`](#MIN) or [`MAX`](#MAX). Use this function when a
+boundary value is the required overflow result.
+
+::Anchor{id="checkedAdd"}
+
+## `checkedAdd`
+
+```silk
+pub fn checkedAdd(left: usize, right: usize) -> Option<usize>
+```
+
+Returns `Some` with `left + right`, or `None` if the result is outside the `usize` range.
+Use this function when overflow is input data.
+
+::Anchor{id="checkedSubtract"}
+
+## `checkedSubtract`
+
+```silk
+pub fn checkedSubtract(left: usize, right: usize) -> Option<usize>
+```
+
+Returns `Some` with `left - right`, or `None` if the result is outside the `usize` range.
+Use this function when overflow is input data.
+
+::Anchor{id="checkedMultiply"}
+
+## `checkedMultiply`
+
+```silk
+pub fn checkedMultiply(left: usize, right: usize) -> Option<usize>
+```
+
+Returns `Some` with `left * right`, or `None` if the result is outside the `usize` range.
+Use this function when overflow is input data.
+
+::Anchor{id="checkedDivide"}
+
+## `checkedDivide`
+
+```silk
+pub fn checkedDivide(left: usize, right: usize) -> Option<usize>
+```
+
+Returns `Some` with `left / right`, or `None` if `right` is zero. Use this
+function when a zero divisor is input data.
+
+::Anchor{id="checkedRemainder"}
+
+## `checkedRemainder`
+
+```silk
+pub fn checkedRemainder(left: usize, right: usize) -> Option<usize>
+```
+
+Returns `Some` with the remainder, or `None` if `right` is zero. Use this function
+when a zero divisor is input data.
+
+::Anchor{id="equals"}
+
+## `equals`
+
+```silk
+pub fn equals(left: usize, right: usize) -> bool
+```
+
+Returns `true` when `left` and `right` are equal.
+
+::Anchor{id="notEquals"}
+
+## `notEquals`
+
+```silk
+pub fn notEquals(left: usize, right: usize) -> bool
+```
+
+Returns `true` when `left` and `right` are not equal.
+
+::Anchor{id="lessThan"}
+
+## `lessThan`
+
+```silk
+pub fn lessThan(left: usize, right: usize) -> bool
+```
+
+Returns `true` when `left` is less than `right`.
+
+::Anchor{id="lessOrEqual"}
+
+## `lessOrEqual`
+
+```silk
+pub fn lessOrEqual(left: usize, right: usize) -> bool
+```
+
+Returns `true` when `left` is less than or equal to `right`.
+
+::Anchor{id="greaterThan"}
+
+## `greaterThan`
+
+```silk
+pub fn greaterThan(left: usize, right: usize) -> bool
+```
+
+Returns `true` when `left` is greater than `right`.
+
+::Anchor{id="greaterOrEqual"}
+
+## `greaterOrEqual`
+
+```silk
+pub fn greaterOrEqual(left: usize, right: usize) -> bool
+```
+
+Returns `true` when `left` is greater than or equal to `right`.
+
+::Anchor{id="parse"}
+
+## `parse`
+
+```silk
+pub fn parse(text: string) -> Result<usize, ParseError>
+```
+
+Reads the complete text as an unsigned decimal `usize`.
+
+### Details
+
+A failure contains `silk.format.NotANumber` for empty text, a sign, a non-digit, or trailing
+bytes. It contains `silk.format.OutOfRange` outside the target's `usize` range.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

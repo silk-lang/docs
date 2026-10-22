@@ -6,7 +6,7 @@ import { type CopiedCodeIds, copyButtonFor } from '../copy'
 import * as Icon from '../icon'
 import * as Layout from '../layout'
 import { type Message } from '../message'
-import { docsRouter, releasesRouter } from '../route'
+import { docPageRouter, docsRouter, releasesRouter } from '../route'
 
 // CONTENT
 
@@ -145,13 +145,13 @@ const ALPHA_NOTES: ReadonlyArray<Row> = [
 
 const sectionClass = 'mx-auto w-full max-w-[1440px] px-5 md:px-20'
 
-const label = (text: string, h: HtmlBuilder<Message>): Html =>
+export const label = (text: string, h: HtmlBuilder<Message>): Html =>
   h.p([h.Class('label text-muted')], [text])
 
-const badge = (text: string, h: HtmlBuilder<Message>): Html =>
+export const badge = (text: string, h: HtmlBuilder<Message>): Html =>
   h.span([h.Class('label rounded-full bg-ink px-3 py-1.5 text-paper')], [text])
 
-const tag = (text: string, h: HtmlBuilder<Message>): Html =>
+export const tag = (text: string, h: HtmlBuilder<Message>): Html =>
   h.span(
     [h.Class('rounded-full border border-ink px-2.5 py-1 text-xs')],
     [text],
@@ -246,8 +246,18 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
           h.div(
             [h.Class('flex flex-wrap items-center gap-3')],
             [
-              buttonLink('Take the tour', docsRouter(), 'Primary', h),
-              buttonLink('Read the book', docsRouter(), 'Secondary', h),
+              buttonLink(
+                'Take the tour',
+                docPageRouter({ directory: 'start', slug: 'tour' }),
+                'Primary',
+                h,
+              ),
+              buttonLink(
+                'Read the reference',
+                docPageRouter({ directory: 'reference', slug: 'overview' }),
+                'Secondary',
+                h,
+              ),
             ],
           ),
           h.div(
@@ -393,7 +403,14 @@ const servicesSpotlight = (
               '; a test could hand it anything else.',
             ],
           ),
-          textLink('Testing with providers', docsRouter(), h),
+          textLink(
+            'Testing with providers',
+            docPageRouter({
+              directory: 'reference',
+              slug: 'requirements-and-services',
+            }),
+            h,
+          ),
         ],
       ),
       Code.codeBlock(
@@ -511,7 +528,7 @@ const status = (h: HtmlBuilder<Message>): Html =>
               h.p(
                 [h.Class('leading-prose text-muted')],
                 [
-                  'Silk is usable today: a book, a full language reference, a standard library, and the tools to ship with it. It’s also young, and some edges will move.',
+                  'Silk is usable today: a full language reference, a documented standard library, and the tools to ship with it. It’s also young, and some edges will move.',
                 ],
               ),
               h.p(
@@ -601,7 +618,7 @@ const closingCta = (h: HtmlBuilder<Message>): Html =>
           ),
           h.p(
             [h.Class('text-lg leading-prose text-muted')],
-            ['Start with the tour, or go all the way with the book.'],
+            ['Start with the tour, or go all the way with the reference.'],
           ),
         ],
       ),
@@ -609,7 +626,12 @@ const closingCta = (h: HtmlBuilder<Message>): Html =>
         [h.Class('flex flex-wrap items-center gap-3')],
         [
           buttonLink('Install', releasesRouter(), 'Primary', h),
-          buttonLink('Read the book', docsRouter(), 'Secondary', h),
+          buttonLink(
+            'Read the reference',
+            docPageRouter({ directory: 'reference', slug: 'overview' }),
+            'Secondary',
+            h,
+          ),
         ],
       ),
     ],

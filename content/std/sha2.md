@@ -1,0 +1,427 @@
+Portable SHA-2 states for six fixed-output cryptographic digest algorithms.
+
+## When to use
+Use [`Sha224`](#Sha224) or [`Sha256`](#Sha256) for a 28-byte or 32-byte digest with 32-bit processing. Use
+[`Sha384`](#Sha384), [`Sha512`](#Sha512), [`Sha512_224`](#Sha512_224), or [`Sha512_256`](#Sha512_256) for SHA-512-family processing.
+Use `silk.hash` only for collection keys. It is not a cryptographic hash.
+
+## Details
+Each actor supports incremental input through `update`, consuming finalization through
+`finish`, and one-shot input through `hash`. The states use only inline storage and allocate no
+memory. Each digest uses the standardized big-endian byte order.
+[`Sha256.checkpoint`](#Sha256.impl.checkpoint) and [`Sha384.checkpoint`](#Sha384.impl.checkpoint) also return a digest without consuming the
+streaming state. Use these operations for exact protocol transcript boundaries.
+
+## Gotchas
+If an update exceeds the algorithm's standard bit-length domain, the program traps. `finish`
+consumes its state, so the program cannot update or finish that state again.
+
+## Examples
+### Compare incremental and one-shot SHA-256
+```silk
+import silk.sha2 {Sha256}
+
+pub fn main() -> i32 {
+  let message: [u8; 3] = [97, 98, 99]
+  let mut state = Sha256.make()
+  state.update(&message)
+  let incremental = state.finish()
+  let oneShot = Sha256.hash(&message)
+  if incremental[0] != 186 || oneShot[0] != 186 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `Sha256` with `import silk.sha2 { Sha256 }`.
+
+Public declarations: 6.
+
+::Anchor{id="Sha224"}
+
+## `Sha224`
+
+```silk
+pub struct Sha224
+```
+
+An allocation-free incremental SHA-224 state that returns a 28-byte digest.
+
+::Anchor{id="Sha224.impl"}
+
+## Implementation `Sha224`
+
+```silk
+impl Sha224
+```
+
+::Anchor{id="Sha224.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha224
+```
+
+Creates an empty SHA-224 state.
+
+::Anchor{id="Sha224.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to this SHA-224 state in source order. An empty slice does not change the state.
+If the complete message exceeds the 64-bit bit-length domain, the program traps.
+
+::Anchor{id="Sha224.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 28]
+```
+
+Consumes this SHA-224 state and returns its 28-byte digest in big-endian byte order.
+
+::Anchor{id="Sha224.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 28]
+```
+
+Returns the 28-byte SHA-224 digest of `bytes`. If the message is too long, the program traps.
+
+::Anchor{id="Sha256"}
+
+## `Sha256`
+
+```silk
+pub struct Sha256
+```
+
+An allocation-free incremental SHA-256 state that returns a 32-byte digest.
+
+::Anchor{id="Sha256.impl"}
+
+## Implementation `Sha256`
+
+```silk
+impl Sha256
+```
+
+::Anchor{id="Sha256.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha256
+```
+
+Creates an empty SHA-256 state.
+
+::Anchor{id="Sha256.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to this SHA-256 state in source order. An empty slice does not change the state.
+If the complete message exceeds the 64-bit bit-length domain, the program traps.
+
+::Anchor{id="Sha256.impl.checkpoint"}
+
+### Method `checkpoint`
+
+```silk
+pub fn checkpoint(self: &Self) -> [u8; 32]
+```
+
+Returns the SHA-256 digest of all bytes supplied so far without consuming this state.
+
+#### Details
+
+The operation copies the fixed inline state. A later `update` or `checkpoint` continues from
+the same original byte sequence.
+
+::Anchor{id="Sha256.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 32]
+```
+
+Consumes this SHA-256 state and returns its 32-byte digest in big-endian byte order.
+
+::Anchor{id="Sha256.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 32]
+```
+
+Returns the 32-byte SHA-256 digest of `bytes`. If the message is too long, the program traps.
+
+::Anchor{id="Sha384"}
+
+## `Sha384`
+
+```silk
+pub struct Sha384
+```
+
+An allocation-free incremental SHA-384 state that returns a 48-byte digest.
+
+::Anchor{id="Sha384.impl"}
+
+## Implementation `Sha384`
+
+```silk
+impl Sha384
+```
+
+::Anchor{id="Sha384.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha384
+```
+
+Creates an empty SHA-384 state.
+
+::Anchor{id="Sha384.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to this SHA-384 state in source order. An empty slice does not change the state.
+If the complete message exceeds the 128-bit bit-length domain, the program traps.
+
+::Anchor{id="Sha384.impl.checkpoint"}
+
+### Method `checkpoint`
+
+```silk
+pub fn checkpoint(self: &Self) -> [u8; 48]
+```
+
+Returns the SHA-384 digest of all bytes supplied so far without consuming this state.
+
+#### Details
+
+The operation copies the fixed inline state. A later `update` or `checkpoint` continues from
+the same original byte sequence.
+
+::Anchor{id="Sha384.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 48]
+```
+
+Consumes this SHA-384 state and returns its 48-byte digest in big-endian byte order.
+
+::Anchor{id="Sha384.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 48]
+```
+
+Returns the 48-byte SHA-384 digest of `bytes`. If the message is too long, the program traps.
+
+::Anchor{id="Sha512"}
+
+## `Sha512`
+
+```silk
+pub struct Sha512
+```
+
+An allocation-free incremental SHA-512 state that returns a 64-byte digest.
+
+::Anchor{id="Sha512.impl"}
+
+## Implementation `Sha512`
+
+```silk
+impl Sha512
+```
+
+::Anchor{id="Sha512.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha512
+```
+
+Creates an empty SHA-512 state.
+
+::Anchor{id="Sha512.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to this SHA-512 state in source order. An empty slice does not change the state.
+If the complete message exceeds the 128-bit bit-length domain, the program traps.
+
+::Anchor{id="Sha512.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 64]
+```
+
+Consumes this SHA-512 state and returns its 64-byte digest in big-endian byte order.
+
+::Anchor{id="Sha512.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 64]
+```
+
+Returns the 64-byte SHA-512 digest of `bytes`. If the message is too long, the program traps.
+
+::Anchor{id="Sha512_224"}
+
+## `Sha512_224`
+
+```silk
+pub struct Sha512_224
+```
+
+An allocation-free incremental SHA-512/224 state that returns a 28-byte digest.
+
+::Anchor{id="Sha512_224.impl"}
+
+## Implementation `Sha512_224`
+
+```silk
+impl Sha512_224
+```
+
+::Anchor{id="Sha512_224.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha512_224
+```
+
+Creates an empty SHA-512/224 state.
+
+::Anchor{id="Sha512_224.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to this SHA-512/224 state in source order. An empty slice does not change the
+state. If the complete message exceeds the 128-bit bit-length domain, the program traps.
+
+::Anchor{id="Sha512_224.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 28]
+```
+
+Consumes this SHA-512/224 state and returns its 28-byte digest in big-endian byte order.
+
+::Anchor{id="Sha512_224.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 28]
+```
+
+Returns the 28-byte SHA-512/224 digest of `bytes`. If the message is too long, the program
+traps.
+
+::Anchor{id="Sha512_256"}
+
+## `Sha512_256`
+
+```silk
+pub struct Sha512_256
+```
+
+An allocation-free incremental SHA-512/256 state that returns a 32-byte digest.
+
+::Anchor{id="Sha512_256.impl"}
+
+## Implementation `Sha512_256`
+
+```silk
+impl Sha512_256
+```
+
+::Anchor{id="Sha512_256.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Sha512_256
+```
+
+Creates an empty SHA-512/256 state.
+
+::Anchor{id="Sha512_256.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to this SHA-512/256 state in source order. An empty slice does not change the
+state. If the complete message exceeds the 128-bit bit-length domain, the program traps.
+
+::Anchor{id="Sha512_256.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 32]
+```
+
+Consumes this SHA-512/256 state and returns its 32-byte digest in big-endian byte order.
+
+::Anchor{id="Sha512_256.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 32]
+```
+
+Returns the 32-byte SHA-512/256 digest of `bytes`. If the message is too long, the program
+traps.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
