@@ -348,7 +348,7 @@ const docsLayout = (
       h.div(
         [
           h.Class(
-            'mx-auto grid w-full max-w-[1440px] flex-1 gap-10 px-5 pt-8 pb-20 md:grid-cols-[220px_minmax(0,1fr)] md:px-10 md:pt-12 lg:gap-14 lg:pb-30 xl:grid-cols-[260px_minmax(0,708px)_200px] xl:px-20',
+            'mx-auto grid w-full max-w-[90rem] flex-1 gap-10 px-5 pt-8 pb-20 md:grid-cols-[13.75rem_minmax(0,1fr)] md:px-10 md:pt-12 lg:gap-14 lg:pb-30 xl:grid-cols-[16.25rem_minmax(0,44.25rem)_12.5rem] xl:px-20',
           ),
         ],
         [

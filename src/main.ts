@@ -433,7 +433,7 @@ const placeholder = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.section(
-    [h.Class('mx-auto flex max-w-[1440px] flex-col gap-5 px-5 py-16 md:px-20')],
+    [h.Class('mx-auto flex max-w-[90rem] flex-col gap-5 px-5 py-16 md:px-20')],
     [
       h.h1(
         [
@@ -443,7 +443,10 @@ const placeholder = (
         ],
         [title],
       ),
-      h.p([h.Class('max-w-[620px] text-lg leading-prose text-muted')], [text]),
+      h.p(
+        [h.Class('max-w-[38.75rem] text-lg leading-prose text-muted')],
+        [text],
+      ),
     ],
   )
 
@@ -455,7 +458,7 @@ const notFound = (h: HtmlBuilder<Message>): Html =>
     [
       placeholder('Not found', 'There is no page at this address.', h),
       h.p(
-        [h.Class('mx-auto max-w-[1440px] px-5 pb-16 md:px-20')],
+        [h.Class('mx-auto max-w-[90rem] px-5 pb-16 md:px-20')],
         [
           h.a(
             [

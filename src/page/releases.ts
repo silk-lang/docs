@@ -84,7 +84,7 @@ const header = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
             ['Download Silk'],
           ),
           h.p(
-            [h.Class('max-w-[620px] text-lg leading-prose text-muted')],
+            [h.Class('max-w-[38.75rem] text-lg leading-prose text-muted')],
             [
               'Prebuilt toolchains for macOS and Linux, newest first. Windows support is still ahead. Silk is in alpha, so expect APIs to move between versions.',
             ],
@@ -94,7 +94,7 @@ const header = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
       h.div(
         [
           h.Class(
-            'grid gap-8 md:grid-cols-2 xl:grid-cols-[300px_300px_minmax(0,616px)]',
+            'grid gap-8 md:grid-cols-2 xl:grid-cols-[18.75rem_18.75rem_minmax(0,38.5rem)]',
           ),
         ],
         [
@@ -186,10 +186,10 @@ const downloadTable = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.div(
-    [h.Class('min-w-0 flex-1 overflow-x-auto lg:max-w-[936px] lg:pt-2.5')],
+    [h.Class('min-w-0 flex-1 overflow-x-auto lg:max-w-[58.5rem] lg:pt-2.5')],
     [
       h.table(
-        [h.Class('w-full min-w-[640px] border-collapse text-left text-sm')],
+        [h.Class('w-full min-w-[40rem] border-collapse text-left text-sm')],
         [
           h.thead(
             [h.Class('border-b border-ink')],
@@ -197,11 +197,11 @@ const downloadTable = (
               h.tr(
                 [],
                 [
-                  headerCell('OS', 'w-[120px]', h),
-                  headerCell('Arch', 'w-[120px]', h),
+                  headerCell('OS', 'w-[7.5rem]', h),
+                  headerCell('Arch', 'w-[7.5rem]', h),
                   headerCell('Filename', '', h),
-                  headerCell('Signature', 'w-[120px]', h),
-                  headerCell('Size', 'w-[96px] text-right', h),
+                  headerCell('Signature', 'w-[7.5rem]', h),
+                  headerCell('Size', 'w-[6rem] text-right', h),
                 ],
               ),
             ],
@@ -233,7 +233,7 @@ const releaseMeta = (
 ): Html => {
   const { name, build } = splitVersion(release.version)
   return h.div(
-    [h.Class('flex shrink-0 flex-col gap-3.5 lg:w-[280px]')],
+    [h.Class('flex shrink-0 flex-col gap-3.5 lg:w-[17.5rem]')],
     [
       h.h2(
         [
@@ -319,7 +319,7 @@ export const view = (
     'Releases',
     [
       h.div(
-        [h.Class('mx-auto flex max-w-[1440px] flex-col gap-14 pb-16')],
+        [h.Class('mx-auto flex max-w-[90rem] flex-col gap-14 pb-16')],
         [
           header(copiedCodeIds, h),
           releaseList(h),

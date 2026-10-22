@@ -143,7 +143,7 @@ const ALPHA_NOTES: ReadonlyArray<Row> = [
 
 // VIEW
 
-const sectionClass = 'mx-auto w-full max-w-[1440px] px-5 md:px-20'
+const sectionClass = 'mx-auto w-full max-w-[90rem] px-5 md:px-20'
 
 export const label = (text: string, h: HtmlBuilder<Message>): Html =>
   h.p([h.Class('label text-muted')], [text])
@@ -207,7 +207,7 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
   h.section(
     [
       h.Class(
-        `${sectionClass} grid items-center gap-14 pt-16 pb-20 lg:grid-cols-[minmax(0,640px)_minmax(0,560px)] lg:justify-between lg:gap-20 lg:pt-26 lg:pb-30`,
+        `${sectionClass} grid items-center gap-14 pt-16 pb-20 lg:grid-cols-[minmax(0,40rem)_minmax(0,35rem)] lg:justify-between lg:gap-20 lg:pt-26 lg:pb-30`,
       ),
     ],
     [
@@ -238,7 +238,7 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
             ],
           ),
           h.p(
-            [h.Class('max-w-[580px] text-lg leading-prose text-muted')],
+            [h.Class('max-w-[36.25rem] text-lg leading-prose text-muted')],
             [
               'Silk is a systems language where effects, failures, and dependencies compose, and ownership keeps every resource explicit. Inspired by Effect.',
             ],
@@ -300,7 +300,7 @@ const featureCard = (
   h.article(
     [
       h.Class(
-        'flex min-h-[260px] flex-col justify-between gap-6 rounded-2xl border border-rule p-7',
+        'flex min-h-[16.25rem] flex-col justify-between gap-6 rounded-2xl border border-rule p-7',
       ),
     ],
     [
@@ -374,7 +374,7 @@ const servicesSpotlight = (
   h.section(
     [
       h.Class(
-        `${sectionClass} grid items-center gap-14 pb-20 lg:grid-cols-[minmax(0,480px)_minmax(0,720px)] lg:justify-between lg:gap-20 lg:pb-30`,
+        `${sectionClass} grid items-center gap-14 pb-20 lg:grid-cols-[minmax(0,30rem)_minmax(0,45rem)] lg:justify-between lg:gap-20 lg:pb-30`,
       ),
     ],
     [
@@ -440,7 +440,7 @@ const rowList = (
         [
           h.Class(
             layout === 'Columns'
-              ? 'grid gap-1 border-b border-rule py-3.5 text-sm leading-normal sm:grid-cols-[180px_1fr] sm:gap-6'
+              ? 'grid gap-1 border-b border-rule py-3.5 text-sm leading-normal sm:grid-cols-[11.25rem_1fr] sm:gap-6'
               : 'flex flex-col gap-1 border-b border-rule py-4',
           ),
         ],
@@ -475,7 +475,7 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
                 h,
               ),
               h.p(
-                [h.Class('max-w-[640px] text-lg leading-prose text-muted')],
+                [h.Class('max-w-[40rem] text-lg leading-prose text-muted')],
                 [
                   'Compile for macOS, Linux, no-libc Linux, or WebAssembly, with the same standard library and the same tools. Windows is on the way.',
                 ],
@@ -560,7 +560,7 @@ const status = (h: HtmlBuilder<Message>): Html =>
                 ],
                 [
                   h.p(
-                    [h.Class('max-w-[440px] text-sm leading-normal')],
+                    [h.Class('max-w-[27.5rem] text-sm leading-normal')],
                     [
                       h.strong([], ['Windows']),
                       ' support is still ahead. Today Silk targets macOS, Linux, no-libc Linux, and WebAssembly.',
@@ -591,7 +591,7 @@ const goalBand = (h: HtmlBuilder<Message>): Html =>
           h.p(
             [
               h.Class(
-                'max-w-[1040px] text-3xl leading-tight font-bold tracking-tighter md:text-5xl',
+                'max-w-[65rem] text-3xl leading-tight font-bold tracking-tighter md:text-5xl',
               ),
             ],
             [

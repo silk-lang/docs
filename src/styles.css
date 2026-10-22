@@ -86,7 +86,10 @@
 }
 
 @layer base {
+  /* The design is drawn at 16px, which reads large at 100% zoom, so the whole
+     site renders at 87.5%. Sizes are in rem so they all scale together. */
   html {
+    font-size: 87.5%;
     background-color: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-mono);
@@ -100,7 +103,7 @@
 
 /* The small bold uppercase caption used for section labels, badges and table headers. */
 @utility label {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: var(--tracking-label);
