@@ -48,8 +48,9 @@ Constraint       = Type 'in' Type
 
 ## Declaring a service
 
-- `service Name { ... }` declares a service. It holds operation signatures only.
-- An operation has no body. A body, a field, or a default is SEM0090. A `pub` modifier on an operation is a parse error (PAR0001).
+- `service Name { ... }` declares a service. It holds operations only.
+- An operation may have a body. The body is its default: a provider that leaves the operation out uses it, and one that implements the operation replaces it.
+- A field or any other member that is not an operation is SEM0090. A `pub` modifier on an operation is a parse error (PAR0001).
 - Operation names are distinct within a service (SEM0003).
 - An operation normally requires its own service: `effect fn next() -> i32 ? &mut Counter`. The entry's access decides what a provider's implementation may do.
 - An operation may require other services as well, and may declare a failure row. For example, `HostInput.argument` requires `? &mut HostInput | &mut Allocator`.
@@ -173,10 +174,13 @@ import silk.effect { Effect }
 
 service Counter {
   effect fn next() -> i32 ? &mut Counter
+
   effect fn peek() -> i32 ? &Counter
 }
 
-struct Counting { value: i32 }
+struct Counting {
+  value: i32
+}
 
 effect fn peekCounting(self: &Counting) -> i32 {
   return self.value
@@ -187,14 +191,17 @@ impl Counter for Counting {
     self.value = self.value + 1
     return self.value
   }
+
   peek: Counting.peekCounting
 }
 
-effect fn look() -> i32 ? &Counter {
+effect fn look() -> i32
+  ? &Counter {
   return run Counter.peek()
 }
 
-effect fn step() -> i32 ? &mut Counter {
+effect fn step() -> i32
+  ? &mut Counter {
   let stepped = run Counter.next()
   let seen = run look()
   return stepped + seen
@@ -204,7 +211,9 @@ pub fn main() -> i32 {
   let mut counter = Counting { value: 20 }
   let both = run step() |> Effect.provideMut<Counter>(&mut counter)
   let seen = run look() |> Effect.provide(&counter)
-  if counter.value != 21 { return 1 }
+  if counter.value != 21 {
+    return 1
+  }
   return both + seen - 63
 }
 ```
@@ -218,23 +227,28 @@ role Audit
 
 service Journal {
   effect fn record() -> i32 ? &mut Journal
+
   effect fn audit() -> i32 ? &mut Journal at Audit
 }
 
-struct Book { entries: i32 }
+struct Book {
+  entries: i32
+}
 
 impl Journal for Book {
   effect fn record(self: &mut Self) -> i32 {
     self.entries = self.entries + 1
     return self.entries
   }
+
   effect fn audit(self: &mut Self) -> i32 {
     self.entries = self.entries + 100
     return self.entries
   }
 }
 
-effect fn work() -> i32 ? &mut Journal | &mut Journal at Audit {
+effect fn work() -> i32
+  ? &mut Journal | &mut Journal at Audit {
   let recorded = run Journal.record()
   let audited = run Journal.audit()
   return recorded + audited
@@ -243,10 +257,11 @@ effect fn work() -> i32 ? &mut Journal | &mut Journal at Audit {
 pub fn main() -> i32 {
   let mut daily = Book { entries: 0 }
   let mut audit = Book { entries: 0 }
-  let total = run work()
-    |> Effect.provideMut<Journal>(&mut daily)
+  let total = run work() |> Effect.provideMut<Journal>(&mut daily)
     |> Effect.provideMut<Journal at Audit>(&mut audit)
-  if daily.entries != 1 || audit.entries != 100 { return 1 }
+  if daily.entries != 1 || audit.entries != 100 {
+    return 1
+  }
   return total - 101
 }
 ```
@@ -264,7 +279,9 @@ service Label {
   effect fn label() -> i32 ? &Label
 }
 
-struct Counting { value: i32 }
+struct Counting {
+  value: i32
+}
 
 impl Counter for Counting {
   effect fn next(self: &mut Self) -> i32 {
@@ -273,28 +290,34 @@ impl Counter for Counting {
   }
 }
 
-struct Fixed { value: i32 }
-
-impl Label for Fixed {
-  effect fn label(self: &Self) -> i32 { return self.value }
+struct Fixed {
+  value: i32
 }
 
-effect fn work() -> i32 ? &mut Counter | &Label {
+impl Label for Fixed {
+  effect fn label(self: &Self) -> i32 {
+    return self.value
+  }
+}
+
+effect fn work() -> i32
+  ? &mut Counter | &Label {
   let counted = run Counter.next()
   let labelled = run Label.label()
   return counted + labelled
 }
 
-effect fn withCounter<'env, A, E, ?R>(
+effect fn withCounter<'env, A, E, ? R>(
   body: once Effect<'env; A ! E ? R>,
   counter: &'env mut Counting,
-) -> A ! E ? Without<R, Counter>
-where &'env mut Counting provides Counter from R {
+) -> A
+  ! E
+  ? Without<R, Counter> where &'env mut Counting provides Counter from R {
   return run Effect.provideMut<Counter>(move body, move counter)
 }
 
-effect fn counterFree<'env, A, ?R>(body: once Effect<'env; A ? R>) -> A ? R
-where R in Without<R, Counter> {
+effect fn counterFree<'env, A, ? R>(body: once Effect<'env; A ? R>) -> A
+  ? R where R in Without<R, Counter> {
   return run move body
 }
 
@@ -316,7 +339,9 @@ service Counter {
   effect fn next() -> i32 ? &mut Counter
 }
 
-struct Counting { value: i32 }
+struct Counting {
+  value: i32
+}
 
 impl Counter for Counting {
   effect fn next(self: &mut Self) -> i32 {
@@ -325,12 +350,13 @@ impl Counter for Counting {
   }
 }
 
-effect fn inner<'env, ?S, ?R>(body: once Effect<'env; i32 ? S>) -> i32 ? R
-where S in R {
+effect fn inner<'env, ? S, ? R>(body: once Effect<'env; i32 ? S>) -> i32
+  ? R where S in R {
   return run move body
 }
 
-effect fn twice() -> i32 ? &mut Counter {
+effect fn twice() -> i32
+  ? &mut Counter {
   let a = run Counter.next()
   let b = run Counter.next()
   return a + b
@@ -350,9 +376,13 @@ pub fn main() -> i32 {
 import silk.host_input { HostInput, HostInputError }
 import silk.usize
 
-pub effect fn main() -> i32 ! HostInputError ? &mut HostInput {
+pub effect fn main() -> i32
+  ! HostInputError
+  ? &mut HostInput {
   let count = run HostInput.argumentCount()
-  if count == usize.ONE { return 0 }
+  if count == usize.ONE {
+    return 0
+  }
   return 1
 }
 ```
@@ -407,7 +437,7 @@ pub fn main() -> i32 {
 A `main` that provides the plain provider instead, `let offset = Offset { amount: 10 }` followed by `return run Effect.provide(measure(), &offset)`, is rejected:
 
 ```
-/home/you/trace/src/main.silk:33:14: error[SEM0123] The provider matches no compatible requirement
+src/main.silk:33:14: error[SEM0123] The provider matches no compatible requirement
 ```
 
 ## Diagnostics
@@ -422,7 +452,7 @@ A `main` that provides the plain provider instead, `let offset = Offset { amount
 | SEM0071 | `run` leaves requirements that the enclosing signature does not provide |
 | SEM0083 | Invalid conformance: missing member, or `&mut Self` for a shared operation |
 | SEM0088 | Row variable used where a type is expected |
-| SEM0090 | Service contains a field, body or default |
+| SEM0090 | Service contains a field or another member that is not an operation |
 | SEM0099 | Selected entry or row argument cannot be inferred |
 | SEM0123 | Provider matches no requirement entry, including a plain provider of `S` for `&Option<&S>` |
 | SEM0125 | Provider matches more than one entry; select one explicitly |

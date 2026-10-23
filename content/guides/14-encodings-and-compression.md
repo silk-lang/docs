@@ -39,15 +39,15 @@ Checking unpack (x86_64-unknown-linux-gnu)
   load     60 modules, 1 in package          0.09s
   check    failed: 2 modules, 1 error        0.21s
 [x86_64-unknown-linux-gnu]
-/home/you/unpack/src/main.silk:6:45: error[SEM0016] Multiple bindings claim Format
-  note: /home/you/unpack/src/main.silk:5:22: related location
+src/main.silk:6:45: error[SEM0016] Multiple bindings claim Format
+  note: src/main.silk:5:22: related location
 Failed unpack in 0.30s
 ```
 
 Writing `inflate.Format.Gzip` through the module name does not work either. A module import names the module's types in type positions, but not their members as values:
 
 ```
-/home/you/unpack/src/main.silk:111:38: error[SEM0238] Format is a type of module silk.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.inflate { Format }`
+src/main.silk:111:38: error[SEM0238] Format is a type of module silk.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.inflate { Format }`
 ```
 
 Here `Format` is already taken, so rename on import instead.

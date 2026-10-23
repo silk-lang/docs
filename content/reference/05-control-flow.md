@@ -104,8 +104,12 @@ fn sumPositive(values: &[i32]) -> i32 {
   while index < values.length {
     let value = values[index]
     index = index + 1
-    if value < 0 { continue }
-    if value > 100 { break }
+    if value < 0 {
+      continue
+    }
+    if value > 100 {
+      break
+    }
     total = total + value
   }
   return total
@@ -113,8 +117,12 @@ fn sumPositive(values: &[i32]) -> i32 {
 
 pub fn main() -> i32 {
   let values = [4, -2, 6, 500, 7]
-  if classify(-5) != -1 || classify(0) != 0 { return 1 }
-  if sumPositive(&values) != 10 { return 2 }
+  if classify(-5) != -1 || classify(0) != 0 {
+    return 1
+  }
+  if sumPositive(&values) != 10 {
+    return 2
+  }
   return 0
 }
 ```
@@ -125,7 +133,9 @@ import silk.option { Option }
 fn find(values: &[i32], wanted: i32) -> Option<usize> {
   let mut index: usize = 0
   while index < values.length {
-    if values[index] == wanted { return Option.Some { value: index } }
+    if values[index] == wanted {
+      return Option.Some { value: index }
+    }
     index = index + 1
   }
   return Option.None
@@ -140,8 +150,14 @@ fn positionOf(values: &[i32], wanted: i32) -> usize {
 
 pub fn main() -> i32 {
   let values = [4, 8, 15]
-  if positionOf(&values, 15) != 2 { return 1 }
-  if let Option.Some { value } = find(&values, 99) { return 2 } else { return 0 }
+  if positionOf(&values, 15) != 2 {
+    return 1
+  }
+  if let Option.Some { value } = find(&values, 99) {
+    return 2
+  } else {
+    return 0
+  }
 }
 ```
 
@@ -153,10 +169,18 @@ fn bump(counter: &mut [i32], answer: bool) -> bool {
 
 pub fn main() -> i32 {
   let mut calls = [0]
-  if false && bump(&mut calls, true) { return 1 }
-  if true || bump(&mut calls, true) {} else { return 2 }
-  if calls[0] != 0 { return 3 }
-  if true && bump(&mut calls, false) { return 4 }
+  if false && bump(&mut calls, true) {
+    return 1
+  }
+  if true || bump(&mut calls, true) {} else {
+    return 2
+  }
+  if calls[0] != 0 {
+    return 3
+  }
+  if true && bump(&mut calls, false) {
+    return 4
+  }
   return calls[0] - 1
 }
 ```

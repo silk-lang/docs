@@ -75,7 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | SI
 | `SILK_CHANNEL` | `stable`, `dev` or `auto`. `auto` prefers stable and falls back to dev only before any stable release exists | `auto` |
 | `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit, useful on shared CI machines | none |
 
-`SILK_RELEASE` pins a version, which is what you want in CI. A tag that does not exist stops the script with `silk-install: cannot find release v9.9.9`. Dev tags carry a commit, as in `v0.1.0-dev.3+fbd34fb3d0ee`; quote them in the shell.
+`SILK_RELEASE` pins a version, which is what you want in CI. A tag that does not exist stops the script with `silk-install: silk-lang/silk has no release v9.9.9`. Dev tags carry a commit, as in `v0.1.0-dev.3+fbd34fb3d0ee`; quote them in the shell.
 
 ## Install Clang
 

@@ -344,7 +344,7 @@ Checking sealnote (x86_64-unknown-linux-gnu)
   load     67 modules, 1 in package          0.08s
   check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-/home/you/sealnote/src/main.silk:192:3: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:192:3: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
 Failed sealnote in 0.27s
 ```
 

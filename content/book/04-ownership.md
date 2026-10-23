@@ -122,16 +122,23 @@ fn statusMark(task: &Task) -> string<'static> {
   return "[x]"
 }
 
-effect fn show(task: &Task) -> () ! LogError ? &mut Logger {
-  run Effect.log("{mark} #{id} {title} ({priority})\n", &.{
-    mark: statusMark(task),
-    id: task.id.0,
-    title: task.title,
-    priority: priorityLabel(task.priority),
-  })
+effect fn show(task: &Task) -> ()
+  ! LogError
+  ? &mut Logger {
+  run Effect.log(
+    "{mark} #{id} {title} ({priority})\n",
+    &.{
+      mark: statusMark(task),
+      id: task.id.0,
+      title: task.title,
+      priority: priorityLabel(task.priority),
+    }
+  )
 }
 
-effect fn showBoard(board: &Board) -> () ! LogError ? &mut Logger {
+effect fn showBoard(board: &Board) -> ()
+  ! LogError
+  ? &mut Logger {
   let mut index: usize = 0
   while index < board.count {
     run show(&board.tasks[index])
@@ -140,7 +147,9 @@ effect fn showBoard(board: &Board) -> () ! LogError ? &mut Logger {
   run Effect.log("{open} open\n", &.{ open: board.openCount() })
 }
 
-effect fn report() -> () ! LogError ? &mut Logger {
+effect fn report() -> ()
+  ! LogError
+  ? &mut Logger {
   let mut board = Board.make()
   let draft = Draft { title: "Buy milk", priority: Priority.Normal }
   let milk = board.add(move draft)
@@ -153,7 +162,8 @@ effect fn report() -> () ! LogError ? &mut Logger {
   run showBoard(&board)
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   run report() |> Effect.provideMut(&mut logger)
 }
@@ -214,7 +224,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:135:24: error[OWN0003] Moving draft requires an explicit move
+src/main.silk:135:24: error[OWN0003] Moving draft requires an explicit move
 Failed tasks in 0.17s
 ```
 
@@ -240,8 +250,8 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:136:48: error[OWN0001] draft.title was moved and cannot be used again
-  note: /home/you/tasks/src/main.silk:135:24: related location
+src/main.silk:136:48: error[OWN0001] draft.title was moved and cannot be used again
+  note: src/main.silk:135:24: related location
 Failed tasks in 0.17s
 ```
 
@@ -270,8 +280,8 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:65:41: error[OWN0003] Moving id requires an explicit move
-/home/you/tasks/src/main.silk:137:21: error[OWN0003] Moving milk requires an explicit move
+src/main.silk:65:41: error[OWN0003] Moving id requires an explicit move
+src/main.silk:137:21: error[OWN0003] Moving milk requires an explicit move
 Failed tasks in 0.17s
 ```
 
@@ -319,10 +329,10 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 4 errors       0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:135:20: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
-/home/you/tasks/src/main.silk:136:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
-/home/you/tasks/src/main.silk:137:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
-/home/you/tasks/src/main.silk:139:12: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
+src/main.silk:135:20: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
+src/main.silk:136:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
+src/main.silk:137:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
+src/main.silk:139:12: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
 Failed tasks in 0.17s
 ```
 
@@ -335,7 +345,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:76:18: error[SEM0058] A shared view cannot be reborrowed exclusively
+src/main.silk:76:18: error[SEM0058] A shared view cannot be reborrowed exclusively
 Failed tasks in 0.17s
 ```
 
@@ -362,10 +372,10 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:137:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
-  note: /home/you/tasks/src/main.silk:136:15: related location
-/home/you/tasks/src/main.silk:138:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
-  note: /home/you/tasks/src/main.silk:136:15: related location
+src/main.silk:137:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
+  note: src/main.silk:136:15: related location
+src/main.silk:138:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
+  note: src/main.silk:136:15: related location
 Failed tasks in 0.17s
 ```
 

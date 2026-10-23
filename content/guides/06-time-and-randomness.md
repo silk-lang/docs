@@ -192,7 +192,7 @@ Checking timing (x86_64-unknown-linux-gnu)
   load     60 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        1.75s
 [x86_64-unknown-linux-gnu]
-/home/you/timing/src/main.silk:144:7: error[SEM0123] The provider matches no compatible requirement
+src/main.silk:144:7: error[SEM0123] The provider matches no compatible requirement
 Failed timing in 1.81s
 ```
 

@@ -353,7 +353,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     59 modules, 1 in package          0.08s
   check    failed: 2 modules, 1 error        2.33s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:539:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:539:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
 Failed tasks in 2.41s
 ```
 
@@ -381,7 +381,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:10:17: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:10:17: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
 Failed scratch in 0.19s
 ```
 
@@ -409,7 +409,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules                 0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:3:15: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput`
+src/main.silk:3:15: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput`
 Failed scratch in 0.18s
 ```
 
@@ -439,7 +439,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:12:21: error[SEM0131] A provider whose key matches but whose access cannot satisfy the requirement
+src/main.silk:12:21: error[SEM0131] A provider whose key matches but whose access cannot satisfy the requirement
 Failed scratch in 0.14s
 ```
 
@@ -463,27 +463,35 @@ service Notifier {
 struct Printing {}
 
 impl Notifier for Printing {
-  effect fn notify(self: &mut Self, title: string) -> () ! LogError {
+  effect fn notify(self: &mut Self, title: string) -> ()
+    ! LogError {
     let mut logger = StdoutLogger.make()
-    run Effect.log("reminder: {title}\n", &.{ title: title }) |> Effect.provideMut<Logger>(&mut logger)
+    run Effect.log("reminder: {title}\n", &.{ title: title })
+      |> Effect.provideMut<Logger>(&mut logger)
   }
 }
 
 // ...another only counts, which is what a test wants.
-struct Counting { sent: i32 }
+struct Counting {
+  sent: i32
+}
 
 impl Notifier for Counting {
-  effect fn notify(self: &mut Self, title: string) -> () ! LogError {
+  effect fn notify(self: &mut Self, title: string) -> ()
+    ! LogError {
     self.sent = self.sent + 1
   }
 }
 
-effect fn remindAll() -> () ! LogError ? &mut Notifier {
+effect fn remindAll() -> ()
+  ! LogError
+  ? &mut Notifier {
   run Notifier.notify("Water the plants")
   run Notifier.notify("Call the plumber")
 }
 
-pub effect fn main() -> i32 ! LogError {
+pub effect fn main() -> i32
+  ! LogError {
   let mut printing = Printing {}
   run remindAll() |> Effect.provideMut<Notifier>(&mut printing)
   let mut counting = Counting { sent: 0 }

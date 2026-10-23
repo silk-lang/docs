@@ -251,7 +251,7 @@ Compiling tiny (x86_64-unknown-linux-gnu, debug)
   check    1 module                          0.00s
   codegen  failed: 89 functions, 1 error     0.09s
 [x86_64-unknown-linux-gnu]
-/home/you/tiny/src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/native_start_sync` cannot start
+src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/native_start_sync` cannot start
 Failed tiny in 0.26s
 ```
 

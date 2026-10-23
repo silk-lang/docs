@@ -156,22 +156,38 @@ fn sign(n: i32) -> i32 {
 
 pub fn main() -> i32 {
   let rect = Shape.Rect { width: 4, height: 5 }
-  if area(&rect) != 20 { return 1 }
-  if tall(move rect) != 2 { return 2 }
-  if tall(Shape.Rect { width: 1, height: 12 }) != 1 { return 3 }
-  if sign(-7) != -1 || sign(0) != 0 { return 4 }
+  if area(&rect) != 20 {
+    return 1
+  }
+  if tall(move rect) != 2 {
+    return 2
+  }
+  if tall(Shape.Rect { width: 1, height: 12 }) != 1 {
+    return 3
+  }
+  if sign(-7) != -1 || sign(0) != 0 {
+    return 4
+  }
   return 0
 }
 ```
 
 ```silk
-struct Token { value: i32 }
-union Packet { Empty, Ready { left: Token, right: Token } }
+struct Token {
+  value: i32
+}
+
+union Packet {
+  Empty,
+  Ready { left: Token, right: Token }
+}
 
 pub fn main() -> i32 {
   let mut packet = Packet.Ready { left: Token { value: 1 }, right: Token { value: 2 } }
   match &mut packet {
-    Packet.Ready { right, .. } => { right.value = 20 }
+    Packet.Ready { right, .. } => {
+      right.value = 20
+    }
     Packet.Empty => {}
   }
   let mut taken = 0
@@ -188,15 +204,24 @@ pub fn main() -> i32 {
     Packet.Empty => 0
   }
   drop packet
-  if taken != 1 || sum != 29 { return 1 }
+  if taken != 1 || sum != 29 {
+    return 1
+  }
   return 0
 }
 ```
 
 ```silk
-struct Left { value: i32 }
+struct Left {
+  value: i32
+}
+
 struct Right {}
-struct Point { x: i32 y: i32 }
+
+struct Point {
+  x: i32
+  y: i32
+}
 
 fn read(input: Left | Right) -> i32 {
   if let Left { value } = &input {
@@ -217,15 +242,27 @@ fn whole(input: Left | Right) -> i32 {
 pub fn main() -> i32 {
   let point = Point { x: 3, y: 4 }
   let Point { x, y } = move point
-  if read(Left { value: 7 }) != 7 || read(Right {}) != 0 { return 1 }
-  if whole(Left { value: x + y }) != 7 { return 2 }
+  if read(Left { value: 7 }) != 7 || read(Right {}) != 0 {
+    return 1
+  }
+  if whole(Left { value: x + y }) != 7 {
+    return 2
+  }
   return 0
 }
 ```
 
 ```silk
-enum Color { Red, Green, Blue }
-struct Paint { color: Color amount: i32 }
+enum Color {
+  Red,
+  Green,
+  Blue
+}
+
+struct Paint {
+  color: Color
+  amount: i32
+}
 
 fn make(color: Color, amount: i32) -> Paint {
   return Paint { color: color, amount: amount }
@@ -240,15 +277,23 @@ fn score(paint: Paint) -> i32 {
 }
 
 fn next(n: i32) -> i32 {
-  return match n { i32 whole => whole + 1 }
+  return match n {
+    i32 whole => whole + 1
+  }
 }
 
 pub fn main() -> i32 {
   let c = Color.Green
-  if let Color.Red = c { return 1 }
+  if let Color.Red = c {
+    return 1
+  }
   let Paint { amount, .. } = make(Color.Blue, 3)
-  if score(make(Color.Blue, amount)) != 6 { return 2 }
-  if next(4) != 5 { return 3 }
+  if score(make(Color.Blue, amount)) != 6 {
+    return 2
+  }
+  if next(4) != 5 {
+    return 3
+  }
   return 0
 }
 ```

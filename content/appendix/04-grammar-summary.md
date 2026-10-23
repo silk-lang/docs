@@ -237,37 +237,66 @@ Each row is a `src/main.silk` in `/home/you/demo`. The first column is the progr
 This program uses most of the forms above. It builds and exits 0.
 
 ```silk
-struct Point { x: i32 y: i32 }
-union Shape { Dot, Box { w: i32, h: i32, } }
-enum(u8) Level { Low = 1, High = 2, }
+struct Point {
+  x: i32
+  y: i32
+}
+
+union Shape {
+  Dot,
+  Box { w: i32, h: i32, }
+}
+
+enum(u8) Level {
+  Low = 1,
+  High = 2,
+}
+
 tuple Pair(i32, i32)
-fn origin() -> Point { return .{ x: 0, y: 0, } }
+
+fn origin() -> Point {
+  return .{ x: 0, y: 0 }
+}
+
 fn area(s: &Shape) -> i32 {
   return match &s.* {
     Shape.Dot => 0
     Shape.Box { w, h: height } => w * height
   }
 }
-fn add(a: i32, b: i32,) -> i32 { return a + b }
-effect fn later() -> i32 { return 4 }
+
+fn add(a: i32, b: i32) -> i32 {
+  return a + b
+}
+
+effect fn later() -> i32 {
+  return 4
+}
+
 pub fn main() -> i32 {
   let zeros = [0; 4]
   let p = origin()
   let Point { x, y } = move p
   let pair = Pair(1, 2)
   let s = Shape.Box { w: 2, h: 3 }
-  let mut total = add(zeros[3], area(&s),)
+  let mut total = add(zeros[3], area(&s))
   total = total + pair.0 - 1
-  if let Shape.Box { w, .. } = move s { total = total + w - 2 }
+  if let Shape.Box { w, .. } = move s {
+    total = total + w - 2
+  }
   let n = 5
   let picked = match n {
     -1 => 0
     i32 k if k > 3 => k
     _ => 1
   }
-  if (run later()) != 4 { return 9 }
+  if (run later()) != 4 {
+    return 9
+  }
   let level = Level.High
-  if level == Level.Low { return 8 }
+  if level == Level.Low {
+    return 8
+  }
   return total - 6 + x + y + picked - 5
 }
 ```

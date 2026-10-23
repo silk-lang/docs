@@ -274,11 +274,12 @@ fn total(values: &[u32]) -> u32 {
 }
 
 // The same kernel compiled for AVX2. A caller must know the machine has it.
-unsafe fn totalAvx2(values: &[u32]) -> u32 with Intrinsic.machine(features: ("avx2",)) {
+unsafe fn totalAvx2(values: &[u32]) -> u32 with Intrinsic .machine (features: ("avx2",)) {
   return total(values)
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   let mut values: [u32; 1000] = [0; 1000]
   let mut at: usize = 0

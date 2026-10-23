@@ -26,7 +26,7 @@ Checking app (x86_64-unknown-linux-gnu)
   load     54 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-/home/you/app/src/main.silk:4:8: error[MOD0003] Module lib is not exported by package text-utils@0.1.0
+src/main.silk:4:8: error[MOD0003] Module lib is not exported by package text-utils@0.1.0
 Failed app in 0.16s
 ```
 

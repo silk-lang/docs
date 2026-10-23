@@ -109,18 +109,31 @@ Selective and complete recovery of a two-member row:
 ```silk
 import silk.effect { Effect }
 
-struct Missing { code: i32 }
-struct Denied { code: i32 }
+struct Missing {
+  code: i32
+}
 
-effect fn open(mode: i32) -> i32 ! Missing | Denied {
-  if mode == 1 { fail Missing { code: 10 } }
-  if mode == 2 { fail Denied { code: 20 } }
+struct Denied {
+  code: i32
+}
+
+effect fn open(mode: i32) -> i32
+  ! Missing | Denied {
+  if mode == 1 {
+    fail Missing { code: 10 }
+  }
+  if mode == 2 {
+    fail Denied { code: 20 }
+  }
   return 0
 }
 
-effect fn useDefault(missing: Missing) -> i32 { return missing.code }
+effect fn useDefault(missing: Missing) -> i32 {
+  return missing.code
+}
 
-effect fn partial(mode: i32) -> i32 ! Denied {
+effect fn partial(mode: i32) -> i32
+  ! Denied {
   return run open(mode) |> Effect.catch(useDefault)
 }
 
@@ -131,7 +144,9 @@ effect fn either(error: Missing | Denied) -> i32 {
   }
 }
 
-effect fn last(denied: Denied) -> i32 { return denied.code }
+effect fn last(denied: Denied) -> i32 {
+  return denied.code
+}
 
 pub fn main() -> i32 {
   let a = run partial(1) |> Effect.catchAll(last)
@@ -147,17 +162,29 @@ Mapping a failure and inspecting the outcome as data:
 import silk.effect { Effect }
 import silk.result { Result }
 
-struct Missing { code: i32 }
-struct Wrapped { inner: i32 }
+struct Missing {
+  code: i32
+}
 
-effect fn load(ok: bool) -> i32 ! Missing {
-  if !ok { fail Missing { code: 4 } }
+struct Wrapped {
+  inner: i32
+}
+
+effect fn load(ok: bool) -> i32
+  ! Missing {
+  if !ok {
+    fail Missing { code: 4 }
+  }
   return 10
 }
 
-fn wrap(missing: Missing) -> Wrapped { return Wrapped { inner: missing.code } }
+fn wrap(missing: Missing) -> Wrapped {
+  return Wrapped { inner: missing.code }
+}
 
-effect fn fallback(error: Wrapped) -> bool { return false }
+effect fn fallback(error: Wrapped) -> bool {
+  return false
+}
 
 pub fn main() -> i32 {
   let outcome = run Effect.result(Effect.mapError(load(false), wrap))
@@ -165,7 +192,9 @@ pub fn main() -> i32 {
     Result<i32, Wrapped>.Success { value } => value
     Result<i32, Wrapped>.Failure { error } => error.inner
   }
-  if code != 4 { return 1 }
+  if code != 4 {
+    return 1
+  }
   let mixed: i32 | bool = run Effect.catchAll(Effect.mapError(load(false), wrap), fallback)
   let n = match mixed {
     i32 v => v
@@ -181,8 +210,13 @@ A failure drops the frame's locals, runs the finalizers innermost first, then re
 import silk.effect { Effect }
 import silk.ownership { Drop }
 
-struct Problem { code: i32 }
-struct Guard<'a> { count: &'a mut i32 }
+struct Problem {
+  code: i32
+}
+
+struct Guard<'a> {
+  count: &'a mut i32
+}
 
 impl<'a> Drop for Guard<'a> {
   fn drop(self: &mut Guard<'a>) -> () {
@@ -191,23 +225,38 @@ impl<'a> Drop for Guard<'a> {
   }
 }
 
-service Journal { effect fn mark(value: i32) -> () ? &mut Journal }
-struct Memory { value: i32 }
+service Journal {
+  effect fn mark(value: i32) -> () ? &mut Journal
+}
+
+struct Memory {
+  value: i32
+}
+
 effect fn mark(self: &mut Memory, value: i32) -> () {
   self.value = self.value * 10 + value
   return ()
 }
-impl Journal for Memory { mark: Memory.mark }
 
-effect fn work(count: &mut i32) -> i32 ! Problem ? &mut Journal {
+impl Journal for Memory {
+  mark: Memory.mark
+}
+
+effect fn work(count: &mut i32) -> i32
+  ! Problem
+  ? &mut Journal {
   let guard = Guard { count: move count }
   run Journal.mark(1)
   fail Problem { code: 3 }
 }
 
-effect fn note(value: i32) -> () ? &mut Journal { return run Journal.mark(value) }
+effect fn note(value: i32) -> ()
+  ? &mut Journal {
+  return run Journal.mark(value)
+}
 
-effect fn recover(error: Problem) -> i32 ? &mut Journal {
+effect fn recover(error: Problem) -> i32
+  ? &mut Journal {
   run Journal.mark(4)
   return error.code
 }
@@ -218,8 +267,12 @@ pub fn main() -> i32 {
   let inner = Effect.ensuring(work(&mut drops), note(2))
   let outer = Effect.ensuring(move inner, note(3))
   let code = run Effect.catchAll(move outer, recover) |> Effect.provideMut(&mut journal)
-  if code != 3 || drops != 1 { return 1 }
-  if journal.value != 1234 { return 2 }
+  if code != 3 || drops != 1 {
+    return 1
+  }
+  if journal.value != 1234 {
+    return 2
+  }
   return 0
 }
 ```

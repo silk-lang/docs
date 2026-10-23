@@ -13,7 +13,9 @@ import silk.effect { Effect }
 import silk.logger { Logger, LogError }
 import silk.os_logger { StdoutLogger }
 
-effect fn report() -> () ! LogError ? &mut Logger {
+effect fn report() -> ()
+  ! LogError
+  ? &mut Logger {
   // Three tasks for now: an estimate in minutes, and whether each is finished.
   let estimates = [25, 90, 40]
   let finished = [true, false, false]
@@ -29,13 +31,11 @@ effect fn report() -> () ! LogError ? &mut Logger {
     index = index + 1
   }
 
-  run Effect.log("{open} open, {minutes} minutes left\n", &.{
-    open: open,
-    minutes: minutesLeft,
-  })
+  run Effect.log("{open} open, {minutes} minutes left\n", &.{ open: open, minutes: minutesLeft })
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   run report() |> Effect.provideMut(&mut logger)
 }
@@ -97,7 +97,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:13:15: error[SEM0135] Operator < does not accept (i32, usize)
+src/main.silk:13:15: error[SEM0135] Operator < does not accept (i32, usize)
 Failed tasks in 0.17s
 ```
 
@@ -120,7 +120,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:15:7: error[SEM0035] Cannot assign through immutable binding open
+src/main.silk:15:7: error[SEM0035] Cannot assign through immutable binding open
 Failed tasks in 0.17s
 ```
 
@@ -137,7 +137,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:15:13: error[PAR0001] Expected identifier
+src/main.silk:15:13: error[PAR0001] Expected identifier
 Failed tasks in 0.16s
 ```
 
@@ -207,8 +207,8 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:16:14: error[PAR0001] Expected identifier
-/home/you/tasks/src/main.silk:16:30: error[SEM0087] Expression statement produces string<'static>, but only () or never may be ignored
+src/main.silk:16:14: error[PAR0001] Expected identifier
+src/main.silk:16:30: error[SEM0087] Expression statement produces string<'static>, but only () or never may be ignored
 Failed tasks in 0.18s
 ```
 
@@ -263,7 +263,9 @@ fn noun(count: i32) -> string<'static> {
   return "tasks"
 }
 
-effect fn report() -> () ! LogError ? &mut Logger {
+effect fn report() -> ()
+  ! LogError
+  ? &mut Logger {
   // Three tasks for now: an estimate in minutes, and whether each is finished.
   let estimates = [25, 90, 40]
   let finished = [true, false, false]
@@ -281,19 +283,18 @@ effect fn report() -> () ! LogError ? &mut Logger {
 
   let total = usize.toI32(estimates.length)
   let done = total - open
-  run Effect.log("{open} of {total} {noun} open, {percent}% done\n", &.{
-    open: open,
-    total: total,
-    noun: noun(total),
-    percent: percent(done, total),
-  })
-  run Effect.log("time left: {hours}h {minutes}m\n", &.{
-    hours: minutesLeft / MINUTES_PER_HOUR,
-    minutes: minutesLeft % MINUTES_PER_HOUR,
-  })
+  run Effect.log(
+    "{open} of {total} {noun} open, {percent}% done\n",
+    &.{ open: open, total: total, noun: noun(total), percent: percent(done, total) }
+  )
+  run Effect.log(
+    "time left: {hours}h {minutes}m\n",
+    &.{ hours: minutesLeft / MINUTES_PER_HOUR, minutes: minutesLeft % MINUTES_PER_HOUR }
+  )
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   run report() |> Effect.provideMut(&mut logger)
 }
@@ -366,7 +367,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:2:18: error[SEM0135] Operator + does not accept (i32, i64)
+src/main.silk:2:18: error[SEM0135] Operator + does not accept (i32, i64)
 Failed scratch in 0.17s
 ```
 

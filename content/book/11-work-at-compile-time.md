@@ -63,7 +63,7 @@ silk check
 Checking scratch (x86_64-unknown-linux-gnu)
   load     failed: 1 error                   0.15s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:1:41: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
+src/main.silk:1:41: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
 Failed scratch in 0.15s
 ```
 
@@ -143,7 +143,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     68 modules, 1 in package          0.10s
   check    failed: 2 modules, 1 error        5.10s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:566:10: error[PAR0001] Expected `{`
+src/main.silk:566:10: error[PAR0001] Expected `{`
 Failed tasks in 5.21s
 ```
 
@@ -165,7 +165,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:4:14: error[PAR0001] Expected identifier
+src/main.silk:4:14: error[PAR0001] Expected identifier
 Failed tasks in 0.19s
 ```
 
@@ -278,7 +278,7 @@ The `where` clause guards bindings too. Change the value to `"90000"` and check:
 Checking tasks (x86_64-unknown-linux-gnu)
   load     failed: 1 error                   0.09s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:248:43: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
+src/main.silk:248:43: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
 Failed tasks in 0.09s
 ```
 
@@ -421,8 +421,8 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     68 modules, 1 in package          0.08s
   check    failed: 2 modules, 1 error        5.10s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:561:5: error[SEM0177] a progress bar is 1 to 40 cells wide
-  note: /home/you/tasks/src/main.silk:554:7: related location
+src/main.silk:561:5: error[SEM0177] a progress bar is 1 to 40 cells wide
+  note: src/main.silk:554:7: related location
 Failed tasks in 5.18s
 ```
 
@@ -450,7 +450,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:3:13: error[SEM0176] Crossing from static evaluation into unavailable runtime work
+src/main.silk:3:13: error[SEM0176] Crossing from static evaluation into unavailable runtime work
 Failed tasks in 0.16s
 ```
 

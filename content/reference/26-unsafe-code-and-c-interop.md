@@ -172,22 +172,32 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 ```silk
 import silk.pointer { Pointer }
 
-unsafe extern "C" fn strlen(text: [*]const u8) -> usize
-unsafe extern "C" fn snprintf(buffer: ?[*]mut u8, size: usize, format: ?[*]const u8, ...) -> i32
+unsafe extern "C" fn strlen(text: [*] const u8) -> usize
+
+unsafe extern "C" fn snprintf(buffer: ?[*] mut u8, size: usize, format: ?[*] const u8, ...) -> i32
+
 unsafe extern "C" fn getpid() -> i32
 
 pub fn main() -> i32 {
   let mut buffer: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0]
   let format = b"n=%d\0"
   let written = unsafe snprintf(Pointer.fromMutSlice(&mut buffer), 8, Pointer.fromSlice(format), 42)
-  if written != 4 { return 1 }
-  if buffer[2] != 52 || buffer[3] != 50 { return 2 }
+  if written != 4 {
+    return 1
+  }
+  if buffer[2] != 52 || buffer[3] != 50 {
+    return 2
+  }
   let text = Pointer.fromSlice(&buffer)
   unsafe {
-    let many = Intrinsic.pointerRequalify<?[*]const u8, [*]const u8>(text)
-    if strlen(many) != 4 { return 3 }
+    let many = Intrinsic.pointerRequalify<?[*] const u8, [*] const u8>(text)
+    if strlen(many) != 4 {
+      return 3
+    }
   }
-  if unsafe getpid() <= 0 { return 4 }
+  if unsafe getpid() <= 0 {
+    return 4
+  }
   return 0
 }
 ```
@@ -198,24 +208,30 @@ A C callback, sorting with libc `qsort`:
 import silk.pointer { Pointer }
 
 unsafe extern "C" fn qsort(
-  base: ?[*]mut i32,
+  base: ?[*] mut i32,
   count: usize,
   size: usize,
   compare: extern "C" fn(*const i32, *const i32) -> i32
-) -> () with Intrinsic.foreign(callbacks: ("compare",))
+) -> () with Intrinsic .foreign (callbacks: ("compare",))
 
 export "C" fn descending(left: *const i32, right: *const i32) -> i32 {
   let a = unsafe Pointer.read(left)
   let b = unsafe Pointer.read(right)
-  if a > b { return -1 }
-  if a < b { return 1 }
+  if a > b {
+    return -1
+  }
+  if a < b {
+    return 1
+  }
   return 0
 }
 
 pub fn main() -> i32 {
   let mut values = [3, 9, 1, 7]
   unsafe qsort(Pointer.fromMutSlice(&mut values), 4, 4, descending)
-  if values[0] != 9 || values[1] != 7 || values[2] != 3 || values[3] != 1 { return 1 }
+  if values[0] != 9 || values[1] != 7 || values[2] != 3 || values[3] != 1 {
+    return 1
+  }
   return 0
 }
 ```
@@ -231,14 +247,21 @@ extern "C" struct Timespec {
 }
 
 unsafe extern "C" fn clock_gettime(clock: i32, value: *mut Timespec) -> i32
-unsafe extern "C" static environment: ?[*]const ?[*]const u8 as "environ"
+
+unsafe extern "C" static environment: ?[*] const ?[*] const u8 as "environ"
 
 pub fn main() -> i32 {
   let mut now = Timespec { seconds: -1, nanoseconds: -1 }
-  if unsafe clock_gettime(1, Pointer.fromMutRef(&mut now)) != 0 { return 1 }
-  if now.seconds < 0 || now.nanoseconds >= 1000000000 { return 2 }
+  if unsafe clock_gettime(1, Pointer.fromMutRef(&mut now)) != 0 {
+    return 1
+  }
+  if now.seconds < 0 || now.nanoseconds >= 1000000000 {
+    return 2
+  }
   unsafe {
-    if Pointer.isNullMany(environment) { return 3 }
+    if Pointer.isNullMany(environment) {
+      return 3
+    }
   }
   return 0
 }
@@ -248,14 +271,23 @@ An exported function and static, read through matching imports:
 
 ```silk
 export "C" static limit: i32 = 40
-export "C" fn twice(value: i32) -> i32 { return value * 2 }
+
+export "C" fn twice(value: i32) -> i32 {
+  return value * 2
+}
+
 unsafe extern "C" fn doubled(value: i32) -> i32 as "twice"
+
 unsafe extern "C" static seenLimit: i32 as "limit"
 
 pub fn main() -> i32 {
   unsafe {
-    if limit != 40 || seenLimit != 40 { return 1 }
-    if doubled(21) != 42 { return 2 }
+    if limit != 40 || seenLimit != 40 {
+      return 1
+    }
+    if doubled(21) != 42 {
+      return 2
+    }
   }
   return 0
 }
@@ -292,6 +324,7 @@ native-link-inputs = [{ object = "native/vec.o" }]
 import silk.simd.f32x4
 
 unsafe extern "C" fn scale(values: simd<f32, 4>, factor: f32) -> simd<f32, 4>
+
 unsafe extern "C" fn check_add() -> i32
 
 export "C" fn add_lanes(a: simd<i32, 4>, b: simd<i32, 4>) -> simd<i32, 4> {
@@ -301,7 +334,9 @@ export "C" fn add_lanes(a: simd<i32, 4>, b: simd<i32, 4>) -> simd<i32, 4> {
 pub fn main() -> i32 {
   let values = f32x4.fromArray([1.0, 2.0, 3.0, 4.0])
   let scaled = f32x4.toArray(unsafe scale(values, 2.5))
-  if scaled[3] != 10.0 { return 1 }
+  if scaled[3] != 10.0 {
+    return 1
+  }
   return unsafe check_add()
 }
 ```

@@ -32,7 +32,7 @@ test fn withParam(x: i32) {
 ```
 
 ```
-/home/you/hello/src/main.silk:1:19: error[SEM0218] A `test` qualifier marks a function outside the finite executable test contract
+src/main.silk:1:19: error[SEM0218] A `test` qualifier marks a function outside the finite executable test contract
 ```
 
 `pub test fn` is allowed. Outside `silk test`, a test is checked like any other function, so `silk check` reports its errors too.
@@ -153,7 +153,9 @@ import silk.os_logger { StdoutLogger }
 import silk.testing { AssertionError, Testing }
 
 // Greets each name, skipping empty ones. Returns how many it greeted.
-effect fn greetAll(names: &[string]) -> i32 ! LogError ? &mut Logger {
+effect fn greetAll(names: &[string]) -> i32
+  ! LogError
+  ? &mut Logger {
   let mut greeted = 0
   let mut at: usize = 0
   while at < names.length {
@@ -166,13 +168,15 @@ effect fn greetAll(names: &[string]) -> i32 ! LogError ? &mut Logger {
   return greeted
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   let names = ["Ada", "", "Grace"]
   drop run greetAll(&names) |> Effect.provideMut<Logger>(&mut logger)
 }
 
-test effect fn emptyNamesAreSkipped() ! AssertionError<'static> | LogError {
+test effect fn emptyNamesAreSkipped()
+  ! AssertionError<'static> | LogError {
   let mut logger = Logger.inMemoryProvider()
   let names = ["Ada", "", "Grace"]
   let greeted = run greetAll(&names) |> Effect.provideMut<Logger>(&mut logger)
@@ -180,7 +184,8 @@ test effect fn emptyNamesAreSkipped() ! AssertionError<'static> | LogError {
   run Testing.expect(Logger.length(&logger) == 2, "two lines logged")
 }
 
-test effect fn onlyEmptyNamesLogNothing() ! AssertionError<'static> | LogError {
+test effect fn onlyEmptyNamesLogNothing()
+  ! AssertionError<'static> | LogError {
   let mut logger = Logger.inMemoryProvider()
   let names = ["", ""]
   let greeted = run greetAll(&names) |> Effect.provideMut<Logger>(&mut logger)
@@ -222,7 +227,7 @@ test effect fn copies() -> () ! OutOfMemoryError ? &mut Allocator {
 ```
 
 ```
-/home/you/hello/src/main.silk:4:50: error[SEM0218] Invalid test declaration: a test cannot have a requirement row; the test runner provides no services, so provide them inside the test
+src/main.silk:4:50: error[SEM0218] Invalid test declaration: a test cannot have a requirement row; the test runner provides no services, so provide them inside the test
 ```
 
 For memory, create an allocator in the test with `Allocator.systemAllocatorProvider()` and provide it to the calls that need it.

@@ -9,7 +9,7 @@ Every package has a `silk.toml` at its top. It names the package, says where its
 - With no manifest anywhere up the tree, the command stops:
 
 ```
-No silk.toml found from /home/you; create one
+No silk.toml found from /home/you; run `silk init` to create a package here, or `silk init <name>` for a new folder
 ```
 
 - Paths inside the manifest are relative to the directory that holds it.

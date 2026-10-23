@@ -211,7 +211,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   load     53 modules, 1 in package          0.10s
   check    failed: 1 module, 1 error         0.15s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
+src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
 Failed tasks in 0.27s
 ```
 
@@ -226,7 +226,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
+src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
 Failed tasks in 0.19s
 ```
 

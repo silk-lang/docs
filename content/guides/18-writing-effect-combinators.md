@@ -317,7 +317,7 @@ Checking weather (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.08s
   check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:126:26: error[SEM0076] Callable value with mode `once` cannot satisfy a parameter with mode `mut`, which may call it more than once
+src/main.silk:126:26: error[SEM0076] Callable value with mode `once` cannot satisfy a parameter with mode `mut`, which may call it more than once
 Failed weather in 0.23s
 ```
 
@@ -357,7 +357,7 @@ Checking weather (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:12:23: error[SEM0245] An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled`
+src/main.silk:12:23: error[SEM0245] An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled`
 Failed weather in 0.21s
 ```
 
@@ -392,8 +392,8 @@ Checking weather (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.16s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:120:16: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
-  note: /home/you/weather/src/main.silk:119:38: related location
+src/main.silk:120:16: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
+  note: src/main.silk:119:38: related location
 Failed weather in 0.23s
 ```
 
@@ -406,7 +406,7 @@ Checking weather (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/weather/src/main.silk:119:55: error[SEM0076] Callable value with mode `mut` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow
+src/main.silk:119:55: error[SEM0076] Callable value with mode `mut` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow
 Failed weather in 0.20s
 ```
 

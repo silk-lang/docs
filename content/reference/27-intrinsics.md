@@ -218,13 +218,21 @@ const pointerBits: u32 = Intrinsic.targetPointerBits()
 pub fn main() -> i32 {
   let big: i32 = 2147483647
   let wrapped = Intrinsic.i32WrappingAdd(big, 1)
-  if wrapped != -2147483648 { return 1 }
-  if pointerBits != 64 { return 2 }
+  if wrapped != -2147483648 {
+    return 1
+  }
+  if pointerBits != 64 {
+    return 2
+  }
   let mut place = 5
   let old = Intrinsic.replace(place, 9)
-  if old != 5 || place != 9 { return 3 }
+  if old != 5 || place != 9 {
+    return 3
+  }
   let narrowed: u8 = Intrinsic.i32ToU8(44)
-  if narrowed != 44 { return 4 }
+  if narrowed != 44 {
+    return 4
+  }
   static if Intrinsic.targetOperatingSystem() == "linux" {
     return 0
   }
@@ -238,13 +246,21 @@ import silk.option { Option }
 pub fn main() -> i32 {
   let big: i32 = 2147483647
   let sum = Intrinsic.i32CheckedAdd<Option<i32>>(big, 1, Option.some, Option.none)
-  if let Option<i32>.Some {value} = move sum { return 1 }
+  if let Option<i32>.Some { value } = move sum {
+    return 1
+  }
   let saturated = Intrinsic.i32SaturatingAdd(big, 1)
-  if saturated != big { return 2 }
+  if saturated != big {
+    return 2
+  }
   let shifted = Intrinsic.u32ShiftLeft(1, 4)
-  if shifted != 16 { return 3 }
+  if shifted != 16 {
+    return 3
+  }
   let narrow = Intrinsic.i32CheckedToU8<Option<u8>>(300, Option.some, Option.none)
-  if let Option<u8>.Some {value} = move narrow { return 4 }
+  if let Option<u8>.Some { value } = move narrow {
+    return 4
+  }
   return 0
 }
 ```
@@ -252,10 +268,17 @@ pub fn main() -> i32 {
 Ownership properties and an unsafe pointer member, without any import:
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point {
+  x: i32
+  y: i32
+}
+
 impl Intrinsic.Copy for Point {}
 
-struct Counter { hits: *mut i32 }
+struct Counter {
+  hits: *mut i32
+}
+
 impl Intrinsic.Drop for Counter {
   fn drop(self: &mut Counter) -> () {
     unsafe Intrinsic.pointerWrite<i32>(self.hits, 1)
@@ -284,12 +307,18 @@ SIMD members on shapes that have no `silk/simd` module, a 64-lane byte vector an
 pub fn main() -> i32 {
   let a = Intrinsic.simdFromArray<simd<u32, 4>>([1, 2, 3, 4])
   let pair = Intrinsic.simdShuffle<simd<u32, 4>, simd<u32, 2>>(a, a, [3, 0])
-  if pair != Intrinsic.simdFromArray<simd<u32, 2>>([4, 1]) { return 1 }
+  if pair != Intrinsic.simdFromArray<simd<u32, 2>>([4, 1]) {
+    return 1
+  }
   let bytes = Intrinsic.simdSplat<simd<u8, 64>>(3)
-  if Intrinsic.simdReduceAdd<simd<u8, 64>>(bytes) != 192 { return 2 }
+  if Intrinsic.simdReduceAdd<simd<u8, 64>>(bytes) != 192 {
+    return 2
+  }
   let floats = Intrinsic.simdConvert<simd<u32, 4>, simd<f32, 4>>(a)
   let bits = Intrinsic.simdBitcast<simd<f32, 4>, simd<u32, 4>>(floats)
-  if Intrinsic.simdExtract<simd<u32, 4>>(bits, 0) != 0x3F800000 { return 3 }
+  if Intrinsic.simdExtract<simd<u32, 4>>(bits, 0) != 0x3F800000 {
+    return 3
+  }
   return 0
 }
 ```
@@ -302,9 +331,15 @@ import silk.cpu { CpuFeatures }
 static if Intrinsic.targetArchitecture() == "x86_64" {
   // Compiled for AVX2, so the 32-byte pshufb is admitted. AVX2 implies SSSE3, so the
   // 16-byte form is admitted too.
-  unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> with Intrinsic.machine(features: ("avx2",)) {
-    let low = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(Intrinsic.simdSplat<simd<u8, 16>>(7), Intrinsic.simdSplat<simd<u8, 16>>(0))
-    if Intrinsic.simdExtract<simd<u8, 16>>(low, 0) != 7 { return table }
+  unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8,
+    32> with Intrinsic .machine (features: ("avx2",)) {
+    let low = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(
+      Intrinsic.simdSplat<simd<u8, 16>>(7),
+      Intrinsic.simdSplat<simd<u8, 16>>(0)
+    )
+    if Intrinsic.simdExtract<simd<u8, 16>>(low, 0) != 7 {
+      return table
+    }
     return Intrinsic.x86ShuffleBytes<simd<u8, 32>>(table, indices)
   }
 }
@@ -313,14 +348,51 @@ pub fn main() -> i32 {
   let machine = CpuFeatures.detect()
   static if Intrinsic.targetArchitecture() == "x86_64" {
     if CpuFeatures.has(&machine, "avx2") {
-      let table = Intrinsic.simdFromArray<simd<u8, 32>>([
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
-      ])
+      let table = Intrinsic.simdFromArray<simd<u8, 32>>(
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+        ]
+      )
+
       // Each index picks within its own 16-byte half: lane 3, then lane 19.
       let picked = unsafe lookup(table, Intrinsic.simdSplat<simd<u8, 32>>(3))
-      if Intrinsic.simdExtract<simd<u8, 32>>(picked, 0) != 3 { return 1 }
-      if Intrinsic.simdExtract<simd<u8, 32>>(picked, 16) != 19 { return 2 }
+      if Intrinsic.simdExtract<simd<u8, 32>>(picked, 0) != 3 {
+        return 1
+      }
+      if Intrinsic.simdExtract<simd<u8, 32>>(picked, 16) != 19 {
+        return 2
+      }
     }
   }
   return 0
@@ -336,7 +408,8 @@ import silk.simd.u32x4
 
 static if Intrinsic.targetArchitecture() == "x86_64" {
   // Compiled for SHA, so sha256rnds2 is admitted in this body.
-  unsafe fn rounds(cdgh: simd<u32, 4>, abef: simd<u32, 4>, wk: simd<u32, 4>) -> simd<u32, 4> with Intrinsic.machine(features: ("sha",)) {
+  unsafe fn rounds(cdgh: simd<u32, 4>, abef: simd<u32, 4>, wk: simd<u32, 4>) -> simd<u32,
+    4> with Intrinsic .machine (features: ("sha",)) {
     return Intrinsic.x86Sha256Rounds2<simd<u32, 4>>(cdgh, abef, wk)
   }
 }
@@ -345,15 +418,21 @@ pub fn main() -> i32 {
   // The SHA-256 initial state: A, B, E, F and C, D, G, H, highest lane first.
   let abef = u32x4.fromArray([0x9b05688c, 0x510e527f, 0xbb67ae85, 0x6a09e667])
   let cdgh = u32x4.fromArray([0x5be0cd19, 0x1f83d9ab, 0xa54ff53a, 0x3c6ef372])
+
   // Two message words plus their round constants in lanes 0 and 1.
   let wk = u32x4.fromArray([0x61626380 + 0x428a2f98, 0x71374491, 0, 0])
   let portable = x86.sha256Rounds2(cdgh, abef, wk)
   static if Intrinsic.targetArchitecture() == "x86_64" {
     let machine = CpuFeatures.detect()
-    if CpuFeatures.has(&machine, "sha") && unsafe rounds(cdgh, abef, wk) != portable { return 1 }
+    if CpuFeatures.has(&machine, "sha") && unsafe rounds(cdgh, abef, wk) != portable {
+      return 1
+    }
   }
+
   // After rounds 0 and 1 of the "abc" example in FIPS 180-4, A and B are these.
-  if u32x4.extract(portable, 3) != 0x5a6ad9ad || u32x4.extract(portable, 2) != 0x5d6aebcd { return 2 }
+  if u32x4.extract(portable, 3) != 0x5a6ad9ad || u32x4.extract(portable, 2) != 0x5d6aebcd {
+    return 2
+  }
   return 0
 }
 ```

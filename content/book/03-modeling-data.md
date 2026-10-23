@@ -53,7 +53,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:26:10: error[SEM0158] Match over Priority does not cover High
+src/main.silk:26:10: error[SEM0158] Match over Priority does not cover High
 Failed tasks in 0.17s
 ```
 
@@ -128,7 +128,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:51:9: error[SEM0025] Field id expects main.TaskId but received i32
+src/main.silk:51:9: error[SEM0025] Field id expects main.TaskId but received i32
 Failed tasks in 0.17s
 ```
 
@@ -162,7 +162,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:34:10: error[OWN0003] A non-Copy value consumed without the explicit `move` its position requires
+src/main.silk:34:10: error[OWN0003] A non-Copy value consumed without the explicit `move` its position requires
 Failed tasks in 0.17s
 ```
 
@@ -271,7 +271,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:47:10: error[SEM0044] Match does not cover Done
+src/main.silk:47:10: error[SEM0044] Match does not cover Done
 Failed tasks in 0.17s
 ```
 
@@ -353,16 +353,23 @@ fn describe(command: &Command) -> string<'static> {
   }
 }
 
-effect fn show(task: &Task) -> () ! LogError ? &mut Logger {
-  run Effect.log("{mark} #{id} {title} ({priority})\n", &.{
-    mark: statusMark(&task.status),
-    id: task.id.0,
-    title: task.title,
-    priority: priorityLabel(task.priority),
-  })
+effect fn show(task: &Task) -> ()
+  ! LogError
+  ? &mut Logger {
+  run Effect.log(
+    "{mark} #{id} {title} ({priority})\n",
+    &.{
+      mark: statusMark(&task.status),
+      id: task.id.0,
+      title: task.title,
+      priority: priorityLabel(task.priority),
+    }
+  )
 }
 
-effect fn report() -> () ! LogError ? &mut Logger {
+effect fn report() -> ()
+  ! LogError
+  ? &mut Logger {
   let milk = Task {
     id: TaskId(1),
     title: "Buy milk",
@@ -382,7 +389,8 @@ effect fn report() -> () ! LogError ? &mut Logger {
   run Effect.log("next command: {what}\n", &.{ what: describe(&next) })
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   run report() |> Effect.provideMut(&mut logger)
 }

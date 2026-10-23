@@ -44,7 +44,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:2:27: error[SEM0135] Operator + does not accept (string<'static>, string<'static>)
+src/main.silk:2:27: error[SEM0135] Operator + does not accept (string<'static>, string<'static>)
 Failed scratch in 0.14s
 ```
 
@@ -76,7 +76,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     61 modules, 1 in package          0.08s
   check    failed: 2 modules, 1 error        3.30s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:175:14: error[SEM0052] Cannot infer all type arguments for List.make from supplied values
+src/main.silk:175:14: error[SEM0052] Cannot infer all type arguments for List.make from supplied values
 Failed tasks in 3.39s
 ```
 
@@ -145,7 +145,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:12:15: error[SEM0121] `main.Task: Copy` cannot be proved: the callee requires a `Copy` type argument here, and this type does not implement `Copy`
+src/main.silk:12:15: error[SEM0121] `main.Task: Copy` cannot be proved: the callee requires a `Copy` type argument here, and this type does not implement `Copy`
 Failed scratch in 0.16s
 ```
 
@@ -239,7 +239,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:10:12: error[SEM0121] `main.Title: silk/hash.HashKey` cannot be proved: no implementation of `silk/hash.HashKey` exists for `main.Title`
+src/main.silk:10:12: error[SEM0121] `main.Title: silk/hash.HashKey` cannot be proved: no implementation of `silk/hash.HashKey` exists for `main.Title`
 Failed scratch in 0.19s
 ```
 
@@ -371,7 +371,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     61 modules, 1 in package          0.07s
   check    failed: 2 modules, 1 error        1.73s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:519:45: error[SEM0012] Expected &main.Board<'_> but received &mut main.Board<'_>
+src/main.silk:519:45: error[SEM0012] Expected &main.Board<'_> but received &mut main.Board<'_>
 Failed tasks in 1.81s
 ```
 

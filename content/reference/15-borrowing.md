@@ -87,10 +87,15 @@ See Patterns and match for patterns and `match place`.
 ## Examples
 
 ```silk
-struct Counter { value: i32 }
+struct Counter {
+  value: i32
+}
 
 impl Counter {
-  fn get(self: &Counter) -> i32 { return self.value }
+  fn get(self: &Counter) -> i32 {
+    return self.value
+  }
+
   fn bump(self: &mut Counter) -> () {
     self.value = self.value + 1
     return ()
@@ -186,8 +191,14 @@ pub fn main() -> i32 { return 0 }
 Take `&mut` and leave a value behind:
 
 ```silk
-struct Tok { v: i32 }
-fn take(r: &mut Tok) -> Tok { return Intrinsic.replace(r.*, Tok { v: 0 }) }
+struct Tok {
+  v: i32
+}
+
+fn take(r: &mut Tok) -> Tok {
+  return Intrinsic.replace(r.*, Tok { v: 0 })
+}
+
 pub fn main() -> i32 {
   let mut t = Tok { v: 7 }
   let old = take(&mut t)
@@ -210,13 +221,24 @@ pub fn main() -> i32 { return 0 }
 Copy the needed value out inside the arm:
 
 ```silk
-struct Tok { v: i32 }
-struct Box { t: Tok }
+struct Tok {
+  v: i32
+}
+
+struct Box {
+  t: Tok
+}
+
 fn value(b: Box) -> i32 {
-  let r = match &b { Box { t } => t.v }
+  let r = match &b {
+    Box { t } => t.v
+  }
   return r
 }
-pub fn main() -> i32 { return value(Box { t: Tok { v: 4 } }) - 4 }
+
+pub fn main() -> i32 {
+  return value(Box { t: Tok { v: 4 } }) - 4
+}
 ```
 
 OWN0019, a reference outlives its referent:

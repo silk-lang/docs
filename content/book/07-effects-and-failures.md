@@ -42,7 +42,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.10s
   check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:11:3: error[SEM0087] Expression statement produces an Effect of `()` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
+src/main.silk:11:3: error[SEM0087] Expression statement produces an Effect of `()` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
 Failed scratch in 0.29s
 ```
 
@@ -138,7 +138,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:5:5: error[SEM0063] Only effect functions may originate a typed failure
+src/main.silk:5:5: error[SEM0063] Only effect functions may originate a typed failure
 Failed scratch in 0.17s
 ```
 
@@ -171,7 +171,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:10:3: error[SEM0066] A `run` whose failures the enclosing signature does not declare
+src/main.silk:10:3: error[SEM0066] A `run` whose failures the enclosing signature does not declare
 Failed scratch in 0.15s
 ```
 
@@ -448,7 +448,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:18:37: error[SEM0099] One named type parameter left undetermined by an explicit prefix and the arguments
+src/main.silk:18:37: error[SEM0099] One named type parameter left undetermined by an explicit prefix and the arguments
 Failed scratch in 0.15s
 ```
 
@@ -479,7 +479,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:390:17: error[SEM0052] A generic call whose type arguments its values do not determine
+src/main.silk:390:17: error[SEM0052] A generic call whose type arguments its values do not determine
 Failed tasks in 0.24s
 ```
 
@@ -612,16 +612,21 @@ import silk.logger { Logger, LogError }
 import silk.os_logger { StdoutLogger }
 import silk.result { Result }
 
-struct NoSuchTask { id: u32 }
+struct NoSuchTask {
+  id: u32
+}
 
-effect fn complete(id: u32) -> u32 ! NoSuchTask {
+effect fn complete(id: u32) -> u32
+  ! NoSuchTask {
   if id > 3 {
     fail NoSuchTask { id: id }
   }
   return id
 }
 
-effect fn report(id: u32) -> () ! LogError ? &mut Logger {
+effect fn report(id: u32) -> ()
+  ! LogError
+  ? &mut Logger {
   let outcome = run Effect.result(complete(id))
   match move outcome {
     Result<u32, NoSuchTask>.Success { value } => {
@@ -633,7 +638,8 @@ effect fn report(id: u32) -> () ! LogError ? &mut Logger {
   }
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   run report(2) |> Effect.provideMut(&mut logger)
   run report(9) |> Effect.provideMut(&mut logger)

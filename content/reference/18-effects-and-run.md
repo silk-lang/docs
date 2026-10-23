@@ -146,7 +146,9 @@ fn inc(counter: &mut i32) -> i32 {
   return counter.*
 }
 
-effect fn keep(value: i32) -> i32 { return value }
+effect fn keep(value: i32) -> i32 {
+  return value
+}
 
 effect fn bump(counter: &mut i32) {
   counter.* = counter.* + 1
@@ -155,17 +157,23 @@ effect fn bump(counter: &mut i32) {
 pub fn main() -> i32 {
   let mut calls = 0
   let pending = keep(inc(&mut calls))
-  if calls != 1 { return 1 }
+  if calls != 1 {
+    return 1
+  }
   let a = run pending
   let b = run pending
-  if calls != 1 || a + b != 2 { return 2 }
+  if calls != 1 || a + b != 2 {
+    return 2
+  }
 
   let mut n = 0
   let mut step = bump(&mut n)
   run step
   run step
   drop step
-  if n != 2 { return 3 }
+  if n != 2 {
+    return 3
+  }
   return 0
 }
 ```
@@ -175,24 +183,42 @@ Effect blocks, an anonymous effect function, an opaque result and a stored Effec
 ```silk
 import silk.effect { Effect }
 
-struct Token { value: i32 }
-struct Oops { code: i32 }
-struct Job<F: once Effect<'static; i32>> { work: F }
+struct Token {
+  value: i32
+}
 
-effect fn take(token: Token) -> i32 { return token.value }
+struct Oops {
+  code: i32
+}
+
+struct Job<F: once Effect<'static; i32>> {
+  work: F
+}
+
+effect fn take(token: Token) -> i32 {
+  return token.value
+}
 
 fn make(value: i32) -> some<F: Effect<'static; i32>> F {
-  return effect { return value * 2 }
+  return effect {
+    return value * 2
+  }
 }
 
 pub fn main() -> i32 {
   let base = 40
-  let add = effect { return base + 2 }
+  let add = effect {
+    return base + 2
+  }
   let failing = effect {
-    if base > 0 { fail Oops { code: 1 } }
+    if base > 0 {
+      fail Oops { code: 1 }
+    }
     return 0
   }
-  let recover = effect fn(error: Oops) -> i32 { return error.code }
+  let recover = effect fn(error: Oops) -> i32 {
+    return error.code
+  }
   let job = Job { work: take(Token { value: 3 }) }
 
   let a = run add
@@ -208,20 +234,29 @@ A generic effect function over failure and requirement rows:
 ```silk
 import silk.effect { Effect }
 
-struct Problem { code: i32 }
+struct Problem {
+  code: i32
+}
 
-effect fn twice<'env, E, ?R>(step: Effect<'env; i32 ! E ? R>) -> i32 ! E ? R {
+effect fn twice<'env, E, ? R>(step: Effect<'env; i32 ! E ? R>) -> i32
+  ! E
+  ? R {
   let a = run step
   let b = run step
   return a + b
 }
 
-effect fn ten(ok: bool) -> i32 ! Problem {
-  if !ok { fail Problem { code: 1 } }
+effect fn ten(ok: bool) -> i32
+  ! Problem {
+  if !ok {
+    fail Problem { code: 1 }
+  }
   return 10
 }
 
-effect fn recover(problem: Problem) -> i32 { return problem.code }
+effect fn recover(problem: Problem) -> i32 {
+  return problem.code
+}
 
 pub fn main() -> i32 {
   let good = run twice(ten(true)) |> Effect.catchAll(recover)

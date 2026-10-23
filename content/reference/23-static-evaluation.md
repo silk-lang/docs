@@ -124,8 +124,8 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - The SEM0177 is reported at the `compileError`. When a call selected it through a static argument, a note points at that call. In the second example below, changing `scaled(3, 1)` on line 24 to `scaled(-1, 1)` reports:
 
   ```
-  /home/you/demo/src/main.silk:8:26: error[SEM0177] factor must not be negative
-    note: /home/you/demo/src/main.silk:24:50: related location
+  src/main.silk:8:26: error[SEM0177] factor must not be negative
+    note: src/main.silk:24:50: related location
   ```
 - `compileError` in an untaken branch, or in an unselected `static if` arm, reports nothing. This makes it a static assertion.
 - `compileError` in ordinary runtime code that is not inside a static selection is refused as not supported.
@@ -136,9 +136,12 @@ Constants, a static function, `let static`, and constant array lengths:
 
 ```silk
 const SIZE: usize = 3
+
 const GREETING: string = "silk"
 
-static fn triple(value: i32) -> i32 { return value * 3 }
+static fn triple(value: i32) -> i32 {
+  return value * 3
+}
 
 static fn sumTo(limit: i32) -> i32 {
   let mut total = 0
@@ -150,7 +153,9 @@ static fn sumTo(limit: i32) -> i32 {
   return total
 }
 
-static fn doubled(n: usize) -> usize { return n * 2 }
+static fn doubled(n: usize) -> usize {
+  return n * 2
+}
 
 const TWELVE: i32 = triple(4)
 
@@ -158,7 +163,9 @@ pub fn main() -> i32 {
   let static fiftyFive = sumTo(10)
   let values: [i32; SIZE] = [1, 2, 3]
   let wider: [i32; doubled(2)] = [0, 0, 0, 4]
-  if GREETING != "silk" { return 1 }
+  if GREETING != "silk" {
+    return 1
+  }
   return TWELVE + fiftyFive + values[2] + wider[3] - 74
 }
 ```
@@ -169,11 +176,18 @@ Static parameters, one instance per value, and a static assertion:
 import silk.static_text { StaticText }
 import silk.usize
 
-struct Config { base: i32 }
-static fn makeConfig(base: i32) -> Config { return Config { base: base } }
+struct Config {
+  base: i32
+}
+
+static fn makeConfig(base: i32) -> Config {
+  return Config { base: base }
+}
 
 fn scaled(static factor: i32, value: i32) -> i32 {
-  static if factor < 0 { compileError("factor must not be negative") }
+  static if factor < 0 {
+    compileError("factor must not be negative")
+  }
   return factor * value
 }
 
@@ -182,9 +196,12 @@ fn width(static label: string) -> i32 {
   return usize.toI32(n)
 }
 
-fn based(static config: Config, value: i32) -> i32 { return config.base + value }
+fn based(static config: Config, value: i32) -> i32 {
+  return config.base + value
+}
 
 const TWO: i32 = 2
+
 const LABEL: string = "four"
 
 pub fn main() -> i32 {
@@ -204,7 +221,9 @@ static fn countByte(text: string, wanted: u8) -> i32 {
   let mut count = 0
   let mut i: usize = 0
   while i < StaticText.byteLength(text) {
-    if StaticText.byteAt(text, i) == wanted { count = count + 1 }
+    if StaticText.byteAt(text, i) == wanted {
+      count = count + 1
+    }
     i = i + 1
   }
   return count
@@ -251,7 +270,10 @@ pub fn main() -> i32 {
 Make the argument static with `let static`, a constant or a literal:
 
 ```silk
-static fn triple(value: i32) -> i32 { return value * 3 }
+static fn triple(value: i32) -> i32 {
+  return value * 3
+}
+
 pub fn main() -> i32 {
   let static x = 4
   return triple(x) - 12
@@ -261,8 +283,15 @@ pub fn main() -> i32 {
 SEM0176, field assignment in a `static fn`. Build a new value instead:
 
 ```silk
-struct Point { x: i32 y: i32 }
-static fn shifted(p: Point) -> Point { return Point { x: p.x + 1, y: p.y } }
+struct Point {
+  x: i32
+  y: i32
+}
+
+static fn shifted(p: Point) -> Point {
+  return Point { x: p.x + 1, y: p.y }
+}
+
 pub fn main() -> i32 {
   let static q = shifted(Point { x: 1, y: 2 })
   return q.x + q.y - 4

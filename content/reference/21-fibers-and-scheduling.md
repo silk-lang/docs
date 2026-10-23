@@ -109,8 +109,8 @@ effect fn square(n: i32) -> i32 {
 }
 
 effect fn root() -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
   let a = run Fiber<i32, never>.forkChild(square(3))
   let b = run Fiber<i32, never>.forkChild(square(4))
   let x = run Fiber.join(move a)
@@ -119,7 +119,7 @@ effect fn root() -> i32
 }
 
 pub effect fn main() -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
   let mut scheduler = LocalScheduler.make()
   let mut clock = OsMonotonicClock.make()
   let total = run LocalScheduler.execute(&mut scheduler, root())
@@ -139,9 +139,12 @@ import silk.os_monotonic_clock { OsMonotonicClock }
 import silk.allocator { OutOfMemoryError }
 import silk.scheduler { Scheduler, TaskIdExhaustedError }
 
-struct Refused { code: i32 }
+struct Refused {
+  code: i32
+}
 
-effect fn slow() -> i32 ? &mut Scheduler | &mut MonotonicClock {
+effect fn slow() -> i32
+  ? &mut Scheduler | &mut MonotonicClock {
   run Effect.sleep(2ms)
   return 30
 }
@@ -151,13 +154,14 @@ effect fn quick() -> i32 {
   return 10
 }
 
-effect fn refuse() -> i32 ! Refused {
+effect fn refuse() -> i32
+  ! Refused {
   fail Refused { code: 2 }
 }
 
 effect fn root() -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
   let a = run Fiber<i32, never>.forkChild(slow())
   let b = run Fiber<i32, never>.forkChild(quick())
   let c = run Fiber<i32, Refused>.forkChild(refuse())
@@ -174,14 +178,17 @@ effect fn root() -> i32
   return total + extra
 }
 
-effect fn program() -> i32 ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+effect fn program() -> i32
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
   let mut scheduler = LocalScheduler.make()
   let mut clock = OsMonotonicClock.make()
   return run LocalScheduler.execute(&mut scheduler, root())
     |> Effect.provideMut<MonotonicClock>(&mut clock)
 }
 
-effect fn recover(error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError) -> i32 {
+effect fn recover(
+  error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError
+) -> i32 {
   drop error
   return 99
 }
@@ -204,32 +211,39 @@ import silk.os_monotonic_clock { OsMonotonicClock }
 import silk.scheduler { Scheduler, TaskIdExhaustedError }
 import silk.shared { Shared }
 
-struct Log { value: i32 }
+struct Log {
+  value: i32
+}
 
 fn bump(log: &mut Log) -> () {
   log.value = log.value * 10 + 1
   return ()
 }
+
 fn mark(log: &mut Log) -> () {
   log.value = log.value * 10 + 2
   return ()
 }
-fn read(log: &Log) -> i32 { return log.value }
+
+fn read(log: &Log) -> i32 {
+  return log.value
+}
 
 effect fn child(log: Shared<Log>) -> () {
   Shared<Log>.withMut<()>(&log, bump)
   return ()
 }
 
-effect fn late(log: Shared<Log>) -> () ? &mut Scheduler | &mut MonotonicClock {
+effect fn late(log: Shared<Log>) -> ()
+  ? &mut Scheduler | &mut MonotonicClock {
   run Effect.sleep(1ms)
   Shared<Log>.withMut<()>(&log, bump)
   return ()
 }
 
 effect fn root(log: Shared<Log>) -> i32
-! OutOfMemoryError | TaskIdExhaustedError
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError
+  ? &mut Scheduler | &mut MonotonicClock {
   let f = run Fiber<(), never>.forkChild(child(Shared<Log>.clone(&log)))
   Shared<Log>.withMut<()>(&log, mark)
   drop f
@@ -240,17 +254,21 @@ effect fn root(log: Shared<Log>) -> i32
   return Shared<Log>.with<i32>(&log, read)
 }
 
-effect fn program() -> i32 ! OutOfMemoryError | TaskIdExhaustedError | StalledError {
+effect fn program() -> i32
+  ! OutOfMemoryError | TaskIdExhaustedError | StalledError {
   let mut allocator = Allocator.systemAllocatorProvider()
-  let log = run Shared<Log>.make(Log { value: 0 })
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let log = run Shared<Log>.make(Log { value: 0 }) |> Effect.provideMut<Allocator>(&mut allocator)
   let mut scheduler = LocalScheduler.make()
   let mut clock = OsMonotonicClock.make()
   let seen = run LocalScheduler.execute(&mut scheduler, root(Shared<Log>.clone(&log)))
     |> Effect.provideMut<MonotonicClock>(&mut clock)
   let after = Shared<Log>.with<i32>(&log, read)
-  if seen != 212 { return 1 }
-  if after != 212 { return 2 }
+  if seen != 212 {
+    return 1
+  }
+  if after != 212 {
+    return 2
+  }
   return 0
 }
 

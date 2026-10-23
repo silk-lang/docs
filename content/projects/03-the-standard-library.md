@@ -50,7 +50,7 @@ silk: invalid module /home/you/hello/src/silk of hello@0.1.0: `silk` and `Intrin
 - `Intrinsic` is the compiler's own namespace. It needs no import, and no declaration may take its name. Any import whose path starts with `Intrinsic`, as in `import Intrinsic { replace }` or `import Intrinsic.helpers { hi }`, is MOD0004:
 
 ```
-/home/you/hello/src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `Intrinsic` is reserved for compiler intrinsics, which are written `Intrinsic.<name>` without an import
+src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `Intrinsic` is reserved for compiler intrinsics, which are written `Intrinsic.<name>` without an import
 ```
 
 Write `Intrinsic.replace(...)` with no import instead. The one importable module is `Intrinsic.application`. See **Intrinsics** in the reference.
@@ -73,7 +73,7 @@ Checking hello (wasm32-unknown-unknown)
   load     50 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.05s
 [wasm32-unknown-unknown]
-/home/you/hello/src/main.silk:3:25: error[SEM0014] Module silk/os_logger has no member StdoutLogger
+src/main.silk:3:25: error[SEM0014] Module silk/os_logger has no member StdoutLogger
 Failed hello in 0.11s
 ```
 

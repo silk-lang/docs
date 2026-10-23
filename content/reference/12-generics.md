@@ -91,7 +91,10 @@ ExactType         = 'typeof' '(' Path ')'
 ## Examples
 
 ```silk
-struct Pair<A, B> { first: A second: B }
+struct Pair<A, B> {
+  first: A
+  second: B
+}
 
 union Maybe<T> {
   None,
@@ -102,7 +105,9 @@ fn swap<A, B>(pair: Pair<A, B>) -> Pair<B, A> {
   return Pair { first: move pair.second, second: move pair.first }
 }
 
-fn pick<A, B>(left: A, right: B) -> A { return move left }
+fn pick<A, B>(left: A, right: B) -> A {
+  return move left
+}
 
 fn orElse<T>(maybe: Maybe<T>, fallback: T) -> T {
   return match move maybe {
@@ -113,10 +118,18 @@ fn orElse<T>(maybe: Maybe<T>, fallback: T) -> T {
 
 pub fn main() -> i32 {
   let swapped = swap(Pair { first: 1, second: true })
-  if !swapped.first || swapped.second != 1 { return 1 }
-  if pick<i32>(40, false) != 40 { return 2 }
-  if orElse(Maybe<i32>.Some { value: 42 }, 0) != 42 { return 3 }
-  if orElse(Maybe<i32>.None, 7) != 7 { return 4 }
+  if !swapped.first || swapped.second != 1 {
+    return 1
+  }
+  if pick<i32>(40, false) != 40 {
+    return 2
+  }
+  if orElse(Maybe<i32>.Some { value: 42 }, 0) != 42 {
+    return 3
+  }
+  if orElse(Maybe<i32>.None, 7) != 7 {
+    return 4
+  }
   return 0
 }
 ```
@@ -125,16 +138,22 @@ pub fn main() -> i32 {
 import silk.ops { Add }
 import silk.order { Order }
 
-struct Meters { value: i32 }
+struct Meters {
+  value: i32
+}
 
 fn addMeters(left: Meters, right: Meters) -> Meters {
   return Meters { value: left.value + right.value }
 }
 
-impl Add<Meters, Meters> for Meters { add: addMeters }
+impl Add<Meters, Meters> for Meters {
+  add: addMeters
+}
 
 fn larger<T: Order>(left: T, right: T) -> T {
-  if (&left) < (&right) { return move right }
+  if (&left) < (&right) {
+    return move right
+  }
   return move left
 }
 
@@ -142,34 +161,60 @@ fn sumLarger<T: Add<T, T> + Order>(a: T, b: T, c: T) -> T {
   return larger(move a, move b) + move c
 }
 
-fn add(value: i32, amount: i32) -> i32 { return value + amount }
+fn add(value: i32, amount: i32) -> i32 {
+  return value + amount
+}
 
-fn adder(amount: i32) -> some<F: fn<'static>(i32) -> i32> F { return add(amount) }
+fn adder(amount: i32) -> some<F: fn<'static>(i32) -> i32> F {
+  return add(amount)
+}
 
-fn exactAdd() -> typeof(add) { return add }
+fn exactAdd() -> typeof (add) {
+  return add
+}
 
 pub fn main() -> i32 {
-  if sumLarger(3, 9, 1) != 10 { return 1 }
+  if sumLarger(3, 9, 1) != 10 {
+    return 1
+  }
   let total = Meters { value: 40 } + Meters { value: 2 }
-  if total.value != 42 { return 2 }
-  if adder(40)(2) != 42 { return 3 }
-  if exactAdd()(40, 2) != 42 { return 4 }
+  if total.value != 42 {
+    return 2
+  }
+  if adder(40)(2) != 42 {
+    return 3
+  }
+  if exactAdd()(40, 2) != 42 {
+    return 4
+  }
   return 0
 }
 ```
 
 ```silk
-fn id<T>(value: T) -> T { return move value }
+fn id<T>(value: T) -> T {
+  return move value
+}
 
-fn apply(f: typeof(id<i32>), value: i32) -> i32 { return f(value) }
+fn apply(f: typeof (id<i32>), value: i32) -> i32 {
+  return f(value)
+}
 
-fn pick() -> typeof(id<i32>) { return id }
+fn pick() -> typeof (id<i32>) {
+  return id
+}
 
 pub fn main() -> i32 {
-  if apply(id, 5) != 5 { return 1 }
-  if pick()(7) != 7 { return 2 }
-  let f: typeof(id<i32>) = id
-  if f(9) != 9 { return 3 }
+  if apply(id, 5) != 5 {
+    return 1
+  }
+  if pick()(7) != 7 {
+    return 2
+  }
+  let f: typeof (id<i32>) = id
+  if f(9) != 9 {
+    return 3
+  }
   return 0
 }
 ```

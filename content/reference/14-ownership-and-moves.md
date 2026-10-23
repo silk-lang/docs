@@ -114,12 +114,20 @@ Everything else moves. That includes exclusive references `&mut T` and `&mut [T]
 ```silk
 import silk.ownership { Copy }
 
-struct Point { x: i32 y: i32 }
+struct Point {
+  x: i32
+  y: i32
+}
+
 impl Copy for Point {}
 
-struct Token { id: i32 }
+struct Token {
+  id: i32
+}
 
-fn consume(token: Token) -> i32 { return token.id }
+fn consume(token: Token) -> i32 {
+  return token.id
+}
 
 pub fn main() -> i32 {
   let p = Point { x: 1, y: 2 }
@@ -137,11 +145,23 @@ pub fn main() -> i32 {
 Partial moves, `match move` and `Intrinsic.replace`:
 
 ```silk
-struct Token { value: i32 }
-struct Pair { left: Token right: Token }
-union Slot { Empty, Full { token: Token } }
+struct Token {
+  value: i32
+}
 
-fn consume(token: Token) -> i32 { return token.value }
+struct Pair {
+  left: Token
+  right: Token
+}
+
+union Slot {
+  Empty,
+  Full { token: Token }
+}
+
+fn consume(token: Token) -> i32 {
+  return token.value
+}
 
 fn take(slot: &mut Slot) -> i32 {
   let old = Intrinsic.replace(slot.*, Slot.Empty)
@@ -172,9 +192,19 @@ import silk.effect { Effect }
 import silk.ownership { Drop }
 import silk.shared { Shared }
 
-struct Log { order: i32 }
-struct Tracer { id: i32 log: Shared<Log> }
-struct Pair { first: Tracer second: Tracer }
+struct Log {
+  order: i32
+}
+
+struct Tracer {
+  id: i32
+  log: Shared<Log>
+}
+
+struct Pair {
+  first: Tracer
+  second: Tracer
+}
 
 fn record(log: &mut Log, id: i32) -> i32 {
   log.order = log.order * 10 + id
@@ -202,21 +232,31 @@ fn scenario(log: &Shared<Log>) -> () {
   return ()
 }
 
-fn order(log: &Log) -> i32 { return log.order }
+fn order(log: &Log) -> i32 {
+  return log.order
+}
 
-effect fn body() -> i32 ! OutOfMemoryError {
+effect fn body() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let log = run Shared<Log>.make(Log { order: 0 }) |> Effect.provideMut<Allocator>(&mut allocator)
   scenario(&log)
+
   // 1: replaced by assignment, 2: dropped by `drop b`,
   // then at scope end: pair (fields 4, 5), then a (3).
-  if Shared<Log>.with<i32>(&log, order) != 12453 { return 1 }
+  if Shared<Log>.with<i32>(&log, order) != 12453 {
+    return 1
+  }
   return 0
 }
 
-effect fn recover(error: OutOfMemoryError) -> i32 { return 2 }
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 2
+}
 
-pub fn main() -> i32 { return run Effect.catchAll(body(), recover) }
+pub fn main() -> i32 {
+  return run Effect.catchAll(body(), recover)
+}
 ```
 
 ## Diagnostics

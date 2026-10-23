@@ -31,7 +31,9 @@ import silk.result { Result }
 import silk.writer { Writer, WriterError }
 
 // Asks the service how many tasks are open. A non-2xx status is a failure here.
-effect fn openTasks(path: string) -> i32 ! HttpError | OutOfMemoryError ? &mut Http | &mut Allocator {
+effect fn openTasks(path: string) -> i32
+  ! HttpError | OutOfMemoryError
+  ? &mut Http | &mut Allocator {
   let response = run Http.send(Request.get(path).timeoutSeconds(2))
   let checked = run response.expectOk()
   let document = run checked.json()
@@ -42,37 +44,52 @@ effect fn openTasks(path: string) -> i32 ! HttpError | OutOfMemoryError ? &mut H
 }
 
 // Adds a task. Whatever status comes back is a response, not a failure.
-effect fn addTask(title: string) -> u16 ! HttpError | OutOfMemoryError ? &mut Http | &mut Allocator {
+effect fn addTask(title: string) -> u16
+  ! HttpError | OutOfMemoryError
+  ? &mut Http | &mut Allocator {
   let response = run Http.postJson("/tasks", &.{ title: title, priority: "high" })
   return response.status()
 }
 
-effect fn explain(error: HttpError) -> () ! WriterError ? &mut Writer {
-  run Format.format("  failed: {kind}: {message}", &.{ kind: kindName(error.kind), message: error.message })
+effect fn explain(error: HttpError) -> ()
+  ! WriterError
+  ? &mut Writer {
+  run Format.format(
+    "  failed: {kind}: {message}",
+    &.{ kind: kindName(error.kind), message: error.message }
+  )
   if let Option.Some { value } = &error.status {
     run Format.format(" (HTTP {status})", &.{ status: value })
   }
   run Writer.writeAll(b"\n")
 }
 
-effect fn check(path: string) -> () ! WriterError | OutOfMemoryError ? &mut Http | &mut Writer | &mut Allocator {
+effect fn check(path: string) -> ()
+  ! WriterError | OutOfMemoryError
+  ? &mut Http | &mut Writer | &mut Allocator {
   run Format.format("GET {path}\n", &.{ path: path })
   match move run Effect.result(openTasks(path)) {
     Result.Success { value } => run Format.format("  open tasks: {open}\n", &.{ open: value })
     Result.Failure { error } => match move error {
       HttpError failure => run explain(move failure)
-      OutOfMemoryError exhausted => { fail move exhausted }
+      OutOfMemoryError exhausted => {
+        fail move exhausted
+      }
     }
   }
 }
 
-effect fn add(title: string) -> () ! WriterError | OutOfMemoryError ? &mut Http | &mut Writer | &mut Allocator {
+effect fn add(title: string) -> ()
+  ! WriterError | OutOfMemoryError
+  ? &mut Http | &mut Writer | &mut Allocator {
   run Format.format("POST /tasks\n", &())
   match move run Effect.result(addTask(title)) {
     Result.Success { value } => run Format.format("  answered HTTP {status}\n", &.{ status: value })
     Result.Failure { error } => match move error {
       HttpError failure => run explain(move failure)
-      OutOfMemoryError exhausted => { fail move exhausted }
+      OutOfMemoryError exhausted => {
+        fail move exhausted
+      }
     }
   }
 }
@@ -94,19 +111,23 @@ fn kindName(kind: HttpErrorKind) -> string<'static> {
 }
 
 // The whole session, run against whichever Http provider main supplies.
-effect fn session() -> () ! WriterError | OutOfMemoryError ? &mut Http | &mut Writer | &mut Allocator {
+effect fn session() -> ()
+  ! WriterError | OutOfMemoryError
+  ? &mut Http | &mut Writer | &mut Allocator {
   run check("/status.json")
   run check("/missing.json")
   run add("Buy milk")
 }
 
-pub effect fn main() -> () ! WriterError | OutOfMemoryError {
+pub effect fn main() -> ()
+  ! WriterError | OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let mut writer = StdoutWriter.make()
-  let mut http = NativeHttp.make().baseUrl("http://127.0.0.1:8000").header("User-Agent", "statuscheck/0.1")
-  run session()
-    |> Effect.provideMut<Http>(&mut http)
-    |> Effect.provideMut<Writer>(&mut writer)
+  let mut http = NativeHttp.make().baseUrl("http://127.0.0.1:8000").header(
+    "User-Agent",
+    "statuscheck/0.1"
+  )
+  run session() |> Effect.provideMut<Http>(&mut http) |> Effect.provideMut<Writer>(&mut writer)
     |> Effect.provideMut<Allocator>(&mut allocator)
 }
 ```
