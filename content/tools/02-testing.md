@@ -59,6 +59,8 @@ The runner is a separate executable, built under `build/test/llvm/<target>/<prof
 
 While it builds the runner, `silk test` prints no progress rows, unlike `silk build`. A compile error is printed as its diagnostic line, and the command exits 1 without running any test.
 
+The next `silk test` reuses the runner when nothing it was built from has changed: the sources it read, the std lib, the compiler and the toolchain. A rerun, with or without `--filter`, then starts at once. Editing a test or adding a file under `src` builds the runner again. `--no-cache` builds it again anyway. Test results are never reused: every run executes every selected test.
+
 The summary line counts tests at each stage. Discovered tests were found by the compiler, selected ones passed the filters, and executed ones ran. Cached is always 0 in this release. The command exits 0 when every selected test passed. Without `--file` or `--filter`, that includes a package with no tests.
 
 ## When a test fails
@@ -95,6 +97,17 @@ fatal trap: index out of bounds
     FAIL  stopped the test process
   lib::sumsTheValues
     PASS  <1 us
+```
+
+Deep recursion fails the same way, with `fatal trap: stack overflow` and no frames. A test that never finishes is stopped after 60 seconds, and the rest still run. `--timeout <seconds>` changes the limit, and `--timeout 0` removes it:
+
+```
+  lib::overflows
+fatal trap: stack overflow
+    FAIL  stopped the test process
+  lib::spins
+silk test: the test did not finish within 2 s; pass --timeout <seconds> to change the limit, or 0 for none
+    FAIL  stopped the test process
 ```
 
 ## Which tests are discovered
@@ -243,7 +256,8 @@ Each package tests its own modules. At a workspace root, `silk test` runs every 
 ## Summary
 
 - Mark a top-level function with `test`. Use `test effect fn` and `Testing.expect` for checks that can fail.
-- Run tests with `silk test`. A failure prints `FAIL` and the `expect` message for an assertion; a trapping test fails too and the rest still run. Any failure exits 1.
+- Run tests with `silk test`. A failure prints `FAIL` and the `expect` message for an assertion; a trapping, overflowing or hanging test (60 s by default, `--timeout`) fails too and the rest still run. Any failure exits 1.
+- An unchanged rerun reuses the runner; `--no-cache` builds it again.
 - Tests are discovered by following imports from the root module (and a library's exports). Use `--root` or an import to reach other files.
 - `--filter` matches `module::name` without regard to ASCII case; `--file` selects one file. A selection that matches nothing exits 1.
 - Test effectful code by providing fakes such as `Logger.inMemoryProvider()` with `Effect.provideMut`, and provide every service inside the test: a test has no `?` row (SEM0218).
