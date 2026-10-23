@@ -120,32 +120,50 @@ pub struct Point {
   pub y: i32
 }
 
-struct Labeled<T> { label: u8 value: T }
+struct Labeled<T> {
+  label: u8
+  value: T
+}
 
-fn origin() -> Point { return .{ x: 0, y: 0 } }
+fn origin() -> Point {
+  return .{ x: 0, y: 0 }
+}
 
-fn lengthSquared(p: &Point) -> i32 { return p.x * p.x + p.y * p.y }
+fn lengthSquared(p: &Point) -> i32 {
+  return p.x * p.x + p.y * p.y
+}
 
 pub fn main() -> i32 {
   let mut p = Point { y: 4, x: 3 }
-  if lengthSquared(&p) != 25 { return 1 }
+  if lengthSquared(&p) != 25 {
+    return 1
+  }
   p.x = 0
   let o = origin()
-  if lengthSquared(&p) != 16 || o.y != 0 { return 2 }
+  if lengthSquared(&p) != 16 || o.y != 0 {
+    return 2
+  }
   let boxed = Labeled<Point> { label: 1, value: move p }
   let inferred = Labeled { label: 2, value: true }
-  if boxed.value.y != 4 || !inferred.value { return 3 }
+  if boxed.value.y != 4 || !inferred.value {
+    return 3
+  }
   return 0
 }
 ```
 
 ```silk
 tuple Meters(f64)
+
 tuple Range(i32, i32)
 
-fn width(r: &Range) -> i32 { return r.1 - r.0 }
+fn width(r: &Range) -> i32 {
+  return r.1 - r.0
+}
 
-fn unit() -> Range { return (0, 1) }
+fn unit() -> Range {
+  return (0, 1)
+}
 
 pub fn main() -> i32 {
   let mut r = Range(2, 9)
@@ -153,8 +171,12 @@ pub fn main() -> i32 {
   let m = Meters(1.5)
   let pair = (10, true)
   let nothing: () = ()
-  if width(&r) != 6 || width(&unit()) != 1 { return 1 }
-  if m.0 != 1.5 || !pair.1 || pair.0 != 10 { return 2 }
+  if width(&r) != 6 || width(&unit()) != 1 {
+    return 1
+  }
+  if m.0 != 1.5 || !pair.1 || pair.0 != 10 {
+    return 2
+  }
   return 0
 }
 ```
@@ -185,9 +207,13 @@ pub fn main() -> i32 {
   numbers[0] = 10
   let grid = [[1, 2], [3, 4]]
   let none: [u8; 0] = []
-  if total(&numbers) != 24 || grid[1][0] != 3 || none.length != 0 { return 1 }
+  if total(&numbers) != 24 || grid[1][0] != 3 || none.length != 0 {
+    return 1
+  }
   let middle = Slice.view(&numbers, 1, 3)
-  if middle.length != 3 || total(middle) != 9 { return 2 }
+  if middle.length != 3 || total(middle) != 9 {
+    return 2
+  }
   clear(&mut numbers)
   return total(&numbers)
 }

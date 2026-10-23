@@ -24,8 +24,8 @@ Silk has eleven binary operator levels, one prefix level and one postfix level. 
 - Comparison and equality do not chain. `1 < 2 < 3` is a parse error at the second operator:
 
 ```
-/home/you/demo/src/main.silk:2:17: error[PAR0002] Unexpected `<`; expected valid syntax
-/home/you/demo/src/main.silk:2:19: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
+src/main.silk:2:17: error[PAR0002] Unexpected `<`; expected valid syntax
+src/main.silk:2:19: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
 ```
 
 - An index `[i]` must start on the same line as its operand. A call, `.name` or `|>` may start on the next line.
@@ -61,9 +61,9 @@ Silk has eleven binary operator levels, one prefix level and one postfix level. 
 - No matching conformance is SEM0135; two matching conformances are SEM0136.
 
 ```
-/home/you/demo/src/main.silk:4:13: error[SEM0135] Operator + does not accept (i64, i32)
-/home/you/demo/src/main.silk:2:11: error[SEM0135] Operator ! does not accept (i32)
-/home/you/demo/src/main.silk:2:16: error[SEM0135] Operator & does not accept (bool, bool)
+src/main.silk:4:13: error[SEM0135] Operator + does not accept (i64, i32)
+src/main.silk:2:11: error[SEM0135] Operator ! does not accept (i32)
+src/main.silk:2:16: error[SEM0135] Operator & does not accept (bool, bool)
 ```
 
 ## Generic code and primitives
@@ -82,7 +82,7 @@ A bound such as `T: Add<T, T>` lets generic code use an operator. A primitive ty
 Floats compare with `<` but do not satisfy `Order`. Any other bound on a primitive is SEM0121 at the call, for example `T: Subtract<T, T>` with `bool`:
 
 ```
-/home/you/demo/src/main.silk:4:14: error[SEM0121] `bool: intrinsic/operators.Subtract<bool, bool>` cannot be proved: no implementation of `intrinsic/operators.Subtract<bool, bool>` exists for `bool`
+src/main.silk:4:14: error[SEM0121] `bool: intrinsic/operators.Subtract<bool, bool>` cannot be proved: no implementation of `intrinsic/operators.Subtract<bool, bool>` exists for `bool`
 ```
 
 ## Example
@@ -90,43 +90,135 @@ Floats compare with `<` but do not satisfy `Order`. Any other bound on a primiti
 Every overloadable operator on one user type. The program exits 0.
 
 ```silk
-import silk.ops {Add, Subtract, Multiply, Divide, Remainder, Negate, BitAnd, BitOr, BitXor, BitNot, Not}
-import silk.equal {Equal}
-import silk.order {Order, Ordering}
+import silk.ops {
+  Add,
+  Subtract,
+  Multiply,
+  Divide,
+  Remainder,
+  Negate,
+  BitAnd,
+  BitOr,
+  BitXor,
+  BitNot,
+  Not
+}
+import silk.equal { Equal }
+import silk.order { Order, Ordering }
 
-struct N { v: i32 }
+struct N {
+  v: i32
+}
 
-fn add(a: N, b: N) -> N { return N { v: a.v + b.v } }
-fn sub(a: N, b: N) -> N { return N { v: a.v - b.v } }
-fn mul(a: N, b: N) -> N { return N { v: a.v * b.v } }
-fn div(a: N, b: N) -> N { return N { v: a.v / b.v } }
-fn rem(a: N, b: N) -> N { return N { v: a.v % b.v } }
-fn neg(a: N) -> N { return N { v: -a.v } }
-fn band(a: N, b: N) -> N { return N { v: a.v & b.v } }
-fn bor(a: N, b: N) -> N { return N { v: a.v | b.v } }
-fn bxor(a: N, b: N) -> N { return N { v: a.v ^ b.v } }
-fn bnot(a: N) -> N { return N { v: ~a.v } }
-fn lnot(a: N) -> bool { return a.v == 0 }
-fn eq(a: &N, b: &N) -> bool { return a.v == b.v }
+fn add(a: N, b: N) -> N {
+  return N { v: a.v + b.v }
+}
+
+fn sub(a: N, b: N) -> N {
+  return N { v: a.v - b.v }
+}
+
+fn mul(a: N, b: N) -> N {
+  return N { v: a.v * b.v }
+}
+
+fn div(a: N, b: N) -> N {
+  return N { v: a.v / b.v }
+}
+
+fn rem(a: N, b: N) -> N {
+  return N { v: a.v % b.v }
+}
+
+fn neg(a: N) -> N {
+  return N { v: -a.v }
+}
+
+fn band(a: N, b: N) -> N {
+  return N { v: a.v & b.v }
+}
+
+fn bor(a: N, b: N) -> N {
+  return N { v: a.v | b.v }
+}
+
+fn bxor(a: N, b: N) -> N {
+  return N { v: a.v ^ b.v }
+}
+
+fn bnot(a: N) -> N {
+  return N { v: ~a.v }
+}
+
+fn lnot(a: N) -> bool {
+  return a.v == 0
+}
+
+fn eq(a: &N, b: &N) -> bool {
+  return a.v == b.v
+}
+
 fn cmp(a: &N, b: &N) -> Ordering {
-  if a.v < b.v { return Ordering.Less }
-  if a.v > b.v { return Ordering.Greater }
+  if a.v < b.v {
+    return Ordering.Less
+  }
+  if a.v > b.v {
+    return Ordering.Greater
+  }
   return Ordering.Equal
 }
 
-impl Add<N, N> for N { add: N.add }
-impl Subtract<N, N> for N { subtract: N.sub }
-impl Multiply<N, N> for N { multiply: N.mul }
-impl Divide<N, N> for N { divide: N.div }
-impl Remainder<N, N> for N { remainder: N.rem }
-impl Negate<N> for N { negate: N.neg }
-impl BitAnd<N, N> for N { bitAnd: N.band }
-impl BitOr<N, N> for N { bitOr: N.bor }
-impl BitXor<N, N> for N { bitXor: N.bxor }
-impl BitNot<N> for N { bitNot: N.bnot }
-impl Not<bool> for N { not: N.lnot }
-impl Equal for N { equals: N.eq }
-impl Order for N { compare: N.cmp }
+impl Add<N, N> for N {
+  add: N.add
+}
+
+impl Subtract<N, N> for N {
+  subtract: N.sub
+}
+
+impl Multiply<N, N> for N {
+  multiply: N.mul
+}
+
+impl Divide<N, N> for N {
+  divide: N.div
+}
+
+impl Remainder<N, N> for N {
+  remainder: N.rem
+}
+
+impl Negate<N> for N {
+  negate: N.neg
+}
+
+impl BitAnd<N, N> for N {
+  bitAnd: N.band
+}
+
+impl BitOr<N, N> for N {
+  bitOr: N.bor
+}
+
+impl BitXor<N, N> for N {
+  bitXor: N.bxor
+}
+
+impl BitNot<N> for N {
+  bitNot: N.bnot
+}
+
+impl Not<bool> for N {
+  not: N.lnot
+}
+
+impl Equal for N {
+  equals: N.eq
+}
+
+impl Order for N {
+  compare: N.cmp
+}
 
 pub fn main() -> i32 {
   let a = N { v: 12 } + N { v: 3 } - N { v: 1 }
@@ -135,11 +227,17 @@ pub fn main() -> i32 {
   let d = (N { v: 6 } & N { v: 3 }) | (N { v: 8 } ^ N { v: 1 })
   let e = ~N { v: 0 }
   let f = !N { v: 0 }
-  if a.v != 14 || b.v != 3 || c.v != -5 || d.v != 11 || e.v != -1 || !f { return 1 }
+  if a.v != 14 || b.v != 3 || c.v != -5 || d.v != 11 || e.v != -1 || !f {
+    return 1
+  }
   let one = N { v: 1 }
   let two = N { v: 2 }
-  if !(&one == &one) || &one != &one { return 2 }
-  if !(&one < &two) || &two <= &one || &one > &two || !(&two >= &two) { return 3 }
+  if !(&one == &one) || &one != &one {
+    return 2
+  }
+  if !(&one < &two) || &two <= &one || &one > &two || !(&two >= &two) {
+    return 3
+  }
   return 0
 }
 ```

@@ -89,25 +89,46 @@ QualifiedCall   = TypePath TypeArguments? '.' Identifier '(' Arguments? ')'
 ## Examples
 
 ```silk
-pub struct Counter { value: i32 }
+pub struct Counter {
+  value: i32
+}
 
 impl Counter {
-  pub fn zero() -> Self { return Counter { value: 0 } }
-  pub fn read(self: &Self) -> i32 { return self.value }
-  pub fn bump(self: &mut Self) -> () { self.value = self.value + 1 }
-  pub fn take(self: Self) -> i32 { return self.value }
+  pub fn zero() -> Self {
+    return Counter { value: 0 }
+  }
+
+  pub fn read(self: &Self) -> i32 {
+    return self.value
+  }
+
+  pub fn bump(self: &mut Self) -> () {
+    self.value = self.value + 1
+  }
+
+  pub fn take(self: Self) -> i32 {
+    return self.value
+  }
 }
 
 pub fn main() -> i32 {
   let mut c = Counter.zero()
   c.bump()
   Counter.bump(&mut c)
-  if c.read() != 2 || Counter.read(&c) != 2 { return 1 }
+  if c.read() != 2 || Counter.read(&c) != 2 {
+    return 1
+  }
   let read = c.read
-  if read() != 2 { return 2 }
+  if read() != 2 {
+    return 2
+  }
   let last = c.take()
-  if last != 2 { return 3 }
-  if (Counter { value: 5 }).take() != 5 { return 4 }
+  if last != 2 {
+    return 3
+  }
+  if (Counter { value: 5 }).take() != 5 {
+    return 4
+  }
   return 0
 }
 ```
@@ -123,28 +144,45 @@ fn countdown(mut n: i32) -> i32 {
 }
 
 fn even(n: i32) -> bool {
-  if n == 0 { return true }
+  if n == 0 {
+    return true
+  }
   return odd(n - 1)
 }
 
 fn odd(n: i32) -> bool {
-  if n == 0 { return false }
+  if n == 0 {
+    return false
+  }
   return even(n - 1)
 }
 
 fn log(flag: bool) {
-  if flag { return }
+  if flag {
+    return
+  }
 }
 
-fn add(a: i32, b: i32) -> i32 { return a + b }
-fn pick() -> typeof(add) { return add }
+fn add(a: i32, b: i32) -> i32 {
+  return a + b
+}
+
+fn pick() -> typeof (add) {
+  return add
+}
 
 pub fn main() -> i32 {
   log(true)
-  if countdown(4) != 4 { return 1 }
-  if !even(10) || odd(10) { return 2 }
+  if countdown(4) != 4 {
+    return 1
+  }
+  if !even(10) || odd(10) {
+    return 2
+  }
   let f = pick()
-  if f(1, 2) != 3 { return 3 }
+  if f(1, 2) != 3 {
+    return 3
+  }
   return 0
 }
 ```

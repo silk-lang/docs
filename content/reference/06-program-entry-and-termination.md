@@ -83,7 +83,9 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 ```silk
 pub fn main() -> i32 {
   let answer = 6 * 7
-  if answer != 42 { return 1 }
+  if answer != 42 {
+    return 1
+  }
   return 0
 }
 ```

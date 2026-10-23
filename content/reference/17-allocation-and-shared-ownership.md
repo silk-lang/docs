@@ -97,18 +97,18 @@ import silk.box { Box }
 import silk.effect { Effect }
 import silk.list { List }
 
-effect fn build() -> i32 ! OutOfMemoryError {
+effect fn build() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let mut values = List<i32>.make()
-  run List<i32>.append(&mut values, 10)
-    |> Effect.provideMut<Allocator>(&mut allocator)
-  run List<i32>.append(&mut values, 32)
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  run List<i32>.append(&mut values, 10) |> Effect.provideMut<Allocator>(&mut allocator)
+  run List<i32>.append(&mut values, 32) |> Effect.provideMut<Allocator>(&mut allocator)
   let slice = List<i32>.asSlice(&values)
   let sum = slice[0] + slice[1]
-  let boxed = run Box<i32>.make(sum)
-    |> Effect.provideMut<Allocator>(&mut allocator)
-  if List<i32>.length(&values) != 2 { return 1 }
+  let boxed = run Box<i32>.make(sum) |> Effect.provideMut<Allocator>(&mut allocator)
+  if List<i32>.length(&values) != 2 {
+    return 1
+  }
   return Box<i32>.into(move boxed) - 42
 }
 
@@ -126,25 +126,40 @@ import silk.allocator { Allocator, OutOfMemoryError }
 import silk.effect { Effect }
 import silk.shared { Shared }
 
-struct Counter { value: i32 }
+struct Counter {
+  value: i32
+}
 
-effect fn useCell() -> i32 ! OutOfMemoryError {
+effect fn useCell() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let cell = run Shared<Counter>.make(Counter { value: 40 })
     |> Effect.provideMut<Allocator>(&mut allocator)
   let alias = Shared<Counter>.clone(&cell)
   let step = 2
-  let after = Shared<Counter>.withMut<i32>(&alias, fn(c: &mut Counter) -> i32 {
-    c.value = c.value + step
-    return c.value
-  })
+  let after = Shared<Counter>.withMut<i32>(
+    &alias,
+    fn(c: &mut Counter) -> i32 {
+      c.value = c.value + step
+      return c.value
+    }
+  )
   drop alias
-  let seen = Shared<Counter>.with<i32>(&cell, fn(c: &Counter) -> i32 { return c.value })
-  if after != 42 { return 1 }
+  let seen = Shared<Counter>.with<i32>(
+    &cell,
+    fn(c: &Counter) -> i32 {
+      return c.value
+    }
+  )
+  if after != 42 {
+    return 1
+  }
   return seen - 42
 }
 
-effect fn recover(error: OutOfMemoryError) -> i32 { return 100 }
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 100
+}
 
 pub fn main() -> i32 {
   return run Effect.catchAll(useCell(), recover)
@@ -160,7 +175,8 @@ import silk.box { Box }
 import silk.effect { Effect }
 import silk.list { List }
 
-effect fn phases() -> i32 ! OutOfMemoryError {
+effect fn phases() -> i32
+  ! OutOfMemoryError {
   let options = ArenaOptions { firstChunkBytes: 1024, maximumChunkBytes: 4096 }
   let mut arena = Arena.withOptions(Allocator.systemAllocatorProvider(), move options)
   let mut total = 0
@@ -175,17 +191,23 @@ effect fn phases() -> i32 ! OutOfMemoryError {
     total = total + List<i32>.get(&values, 9)
     drop values
     arena.reset(ArenaReset.RetainCapacity)
-    if arena.available() == 0 { return 2 }
+    if arena.available() == 0 {
+      return 2
+    }
     round = round + 1
   }
   arena.reset(ArenaReset.Release)
-  if arena.available() != 0 { return 3 }
+  if arena.available() != 0 {
+    return 3
+  }
   let kept = run Box<i32>.make(15) |> Effect.provideMut<Allocator>(&mut arena)
   drop arena
   return total + kept.get()[0]
 }
 
-effect fn recover(error: OutOfMemoryError) -> i32 { return 1 }
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 1
+}
 
 pub fn main() -> i32 {
   return run Effect.catchAll(phases(), recover)
@@ -203,7 +225,8 @@ import silk.list { List }
 struct Refusing {}
 
 impl Refusing {
-  effect fn refuse(self: &mut Self, layout: Layout) -> Intrinsic.Allocation ! OutOfMemoryError {
+  effect fn refuse(self: &mut Self, layout: Layout) -> Intrinsic.Allocation
+    ! OutOfMemoryError {
     drop layout
     fail OutOfMemoryError {}
   }
@@ -213,15 +236,17 @@ impl Allocator for Refusing {
   allocate: Refusing.refuse
 }
 
-effect fn grow() -> i32 ! OutOfMemoryError {
+effect fn grow() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Refusing {}
   let mut values = List<i32>.make()
-  run List<i32>.append(&mut values, 1)
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  run List<i32>.append(&mut values, 1) |> Effect.provideMut<Allocator>(&mut allocator)
   return 1
 }
 
-effect fn recover(error: OutOfMemoryError) -> i32 { return 0 }
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 0
+}
 
 pub fn main() -> i32 {
   return run Effect.catchAll(grow(), recover)

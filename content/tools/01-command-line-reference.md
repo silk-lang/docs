@@ -1,6 +1,6 @@
 # Command-line reference
 
-Every `silk` command, its options and its exit status. `silk --help` prints the same synopsis in short form, and `silk <command> --help` prints the lines for one command. The pages after this one explain testing, formatting, diagnostics, documentation and changesets in more depth.
+Every `silk` command, its options and its exit status. `silk help` (or `silk --help`) prints one line for each command, and `silk help <command>` (or `silk <command> --help`) prints that command's options. The pages after this one explain testing, formatting, diagnostics, documentation and changesets in more depth.
 
 ## Commands
 
@@ -22,11 +22,19 @@ Every `silk` command, its options and its exit status. `silk --help` prints the 
 | `silk changes <subcommand>` | Record changes, version and release the package |
 | `silk toolchain <subcommand>` | List, install, pin and remove Silk toolchains |
 | `silk +<version> <command>` | Run the command with that installed toolchain |
-| `silk --help`, `-h` | Print the synopsis and exit 0 |
-| `silk <command> --help`, `-h` | Print that command's usage lines and exit 0 |
+| `silk help`, `silk --help`, `-h` | Print one line for each command and exit 0 |
+| `silk help <command>`, `silk <command> --help`, `-h` | Print that command's usage lines and exit 0 |
 | `silk --version`, `-v` | Print `silk v0.1.0` and exit 0 |
 
-An unknown command prints `` silk: unknown command `frobnicate`  `` and the synopsis, and exits 2. A lone argument that is not a command is read as a Silk source file whose syntax tree to print, a debugging aid. When no such file exists, `silk foo.silk` prints `` silk: no such source file `foo.silk`; a lone argument is a command or a Silk source file to dump `` and the synopsis, and exits 2.
+An unknown command prints `` silk: unknown command `frobnicate`  `` and the command list, and exits 2. So does `silk help frobnicate`. A lone argument that is not a command is read as a Silk source file whose syntax tree to print, a debugging aid. When no such file exists, `silk foo.silk` prints `` silk: no such source file `foo.silk`; a lone argument is a command or a Silk source file to dump `` and the command list, and exits 2.
+
+An option a command does not take is named, with the closest option it does take, followed by that command's usage lines; the exit status is 2:
+
+```
+$ silk check --relase
+silk check: unknown option `--relase`; did you mean `--release`?
+usage: silk check [--manifest-path <path>] [--package <name>]... [--workspace] [--target <host|triple>]... [--release] [--optimization <profile>] [--profile <name>] [--profile-input <json>] [--stdlib <directory>] [--progress auto|live|plain|never] [--quiet] [--timings] [--json] [--replay <script> [--differential]]
+```
 
 ## Finding the project
 
@@ -35,7 +43,7 @@ Project commands start from the current directory and walk up to the nearest `si
 When no manifest is found, the command stops with exit status 2:
 
 ```
-No silk.toml found from /home/you; create one
+No silk.toml found from /home/you; run `silk init` to create a package here, or `silk init <name>` for a new folder
 ```
 
 A manifest that has `[workspace]` and no `[package]` is a workspace root. At a root, `check`, `build` and `test` run every member, and `format` and `doc` cover every member. See **Workspaces** in Projects and packages.
@@ -202,7 +210,7 @@ Builds the test runner under `build/test/` and runs the selected tests. In this 
 silk clean [--manifest-path <path>]
 ```
 
-Deletes the build output directory and prints `Removed /home/you/hello/build`. At a workspace root it deletes the shared output directory. It succeeds when there is nothing to remove.
+Deletes the build output directory and prints `Removed /home/you/hello/build`. At a workspace root it deletes the shared output directory. When there is nothing to remove, it prints `Nothing to clean: /home/you/hello/build does not exist` and still exits 0.
 
 ## format
 
@@ -218,7 +226,7 @@ Formats every `.silk` file under the package's source root, or only the given fi
 silk lsp [--stdlib <directory>]
 ```
 
-Runs a language server that speaks the Language Server Protocol over standard input and output. An editor starts it; you do not run it by hand. It reports diagnostics as you type, lists the declarations in a file, folds blocks, and formats the file the way `silk format` does. Hover, go to definition and signature help work for the functions you call, from your package or the std lib, and for local variables where they are used. Inlay hints show the type of each `let` binding. Completion, rename and find references are not available. See **Editor setup** in Get started.
+Runs a language server that speaks the Language Server Protocol over standard input and output. An editor starts it; you do not run it by hand. It reports diagnostics as you type, lists the declarations in a file, folds blocks, and formats the file the way `silk format` does. Hover, go to definition and signature help work for the functions you call, from your package or the std lib, and for local variables where they are used. Inlay hints show the type of each `let` binding. Completion, find references, rename and workspace symbol search work over the package. See **Editor setup** in Get started.
 
 ## doc, doctest and doc-reference
 
@@ -255,7 +263,7 @@ silk toolchain default <version>
 silk toolchain uninstall <version>
 ```
 
-Manages the Silk versions installed side by side in `$SILK_HOME/toolchains/<version>` (`SILK_HOME` defaults to `~/.silk`). When `SILK_HOME` is unset and `HOME` names no existing directory, `install`, `use`, `default` and `uninstall` create nothing and exit 1 with `silk toolchain: cannot find the toolchain directory; set SILK_HOME to an absolute path, or HOME to an existing directory`; `list` and `which` still show the running compiler. Each toolchain is a release archive unpacked as is: `bin/silk` beside `lib/silk/stdlib`. No subcommand prompts. Results go to standard output, and `--json` prints one JSON object instead. `silk toolchain help`, `silk toolchain --help` and `silk toolchain -h` print the usage above with notes and exit 0. `silk help toolchain` is not a command: it prints the general usage and exits 2.
+Manages the Silk versions installed side by side in `$SILK_HOME/toolchains/<version>` (`SILK_HOME` defaults to `~/.silk`). When `SILK_HOME` is unset and `HOME` names no existing directory, `install`, `use`, `default` and `uninstall` create nothing and exit 1 with `silk toolchain: cannot find the toolchain directory; set SILK_HOME to an absolute path, or HOME to an existing directory`; `list` and `which` still show the running compiler. Each toolchain is a release archive unpacked as is: `bin/silk` beside `lib/silk/stdlib`. No subcommand prompts. Results go to standard output, and `--json` prints one JSON object instead. `silk toolchain help`, `silk toolchain --help` and `silk toolchain -h` print the usage above with notes and exit 0. `silk help toolchain` prints the one-line synopsis of `silk toolchain`.
 
 | Subcommand | What it does |
 | --- | --- |
@@ -380,7 +388,7 @@ $ silk toolchain uninstall 0.5.0
 Two lower-level forms compile one root module directly. They still need a `silk.toml` in the source file's directory or above it, which supplies the package context. Without one, both stop with exit status 2:
 
 ```
-No silk.toml found from /home/you/loose; create one
+No silk.toml found from /home/you/loose; run `silk init` to create a package here, or `silk init <name>` for a new folder
 ```
 
 ```
@@ -405,7 +413,7 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | --- | --- |
 | 0 | Success. For `format --check`: every file is already formatted |
 | 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, a source file or folder named `silk` or `Intrinsic`, any `silk changes` error including a malformed `silk changes` command line |
-| 2 | The command could not start: a malformed command line (it prints the synopsis), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, conflicting options, `test` without `--no-cache`, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
+| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, conflicting options, `test` without `--no-cache`, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
 | 3, 4, 5 | The selected toolchain is not installed, a toolchain download failed, or a release failed verification. See "Exit status of toolchain commands" |
 | other | `silk run` only: the program's own status |
 

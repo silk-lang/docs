@@ -93,24 +93,37 @@ import silk.execution { Execution, Wake }
 import silk.shared { Shared }
 
 struct Empty {}
-struct Waiting { wake: Wake }
-struct Mailbox { slot: Empty | Waiting readyCount: i32 }
+
+struct Waiting {
+  wake: Wake
+}
+
+struct Mailbox {
+  slot: Empty | Waiting
+  readyCount: i32
+}
 
 fn install(mailbox: &mut Mailbox, wake: Wake) -> () {
   let previous = Intrinsic.replace(mailbox.slot, Waiting { wake: move wake })
   drop previous
   return ()
 }
+
 fn extract(mailbox: &mut Mailbox) -> Empty | Waiting {
   return Intrinsic.replace(mailbox.slot, Empty {})
 }
+
 fn markReady(mailbox: &mut Mailbox) -> () {
   mailbox.readyCount = mailbox.readyCount + 1
   return ()
 }
-fn readyCount(mailbox: &Mailbox) -> i32 { return mailbox.readyCount }
+
+fn readyCount(mailbox: &Mailbox) -> i32 {
+  return mailbox.readyCount
+}
 
 struct Registration {}
+
 fn register(wake: Wake, mailbox: Shared<Mailbox>) -> Registration {
   Shared.withMut(&mailbox, install(move wake))
   return Registration {}
@@ -127,12 +140,21 @@ fn onReady(mailbox: &Shared<Mailbox>) -> () {
 }
 
 struct Idle {}
-struct Parked { execution: Intrinsic.Execution<i32> }
-struct Owner { slot: Idle | Parked result: i32 }
+
+struct Parked {
+  execution: Intrinsic.Execution<i32>
+}
+
+struct Owner {
+  slot: Idle | Parked
+  result: i32
+}
+
 fn complete(owner: &mut Owner, value: i32) -> () {
   owner.result = value
   return ()
 }
+
 fn suspended(owner: &mut Owner, execution: Intrinsic.Execution<i32>) -> () {
   let previous = Intrinsic.replace(owner.slot, Parked { execution: move execution })
   drop previous
@@ -153,7 +175,8 @@ effect fn resume(selected: Idle | Parked, owner: &mut Owner) -> () {
   }
 }
 
-effect fn program() -> i32 ! OutOfMemoryError {
+effect fn program() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let mailbox = run Shared<Mailbox>.make(Mailbox { slot: Empty {}, readyCount: 0 })
     |> Effect.provideMut<Allocator>(&mut allocator)
@@ -167,8 +190,13 @@ effect fn program() -> i32 ! OutOfMemoryError {
   return owner.result + Shared.with(&mailbox, readyCount) - 41
 }
 
-effect fn recover(error: OutOfMemoryError) -> i32 { return 1 }
-pub fn main() -> i32 { return run Effect.catchAll(program(), recover) }
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return 1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), recover)
+}
 ```
 
 Cancel a parked execution. The local `Token` drops first (digit 1), then the nonparking finalizer runs (digit 2). With `Effect.ensuring` in place of `Effect.ensuringNonParking`, the log is `1`.
@@ -180,14 +208,24 @@ import silk.execution { Execution, Wake }
 import silk.ownership { Drop }
 import silk.shared { Shared }
 
-struct Log { value: i32 }
+struct Log {
+  value: i32
+}
+
 fn push(log: &mut Log, digit: i32) -> () {
   log.value = log.value * 10 + digit
   return ()
 }
-fn read(log: &Log) -> i32 { return log.value }
 
-struct Token { log: Shared<Log> digit: i32 }
+fn read(log: &Log) -> i32 {
+  return log.value
+}
+
+struct Token {
+  log: Shared<Log>
+  digit: i32
+}
+
 impl Drop for Token {
   fn drop(self: &mut Token) -> () {
     Shared.withMut(&self.log, push(self.digit))
@@ -195,8 +233,13 @@ impl Drop for Token {
   }
 }
 
-struct Guard { wake: Wake }
-fn register(wake: Wake) -> Guard { return Guard { wake: move wake } }
+struct Guard {
+  wake: Wake
+}
+
+fn register(wake: Wake) -> Guard {
+  return Guard { wake: move wake }
+}
 
 effect fn body(log: Shared<Log>) -> i32 {
   let token = Token { log: move log, digit: 1 }
@@ -216,17 +259,24 @@ effect fn guarded(log: Shared<Log>) -> i32 {
 }
 
 struct Endpoint {}
-fn ready(endpoint: &Endpoint) -> () { return () }
-fn complete(state: &mut (), value: i32) -> () { return () }
+
+fn ready(endpoint: &Endpoint) -> () {
+  return ()
+}
+
+fn complete(state: &mut (), value: i32) -> () {
+  return ()
+}
+
 fn suspended(state: &mut (), execution: Intrinsic.Execution<i32>) -> () {
   drop execution
   return ()
 }
 
-effect fn program() -> i32 ! OutOfMemoryError {
+effect fn program() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
-  let log = run Shared<Log>.make(Log { value: 0 })
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let log = run Shared<Log>.make(Log { value: 0 }) |> Effect.provideMut<Allocator>(&mut allocator)
   let execution = run Execution.make(guarded(Shared.clone(&log)), Endpoint {}, ready)
     |> Effect.provideMut<Allocator>(&mut allocator)
   let mut state = ()
@@ -234,8 +284,13 @@ effect fn program() -> i32 ! OutOfMemoryError {
   return Shared.with(&log, read) - 12
 }
 
-effect fn recover(error: OutOfMemoryError) -> i32 { return -1 }
-pub fn main() -> i32 { return run Effect.catchAll(program(), recover) }
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return -1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), recover)
+}
 ```
 
 A child is cancelled when its parent task finishes. The grandchild `leaf` sleeps for an hour; `middle` returns first, so `leaf` is cancelled, its `Token` drops, and awaiting its `Fiber` reports `Cancelled`:
@@ -251,14 +306,23 @@ import silk.ownership { Drop }
 import silk.scheduler { Scheduler, TaskIdExhaustedError }
 import silk.shared { Shared }
 
-struct Log { drops: i32 }
+struct Log {
+  drops: i32
+}
+
 fn countDrop(log: &mut Log) -> () {
   log.drops = log.drops + 1
   return ()
 }
-fn drops(log: &Log) -> i32 { return log.drops }
 
-struct Token { log: Shared<Log> }
+fn drops(log: &Log) -> i32 {
+  return log.drops
+}
+
+struct Token {
+  log: Shared<Log>
+}
+
 impl Drop for Token {
   fn drop(self: &mut Token) -> () {
     Shared.withMut(&self.log, countDrop)
@@ -267,19 +331,27 @@ impl Drop for Token {
 }
 
 struct Empty {}
-struct Held { fiber: Fiber<i32, never> }
-struct Slot { phase: Empty | Held }
+
+struct Held {
+  fiber: Fiber<i32, never>
+}
+
+struct Slot {
+  phase: Empty | Held
+}
+
 fn store(slot: &mut Slot, fiber: Fiber<i32, never>) -> () {
   let previous = Intrinsic.replace(slot.phase, Held { fiber: move fiber })
   drop previous
   return ()
 }
+
 fn take(slot: &mut Slot) -> Empty | Held {
   return Intrinsic.replace(slot.phase, Empty {})
 }
 
 effect fn leaf(log: Shared<Log>) -> i32
-? &mut Scheduler | &mut MonotonicClock {
+  ? &mut Scheduler | &mut MonotonicClock {
   let token = Token { log: move log }
   run MonotonicClock.waitFor(1h)
   drop token
@@ -287,8 +359,8 @@ effect fn leaf(log: Shared<Log>) -> i32
 }
 
 effect fn middle(slot: Shared<Slot>, log: Shared<Log>) -> i32
-! OutOfMemoryError | TaskIdExhaustedError
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError
+  ? &mut Scheduler | &mut MonotonicClock {
   let child = run Fiber<i32, never>.forkChild(leaf(move log))
   Shared.withMut(&slot, store(move child))
   run Fiber.yieldNow()
@@ -305,8 +377,8 @@ fn wasCancelled(outcome: Outcome<i32, never>) -> bool {
 }
 
 effect fn root(log: Shared<Log>) -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
   let mut allocator = Allocator.systemAllocatorProvider()
   let slot = run Shared<Slot>.make(Slot { phase: Empty {} })
     |> Effect.provideMut<Allocator>(&mut allocator)
@@ -322,27 +394,35 @@ effect fn root(log: Shared<Log>) -> i32
 }
 
 fn checkLeaf(value: i32, outcome: Outcome<i32, never>, dropCount: i32) -> i32 {
-  if value != 2 { return 11 }
-  if !wasCancelled(move outcome) { return 12 }
+  if value != 2 {
+    return 11
+  }
+  if !wasCancelled(move outcome) {
+    return 12
+  }
   return dropCount - 1
 }
 
 effect fn scenario() -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
   let mut allocator = Allocator.systemAllocatorProvider()
-  let log = run Shared<Log>.make(Log { drops: 0 })
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let log = run Shared<Log>.make(Log { drops: 0 }) |> Effect.provideMut<Allocator>(&mut allocator)
   let mut scheduler = LocalScheduler.make()
   let mut clock = OsMonotonicClock.make()
   return run LocalScheduler.execute(&mut scheduler, root(move log))
     |> Effect.provideMut<MonotonicClock>(&mut clock)
 }
 
-effect fn recover(error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError) -> i32 {
+effect fn recover(
+  error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError
+) -> i32 {
   drop error
   return 99
 }
-pub fn main() -> i32 { return run Effect.catchAll(scenario(), recover) }
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(scenario(), recover)
+}
 ```
 
 ## Errors and fixes
@@ -378,22 +458,35 @@ import silk.allocator { Allocator, OutOfMemoryError }
 import silk.effect { Effect }
 import silk.shared { Shared }
 
-struct Counter { value: i32 }
-effect fn five() -> i32 { return 5 }
+struct Counter {
+  value: i32
+}
+
+effect fn five() -> i32 {
+  return 5
+}
+
 fn add(counter: &mut Counter, amount: i32) -> i32 {
   counter.value = counter.value + amount
   return counter.value
 }
 
-effect fn program() -> i32 ! OutOfMemoryError {
+effect fn program() -> i32
+  ! OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let cell = run Shared<Counter>.make(Counter { value: 1 })
     |> Effect.provideMut<Allocator>(&mut allocator)
   let amount = run five()
   return Shared.withMut(&cell, add(amount)) - 6
 }
-effect fn recover(error: OutOfMemoryError) -> i32 { return -1 }
-pub fn main() -> i32 { return run Effect.catchAll(program(), recover) }
+
+effect fn recover(error: OutOfMemoryError) -> i32 {
+  return -1
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), recover)
+}
 ```
 
 SEM0139, a parking finalizer passed to `Effect.ensuringNonParking`. In the cancellation example, adding `run Execution.park(register)` to the body of `note` makes the build fail with SEM0139 at the `Effect.ensuringNonParking` call. Use `Effect.ensuring` for a finalizer that must park, and accept that it does not run on cancellation.

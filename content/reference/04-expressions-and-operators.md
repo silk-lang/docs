@@ -147,16 +147,28 @@ fn negate(value: i32) -> i32 {
 }
 
 pub fn main() -> i32 {
-  if 1 + 2 * 3 != 7 { return 1 }
-  if 10 - 4 - 3 != 3 { return 2 }
-  if (6 & 3) != 2 || 6 & 3 != 2 { return 3 }
-  if -7 / 2 != -3 || -7 % 2 != -1 { return 4 }
-  let piped = 10
-    |> subtract(3)
-    |> negate
-  if piped != -7 { return 5 }
-  if (2 |> subtract(5)) != -3 { return 6 }
-  if false && 1 / 0 == 0 { return 7 }
+  if 1 + 2 * 3 != 7 {
+    return 1
+  }
+  if 10 - 4 - 3 != 3 {
+    return 2
+  }
+  if (6 & 3) != 2 || 6 & 3 != 2 {
+    return 3
+  }
+  if -7 / 2 != -3 || -7 % 2 != -1 {
+    return 4
+  }
+  let piped = 10 |> subtract(3) |> negate
+  if piped != -7 {
+    return 5
+  }
+  if (2 |> subtract(5)) != -3 {
+    return 6
+  }
+  if false && 1 / 0 == 0 {
+    return 7
+  }
   return 0
 }
 ```
@@ -165,7 +177,9 @@ pub fn main() -> i32 {
 import silk.equal { Equal }
 import silk.ops { Add }
 
-struct Meters { value: i32 }
+struct Meters {
+  value: i32
+}
 
 fn addMeters(left: Meters, right: Meters) -> Meters {
   return Meters { value: left.value + right.value }
@@ -175,19 +189,28 @@ fn sameMeters(left: &Meters, right: &Meters) -> bool {
   return left.value == right.value
 }
 
-impl Add<Meters, Meters> for Meters { add: Meters.addMeters }
-impl Equal for Meters { equals: Meters.sameMeters }
+impl Add<Meters, Meters> for Meters {
+  add: Meters.addMeters
+}
+
+impl Equal for Meters {
+  equals: Meters.sameMeters
+}
 
 pub fn main() -> i32 {
   let total = Meters { value: 40 } + Meters { value: 2 }
   let expected = Meters { value: 42 }
-  if &total != &expected { return 1 }
+  if &total != &expected {
+    return 1
+  }
   return 0
 }
 ```
 
 ```silk
-struct Counter { hits: i32 }
+struct Counter {
+  hits: i32
+}
 
 fn bump(counter: &mut Counter) {
   counter.hits = counter.hits + 1
@@ -205,9 +228,15 @@ pub fn main() -> i32 {
   let row: usize = 1
   let wide = identity<i64>(5)
   let moved = identity(move counter)
-  if pair.0 != 1 || !pair.1 { return 1 }
-  if grid[row][row] != 4 { return 2 }
-  if wide != 5 || moved.hits != 1 { return 3 }
+  if pair.0 != 1 || !pair.1 {
+    return 1
+  }
+  if grid[row][row] != 4 {
+    return 2
+  }
+  if wide != 5 || moved.hits != 1 {
+    return 3
+  }
   return 0
 }
 ```

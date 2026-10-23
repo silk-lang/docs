@@ -46,7 +46,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:13:7: error[SEM0121] `main.Status: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Status`
+src/main.silk:13:7: error[SEM0121] `main.Status: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Status`
 Failed scratch in 0.25s
 ```
 
@@ -145,7 +145,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:9:15: error[SEM0157] Direct ordering of scalar enum values
+src/main.silk:9:15: error[SEM0157] Direct ordering of scalar enum values
 Failed scratch in 0.18s
 ```
 
@@ -185,7 +185,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:122:18: error[SEM0135] Operator == does not accept (main.TaskId, main.TaskId)
+src/main.silk:122:18: error[SEM0135] Operator == does not accept (main.TaskId, main.TaskId)
 Failed tasks in 0.21s
 ```
 
@@ -284,7 +284,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:7:1: error[SEM0083] Invalid conformance: `Filter` requires `keep`, which this implementation does not define
+src/main.silk:7:1: error[SEM0083] Invalid conformance: `Filter` requires `keep`, which this implementation does not define
 Failed scratch in 0.19s
 ```
 
@@ -389,7 +389,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:7:10: error[SEM0077] Invoking a stored callable through a place without the access its contract requires
+src/main.silk:7:10: error[SEM0077] Invoking a stored callable through a place without the access its contract requires
 Failed scratch in 0.16s
 ```
 

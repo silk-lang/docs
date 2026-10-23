@@ -146,7 +146,7 @@ Checking shapes (x86_64-unknown-linux-gnu)
   load     53 modules, 3 in package          0.06s
   check    failed: 4 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-/home/you/shapes/src/main.silk:1:25: error[SEM0015] An import or qualified reference naming a private member of another module
+src/main.silk:1:25: error[SEM0015] An import or qualified reference naming a private member of another module
 Failed shapes in 0.20s
 ```
 

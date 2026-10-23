@@ -90,22 +90,34 @@ Omitted lifetimes in a function signature follow these rules.
 ## Examples
 
 ```silk
-struct View<'a> { item: &'a i32 }
+struct View<'a> {
+  item: &'a i32
+}
 
 impl<'a> View<'a> {
-  fn get(self: &View<'a>) -> &'a i32 { return self.item }
+  fn get(self: &View<'a>) -> &'a i32 {
+    return self.item
+  }
 }
 
 fn longest<'a>(left: &'a i32, right: &'a i32) -> &'a i32 {
-  if left.* >= right.* { return left }
+  if left.* >= right.* {
+    return left
+  }
   return right
 }
 
-fn widen<'short, 'long: 'short>(value: &'long i32) -> &'short i32 { return value }
+fn widen<'short, 'long: 'short>(value: &'long i32) -> &'short i32 {
+  return value
+}
 
-fn first(values: &[i32]) -> &i32 { return &values[0] }
+fn first(values: &[i32]) -> &i32 {
+  return &values[0]
+}
 
-fn label() -> string<'static> { return "static text" }
+fn label() -> string<'static> {
+  return "static text"
+}
 
 pub fn main() -> i32 {
   let a = 3
@@ -127,21 +139,35 @@ interface Source<'s> {
   fn peek(self: &Self) -> &'s i32
 }
 
-struct Fixed<'s> { value: &'s i32 }
-
-impl<'s> Source<'s> for Fixed<'s> {
-  fn peek(self: &Self) -> &'s i32 { return self.value }
+struct Fixed<'s> {
+  value: &'s i32
 }
 
-struct Holder<'a, T: 'a> { item: &'a T }
+impl<'s> Source<'s> for Fixed<'s> {
+  fn peek(self: &Self) -> &'s i32 {
+    return self.value
+  }
+}
 
-fn read<'s, S: Source<'s>>(source: &S) -> i32 { return source.peek().* }
+struct Holder<'a, T: 'a> {
+  item: &'a T
+}
 
-fn hold<'a, T: 'a>(item: &'a T) -> Holder<'a, T> { return Holder { item: item } }
+fn read<'s, S: Source<'s>>(source: &S) -> i32 {
+  return source.peek().*
+}
 
-fn apply(f: for<'x> fn(&'x i32) -> &'x i32, value: &i32) -> i32 { return f(value).* }
+fn hold<'a, T: 'a>(item: &'a T) -> Holder<'a, T> {
+  return Holder { item: item }
+}
 
-fn same<'b>(value: &'b i32) -> &'b i32 { return value }
+fn apply(f: for<'x> fn(&'x i32) -> &'x i32, value: &i32) -> i32 {
+  return f(value).*
+}
+
+fn same<'b>(value: &'b i32) -> &'b i32 {
+  return value
+}
 
 pub fn main() -> i32 {
   let k = 6
@@ -155,7 +181,9 @@ Inferred and explicit lifetime arguments at a call:
 
 ```silk
 fn pick<'a: 'c, 'b: 'c, 'c>(x: &'a i32, y: &'b i32, first: bool) -> &'c i32 {
-  if first { return x }
+  if first {
+    return x
+  }
   return y
 }
 
@@ -166,7 +194,9 @@ fn both<'p>(a: &'p i32, b: &'p i32) -> i32 {
 pub fn main() -> i32 {
   let a = 1
   let b = 2
-  if pick(&a, &b, true).* != 1 { return 1 }
+  if pick(&a, &b, true).* != 1 {
+    return 1
+  }
   return both(&a, &b) - 2
 }
 ```
@@ -190,7 +220,10 @@ pub fn main() -> i32 { return 0 }
 Name the lifetime the result borrows from:
 
 ```silk
-fn pick<'a>(a: &'a i32, b: &i32) -> &'a i32 { return a }
+fn pick<'a>(a: &'a i32, b: &i32) -> &'a i32 {
+  return a
+}
+
 pub fn main() -> i32 {
   let x = 1
   let y = 2
@@ -216,8 +249,14 @@ pub fn main() -> i32 { return 0 }
 Declare the needed relationship:
 
 ```silk
-fn widen<'a, 'b: 'a>(value: &'b i32) -> &'a i32 { return value }
-fn swap<'a: 'b, 'b>(x: &'a i32) -> &'b i32 { return widen<'b, 'a>(x) }
+fn widen<'a, 'b: 'a>(value: &'b i32) -> &'a i32 {
+  return value
+}
+
+fn swap<'a: 'b, 'b>(x: &'a i32) -> &'b i32 {
+  return widen<'b, 'a>(x)
+}
+
 pub fn main() -> i32 {
   let k = 5
   return swap(&k).* - 5
@@ -252,10 +291,17 @@ Implement it for every lifetime:
 
 ```silk
 import silk.ownership { Drop }
-struct Handle<'a> { item: &'a i32 }
-impl<'a> Drop for Handle<'a> {
-  fn drop(self: &mut Handle<'a>) -> () { return () }
+
+struct Handle<'a> {
+  item: &'a i32
 }
+
+impl<'a> Drop for Handle<'a> {
+  fn drop(self: &mut Handle<'a>) -> () {
+    return ()
+  }
+}
+
 pub fn main() -> i32 {
   let k = 1
   let h = Handle { item: &k }
@@ -288,11 +334,15 @@ pub fn main() -> i32 { return 0 }
 Store a borrow the caller provides:
 
 ```silk
-struct View<'a> { item: &'a i32 }
+struct View<'a> {
+  item: &'a i32
+}
+
 fn fill<'s>(out: &mut View<'s>, source: &'s i32) -> () {
   out.* = View { item: source }
   return ()
 }
+
 pub fn main() -> i32 {
   let zero = 0
   let k = 4

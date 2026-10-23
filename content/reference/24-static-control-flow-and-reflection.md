@@ -144,8 +144,15 @@ All of these are fixed by the build request (`--target`, `--release`, `--profile
 ```silk
 import silk.reflect { Reflect, namedKind }
 
-struct Point { pub x: i32 pub y: i32 }
-struct Sample { pub flag: bool pub count: i32 }
+struct Point {
+  pub x: i32
+  pub y: i32
+}
+
+struct Sample {
+  pub flag: bool
+  pub count: i32
+}
 
 fn total<T>(value: &T) -> i32 {
   static if Reflect.typeKind(Reflect.typeOf<T>()) != namedKind {
@@ -168,8 +175,12 @@ fn countOf(sample: &Sample) -> i32 {
 }
 
 pub fn main() -> i32 {
-  if total(&Point { x: 40, y: 2 }) != 42 { return 1 }
-  if countOf(&Sample { flag: true, count: 7 }) != 7 { return 2 }
+  if total(&Point { x: 40, y: 2 }) != 42 {
+    return 1
+  }
+  if countOf(&Sample { flag: true, count: 7 }) != 7 {
+    return 2
+  }
   return 0
 }
 ```
@@ -179,11 +190,17 @@ import silk.target { Target, OperatingSystem, pointerBits }
 import silk.static_sequence { StaticSequence }
 
 static if Target.operatingSystem() == OperatingSystem.Linux {
-  fn platform() -> i32 { return 1 }
+  fn platform() -> i32 {
+    return 1
+  }
 } else static if Target.operatingSystem() == OperatingSystem.Darwin {
-  fn platform() -> i32 { return 2 }
+  fn platform() -> i32 {
+    return 2
+  }
 } else {
-  fn platform() -> i32 { return 0 }
+  fn platform() -> i32 {
+    return 0
+  }
 }
 
 static fn sizes() -> Intrinsic.StaticSequence<i32> {
@@ -202,12 +219,16 @@ fn wordBits() -> i32 {
 }
 
 pub fn main() -> i32 {
-  if platform() == 0 { return 1 }
+  if platform() == 0 {
+    return 1
+  }
   let mut sum = 0
   static for size in sizes() {
     sum = sum + size
   }
-  if sum != 24 { return 2 }
+  if sum != 24 {
+    return 2
+  }
   return wordBits() - 64
 }
 ```
@@ -252,8 +273,8 @@ pub fn main() -> i32 {
 Calling `scaled(0, 21)` instead, on line 32, fails the build with SEM0177. The note is the call that selected the branch:
 
 ```
-/home/you/demo/src/main.silk:24:5: error[SEM0177] factor must be nonzero
-  note: /home/you/demo/src/main.silk:32:6: related location
+src/main.silk:24:5: error[SEM0177] factor must be nonzero
+  note: src/main.silk:32:6: related location
 ```
 
 ## Diagnostics

@@ -124,9 +124,15 @@ fn score(level: Level) -> i32 {
 pub fn main() -> i32 {
   let level = Level.Mid
   let again = level
-  if level != again { return 1 }
-  if Level.value(Level.Mid) != 0 { return 2 }
-  if score(Level.High) != 3 { return 3 }
+  if level != again {
+    return 1
+  }
+  if Level.value(Level.Mid) != 0 {
+    return 2
+  }
+  if score(Level.High) != 3 {
+    return 3
+  }
   return 0
 }
 ```
@@ -149,15 +155,22 @@ pub fn main() -> i32 {
   let b: Maybe<i32> = Maybe.Some { value: 2 }
   let none: Maybe<i32> = Maybe.None
   let total = orZero(move a) + orZero(move b) + orZero(Maybe.Some { value: 3 }) + orZero(move none)
-  if total != 6 { return 1 }
+  if total != 6 {
+    return 1
+  }
   return 0
 }
 ```
 
 ```silk
-union Shape { A, B }
+union Shape {
+  A,
+  B
+}
 
-fn widen(value: i32 | char) -> i32 | char | f64 { return value }
+fn widen(value: i32 | char) -> i32 | char | f64 {
+  return value
+}
 
 fn describe(value: Shape | i32) -> i32 {
   return match move value {
@@ -170,14 +183,23 @@ fn describe(value: Shape | i32) -> i32 {
 fn letter(value: i32 | char | f64) -> i32 {
   return match value {
     i32 n => n
-    char c => { if c == 'z' { return 10 } return 20 }
+    char c => {
+      if c == 'z' {
+        return 10
+      }
+      return 20
+    }
     f64 _ => 30
   }
 }
 
 pub fn main() -> i32 {
-  if describe(Shape.B) != 2 || describe(7) != 7 { return 1 }
-  if letter(widen('z')) != 10 { return 2 }
+  if describe(Shape.B) != 2 || describe(7) != 7 {
+    return 1
+  }
+  if letter(widen('z')) != 10 {
+    return 2
+  }
   return 0
 }
 ```

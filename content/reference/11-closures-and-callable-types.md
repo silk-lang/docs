@@ -104,11 +104,21 @@ A callable's invocation mode follows from its captures:
 ## Examples
 
 ```silk
-struct Token { value: i32 }
+struct Token {
+  value: i32
+}
 
-fn consume(token: Token) -> i32 { return token.value }
-fn callTwice(mut step: mut fn() -> i32) -> i32 { return step() + step() }
-fn callOnce(step: once fn() -> i32) -> i32 { return step() }
+fn consume(token: Token) -> i32 {
+  return token.value
+}
+
+fn callTwice(mut step: mut fn() -> i32) -> i32 {
+  return step() + step()
+}
+
+fn callOnce(step: once fn() -> i32) -> i32 {
+  return step()
+}
 
 pub fn main() -> i32 {
   let offset = 2
@@ -116,55 +126,92 @@ pub fn main() -> i32 {
   let mut counter = 0
   let owned = Token { value: 17 }
 
-  let add = fn(x: i32) -> i32 { return x + offset }
-  let read = fn() -> i32 { return shared.value }
+  let add = fn(x: i32) -> i32 {
+    return x + offset
+  }
+  let read = fn() -> i32 {
+    return shared.value
+  }
   let mut bump = fn() -> i32 {
     counter = counter + 1
     return counter
   }
-  let take = fn() -> i32 { return consume(move owned) }
+  let take = fn() -> i32 {
+    return consume(move owned)
+  }
 
-  if add(40) != 42 || read() != 10 { return 1 }
-  if callTwice(move bump) != 3 { return 2 }
-  if counter != 2 { return 3 }
-  if callOnce(move take) != 17 { return 4 }
+  if add(40) != 42 || read() != 10 {
+    return 1
+  }
+  if callTwice(move bump) != 3 {
+    return 2
+  }
+  if counter != 2 {
+    return 3
+  }
+  if callOnce(move take) != 17 {
+    return 4
+  }
   return 0
 }
 ```
 
 ```silk
-fn combine(a: i32, b: i32, c: i32) -> i32 { return a * 100 + b * 10 + c }
+fn combine(a: i32, b: i32, c: i32) -> i32 {
+  return a * 100 + b * 10 + c
+}
 
-fn apply(f: fn(i32) -> i32, x: i32) -> i32 { return f(x) }
+fn apply(f: fn(i32) -> i32, x: i32) -> i32 {
+  return f(x)
+}
 
 fn adder(n: i32) -> fn<'static>(i32) -> i32 {
-  return fn(x: i32) -> i32 { return x + n }
+  return fn(x: i32) -> i32 {
+    return x + n
+  }
 }
 
 pub fn main() -> i32 {
   let lastTwo = combine(2, 3)
-  if lastTwo(1) != 123 { return 1 }
-  if combine(3)(2)(1) != 123 { return 2 }
-  if (1 |> combine(2, 3)) != 123 { return 3 }
-  if apply(adder(40), 2) != 42 { return 4 }
+  if lastTwo(1) != 123 {
+    return 1
+  }
+  if combine(3)(2)(1) != 123 {
+    return 2
+  }
+  if (1 |> combine(2, 3)) != 123 {
+    return 3
+  }
+  if apply(adder(40), 2) != 42 {
+    return 4
+  }
   let step: fn(i32) -> i32 = combine(0, 0)
-  if apply(step, 1) != 100 { return 5 }
+  if apply(step, 1) != 100 {
+    return 5
+  }
   return 0
 }
 ```
 
 ```silk
-pub struct Counter { value: i32 }
+pub struct Counter {
+  value: i32
+}
 
 impl Counter {
-  pub fn read(self: &Self) -> i32 { return self.value }
+  pub fn read(self: &Self) -> i32 {
+    return self.value
+  }
+
   pub fn bump(self: &mut Self) -> i32 {
     self.value = self.value + 1
     return self.value
   }
 }
 
-struct Holder<F: mut fn<'static>() -> i32> { step: F }
+struct Holder<F: mut fn<'static>() -> i32> {
+  step: F
+}
 
 fn drive<F: mut fn<'static>() -> i32>(holder: &mut Holder<F>) -> i32 {
   return holder.step() + holder.step()
@@ -175,11 +222,21 @@ pub fn main() -> i32 {
   let read = shared.read
   let mut exclusive = Counter { value: 0 }
   let mut bump = exclusive.bump
-  if read() != 10 || bump() != 1 || bump() != 2 { return 1 }
+  if read() != 10 || bump() != 1 || bump() != 2 {
+    return 1
+  }
   drop bump
-  if exclusive.value != 2 { return 2 }
-  let mut holder = Holder { step: fn() -> i32 { return 5 } }
-  if drive(&mut holder) != 10 { return 3 }
+  if exclusive.value != 2 {
+    return 2
+  }
+  let mut holder = Holder {
+    step: fn() -> i32 {
+      return 5
+    }
+  }
+  if drive(&mut holder) != 10 {
+    return 3
+  }
   return 0
 }
 ```

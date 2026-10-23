@@ -39,14 +39,15 @@ import silk.scheduler { Scheduler, TaskIdExhaustedError }
 const MILLISECOND: u64 = 1000000
 
 // Pretend each estimate needs a slow lookup.
-effect fn estimate(minutes: i32, lookup: u64) -> i32 ? &mut Scheduler | &mut MonotonicClock {
+effect fn estimate(minutes: i32, lookup: u64) -> i32
+  ? &mut Scheduler | &mut MonotonicClock {
   run Effect.sleep(lookup * MILLISECOND)
   return minutes
 }
 
 effect fn total() -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
   // One after the other, no fibers.
   let a = run estimate(25, 300)
   let b = run estimate(90, 300)
@@ -54,13 +55,14 @@ effect fn total() -> i32
 }
 
 pub effect fn main() -> ()
-! LogError | OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  ! LogError | OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
   let mut logger = StdoutLogger.make()
   let mut scheduler = LocalScheduler.make()
   let mut clock = OsMonotonicClock.make()
   let minutes = run LocalScheduler.execute(&mut scheduler, total())
     |> Effect.provideMut<MonotonicClock>(&mut clock)
-  run Effect.log("{minutes} minutes in total\n", &.{ minutes: minutes }) |> Effect.provideMut<Logger>(&mut logger)
+  run Effect.log("{minutes} minutes in total\n", &.{ minutes: minutes })
+    |> Effect.provideMut<Logger>(&mut logger)
 }
 ```
 
@@ -134,9 +136,13 @@ import silk.os_monotonic_clock { OsMonotonicClock }
 import silk.allocator { OutOfMemoryError }
 import silk.scheduler { Scheduler, TaskIdExhaustedError }
 
-struct NoSuchTask { id: u32 }
+struct NoSuchTask {
+  id: u32
+}
 
-effect fn lookup(id: u32) -> i32 ! NoSuchTask ? &mut Scheduler | &mut MonotonicClock {
+effect fn lookup(id: u32) -> i32
+  ! NoSuchTask
+  ? &mut Scheduler | &mut MonotonicClock {
   if id > 3 {
     fail NoSuchTask { id: id }
   }
@@ -145,8 +151,8 @@ effect fn lookup(id: u32) -> i32 ! NoSuchTask ? &mut Scheduler | &mut MonotonicC
 
 // await never fails: success, typed failure and cancellation all come back as data.
 effect fn check(id: u32) -> i32
-! OutOfMemoryError | TaskIdExhaustedError
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError
+  ? &mut Scheduler | &mut MonotonicClock {
   let fiber = run Fiber<i32, NoSuchTask>.forkChild(lookup(id))
   let outcome = run Fiber<i32, NoSuchTask>.await(move fiber)
   let Outcome<i32, NoSuchTask> { value } = move outcome
@@ -157,13 +163,17 @@ effect fn check(id: u32) -> i32
   }
 }
 
-pub effect fn main() -> () ! LogError | OutOfMemoryError | TaskIdExhaustedError | StalledError {
+pub effect fn main() -> ()
+  ! LogError | OutOfMemoryError | TaskIdExhaustedError | StalledError {
   let mut logger = StdoutLogger.make()
   let mut clock = OsMonotonicClock.make()
   let mut scheduler = LocalScheduler.make()
-  let found = run LocalScheduler.execute(&mut scheduler, check(2)) |> Effect.provideMut<MonotonicClock>(&mut clock)
-  let missing = run LocalScheduler.execute(&mut scheduler, check(9)) |> Effect.provideMut<MonotonicClock>(&mut clock)
-  run Effect.log("task 2: {a}, task 9: {b}\n", &.{ a: found, b: missing }) |> Effect.provideMut<Logger>(&mut logger)
+  let found = run LocalScheduler.execute(&mut scheduler, check(2))
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+  let missing = run LocalScheduler.execute(&mut scheduler, check(9))
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+  run Effect.log("task 2: {a}, task 9: {b}\n", &.{ a: found, b: missing })
+    |> Effect.provideMut<Logger>(&mut logger)
 }
 ```
 
@@ -216,7 +226,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:14:49: error[SEM0076] A callable value whose signature cannot satisfy the expected callable type
+src/main.silk:14:49: error[SEM0076] A callable value whose signature cannot satisfy the expected callable type
 Failed tasks in 0.17s
 ```
 
@@ -241,7 +251,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:14:15: error[SEM0212] A lifetime that must outlive another but is not known to
+src/main.silk:14:15: error[SEM0212] A lifetime that must outlive another but is not known to
 Failed tasks in 0.19s
 ```
 
@@ -330,7 +340,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     67 modules, 1 in package          0.07s
   check    failed: 2 modules, 1 error        4.11s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:576:63: error[OWN0003] Moving state requires an explicit move
+src/main.silk:576:63: error[OWN0003] Moving state requires an explicit move
 Failed tasks in 4.19s
 ```
 
@@ -430,7 +440,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:16:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:16:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
 Failed tasks in 0.14s
 ```
 
@@ -500,7 +510,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     67 modules, 1 in package          0.09s
   check    failed: 2 modules, 1 error        4.36s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:470:33: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
+src/main.silk:470:33: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
 Failed tasks in 4.46s
 ```
 

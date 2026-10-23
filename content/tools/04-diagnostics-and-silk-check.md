@@ -42,7 +42,7 @@ Checking hello (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/hello/src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
+src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
 Failed hello in 0.15s
 ```
 
@@ -51,7 +51,7 @@ Read it piece by piece:
 | Part | Here | Meaning |
 | --- | --- | --- |
 | Target header | `[x86_64-unknown-linux-gnu]` | The target being checked. The diagnostics below it belong to that target |
-| Location | `/home/you/hello/src/main.silk:7:15` | File, line and column, both counted from 1. Column 15 is the start of `count` |
+| Location | `src/main.silk:7:15` | File, line and column, both counted from 1. Column 15 is the start of `count`. The file is relative to the package folder, or to the workspace root for a workspace member, so it reads the same wherever you run the command. A file outside that folder, such as a std lib module, is printed in full |
 | Severity | `error` | Every diagnostic is an error today; there are no warnings |
 | Code | `SEM0012` | A stable identifier. Search for it in the Appendix |
 | Message | `Expected i32 but received i64` | What went wrong, with the names and types filled in |
@@ -77,10 +77,10 @@ Checking hello (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.04s
   check    failed: 2 modules, 2 errors       0.09s
 [x86_64-unknown-linux-gnu]
-/home/you/hello/src/main.silk:5:4: error[SEM0003] Duplicate declaration name half
-  note: /home/you/hello/src/main.silk:1:4: related location
-/home/you/hello/src/main.silk:5:4: error[SEM0016] Multiple bindings claim half
-  note: /home/you/hello/src/main.silk:1:4: related location
+src/main.silk:5:4: error[SEM0003] Duplicate declaration name half
+  note: src/main.silk:1:4: related location
+src/main.silk:5:4: error[SEM0016] Multiple bindings claim half
+  note: src/main.silk:1:4: related location
 Failed hello in 0.14s
 ```
 
@@ -104,8 +104,8 @@ Checking hello (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.11s
 [x86_64-unknown-linux-gnu]
-/home/you/hello/src/main.silk:1:20: error[PAR0001] Expected `)`
-/home/you/hello/src/main.silk:6:20: error[SEM0037] Assignment expected i32 but received string<'static>
+src/main.silk:1:20: error[PAR0001] Expected `)`
+src/main.silk:6:20: error[SEM0037] Assignment expected i32 but received string<'static>
 Failed hello in 0.17s
 ```
 
@@ -122,13 +122,13 @@ Checking hello (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-/home/you/hello/src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
+src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
 Failed hello in 0.16s
 Checking hello (wasm32-unknown-unknown)
   load     47 modules, 1 in package          0.03s
   check    failed: 2 modules, 1 error        0.02s
 [wasm32-unknown-unknown]
-/home/you/hello/src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
+src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
 Failed hello in 0.06s
 ```
 
@@ -160,7 +160,7 @@ The letters of a code say which part of the compiler found the problem. A syntax
 `silk check` and `silk build` report a lexical mistake at the bad token and skip parse errors inside it:
 
 ```
-/home/you/hello/src/main.silk:2:15: error[LEX0004] Base-16 integer literal without digits
+src/main.silk:2:15: error[LEX0004] Base-16 integer literal without digits
 ```
 
 `silk format` refuses such a file and lists its codes, parse errors included: `cannot format damaged source (LEX0004, PAR0002)`.

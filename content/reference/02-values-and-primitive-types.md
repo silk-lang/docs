@@ -217,9 +217,15 @@ pub fn main() -> i32 {
   let count = 7
   let big = widen(i32.toI64(count))
   let narrowed = i64.checkedToI32(big)
-  if byte != u8.MAX { return 1 }
-  if Option<i32>.unwrapOr(move narrowed, 0) != 14 { return 2 }
-  if (i64.checkedToI32(i64.MAX) |> Option<i32>.unwrapOr(-1)) != -1 { return 3 }
+  if byte != u8.MAX {
+    return 1
+  }
+  if Option<i32>.unwrapOr(move narrowed, 0) != 14 {
+    return 2
+  }
+  if (i64.checkedToI32(i64.MAX) |> Option<i32>.unwrapOr(-1)) != -1 {
+    return 3
+  }
   return 0
 }
 ```
@@ -231,12 +237,17 @@ import silk.u8
 
 pub fn main() -> i32 {
   let top: u8 = 250
-  if u8.wrappingAdd(top, 10) != 4 { return 1 }
-  if u8.saturatingAdd(top, 10) != 255 { return 2 }
+  if u8.wrappingAdd(top, 10) != 4 {
+    return 1
+  }
+  if u8.saturatingAdd(top, 10) != 255 {
+    return 2
+  }
   let checked = u8.checkedAdd(top, 10)
-  if Option<u8>.unwrapOr(move checked, 0) != 0 { return 3 }
-  let quotient = i32.checkedDivide(i32.MIN, -1)
-    |> Option<i32>.unwrapOr(0)
+  if Option<u8>.unwrapOr(move checked, 0) != 0 {
+    return 3
+  }
+  let quotient = i32.checkedDivide(i32.MIN, -1) |> Option<i32>.unwrapOr(0)
   return quotient
 }
 ```
@@ -252,9 +263,15 @@ pub fn main() -> i32 {
   let text: string = "héllo"
   let nothing: () = ()
   drop nothing
-  if char.toU32(letter) != 0xE9 { return 1 }
-  if byte != 65 { return 2 }
-  if String.byteLength(text) != 6 { return 3 }
+  if char.toU32(letter) != 0xE9 {
+    return 1
+  }
+  if byte != 65 {
+    return 2
+  }
+  if String.byteLength(text) != 6 {
+    return 3
+  }
   return 0
 }
 ```
@@ -287,9 +304,15 @@ fn find(text: &[u8], wanted: u8) -> usize {
 
 pub fn main() -> i32 {
   let text = b"the quick brown fox jumps over the lazy dog"
-  if find(text, 'j') != 20 { return 1 }
-  if find(text, 'g') != 42 { return 2 }
-  if find(text, '!') != text.length { return 3 }
+  if find(text, 'j') != 20 {
+    return 1
+  }
+  if find(text, 'g') != 42 {
+    return 2
+  }
+  if find(text, '!') != text.length {
+    return 3
+  }
   return 0
 }
 ```
@@ -330,16 +353,26 @@ fn total(values: &[i32]) -> i32 {
 
 pub fn main() -> i32 {
   let values: [i32; 11] = [4, -2, 9, 7, 1, 0, -5, 3, 8, 2, 6]
-  if total(&values) != 33 { return 1 }
+  if total(&values) != 33 {
+    return 1
+  }
 
   let v = i32x4.fromArray([4, -2, 9, 7])
   let negative = i32x4.lanesLess(v, i32x4.splat(0))
-  if mask4.toBits(negative) != 2 { return 2 }
+  if mask4.toBits(negative) != 2 {
+    return 2
+  }
   let clamped = i32x4.select(negative, i32x4.splat(0), v)
-  if i32x4.toArray(clamped)[1] != 0 { return 3 }
+  if i32x4.toArray(clamped)[1] != 0 {
+    return 3
+  }
   let reversed = i32x4.shuffle(v, v, [3, 2, 1, 0])
-  if i32x4.extract(reversed, 0) != 7 { return 4 }
-  if i32x4.reduceMaximum(v) != 9 { return 5 }
+  if i32x4.extract(reversed, 0) != 7 {
+    return 4
+  }
+  if i32x4.reduceMaximum(v) != 9 {
+    return 5
+  }
   return 0
 }
 ```
@@ -359,10 +392,15 @@ fn hexDigits(nibbles: simd<u8, 16>) -> simd<u8, 16> {
 pub fn main() -> i32 {
   let nibbles = u8x16.fromArray([12, 10, 15, 14, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13])
   let hex = hexDigits(nibbles)
-  if u8x16.extract(hex, 0) != 99 || u8x16.extract(hex, 4) != 48 || u8x16.extract(hex, 15) != 100 { return 1 }
+  if u8x16.extract(hex, 0) != 99 || u8x16.extract(hex, 4) != 48 || u8x16.extract(hex, 15) != 100 {
+    return 1
+  }
+
   // A set bit 7 gives a zero lane, as pshufb does.
   let cleared = x86.shuffleBytes(nibbles, u8x16.splat(128))
-  if cleared != u8x16.splat(0) { return 2 }
+  if cleared != u8x16.splat(0) {
+    return 2
+  }
   return 0
 }
 ```
@@ -401,10 +439,17 @@ pub fn main() -> i32 {
     u32x4.fromArray([0, 0, 0, 0x18]),
   ]
   let a = nextX86(&w)
-  if a != nextAarch64(&w) { return 1 }
+  if a != nextAarch64(&w) {
+    return 1
+  }
+
   // W[16] = W[0] + sigma0(W[1]) + W[9] + sigma1(W[14]), and W[1], W[9] and W[14] are 0.
-  if u32x4.extract(a, 0) != 0x61626380 { return 2 }
-  if u32x4.extract(a, 1) != sigma1(0x18) { return 3 }
+  if u32x4.extract(a, 0) != 0x61626380 {
+    return 2
+  }
+  if u32x4.extract(a, 1) != sigma1(0x18) {
+    return 3
+  }
   return 0
 }
 ```

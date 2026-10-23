@@ -86,7 +86,10 @@ ConstDeclaration = 'pub'? 'const' Identifier ':' Type '=' Expression
 ## Examples
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point {
+  x: i32
+  y: i32
+}
 
 fn reset(target: &mut i32) {
   target.* = 0
@@ -102,16 +105,27 @@ pub fn main() -> i32 {
   slots[index] = 30
   let mut spare = 5
   reset(&mut spare)
-  if total != 2 { return 1 }
-  if point.x + point.y != 12 { return 2 }
-  if slots[index] != 30 { return 3 }
-  if spare != 0 { return 4 }
+  if total != 2 {
+    return 1
+  }
+  if point.x + point.y != 12 {
+    return 2
+  }
+  if slots[index] != 30 {
+    return 3
+  }
+  if spare != 0 {
+    return 4
+  }
   return 0
 }
 ```
 
 ```silk
-struct Pair { left: i32 right: i32 }
+struct Pair {
+  left: i32
+  right: i32
+}
 
 fn make() -> Pair {
   return Pair { left: 40, right: 2 }
@@ -121,7 +135,9 @@ pub fn main() -> i32 {
   let value = 1
   if value == 1 {
     let value = 2
-    if value != 2 { return 1 }
+    if value != 2 {
+      return 1
+    }
   }
   let Pair { left, right: extra } = make()
   let Pair { left: first, .. } = make()
@@ -140,7 +156,9 @@ static fn offset(step: i32) -> i32 {
 
 pub fn main() -> i32 {
   let static extra = offset(1)
-  if BASE + extra != 42 { return 1 }
+  if BASE + extra != 42 {
+    return 1
+  }
   return 0
 }
 ```

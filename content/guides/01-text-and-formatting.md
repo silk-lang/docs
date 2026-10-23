@@ -86,20 +86,20 @@ Checking textinfo (x86_64-unknown-linux-gnu)
   load     52 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.24s
 [x86_64-unknown-linux-gnu]
-/home/you/textinfo/src/main.silk:8:7: error[SEM0177] template field {count} not found; available visible fields: name, cuont
+src/main.silk:8:7: error[SEM0177] template field {count} not found; available visible fields: name, cuont
 Failed textinfo in 0.31s
 ```
 
 The error points at the call, and the message names the missing placeholder and lists the fields you did pass. A positional template is checked the same way. With `Format.format("{} has {} tasks, {} done\n", &("Julia", 3))` the check reports:
 
 ```
-/home/you/textinfo/src/main.silk:8:7: error[SEM0177] template placeholder 3 `{}` has no positional field; the arguments have 2
+src/main.silk:8:7: error[SEM0177] template placeholder 3 `{}` has no positional field; the arguments have 2
 ```
 
 A value whose type has no `Display` stops the build at the call too, with SEM0121. For a struct `Plain` without an `impl Display`:
 
 ```
-/home/you/textinfo/src/main.silk:10:7: error[SEM0121] `main.Plain: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Plain`
+src/main.silk:10:7: error[SEM0121] `main.Plain: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Plain`
 ```
 
 Implement `Display` for the type, as the next sections show, or pass one of its fields instead.

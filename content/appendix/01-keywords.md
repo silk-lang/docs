@@ -85,7 +85,7 @@ import silk.effect
 ```
 
 ```
-/home/you/demo/src/main.silk:1:13: error[PAR0004] An import whose reserved final path segment cannot form an implicit binding
+src/main.silk:1:13: error[PAR0004] An import whose reserved final path segment cannot form an implicit binding
 ```
 
 Add an alias (`import silk.effect as effects`) or a member list.

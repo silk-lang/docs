@@ -48,21 +48,28 @@ fn label(payment: &Payment) -> string {
   }
 }
 
-effect fn charge(amount: i32, payment: &Payment) -> i32 ! Declined {
+effect fn charge(amount: i32, payment: &Payment) -> i32
+  ! Declined {
   match &payment.* {
     Payment.Cash => {}
     Payment.Card { limit, .. } => {
-      if amount > limit { fail Declined { reason: "over the card limit" } }
+      if amount > limit {
+        fail Declined { reason: "over the card limit" }
+      }
     }
     Payment.Voucher { cents } => {
-      if amount > cents { fail Declined { reason: "the voucher is too small" } }
+      if amount > cents {
+        fail Declined { reason: "the voucher is too small" }
+      }
       return 0
     }
   }
   return amount
 }
 
-effect fn checkout(items: &List<Item>, payment: &Payment) -> () ! LogError ? &mut Logger {
+effect fn checkout(items: &List<Item>, payment: &Payment) -> ()
+  ! LogError
+  ? &mut Logger {
   let amount = total(items)
   run Effect.log("total {amount} cents, ", &.{ amount: amount })
   let outcome = run Effect.result(charge(amount, payment))
@@ -76,7 +83,8 @@ effect fn checkout(items: &List<Item>, payment: &Payment) -> () ! LogError ? &mu
   }
 }
 
-pub effect fn main() -> () ! LogError | OutOfMemoryError {
+pub effect fn main() -> ()
+  ! LogError | OutOfMemoryError {
   let mut logger = StdoutLogger.make()
   let mut allocator = Allocator.systemAllocatorProvider()
 
@@ -189,15 +197,15 @@ Checking tour (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.07s
   check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-/home/you/tour/src/main.silk:76:38: error[OWN0003] Moving tea requires an explicit move
+src/main.silk:76:38: error[OWN0003] Moving tea requires an explicit move
 Failed tour in 0.21s
 ```
 
 After the move, `tea` is gone. Add `let price = tea.cents` on the next line and you get:
 
 ```
-/home/you/tour/src/main.silk:77:15: error[OWN0001] tea.cents was moved and cannot be used again
-  note: /home/you/tour/src/main.silk:76:38: related location
+src/main.silk:77:15: error[OWN0001] tea.cents was moved and cannot be used again
+  note: src/main.silk:76:38: related location
 ```
 
 The `note:` line points at the `move tea` that gave it away.

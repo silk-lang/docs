@@ -643,7 +643,7 @@ The command exits with status 1. The line under the test's name is the message o
 Forgetting to provide a fake is caught before anything runs. Remove the `Random` line from `send`, and `silk check` stops:
 
 ```
-/home/you/beacon/src/tests.silk:59:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/tests.silk:59:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
 ```
 
 Provide every service inside the test or in a helper it calls, as `send` does. The test runner provides no services, so a test whose own header has a `?` row is refused by `silk check` with SEM0218; see the **Testing** page.

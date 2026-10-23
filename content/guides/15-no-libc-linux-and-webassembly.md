@@ -77,7 +77,9 @@ fn sumOfSquares(limit: i32) -> i32 {
   return total
 }
 
-effect fn report(limit: i32) -> () ! WriterError ? &mut Writer {
+effect fn report(limit: i32) -> ()
+  ! WriterError
+  ? &mut Writer {
   let total = sumOfSquares(limit)
   run Format.format("sum of squares to {limit}: {total}\n", &.{ limit: limit, total: total })
 }
@@ -94,16 +96,20 @@ static if Target.arch() == Arch.Wasm32 {
 
   struct RawStdout {}
 
-  effect fn writeAll(self: &mut RawStdout, bytes: &[u8]) -> () ! WriterError {
+  effect fn writeAll(self: &mut RawStdout, bytes: &[u8]) -> ()
+    ! WriterError {
     let mut offset: usize = 0
     while offset < bytes.length {
       let result = RawLinux.write(1, Slice.view(bytes, offset, bytes.length - offset))
-      if RawLinux.error(result) != 0 { fail Writer.failure() }
+      if RawLinux.error(result) != 0 {
+        fail Writer.failure()
+      }
       offset = offset + result
     }
   }
 
-  effect fn writeVectored(self: &mut RawStdout, vals: &[&[u8]]) -> () ! WriterError {
+  effect fn writeVectored(self: &mut RawStdout, vals: &[&[u8]]) -> ()
+    ! WriterError {
     return run Writer.writeEach(&mut self, vals)
   }
 
@@ -111,7 +117,9 @@ static if Target.arch() == Arch.Wasm32 {
 
   impl Writer for RawStdout {
     writeAll: RawStdout.writeAll
+
     writeVectored: RawStdout.writeVectored
+
     flush: RawStdout.flush
   }
 
@@ -126,7 +134,8 @@ static if Target.arch() == Arch.Wasm32 {
 } else {
   import silk.os_writer { StdoutWriter }
 
-  pub effect fn main() -> () ! WriterError {
+  pub effect fn main() -> ()
+    ! WriterError {
     let mut out = StdoutWriter.make()
     run report(10) |> Effect.provideMut<Writer>(&mut out)
   }
@@ -196,7 +205,7 @@ Checking squares (wasm32-unknown-unknown)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.07s
 [wasm32-unknown-unknown]
-/home/you/squares/src/main.silk:23:27: error[SEM0014] Module silk/os_writer has no member StdoutWriter
+src/main.silk:23:27: error[SEM0014] Module silk/os_writer has no member StdoutWriter
 Failed squares in 0.13s
 ```
 
@@ -207,7 +216,7 @@ Checking squares (wasm32-unknown-unknown)
   load     53 modules, 1 in package          0.07s
   check    failed: 2 modules, 1 error        0.06s
 [wasm32-unknown-unknown]
-/home/you/squares/src/main.silk:26:18: error[SEM0177] OsRandom requires a supported Darwin or GNU libc profile
+src/main.silk:26:18: error[SEM0177] OsRandom requires a supported Darwin or GNU libc profile
 Failed squares in 0.13s
 ```
 

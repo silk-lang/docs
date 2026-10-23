@@ -188,7 +188,7 @@ Checking wordfreq (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
-/home/you/wordfreq/src/main.silk:177:7: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
+src/main.silk:177:7: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
 Failed wordfreq in 0.21s
 ```
 

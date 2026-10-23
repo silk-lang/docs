@@ -148,7 +148,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     79 modules, 7 in package          0.07s
   check    failed: 8 modules, 1 error        0.74s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/main.silk:21:8: error[MOD0001] Unknown module cli.command
+tasks/src/main.silk:21:8: error[MOD0001] Unknown module cli.command
 Failed tasks in 0.81s
 Failed 1 of 1 package in 0.85s
 ```
@@ -225,8 +225,8 @@ Checking taskcore (x86_64-unknown-linux-gnu)
   load     47 modules, 5 in package          0.06s
   check    failed: 5 modules, 2 errors       0.19s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/taskcore/src/Board.silk:52:23: error[SEM0021] Constructing a struct at a site where its raw constructor is not available
-/home/you/tasks-workspace/taskcore/src/Store.silk:119:21: error[SEM0028] A field projection naming a private field of another module's struct
+taskcore/src/Board.silk:52:23: error[SEM0021] Constructing a struct at a site where its raw constructor is not available
+taskcore/src/Store.silk:119:21: error[SEM0028] A field projection naming a private field of another module's struct
 Failed taskcore in 0.25s
 Failed 1 of 1 package in 0.26s
 ```
@@ -286,7 +286,7 @@ Checking taskcore (x86_64-unknown-linux-gnu)
   load     47 modules, 5 in package          0.05s
   check    failed: 5 modules, 1 error        0.77s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/taskcore/src/Store.silk:187:10: error[SEM0129] Return expected i32 but received bool
+taskcore/src/Store.silk:187:10: error[SEM0129] Return expected i32 but received bool
 Failed taskcore in 0.83s
 Failed 1 of 1 package in 0.84s
 ```
@@ -392,7 +392,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     78 modules, 7 in package          0.09s
   check    failed: 8 modules, 1 error        1.67s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/main.silk:19:38: error[SEM0015] An import or qualified reference naming a private member of another module
+tasks/src/main.silk:19:38: error[SEM0015] An import or qualified reference naming a private member of another module
 Failed tasks in 1.76s
 ```
 
@@ -409,7 +409,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     79 modules, 7 in package          0.07s
   check    failed: 8 modules, 1 error        5.39s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/main.silk:27:8: error[MOD0003] Module Secret is not exported by package taskcore@0.1.0
+tasks/src/main.silk:27:8: error[MOD0003] Module Secret is not exported by package taskcore@0.1.0
 Failed tasks in 5.46s
 ```
 
@@ -429,8 +429,8 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     78 modules, 7 in package          0.09s
   check    failed: 8 modules, 1 error        1.56s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/main.silk:19:25: error[SEM0016] Multiple bindings claim Board
-  note: /home/you/tasks-workspace/tasks/src/main.silk:18:17: related location
+tasks/src/main.silk:19:25: error[SEM0016] Multiple bindings claim Board
+  note: tasks/src/main.silk:18:17: related location
 Failed tasks in 1.65s
 ```
 
@@ -477,7 +477,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     78 modules, 7 in package          0.09s
   check    failed: 8 modules, 1 error        3.50s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks-workspace/tasks/src/cli/Show.silk:11:1: error[SEM0214] Invalid compilation configuration: package parameter `barWidth` is not declared in the root package's root module, the only module that may declare `param`
+tasks/src/cli/Show.silk:11:1: error[SEM0214] Invalid compilation configuration: package parameter `barWidth` is not declared in the root package's root module, the only module that may declare `param`
 Failed tasks in 3.59s
 ```
 

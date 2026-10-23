@@ -19,7 +19,8 @@ InterfaceType  = Path TypeArguments?
 
 ## Interface declarations
 
-- An interface body lists operation signatures only. Bodies, defaults and stored fields are rejected (SEM0090).
+- An interface body lists operations only. Stored fields and other members are rejected (SEM0090).
+- An operation may have a body. The body is its default: an impl that leaves the operation out uses it, and one that implements the operation replaces it.
 - `Self` inside the interface stands for the conforming type. Receivers are written as ordinary parameters: `value: Self`, `value: &Self` or `value: &mut Self`. The parameter name is free.
 - An operation may be an `effect fn` or an `unsafe fn`, and may have its own type parameters.
 - An operation parameter cannot be `mut` (SEM0143).
@@ -29,7 +30,7 @@ InterfaceType  = Path TypeArguments?
 
 ## Impls
 
-- `impl Interface for Type { ... }` declares a conformance. Every operation must be supplied exactly once, with a matching signature. A missing, extra, repeated or mismatched member is SEM0083. The message names the interface and the member: ``Invalid conformance: `Shape` requires `area`, which this implementation does not define``, or ``member `decode` does not match the operation of `Info`: it returns a different type``. A duplicate impl prints ``Invalid conformance: `Square` implements `Shape` twice; keep one implementation`` at the second impl, and a repeated member ``Invalid conformance: `area` is defined twice in the implementation of `Shape` for `Square` `` at the second definition.
+- `impl Interface for Type { ... }` declares a conformance. Every operation without a default body must be supplied, each at most once and with a matching signature. A missing, extra, repeated or mismatched member is SEM0083. The message names the interface and the member: ``Invalid conformance: `Shape` requires `area`, which this implementation does not define``, or ``member `decode` does not match the operation of `Info`: it returns a different type``. A duplicate impl prints ``Invalid conformance: `Square` implements `Shape` twice; keep one implementation`` at the second impl, and a repeated member ``Invalid conformance: `area` is defined twice in the implementation of `Shape` for `Square` `` at the second definition.
 - A member is either a full function definition or a binding `name: path` to an existing function.
 - A binding may name a top-level function (`area: squareArea`), an inherent member (`multiply: Vec2.scale`), or an intrinsic (`mix: Intrinsic.i32WrappingAdd`).
 - A generic impl declares its parameters after `impl`: `impl<T> Marker for Box<T> {}`.
@@ -101,21 +102,31 @@ InterfaceType  = Path TypeArguments?
 ```silk
 interface Shape {
   fn area(shape: &Self) -> i32
+
   fn grow(shape: &mut Self, by: i32) -> ()
+
   fn label(shape: Self) -> i32
 }
 
-struct Square { side: i32 }
+struct Square {
+  side: i32
+}
 
-fn squareArea(shape: &Square) -> i32 { return shape.side * shape.side }
+fn squareArea(shape: &Square) -> i32 {
+  return shape.side * shape.side
+}
 
 impl Shape for Square {
   area: squareArea
+
   fn grow(shape: &mut Self, by: i32) -> () {
     shape.side = shape.side + by
     return ()
   }
-  fn label(shape: Self) -> i32 { return 4 }
+
+  fn label(shape: Self) -> i32 {
+    return 4
+  }
 }
 
 fn totalArea<T: Shape>(items: &[T]) -> i32 {
@@ -130,13 +141,23 @@ fn totalArea<T: Shape>(items: &[T]) -> i32 {
 
 pub fn main() -> i32 {
   let mut square = Square { side: 2 }
-  if Shape.area(&square) != 4 { return 1 }
+  if Shape.area(&square) != 4 {
+    return 1
+  }
   square.grow(1)
-  if square.area() != 9 { return 2 }
-  if (&square |> Shape.area) != 9 { return 3 }
+  if square.area() != 9 {
+    return 2
+  }
+  if (&square |> Shape.area) != 9 {
+    return 3
+  }
   let items = [Square { side: 1 }, Square { side: 2 }]
-  if totalArea(&items) != 5 { return 4 }
-  if square.label() != 4 { return 5 }
+  if totalArea(&items) != 5 {
+    return 4
+  }
+  if square.label() != 4 {
+    return 5
+  }
   return 0
 }
 ```
@@ -145,57 +166,100 @@ pub fn main() -> i32 {
 import silk.equal { Equal }
 import silk.ops { Multiply, Negate }
 
-struct Vec2 { x: i32 y: i32 }
+struct Vec2 {
+  x: i32
+  y: i32
+}
 
 impl Vec2 {
   fn scale(left: Self, right: i32) -> Self {
     return Vec2 { x: left.x * right, y: left.y * right }
   }
+
   fn dot(left: Self, right: Self) -> i32 {
     return left.x * right.x + left.y * right.y
   }
 }
 
-fn negateVec(value: Vec2) -> Vec2 { return Vec2 { x: -value.x, y: -value.y } }
-fn sameVec(left: &Vec2, right: &Vec2) -> bool { return left.x == right.x && left.y == right.y }
+fn negateVec(value: Vec2) -> Vec2 {
+  return Vec2 { x: -value.x, y: -value.y }
+}
 
-impl Multiply<i32, Vec2> for Vec2 { multiply: Vec2.scale }
-impl Multiply<Vec2, i32> for Vec2 { multiply: Vec2.dot }
-impl Negate<Vec2> for Vec2 { negate: negateVec }
-impl Equal for Vec2 { equals: sameVec }
+fn sameVec(left: &Vec2, right: &Vec2) -> bool {
+  return left.x == right.x && left.y == right.y
+}
 
-fn doubled<T: Multiply<i32, T>>(value: T) -> T { return move value * 2 }
+impl Multiply<i32, Vec2> for Vec2 {
+  multiply: Vec2.scale
+}
+
+impl Multiply<Vec2, i32> for Vec2 {
+  multiply: Vec2.dot
+}
+
+impl Negate<Vec2> for Vec2 {
+  negate: negateVec
+}
+
+impl Equal for Vec2 {
+  equals: sameVec
+}
+
+fn doubled<T: Multiply<i32, T>>(value: T) -> T {
+  return move value * 2
+}
 
 pub fn main() -> i32 {
   let v = doubled(Vec2 { x: 1, y: 2 })
   let expected = Vec2 { x: 2, y: 4 }
   let flipped = -Vec2 { x: 2, y: 4 }
-  if &v != &expected || &v == &flipped { return 1 }
-  if flipped.x != -2 { return 2 }
+  if &v != &expected || &v == &flipped {
+    return 1
+  }
+  if flipped.x != -2 {
+    return 2
+  }
   let ones = Vec2 { x: 1, y: 1 }
   let product = move v * move ones
-  if product != 6 { return 3 }
+  if product != 6 {
+    return 3
+  }
   return 0
 }
 ```
 
 ```silk
-interface Size { fn size(value: &Self) -> i32 }
-
-struct Box<T> { value: T }
-struct Leaf {}
-
-impl Size for Leaf { fn size(value: &Self) -> i32 { return 1 } }
-
-impl<T: Size> Size for Box<T> {
-  fn size(value: &Self) -> i32 { return 10 + Size.size(&value.value) }
+interface Size {
+  fn size(value: &Self) -> i32
 }
 
-fn measure<T: Size>(value: &T) -> i32 { return value.size() }
+struct Box<T> {
+  value: T
+}
+
+struct Leaf {}
+
+impl Size for Leaf {
+  fn size(value: &Self) -> i32 {
+    return 1
+  }
+}
+
+impl<T: Size> Size for Box<T> {
+  fn size(value: &Self) -> i32 {
+    return 10 + Size.size(&value.value)
+  }
+}
+
+fn measure<T: Size>(value: &T) -> i32 {
+  return value.size()
+}
 
 pub fn main() -> i32 {
   let nested = Box { value: Box { value: Leaf {} } }
-  if measure(&nested) != 21 { return 1 }
+  if measure(&nested) != 21 {
+    return 1
+  }
   return 0
 }
 ```
@@ -207,7 +271,7 @@ pub fn main() -> i32 {
 | SEM0018 | An interface used where a type is expected |
 | SEM0083 | Invalid conformance: missing, extra or mismatched member, duplicate impl, impl outside the interface's or type's module, unconstrained impl parameter, or `Drop` used as a bound |
 | SEM0084 | Invalid `Drop` conformance: the impl is not exactly `fn drop(self: &mut Self) -> ()` |
-| SEM0090 | Body, default or stored field inside an interface |
+| SEM0090 | Stored field or another member that is not an operation inside an interface |
 | SEM0119 | Two impl heads may overlap |
 | SEM0120 | Impl bound does not descend toward a smaller type |
 | SEM0121 | Conformance required by a bound cannot be proved |

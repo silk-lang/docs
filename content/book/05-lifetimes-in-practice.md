@@ -36,8 +36,8 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:29:17: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
-/home/you/tasks/src/main.silk:55:16: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
+src/main.silk:29:17: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
+src/main.silk:55:16: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
 Failed tasks in 0.20s
 ```
 
@@ -234,7 +234,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:3:43: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
+src/main.silk:3:43: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
 Failed scratch in 0.14s
 ```
 
@@ -261,7 +261,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:145:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
+src/main.silk:145:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
 Failed tasks in 0.20s
 ```
 
@@ -332,10 +332,10 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.14s
 [x86_64-unknown-linux-gnu]
-/home/you/tasks/src/main.silk:197:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
-  note: /home/you/tasks/src/main.silk:196:17: related location
-/home/you/tasks/src/main.silk:198:57: error[OWN0019] A borrowed value is used beyond the validity of its referent
-  note: /home/you/tasks/src/main.silk:196:17: related location
+src/main.silk:197:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
+  note: src/main.silk:196:17: related location
+src/main.silk:198:57: error[OWN0019] A borrowed value is used beyond the validity of its referent
+  note: src/main.silk:196:17: related location
 Failed tasks in 0.20s
 ```
 
@@ -394,8 +394,8 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-/home/you/scratch/src/main.silk:21:6: error[OWN0019] A borrowed value is used beyond the validity of its referent
-  note: /home/you/scratch/src/main.silk:19:35: related location
+src/main.silk:21:6: error[OWN0019] A borrowed value is used beyond the validity of its referent
+  note: src/main.silk:19:35: related location
 Failed scratch in 0.18s
 ```
 
@@ -572,10 +572,9 @@ fn parseBoard<'text>(text: string<'text>) -> Board<'text> {
     if bytes[index] == '\n' {
       // A line is at least "s|p|" plus one title byte.
       if index - start > 4 {
-        let id = board.add(Draft {
-          title: part(text, start + 4, index),
-          priority: priorityFrom(bytes[start + 2]),
-        })
+        let id = board.add(
+          Draft { title: part(text, start + 4, index), priority: priorityFrom(bytes[start + 2]) }
+        )
         if bytes[start] == 'x' {
           drop board.complete(id, 1)
         }
@@ -602,16 +601,23 @@ fn statusMark(task: &Task) -> string<'static> {
   return "[x]"
 }
 
-effect fn show(task: &Task) -> () ! LogError ? &mut Logger {
-  run Effect.log("{mark} #{id} {title} ({priority})\n", &.{
-    mark: statusMark(task),
-    id: task.id.0,
-    title: task.title,
-    priority: priorityLabel(task.priority),
-  })
+effect fn show(task: &Task) -> ()
+  ! LogError
+  ? &mut Logger {
+  run Effect.log(
+    "{mark} #{id} {title} ({priority})\n",
+    &.{
+      mark: statusMark(task),
+      id: task.id.0,
+      title: task.title,
+      priority: priorityLabel(task.priority),
+    }
+  )
 }
 
-effect fn showBoard(board: &Board) -> () ! LogError ? &mut Logger {
+effect fn showBoard(board: &Board) -> ()
+  ! LogError
+  ? &mut Logger {
   let mut index: usize = 0
   while index < board.count {
     run show(&board.tasks[index])
@@ -620,13 +626,16 @@ effect fn showBoard(board: &Board) -> () ! LogError ? &mut Logger {
   run Effect.log("{open} open\n", &.{ open: board.openCount() })
 }
 
-effect fn report() -> () ! LogError ? &mut Logger {
+effect fn report() -> ()
+  ! LogError
+  ? &mut Logger {
   let board = parseBoard(SEED)
   run showBoard(&board)
   run Effect.log("longest title: {title}\n", &.{ title: board.longestTitle() })
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
   run report() |> Effect.provideMut(&mut logger)
 }

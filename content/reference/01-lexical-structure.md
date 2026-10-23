@@ -172,8 +172,12 @@ first
   second"""
   let snowman = "\u{2603}"
   let space: u8 = ' '
-  if timeout != 5400000000000 { return 1 }
-  if String.byteLength(snowman) != 3 { return 2 }
+  if timeout != 5400000000000 {
+    return 1
+  }
+  if String.byteLength(snowman) != 3 {
+    return 2
+  }
   return 0
 }
 ```
@@ -201,7 +205,7 @@ first
 `silk check` and `silk build` report the LEX codes at the invalid token and exit with status 1. Parse errors inside the invalid token are not reported. `let value = 0x` prints:
 
 ```
-/home/you/demo/src/main.silk:2:15: error[LEX0004] Base-16 integer literal without digits
+src/main.silk:2:15: error[LEX0004] Base-16 integer literal without digits
 ```
 
 The Diagnostic codes appendix has a failing program and the printed message for each code.

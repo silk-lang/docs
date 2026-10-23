@@ -130,8 +130,11 @@ Value tables:
 
 ```silk
 pub param verbose: bool = false
+
 pub param workers: i32 = 4 where workers > 0 && workers <= 64
+
 param queueDepth: i32 = workers * 8
+
 pub param label: string = "service"
 
 fn spread(static count: i32, items: i32) -> i32 {
@@ -142,8 +145,12 @@ pub fn main() -> i32 {
   static if verbose {
     return 1
   }
-  if queueDepth != 32 { return 2 }
-  if label != "service" { return 3 }
+  if queueDepth != 32 {
+    return 2
+  }
+  if label != "service" {
+    return 3
+  }
   return spread(workers, 8) - 2
 }
 ```
