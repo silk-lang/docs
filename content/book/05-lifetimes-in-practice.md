@@ -118,21 +118,15 @@ Now give the tasks some text to borrow from. One task per line: a status byte, `
 const SEED: string = "x|n|Buy milk\n |h|Write the Silk book\n |l|Water the plants\n"
 ```
 
-An `x` in the status column means done. The priority is `l`, `n` or `h`. Here are the helpers, plus three new imports at the top of the file:
+An `x` in the status column means done. The priority is `l`, `n` or `h`. Here are the helpers, plus a new import at the top of the file:
 
 ```silk
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.string { String, InvalidUtf8 }
+import silk.string { String }
 ```
 
 ```silk
 fn part<'text>(text: string<'text>, start: usize, end: usize) -> string<'text> {
-  let bytes = Slice.view(String.utf8Bytes(text), start, end - start)
-  return match String.fromUtf8(bytes) {
-    Result<string<'text>, InvalidUtf8>.Success { value } => value
-    Result<string<'text>, InvalidUtf8>.Failure { .. } => ""
-  }
+  return String.slice(text, start, end - start)
 }
 
 fn priorityFrom(code: u8) -> Priority {
@@ -146,7 +140,7 @@ fn priorityFrom(code: u8) -> Priority {
 }
 ```
 
-`part` cuts the bytes from `start` to `end` out of the text and returns them as a string. Nothing is copied. `String.utf8Bytes` gives a view of the text's bytes, `Slice.view` narrows it, and `String.fromUtf8` checks that the bytes are valid UTF-8 and hands back a string view of them. If they aren't valid, `part` returns an empty title. (Chapter 7 shows better ways to handle a failure.)
+`part` cuts the bytes from `start` to `end` out of the text and returns them as a string. Nothing is copied. `String.slice` takes a byte offset and a length and returns a view of that stretch of the same text. Both ends must fall inside the text and between characters, which they do here: every cut is next to a `|` or a line break.
 
 The signature is the part to read slowly:
 
@@ -207,7 +201,7 @@ That is *elision*: leaving out lifetimes the compiler can work out from simple r
 fn part(text: string, start: usize, end: usize) -> string {
 ```
 
-That compiles and runs just the same, as long as the `Result<string<'text>, ...>` patterns inside also drop the `<'text>`. The book keeps the names in `part` and `parseBoard` because they document the promise, and because the next rule is about to bite.
+That compiles and runs just the same. The book keeps the names in `part` and `parseBoard` because they document the promise, and because the next rule is about to bite.
 
 The fourth rule covers a function with two borrowed inputs. Put this in the `src/main.silk` of the scratch project from chapter 2:
 
@@ -261,11 +255,11 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-src/main.silk:145:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
+src/main.silk:139:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
 Failed tasks in 0.20s
 ```
 
-The line numbers here refer to the whole file at the end of the chapter. SEM0012 says an argument's type doesn't match its parameter. Line 145 is `let id = board.add(Draft {`, and the argument is the draft. `add` expects a `Draft<'static>`, but the draft borrows from `text`. The `'_` stands for a lifetime that has no name in your code.
+The line numbers here refer to the whole file at the end of the chapter. SEM0012 says an argument's type doesn't match its parameter. Line 139 is `let id = board.add(`, and the argument is the draft. `add` expects a `Draft<'static>`, but the draft borrows from `text`. The `'_` stands for a lifetime that has no name in your code.
 
 What went wrong is that `Board.make()` has a lifetime parameter, and nothing in that call says what it should be. The compiler fixes it right there, at the call, rather than looking ahead to the `add` that comes later. By the time you add a draft borrowing from `text`, the board has already been given another lifetime, `'static`, and the draft doesn't fit. Writing `Board<'text>` tells the compiler up front which text the board borrows from. Put the annotation back.
 
@@ -332,14 +326,14 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.14s
 [x86_64-unknown-linux-gnu]
-src/main.silk:197:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
-  note: src/main.silk:196:17: related location
-src/main.silk:198:57: error[OWN0019] A borrowed value is used beyond the validity of its referent
-  note: src/main.silk:196:17: related location
+src/main.silk:199:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
+  note: src/main.silk:198:17: related location
+src/main.silk:200:57: error[OWN0019] A borrowed value is used beyond the validity of its referent
+  note: src/main.silk:198:17: related location
 Failed tasks in 0.20s
 ```
 
-Both notes point at `board.longestTitle()` on line 196, where the loan began.
+Both notes point at `board.longestTitle()` on line 198, where the loan began.
 
 OWN0011 at `drop board` means you touched an owner while a loan on it was still active. As far as the signature says, `longest` borrows the board, and it is used on the next line. OWN0019 at `longest` says a borrow was used after the thing it borrows from stopped being valid. The board is gone, so a view into the board would point at freed memory.
 
@@ -432,9 +426,7 @@ import silk.effect { Effect }
 import silk.logger { Logger, LogError }
 import silk.os_logger { StdoutLogger }
 import silk.ownership { Copy }
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.string { String, InvalidUtf8 }
+import silk.string { String }
 
 enum Priority {
   Low,
@@ -546,11 +538,7 @@ impl<'text> Board<'text> {
 const SEED: string = "x|n|Buy milk\n |h|Write the Silk book\n |l|Water the plants\n"
 
 fn part<'text>(text: string<'text>, start: usize, end: usize) -> string<'text> {
-  let bytes = Slice.view(String.utf8Bytes(text), start, end - start)
-  return match String.fromUtf8(bytes) {
-    Result<string<'text>, InvalidUtf8>.Success { value } => value
-    Result<string<'text>, InvalidUtf8>.Failure { .. } => ""
-  }
+  return String.slice(text, start, end - start)
 }
 
 fn priorityFrom(code: u8) -> Priority {

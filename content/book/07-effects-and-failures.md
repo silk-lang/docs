@@ -538,7 +538,6 @@ import silk.order { Order, Ordering }
 import silk.os_logger { StdoutLogger }
 import silk.ownership { Copy }
 import silk.result { Result }
-import silk.slice { Slice }
 import silk.string { String, InvalidUtf8 }
 import silk.writer { Writer, WriterError }
 ```

@@ -10,25 +10,13 @@ A `string<'text>` is a *view*. It points at UTF-8 bytes that live somewhere else
 
 `Bytes`, from `silk/bytes`, is *owned*. It holds its own buffer, can grow, and frees the buffer when it is dropped. `HostInput.argument` and `FileSystem.readFile` return `Bytes`, because they create new data. Growing a `Bytes` needs memory, so `append` needs an allocator.
 
-Because views are cheap, you can cut them freely. Users type stray spaces, so `"  Water the plants  "` should mean the same task as `"Water the plants"`. Here is `trim`:
+Because views are cheap, you can cut them freely. Users type stray spaces, so `"  Water the plants  "` should mean the same task as `"Water the plants"`. `String.trim` from `silk/string` drops the whitespace at both ends:
 
 ```silk
-// Drops spaces at both ends. The result is a view of the same text: nothing is copied.
-fn trim<'text>(text: string<'text>) -> string<'text> {
-  let bytes = String.utf8Bytes(text)
-  let mut start: usize = 0
-  let mut end = bytes.length
-  while start < end && bytes[start] == ' ' {
-    start = start + 1
-  }
-  while end > start && bytes[end - 1] == ' ' {
-    end = end - 1
-  }
-  return part(text, start, end)
-}
+let title = String.trim("  Water the plants  ")
 ```
 
-It finds the first and last non-space bytes and calls `part` from chapter 5, which returns a smaller view of the same bytes. The result has the same lifetime `'text` as the input. It is a plain `fn`: no allocator, no failure.
+`title` is `"Water the plants"`, a smaller view of the same bytes, just like the views `part` from chapter 5 cuts. Its signature is `fn trim(value: string) -> string`, so by elision the result borrows from `value` and lives as long as it does. It is a plain `fn`: no allocator, no failure. `String.trimStart` and `String.trimEnd` trim one end only.
 
 The flip side is that views cannot be glued together. You might reach for `+`:
 
@@ -205,7 +193,7 @@ Adding to a list may need a bigger buffer. In Silk that is never hidden. `append
 
 And the requirement climbs, exactly like the clock in chapter 8. `parseLine` and `parseBoard` call `add`, so they now say `? &mut Allocator` and list `OutOfMemoryError`. So does `addTask`. `execute` already had the allocator in its row, because `load` needed it, so `main` does not change at all.
 
-This is the payoff of treating memory as a service. You can see, from a signature alone, which functions may allocate. `trim`, `part`, `count` and `complete` cannot. And the allocator a test provides could be one that fails on purpose, to check what happens when memory runs out. A program can also provide a different allocator to one part of itself, such as an `Arena` from `silk/arena`, which hands out memory from large chunks and gives a phase's memory back all at once. See **Allocation and shared ownership** in the reference for `List`, `Box` and `Shared`.
+This is the payoff of treating memory as a service. You can see, from a signature alone, which functions may allocate. `String.trim`, `part`, `count` and `complete` cannot. And the allocator a test provides could be one that fails on purpose, to check what happens when memory runs out. A program can also provide a different allocator to one part of itself, such as an `Arena` from `silk/arena`, which hands out memory from large chunks and gives a phase's memory back all at once. See **Allocation and shared ownership** in the reference for `List`, `Box` and `Shared`.
 
 `BoardFull` is gone. The board only fills when memory does, and that is `OutOfMemoryError`, which `explain` already passes on.
 
@@ -287,7 +275,7 @@ Now `add` can check before it appends:
   ! DuplicateTask | OutOfMemoryError
   ? &mut Allocator {
     let Draft { title, priority } = move draft
-    let key = Title { text: trim(title) }
+    let key = Title { text: String.trim(title) }
     if let Option<TaskId>.Some { value: existing } = self.byTitle.get(key) {
       fail DuplicateTask { id: existing }
     }
@@ -572,7 +560,7 @@ Time   144 us
 
 ## Summary
 
-- A `string<'text>` is a view that never allocates. `Bytes` owns and grows its buffer. `trim` returns a smaller view of the same text.
+- A `string<'text>` is a view that never allocates. `Bytes` owns and grows its buffer. `String.trim` returns a smaller view of the same text.
 - `List<T>` grows on demand. Borrow its elements with `asSlice` and `asMutSlice`. `get` is only for `Copy` elements, and out-of-range indexes trap.
 - Allocation is the `Allocator` service. Its requirement and `OutOfMemoryError` show, in every signature, which code may allocate.
 - A `HashMap` key implements `HashKey` with `equals` and a `hash` built from `Hash.mix` and `Hash.combine`.
