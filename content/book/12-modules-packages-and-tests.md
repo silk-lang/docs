@@ -565,9 +565,9 @@ The binding of 300 ms from `silk.toml` still reaches `main`, and `main` passes i
 Tests move with the code they test. `taskcore` has four: one in `Text`, one in `Board` and two in `Store`. They need nothing from the program. Here is the one in `Text.silk`:
 
 ```silk
-test effect fn trimDropsOuterSpaces() ! AssertionError<'static> {
-  run Testing.expect(trim("  Buy milk ") == "Buy milk", "both ends are trimmed")
-  run Testing.expect(trim("   ") == "", "only spaces gives empty text")
+test effect fn partCutsTheTitle() ! AssertionError<'static> {
+  run Testing.expect(part("x|n|Buy milk", 4, 12) == "Buy milk", "the title follows the two markers")
+  run Testing.expect(part("x|n|", 4, 4) == "", "an empty stretch gives empty text")
 }
 ```
 
@@ -606,7 +606,7 @@ silk test
     PASS  5 us
   Store::fileFormatRoundTrips
     PASS  27 us
-  Text::trimDropsOuterSpaces
+  Text::partCutsTheTitle
     PASS  1 us
 
 Tests  4 passed, 0 failed (0 cached, 4 executed, 4 selected, 4 discovered)
@@ -682,7 +682,7 @@ Package taskcore (/home/you/tasks-workspace/taskcore)
     PASS  5 us
   Store::fileFormatRoundTrips
     PASS  28 us
-  Text::trimDropsOuterSpaces
+  Text::partCutsTheTitle
     PASS  1 us
 
 Tests  4 passed, 0 failed (0 cached, 4 executed, 4 selected, 4 discovered)
