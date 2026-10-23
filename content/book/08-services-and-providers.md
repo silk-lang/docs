@@ -229,7 +229,7 @@ pub effect fn main() -> i32
   // The real providers: stdout, the files under the current directory, the system clock.
   let mut logger = StdoutLogger.make()
   let here = run HostInput.workingDirectory() |> Effect.provideMut<Allocator>(&mut allocator)
-  let mut files = run OsFileSystem.make(Bytes.asSlice(&here)) |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut files = run OsFileSystem.makeBytes(Bytes.asSlice(&here)) |> Effect.provideMut<Allocator>(&mut allocator)
   let mut clock = OsSystemClock.make()
 
   let handled = Effect.catchAll(execute(&words), explain)

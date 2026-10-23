@@ -112,7 +112,7 @@ pub effect fn sendReport(path: &Path) -> usize
 ```silk
 pub effect fn main() -> () ! FileError | OutOfMemoryError | ByteIoError | LogError | NativeSocketError {
   let mut allocator = Allocator.systemAllocatorProvider()
-  let mut files = run OsFileSystem.make(b"/tmp") |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut files = run OsFileSystem.make("/tmp") |> Effect.provideMut<Allocator>(&mut allocator)
   let mut clock = OsMonotonicClock.make()
   let mut random = OsRandom.make()
   let mut logger = StdoutLogger.make()
@@ -137,7 +137,7 @@ pub effect fn main() -> () ! FileError | OutOfMemoryError | ByteIoError | LogErr
 }
 ```
 
-`OsFileSystem.make(b"/tmp")` roots the file system at `/tmp`, so the `Path` `/report.txt` is the file `/tmp/report.txt`. `connectResolvedOwned` connects to 127.0.0.1 port 7070 and returns a `Connection`, which is a `ByteDuplex` provider. The Networking guide explains connections and deadlines.
+`OsFileSystem.make("/tmp")` roots the file system at `/tmp`, so the `Path` `/report.txt` is the file `/tmp/report.txt`. `connectResolvedOwned` connects to 127.0.0.1 port 7070 and returns a `Connection`, which is a `ByteDuplex` provider. The Networking guide explains connections and deadlines.
 
 ## Run it for real
 
@@ -649,7 +649,7 @@ Provide every service inside the test or in a helper it calls, as `send` does. T
 - Give each fake a way to fail on cue, like `failAt` here and in `Logger.inMemoryProviderFailAt`. Most bugs are in the failure paths.
 - Check what did not happen as well as what did: no bytes sent, no id drawn, nothing logged.
 - Keep fakes in their own module, such as `tests/Fakes.silk`, so tests in several modules can share them.
-- A fake for `Writer` works the same way: a struct with a buffer, and an `impl Writer` whose `writeAll` copies the bytes into it, whose `writeVectored` passes the slices to `Writer.writeEach`, and whose `flush` does nothing.
+- A fake for `Writer` works the same way: a struct with a buffer, and an `impl Writer` whose `writeAll` copies the bytes into it, whose `flush` does nothing, and no `writeVectored`, since its default body calls `writeAll` for each slice.
 
 ## API reference
 

@@ -341,7 +341,7 @@ Compiling bare (x86_64-unknown-linux-gnu, bare)
   check    1 module                          0.00s
   codegen  failed: 12 functions, 1 error     0.00s
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
+<silk>/lib/silk/stdlib/silk/raw_start.silk:29:5: unsupported[foreign-contract] not supported by the native compiler yet
 Failed bare in 0.10s
 ```
 
@@ -388,7 +388,7 @@ threading = "multi"
 maxMemory = "256MiB"
 ```
 
-The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `maxMemory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.maxMemory = "100KiB"`. Clang 18.1 crashes while building a threaded module, so use a newer Clang for it.
+The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `maxMemory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.maxMemory = "100KiB"`. A threaded module needs Clang 19 or newer, because Clang 18 crashes on it or writes a module the host rejects; `silk build` refuses an older Clang and names it.
 
 The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32 and runs it in Node.
 

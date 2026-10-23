@@ -18,7 +18,7 @@ Documentation: /home/you/shapes/build/documentation.json
 
 The warnings name links in doc comments that resolve to no declaration; see **Writing documentation**. They go to standard error and do not change the exit status.
 
-The file describes every module of the package and every declaration in it, with its doc comment as Markdown and the links in that comment already resolved. `-o <path>` writes somewhere else; the path is relative to the package directory, not the current directory. `--target <triple>` extracts for another target, which matters when a module's declarations differ by target.
+The file describes every module of the package and every declaration in it, with its doc comment as Markdown and the links in that comment already resolved. Every module means every module `check` sees: the root and the modules it reaches by imports, plus `exports` for a library (see **Modules and imports**). A new module that nothing imports yet is left out, and `silk doctest` then collects none of its examples. `-o <path>` writes somewhere else; the path is relative to the package directory, not the current directory. `--target <triple>` extracts for another target, which matters when a module's declarations differ by target.
 
 At a workspace root, `silk doc` writes one file per member, `build/documentation/<member>.json`, and refuses `-o`. To write one member's file elsewhere, select it with `--manifest-path <member>/silk.toml`.
 

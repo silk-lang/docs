@@ -414,16 +414,13 @@ impl Writer for TextWriter {
     let appending = Effect.catchAll(appendBytes(&mut self.out, bytes), writerFull)
     run move appending |> Effect.provideMut<Allocator>(&mut self.allocator)
   }
-  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> () ! WriterError ? &mut Writer {
-    return run Writer.writeEach(&mut self, vals)
-  }
   effect fn flush(self: &mut Self) -> () ! WriterError ? &mut Writer {
     return ()
   }
 }
 ```
 
-This is the same move `MemoryFiles` made in chapter 8. `writeAll` is fixed by the service: it may fail only with `WriterError` and has no `Allocator` in its row. So the provider carries its own allocator and turns `OutOfMemoryError` into a `WriterError` with `Writer.failure()`. The service also asks for `writeVectored`, which writes several slices as one. `TextWriter` has no faster way to do that than one `writeAll` per slice, so it hands the job to `Writer.writeEach`.
+This is the same move `MemoryFiles` made in chapter 8. `writeAll` is fixed by the service: it may fail only with `WriterError` and has no `Allocator` in its row. So the provider carries its own allocator and turns `OutOfMemoryError` into a `WriterError` with `Writer.failure()`. The service also has `writeVectored`, which writes several slices as one. Its default body calls `writeAll` for each slice, and `TextWriter` has no faster way, so it leaves `writeVectored` out.
 
 Now each line of the file is one template:
 

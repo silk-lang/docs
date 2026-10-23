@@ -450,11 +450,11 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-src/main.silk:3:13: error[SEM0176] Crossing from static evaluation into unavailable runtime work
+src/main.silk:3:13: error[SEM0176] reading the runtime value `verbose` is not available during static evaluation for x86_64-unknown-linux-gnu
 Failed tasks in 0.16s
 ```
 
-In plainer words, static evaluation needs a runtime value. Column 13 is `verbose`, which is only known when the program runs. Make the parameter static, and each call compiles its own copy:
+Column 13 is `verbose`, which is only known when the program runs. Make the parameter static, and each call compiles its own copy:
 
 ```silk
 import silk.effect { Effect }
