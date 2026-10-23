@@ -114,7 +114,7 @@ Write a declaration's name in backticks inside square brackets: ``[`Rect`]``. Th
 | You write | Resolves to |
 | --- | --- |
 | ``[`area`]`` | A declaration in this module, or a name this module imports |
-| ``[`Circle.diameter`]`` | A qualified name: a member of a type, or a declaration in an imported module |
+| ``[`Circle.diameter`]`` | A qualified name: a member of a type, or a declaration in a module this file imports as a whole (`import Circle`, not only `import Circle { diameter }`) |
 | ``[`Rect.width`]`` | A field, case or method of a type |
 | ``[`height`]`` | A member written bare, when exactly one type in this module has a member of that name |
 | ``[`Self`]`` | Inside an `impl` or a type, the type being documented |
