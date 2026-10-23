@@ -65,16 +65,16 @@ Each struct field gets its own line, a one-line function body is split over thre
 
 ## Format some files
 
-Name files or directories to format only those. Paths are relative to the current directory. A directory must be inside the package's source root. A `.silk` file can be anywhere, even in a folder with no `silk.toml`, so an editor can format a scratch file:
+Name files or directories to format only those. Paths are relative to the current directory, and each must be inside the package's source root:
 
 ```sh
 silk format --check src/util/One.silk src/main.silk
 ```
 
-A directory selects every `.silk` file below it. A directory outside the source root, or a file that is not `.silk`, is refused with exit status 2 before any file is touched:
+A directory selects every `.silk` file below it. Anything else is refused with exit status 2 before any file is touched:
 
 ```
-silk format: /home/you/tidy/scripts: selection is outside the package source root
+silk format: /home/you/tidy/README.md: selection is outside the package source root
 ```
 
 Put `--` before a file name that starts with `-`. `--manifest-path <path>` selects the package by its manifest instead of the search upward.
@@ -106,7 +106,7 @@ Each selected file gets one line, `<path>: <outcome>`. `unchanged` and `formatte
 | `cannot format damaged source (CODES)` | The file has lexical or syntax errors, listed by code; left untouched | 1 |
 | a failure message | The file could not be read or written, or formatting would have changed its meaning | 2 |
 
-The command exits with the worst status over all files. Problems that stop it before any file, such as no `silk.toml` for a directory, an unknown option or a directory outside the source root, print one `silk format:` line and exit 2.
+The command exits with the worst status over all files. Problems that stop it before any file, such as no `silk.toml`, an unknown option or a path outside the source root, print one `silk format:` line and exit 2.
 
 A damaged file is skipped, not guessed at. Fix the syntax error first; `silk check` shows where it is.
 
