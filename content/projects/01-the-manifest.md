@@ -37,7 +37,7 @@ root = "src/main.silk"
 | `version` | yes | string | Full semantic version, such as `"0.1.0"`. `"0.1"` is refused. |
 | `root` | yes | string | The root module file, relative to the manifest. A program's root declares `main`. |
 | `source-root` | no | string | Directory that module paths are relative to. Default: the directory of `root`. `root` must be inside it. |
-| `silk-version` | no | string | The Silk toolchain the package runs with. `silk init` writes the running compiler's version. An installed `silk` hands every command in the package to that toolchain; `"0.0.0"` pins nothing. A workspace's own `silk-version` wins. See `silk toolchain` in the Command-line reference. |
+| `silk-version` | no | string | The Silk version the package runs with. `silk init` writes the running compiler's version. sew, and the `silk` it installs, hands every command in the package to that version; `"0.0.0"` pins nothing. A workspace's own `silk-version` wins. Set it with `sew set`; see `sew` in the Command-line reference. |
 | `exports` | no | array of strings | Modules other packages may import, in import spelling (`"Board"`, `"codec.Json"`). Each must exist. |
 
 The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, bindings and symbol maps use it.

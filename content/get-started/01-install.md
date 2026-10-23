@@ -1,6 +1,6 @@
 # Install
 
-Silk installs with one shell script. It downloads a release of the `silk` compiler and its standard library into `~/.silk`, as one toolchain among any others you install later. You also need Clang 18 or newer, because Silk builds programs through Clang.
+Silk installs with one shell script. It downloads a release of the `silk` compiler and its standard library into `~/.silk`, as one version among any others you install later, and installs `sew`, the command you type for Silk. sew runs each project with the Silk version it pins. You also need Clang 18 or newer, because Silk builds programs through Clang.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | sh
@@ -28,7 +28,9 @@ Downloading silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz from v0.1.0
 minisign is not installed; skipping the signature check of silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 
 Installed silk v0.1.0 to /home/you/.silk/toolchains/0.1.0
-It is the default toolchain; /home/you/.silk/bin/silk links to it.
+It is the default Silk version. Installed sew to /home/you/.silk/bin/sew; /home/you/.silk/bin/silk is the same program.
+sew runs each project with the Silk version it pins: sew build, sew test, sew run.
+Update sew with: sew update self
 
 Add Silk to your PATH by adding this line to ~/.bashrc:
 
@@ -41,8 +43,9 @@ Step by step, the script:
 2. Downloads `silk-<version>-<target>.tar.gz` for your host.
 3. Checks the archive's minisign signature, when `minisign` is installed (see below).
 4. Checks that `bin/silk` has the SHA-256 the release publishes in `native-seed.json`, that it reports the requested version, and that its bundled change snapshot matches the release's `changes-snapshot.toml`.
-5. Moves the release into `~/.silk/toolchains/<version>`, replacing an earlier install of the same version. Links `~/.silk/bin/silk` to it and makes it the default in `~/.silk/settings.toml`, keeping an `auto-install` line already there. Toolchains of other versions stay installed.
-6. Checks your Clang and your `PATH`, and prints what to fix.
+5. Moves the release into `~/.silk/toolchains/<version>`, replacing an earlier install of the same version, and makes it the default in `~/.silk/settings.toml`, keeping an `auto-install` line already there. Other versions stay installed.
+6. Copies the release's `bin/sew` to `~/.silk/bin/sew`, checks that it reports the release's version, and makes `~/.silk/bin/silk` a second name (a hard link) for it.
+7. Checks your Clang and your `PATH`, and prints what to fix.
 
 Any failed check stops the script with a `silk-install:` message on standard error, and nothing is installed.
 
@@ -50,15 +53,17 @@ What lands in `~/.silk`:
 
 ```
 ~/.silk/
-  bin/silk                                  a link to the default toolchain's compiler
+  bin/sew                                   sew
+  bin/silk                                  the same file under a second name
   settings.toml                             default = "0.1.0"
   toolchains/0.1.0/
     bin/silk                                the compiler and every tool
+    bin/sew                                 the sew released with it
     lib/silk/stdlib/                        the standard library, in source
     lib/silk/changes-snapshot.toml          the change history this compiler was built from
 ```
 
-The compiler finds its standard library at `../lib/silk/stdlib`, next to its own `bin` folder, following the link, so keep each toolchain's two folders together.
+The compiler finds its standard library at `../lib/silk/stdlib`, next to its own `bin` folder, so keep each version's two folders together. `~/.silk/bin/silk` is not a compiler: like `sew`, it runs the compiler of the version the directory selects.
 
 ## Settings
 
@@ -70,7 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | SI
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `SILK_HOME` | Folder that holds the toolchains, `bin/silk` and `settings.toml` | `~/.silk` |
+| `SILK_HOME` | Folder that holds the Silk versions, `bin/sew`, `bin/silk` and `settings.toml` | `~/.silk` |
 | `SILK_RELEASE` | An exact release tag to install, such as `v0.1.0` | The newest release |
 | `SILK_CHANNEL` | `stable`, `dev` or `auto`. `auto` prefers stable and falls back to dev only before any stable release exists | `auto` |
 | `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit, useful on shared CI machines | none |
@@ -132,7 +137,7 @@ Failed hello in 0.36s
 
 Both failures exit with status 2.
 
-## Add silk to your PATH
+## Add sew to your PATH
 
 The script does not edit your shell profile. When `~/.silk/bin` is not on your `PATH`, it prints the line to add and the file to add it to: `~/.zshrc` for zsh, `~/.bashrc` for bash on Linux, `~/.bash_profile` for bash on macOS.
 
@@ -140,13 +145,15 @@ The script does not edit your shell profile. When `~/.silk/bin` is not on your `
 export PATH="$HOME/.silk/bin:$PATH"
 ```
 
-Open a new terminal, or `source` the profile, and check that `silk` answers:
+Open a new terminal, or `source` the profile, and check that `sew` and `silk` answer:
 
 ```sh
+sew --version
 silk --version
 ```
 
 ```
+sew 0.1.0
 silk v0.1.0
 ```
 
@@ -184,49 +191,51 @@ Signature and comment signature verified
 Trusted comment: silk v0.1.0 silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-Unpack it. The archive holds one folder, `silk-<version>-<target>/`, with `bin/silk` and `lib/silk/` inside:
+Unpack it. The archive holds one folder, `silk-<version>-<target>/`, with `bin/silk`, `bin/sew` and `lib/silk/` inside:
 
 ```sh
 tar -xzf silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-Move the unpacked folder to `~/.silk/toolchains/<version>`, named by the version without the leading `v`, and `silk toolchain list` finds it. Or move `bin` and `lib` together anywhere else you like, and put that `bin` on your `PATH`.
+Move the unpacked folder to `~/.silk/toolchains/<version>`, named by the version without the leading `v`, and `sew use list` finds it. Copy its `bin/sew` to `~/.silk/bin/sew` and link `~/.silk/bin/silk` to that copy (`ln ~/.silk/bin/sew ~/.silk/bin/silk`). Or move `bin` and `lib` together anywhere else you like, and put that `bin` on your `PATH` to run that one compiler directly.
 
 When you save a release asset with `curl -O`, the `+` in a dev version stays encoded as `%2B` in the file name. Use `curl -o <name>` to choose the name yourself.
 
 ## Upgrade
 
-Run the script again. It installs the newest release as a new toolchain, links `~/.silk/bin/silk` to it and makes it the default. The toolchains you had stay installed. Add `SILK_RELEASE` to install a specific version, older or newer. Running it again for a version you already have replaces that toolchain's folder whole, so files from an old standard library do not linger. Outside a project, `silk --version` shows the default you are on, and `silk toolchain list` shows every installed version.
+`sew use latest` installs the newest stable release beside the versions you have and makes it your default; `sew use latest --dev` takes the newest dev release. `sew update self` updates sew itself. Running the script again does both. Add `SILK_RELEASE` to the script to install a specific version, older or newer. Installing a version you already have again with the script replaces its folder whole, so files from an old standard library do not linger. `sew use list` shows every installed version.
 
 ## Switch versions
 
-Each package records the toolchain it runs with in `silk.toml` as `silk-version`. `silk init` writes the version of the compiler that made it. Inside the package, an installed `silk` hands every command to that toolchain, so two projects on one machine can use different releases. A pin of `0.0.0` pins nothing.
+Each package records the Silk version it runs with in `silk.toml` as `silk-version`. `sew init` writes your default version. Inside the package, sew (and `silk`) hands every command to that version, so two projects on one machine can use different releases. A pin of `0.0.0` pins nothing.
 
-Install and pin a version from inside a project with `silk toolchain use`:
+Pin a version from inside a project with `sew set`, then install it with `sew use`:
 
 ```sh
-silk toolchain use 0.1.0-dev.6+1aed5da1a342
+sew set 0.1.0-dev.11
+sew use
 ```
 
 ```
-Pinned Silk 0.1.0-dev.6+1aed5da1a342 in /home/you/app/silk.toml ([package].silk-version)
+Pinned Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/app/silk.toml ([package].silk-version)
+Installed Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/.silk/toolchains/0.1.0-dev.11+6de14da2a8a6
 ```
 
-When a project pins a version you do not have, its commands stop with exit status 3 and name the fix:
+After cloning someone's project, `sew use` alone installs the version it pins. When a project pins a version you do not have, its commands stop with exit status 3 and name the fix:
 
 ```
-silk: Silk 0.3.0 (package silk-version in /home/you/app/silk.toml) is not installed.
-Install it with: silk toolchain install 0.3.0
+sew: Silk 0.3.0 (package silk-version in /home/you/app/silk.toml) is not installed.
+Install it with: sew use
 ```
 
-Add `auto-install = true` to `~/.silk/settings.toml`, or set `SILK_AUTO_INSTALL=1`, to have missing pinned toolchains installed when a command needs them. `silk +<version> <command>` runs one command with another installed version, and `silk toolchain default <version>` changes the version used outside projects. `silk toolchain install` checks the same signature and SHA-256 as the script, and needs no `minisign`. See `silk toolchain` in the Command-line reference.
+Add `auto-install = true` to `~/.silk/settings.toml`, or set `SILK_AUTO_INSTALL=1`, to have missing pinned versions installed when a command needs them. `sew +<version> <command>` runs one command with another installed version, and `sew use <version>` changes the version used outside projects. `sew use` checks the same signature and SHA-256 as the script, and needs no `minisign`. See `sew` in the Command-line reference.
 
 ## Uninstall
 
-Remove one version with `silk toolchain uninstall <version>`. It refuses to remove the toolchain `~/.silk/bin/silk` links to. To remove Silk entirely, delete the install folder and remove the `PATH` line from your shell profile:
+Remove one version with `sew use uninstall <version>`. To remove Silk entirely, delete the install folder and remove the `PATH` line from your shell profile:
 
 ```sh
 rm -rf ~/.silk
 ```
 
-The installer writes nothing outside that folder. Each package's own `build/` folder holds its compiled output; `silk clean` removes it.
+The installer writes nothing outside that folder. Each package's own `build/` folder holds its compiled output; `sew clean` removes it.
