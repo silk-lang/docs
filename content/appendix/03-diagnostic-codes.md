@@ -3887,10 +3887,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:25: error[SEM0176] Crossing from static evaluation into unavailable runtime work
+src/main.silk:4:25: error[SEM0176] reading the runtime value `n` is not available during static evaluation for x86_64-unknown-linux-gnu
 ```
-
-Message template, not filled by this compiler: `{operation} is not available during static evaluation for {target}`.
 
 Fix: Use only values known at compile time in static evaluation. See Static evaluation.
 
@@ -4537,6 +4535,21 @@ src/main.silk:1:30: error[SEM0210] The omitted output lifetime has no unique inp
 ```
 
 Fix: Name the lifetime: `fn pick<'a>(a: &'a i32, b: &i32) -> &'a i32`. See Lifetimes.
+
+The most common case has no borrowed input at all, such as a function that returns a string literal:
+
+```silk
+fn noun() -> string { return "task" }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:1:14: error[SEM0210] The result is a borrow, but the function has no borrowed input it could come from; for a literal or other data that lives for the whole program, write `'static`, as in `string<'static>` or `&'static T`
+```
+
+Fix: Return text that lives for the whole program: `fn noun() -> string<'static> { return "task" }`. See Lifetimes.
 
 ### SEM0211
 
