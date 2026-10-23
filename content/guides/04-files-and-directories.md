@@ -13,12 +13,12 @@ All file access goes through the `FileSystem` service from `silk/filesystem`. Co
 
 ```silk
   let here = run HostInput.workingDirectory() |> Effect.provideMut<Allocator>(&mut allocator)
-  let mut files = run OsFileSystem.make(here.asSlice()) |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut files = run OsFileSystem.makeBytes(here.asSlice()) |> Effect.provideMut<Allocator>(&mut allocator)
 ```
 
 Inside the provider, `/` means that root, not the host's `/`. So `/notes/groceries.txt` is `notes/groceries.txt` under the directory you run the program from. The provider refuses paths that would leave the root, including through symbolic links. That makes the root a boundary you choose once in `main`, and the rest of the program cannot reach past it.
 
-`OsFileSystem.make` needs an absolute, non-empty native path and traps on anything else. It does no I/O; nothing is opened until the first operation. The native provider exists on Linux and macOS with libc. On other targets you supply a provider of your own.
+`OsFileSystem.make` takes the root as text, such as `"/tmp"`. `OsFileSystem.makeBytes` takes it as bytes, such as the working directory from `HostInput.workingDirectory`. Both need an absolute, non-empty native path and trap on anything else. It does no I/O; nothing is opened until the first operation. The native provider exists on Linux and macOS with libc. On other targets you supply a provider of your own.
 
 ## Paths
 
@@ -253,7 +253,7 @@ pub effect fn main() -> i32 ! LogError | HostInputError | OutOfMemoryError ? &mu
   let mut allocator = Allocator.systemAllocatorProvider()
   let args = run HostInput.arguments() |> Effect.provideMut<Allocator>(&mut allocator)
   let here = run HostInput.workingDirectory() |> Effect.provideMut<Allocator>(&mut allocator)
-  let mut files = run OsFileSystem.make(here.asSlice()) |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut files = run OsFileSystem.makeBytes(here.asSlice()) |> Effect.provideMut<Allocator>(&mut allocator)
   let mut logger = StdoutLogger.make()
   let handled = Effect.catchAll(execute(args.asSlice()), explain)
   return run move handled
@@ -356,7 +356,7 @@ effect fn nativeRoot(scratch: &TemporaryDirectory) -> Bytes ! OutOfMemoryError ?
 
 test effect fn addRefusesToOverwrite() ! AssertionError<'static> | FileError | OutOfMemoryError | LogError {
   let mut allocator = Allocator.systemAllocatorProvider()
-  let mut tmp = run OsFileSystem.make(b"/tmp") |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut tmp = run OsFileSystem.make("/tmp") |> Effect.provideMut<Allocator>(&mut allocator)
   let top = run Path.root() |> Effect.provideMut<Allocator>(&mut allocator)
   let scratch = run FileSystem.temporaryDirectory(&top, "notes-test-")
     |> Effect.provideMut<FileSystem>(&mut tmp)
@@ -379,7 +379,7 @@ Two providers are in play. `tmp` is rooted at `/tmp` and owns the temporary dire
 effect fn scenario(root: &[u8]) -> ()
 ! AssertionError<'static> | FileError | OutOfMemoryError | LogError
 ? &mut Allocator {
-  let mut files = run OsFileSystem.make(root)
+  let mut files = run OsFileSystem.makeBytes(root)
   let mut logger = Logger.inMemoryProvider()
 
   let first = run argv(b"add", b"groceries", b"milk")

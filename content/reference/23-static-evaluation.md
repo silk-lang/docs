@@ -320,7 +320,7 @@ Static control flow and reflection · Package parameters · Functions and method
 
 ## Open questions
 
-- Most messages for SEM0176 and SEM0178 through SEM0182 are fixed text, such as "Crossing from static evaluation into unavailable runtime work". They don't name the value or call involved.
+- SEM0176 names the runtime value that static evaluation tried to read and the target, as in "reading the runtime value `n` is not available during static evaluation for x86_64-unknown-linux-gnu". Most messages for SEM0178 through SEM0182 are fixed text that does not name the value or call involved.
 - `StaticSequence.concat`, `length` and `at` are refused as not supported, so a sequence can only be built with `append` and consumed with `static for`.
 - The retained-value budget appears to count every intermediate sequence. About 400 `append` calls of `i32` exceed 1 MiB.
 - A constant initializer written as a struct literal, such as `Point { x: 1 }`, fails to parse instead of reporting SEM0086 alone.
