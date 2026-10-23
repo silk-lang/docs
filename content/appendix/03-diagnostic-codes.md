@@ -656,10 +656,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:3: error[OWN0004] An assignment whose right side consumes the owner it is about to replace
+src/main.silk:6:3: error[OWN0004] `h.token` is consumed while computing its own replacement; move it out first with `let current = move h.token`, then assign `h.token` from `current`
 ```
-
-Message template, not filled by this compiler: `Assignment to {spelling} consumes the same owner before replacement commits`.
 
 Fix: Move the old value into a local first, then assign: `let old = move h.token` then `h.token = wrap(move old)`. See Ownership and moves.
 
