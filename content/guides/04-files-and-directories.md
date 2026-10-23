@@ -414,7 +414,7 @@ effect fn scenario(root: &[u8]) -> ()
 `Effect.result` turns the outcome of `execute` into a `Result`, so the test can look at the failure instead of passing it on. `argv` builds a `List<Bytes>` of four arguments, and `sameBytes` compares two byte slices. Both are short helpers in the program.
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -434,15 +434,6 @@ Afterwards, `ls /tmp` shows no `notes-test-` directory. Change the expected text
 
 Tests  0 passed, 1 failed (0 cached, 1 executed, 1 selected, 1 discovered)
 Time   4 ms
-unhandled error: silk/testing.AssertionError<'static>
-  at silk/testing.Testing.expect (silk/testing:32:7)
-  at main.scenario (main:257:3)
-  at silk/effect.Effect.ensuring (silk/effect:442:12)
-  at silk/effect.Effect.provideMut (silk/effect:679:12)
-  at silk/effect.Effect.provideMut (silk/effect:679:12)
-  at main.addRefusesToOverwrite (main:275:3)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
 ## API reference

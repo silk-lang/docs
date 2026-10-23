@@ -692,7 +692,7 @@ test effect fn slowRemindersAreCancelled()
 ```
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```

@@ -641,7 +641,7 @@ id,priority,done
 None of the tests touched the new code paths, but the parameters changed `execute`, so run them anyway:
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```

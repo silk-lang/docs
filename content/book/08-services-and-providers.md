@@ -645,10 +645,10 @@ test effect fn unknownTaskIsReported() ! AssertionError<'static> | OutOfMemoryEr
 }
 ```
 
-Run the tests. In this release, `silk test` needs `--no-cache`:
+Run the tests:
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -661,13 +661,7 @@ Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
 Time   154 us
 ```
 
-Both tests run in microseconds and touch no files. If you leave off the flag, `silk test` exits with status 2 and prints only one line on stderr:
-
-```
-SILK_GAP test-result-cache: test-result reuse (TEST-008) is not native yet; pass --no-cache
-```
-
-The message tells you what to do. Result caching is not built yet.
+Both tests run in microseconds and touch no files.
 
 ## Summary
 
@@ -675,6 +669,6 @@ The message tells you what to do. Result caching is not built yet.
 - `Effect.provideMut<S>(&mut provider)` lends a provider and removes `S` from the row. A chain of them empties the row so `run` can go.
 - `main` receives only `HostInput`. It creates `StdoutLogger`, `OsFileSystem`, `OsSystemClock` and the system allocator and provides them.
 - You can declare a `service` and write providers for it with `impl Service for Type`.
-- The same program runs under fake providers in a `test effect fn`, checked with `silk test --no-cache`.
+- The same program runs under fake providers in a `test effect fn`, checked with `silk test`.
 
 Chapter 9 lifts the four-task limit with a growable `List`, refuses duplicate titles with a `HashMap`, and looks at how text and memory work.

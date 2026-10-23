@@ -341,7 +341,7 @@ test effect fn wallClockReadsTheProvider() ! AssertionError<'static> | LogError 
 The sleep test asks for 250 ms and finishes in microseconds. It starts the virtual clock just before a whole second, so the test also checks that `deadlineAfter` carries the nanoseconds into the seconds.
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```
