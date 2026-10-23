@@ -46,6 +46,8 @@ src/main.silk:2:16: error[SEM0087] Expression statement produces i32, but only (
 
 The parser then reads the `5` as an expression statement and also reports SEM0087.
 
+A UTF-8 byte order mark at the very start of a file is whitespace, not LEX0001; one anywhere else is reported.
+
 Fix: Remove the stray character. Silk has no `$` operator; identifiers are ASCII letters, digits and `_`. See Lexical structure.
 
 ### LEX0002
@@ -1003,6 +1005,8 @@ pub fn main() -> i32 { return 0 }
 src/main.silk:1:14: error[SEM0001] Unknown type Size
 ```
 
+A commonly used standard-library type also names its import. `fn sizes() -> List<i32>` without the import prints ``Unknown type List; is `import silk.list { List }` missing?``, and SEM0009 does the same for a call such as `List<i32>.make()`.
+
 Fix: Declare the type, import it, or fix its spelling. See Values and primitive types.
 
 ### SEM0002
@@ -1175,12 +1179,12 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:17: error[SEM0010] A known actor called with an unknown operation name
+src/main.silk:6:17: error[SEM0010] main.Point has no associated function `build`
 ```
 
-Message template, not filled by this compiler: `{actor} has no operation {spelling}`.
+A call on a value names the method instead, such as ``silk/list.List<i32> has no method `push` ``.
 
-Fix: Call an operation the type declares, here `Point.make()`. See Functions and methods.
+Fix: Call a function or method the type declares, here `Point.make()`. See Functions and methods.
 
 ### SEM0011
 
@@ -1379,7 +1383,7 @@ Fix: Store the recursive part behind an owning pointer or in a collection, such 
 
 ### SEM0021
 
-Constructing a struct at a site where its raw constructor is not available.
+A struct or variant literal outside the module that can see all of its fields.
 
 `src/main.silk`:
 
@@ -1400,10 +1404,10 @@ pub struct Circle { radius: i32 }
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0021] Constructing a struct at a site where its raw constructor is not available
+src/main.silk:3:11: error[SEM0021] Cannot construct shapes.Circle here because it has fields private to its module; call a function that module provides to build one
 ```
 
-Message template, not filled by this compiler: `Cannot construct {type} because its raw constructor is not available at this site`.
+The message never names the private fields. A union variant is named with its union, such as `shapes.Shape.Square`.
 
 Fix: Construct the struct through a `pub` function of its module, or make every field `pub`. See Structs, tuples and arrays, Modules and imports.
 
@@ -1950,7 +1954,7 @@ Fix: Name each field once. See Patterns and match.
 
 ### SEM0048
 
-A pattern binding whose spelling collides with an existing declaration.
+A pattern binding whose name is already declared in scope.
 
 ```silk
 struct Point { x: i32 y: i32 }
@@ -1965,10 +1969,10 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:5:15: error[SEM0048] A pattern binding whose spelling collides with an existing declaration
+src/main.silk:5:15: error[SEM0048] `x` is already declared in this scope; bind field `x` to another name, as in `{ x: found }`
 ```
 
-Message template, not filled by this compiler: `Pattern binding {spelling} conflicts with an existing declaration`.
+A binding that is not a record field, such as `Color c` in a match arm, asks for another name instead.
 
 Fix: Rename the binder: `Point { x: px, y }`. See Patterns and match.
 
