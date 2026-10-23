@@ -271,7 +271,7 @@ echo $?
 
 An `export "C" fn` in the program is exported from the module under its name, next to `main`, so the host can call it with numbers. Only scalar and pointer arguments cross that boundary on wasm32; C statics, variadic functions and callbacks are refused.
 
-A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory and the wasi-threads `thread-spawn` function, and `silk/native_thread` runs each thread as a Worker under `wasm-runner.mjs`. `maxMemory` in the profile caps the memory, for example `maxMemory = "256MiB"`; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit. The threaded build needs a Clang newer than 18: Clang 18.1 crashes while compiling or linking it.
+A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory and the wasi-threads `thread-spawn` function, and `silk/native_thread` runs each thread as a Worker under `wasm-runner.mjs`. `maxMemory` in the profile caps the memory, for example `maxMemory = "256MiB"`; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit. The threaded build needs Clang 19 or newer, because Clang 18 crashes on it or writes a module the host rejects. `silk build` checks the version and refuses an older Clang with `silk: a threaded wasm32 build needs Clang 19 or newer`; point `SILK_CLANG` or `--clang` at a newer one.
 
 ## Building without libc
 
