@@ -41,10 +41,10 @@ The format is marked `"experimental": true` and may change. Its outline:
 
 ## Check examples with silk doctest
 
-Run `silk doctest` anywhere inside a package. It extracts the package's documentation the way `silk doc` does, in memory, and checks each `silk` fence in it:
+`silk doctest` reads the JSON that `silk doc` wrote and checks each `silk` fence in it:
 
 ```sh
-silk doctest
+silk doctest -i build/documentation.json --source-root src
 ```
 
 ```
@@ -53,7 +53,7 @@ silk doctest
 Doctest: 2 collected, 2 passed, 0 skipped, 0 failed.
 ```
 
-Each line names the file and the line where the example's fence opens. At a workspace root, name the member with `--manifest-path <member>/silk.toml`. A JSON file that `silk doc` already wrote can be checked instead with `silk doctest -i build/documentation.json --source-root src`; `-i` is short for `--input`.
+Each line names the file and the line where the example's fence opens. `-i` is short for `--input`.
 
 What a check does:
 
@@ -75,7 +75,7 @@ Line 4 of that example is `return circumference(2) - "12"`.
 
 ### How examples import your package
 
-An example sees the standard library and your package, by the package's name or by each module's path below the source root. In the `shapes` package, `src/lib.silk` is `shapes.lib` or `lib`, and `src/Circle.silk` is `shapes.Circle` or `Circle`. A hyphenated name is written with underscores, as a dependent package writes it: package `round-shapes` is `round_shapes.lib`. This example imports `shapes.Circle` by the package name:
+An example sees the standard library. With `--source-root <directory>`, it also sees your package, by the package's name or by each module's path below that directory. The name comes from the nearest `silk.toml` above the source root. With `--source-root src` in the `shapes` package, `src/lib.silk` is `shapes.lib` or `lib`, and `src/Circle.silk` is `shapes.Circle` or `Circle`:
 
 ````silk
 /// ```silk
@@ -87,7 +87,7 @@ An example sees the standard library and your package, by the package's name or 
 /// ```
 ````
 
-The package name makes an example read like code in a package that depends on yours. Unlike a dependent package, an example can also name modules the package does not export, such as `shapes.Circle` here. When you check a JSON file with `-i`, pass `--source-root src` too; the package name then comes from the nearest `silk.toml` above that directory. Without it, neither form resolves, and each failing import is reported once:
+The package name makes an example read like code in a package that depends on yours. Unlike a dependent package, an example can also name modules the package does not export, such as `shapes.Circle` here. Without `--source-root`, neither form resolves, and each failing import is reported once:
 
 ```
 /home/you/shapes/src/lib.silk:39 (byte 977): FAILED
@@ -114,10 +114,10 @@ No Silk examples collected; nothing was verified.
 
 ### In CI
 
-One command is enough:
+Run the two commands in a row:
 
 ```sh
-silk doctest
+silk doc && silk doctest -i build/documentation.json --source-root src
 ```
 
 `silk doctest --stdlib` checks the standard library's own examples, with no JSON file needed. It is how the std lib keeps its 73 examples honest, and a quick way to confirm an installation works.
@@ -151,6 +151,6 @@ It exits 1 when anything differs and 0 when the pages are current, so CI can fai
 ## Summary
 
 - `silk doc` writes `build/documentation.json`; `--include-private` adds private declarations.
-- `silk doctest` type-checks every `silk` example of the package it runs in and exits 1 when one fails or none are found.
-- Examples import your modules by package name, with `_` for `-` in a hyphenated name, such as `import shapes.Circle { ... }`, or by their path under the source root.
+- `silk doctest -i build/documentation.json --source-root src` type-checks every `silk` example and exits 1 when one fails or none are found.
+- With `--source-root`, examples import your modules by package name, such as `import shapes.Circle { ... }`, or by their path under the source root.
 - `silk doc-reference -o <dir>` regenerates the std lib Markdown reference; `--check` verifies it is current.
