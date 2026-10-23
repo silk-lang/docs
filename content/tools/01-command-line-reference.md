@@ -234,11 +234,12 @@ Runs a language server that speaks the Language Server Protocol over standard in
 
 ```
 silk doc [--manifest-path <path> | --stdlib] [-o <json>] [--include-private] [--target <triple>] [--stdlib-root <directory>]
+silk doctest [--manifest-path <path>] [--target <triple>] [--stdlib-root <directory>]
 silk doctest (-i <json> | --stdlib) [--source-root <directory>] [--target <triple>] [--stdlib-root <directory>]
 silk doc-reference [--stdlib-root <directory>] -o <directory> [--check]
 ```
 
-`-o` is short for `--output` and `-i` for `--input`. `silk doc --help`, `silk doctest --help` and `silk doc-reference --help` print these three lines. `silk doc` warns on standard error about each documentation link that names no declaration. A link to a private declaration resolves only with `--include-private`. See **Doc tests and reference generation**.
+`-o` is short for `--output` and `-i` for `--input`. `silk doc --help`, `silk doctest --help` and `silk doc-reference --help` print these lines. `silk doc` warns on standard error about each documentation link that names no declaration. A link to a private declaration resolves only with `--include-private`. See **Doc tests and reference generation**.
 
 ## changes
 
