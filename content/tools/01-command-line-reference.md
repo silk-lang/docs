@@ -191,16 +191,18 @@ Cannot run static-library artifact
 ## test
 
 ```
-silk test [project options] [--root <path>] [--file <path>] [--filter <text>]
+silk test [project options] [--root <path>] [--file <path>] [--filter <text>] [--timeout <seconds>] [--no-cache]
 ```
 
-Builds the test runner under `build/test/` and runs the selected tests. `--no-cache` is accepted and changes nothing in this release, because test results are not cached yet.
+Builds the test runner under `build/test/` and runs the selected tests. When nothing the runner was built from has changed, the next run reuses it instead of building it again. Every run executes every selected test.
 
 | Option | Meaning |
 | --- | --- |
 | `--root <path>` | Discover tests from this module instead of the package root |
 | `--file <path>` | Run only tests declared in this source file |
 | `--filter <text>` | Run only tests whose `module::name` contains the text, ignoring ASCII case |
+| `--timeout <seconds>` | Fail a test that runs longer than this; 60 by default, `0` for no limit |
+| `--no-cache` | Build the runner again even when nothing changed |
 
 `--root` and `--file` name files of one package, so in a workspace they need `-p`. See **Testing**.
 
@@ -393,7 +395,7 @@ No silk.toml found from /home/you/loose; run `silk init` to create a package her
 
 ```
 silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|object] [--target <triple>] [--clang <path>] [--stdlib <directory>] [--optimization none|speed] [--debug true|false] [--stats]
-silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--optimization none|speed] [--debug true|false]
+silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--timeout <seconds>] [--optimization none|speed] [--debug true|false]
 ```
 
 `--emit` picks the output stage: `llvm-ir` writes LLVM text, `object` an object file. `--stats` prints compiler query counters. Diagnostics print the same way as `silk check` prints them, and a successful build prints one `Compiled` line. Paths in that line are relative to the current directory, or absolute when the file is outside it:
@@ -413,7 +415,7 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | --- | --- |
 | 0 | Success. For `format --check`: every file is already formatted |
 | 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, a source file or folder named `silk` or `Intrinsic`, any `silk changes` error including a malformed `silk changes` command line |
-| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, conflicting options, `test` without `--no-cache`, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
+| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
 | 3, 4, 5 | The selected toolchain is not installed, a toolchain download failed, or a release failed verification. See "Exit status of toolchain commands" |
 | other | `silk run` only: the program's own status |
 
