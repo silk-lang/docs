@@ -183,10 +183,10 @@ Cannot run static-library artifact
 ## test
 
 ```
-silk test [project options] [--root <path>] [--file <path>] [--filter <text>] --no-cache
+silk test [project options] [--root <path>] [--file <path>] [--filter <text>]
 ```
 
-Builds the test runner under `build/test/` and runs the selected tests. In this release `--no-cache` is required; without it the command prints a `SILK_GAP test-result-cache` line and exits 2 without running anything.
+Builds the test runner under `build/test/` and runs the selected tests. `--no-cache` is accepted and changes nothing in this release, because test results are not cached yet.
 
 | Option | Meaning |
 | --- | --- |
@@ -385,7 +385,7 @@ No silk.toml found from /home/you/loose; create one
 
 ```
 silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|object] [--target <triple>] [--clang <path>] [--stdlib <directory>] [--optimization none|speed] [--debug true|false] [--stats]
-silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--optimization none|speed] [--debug true|false] --no-cache
+silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--optimization none|speed] [--debug true|false]
 ```
 
 `--emit` picks the output stage: `llvm-ir` writes LLVM text, `object` an object file. `--stats` prints compiler query counters. Diagnostics print the same way as `silk check` prints them, and a successful build prints one `Compiled` line. Paths in that line are relative to the current directory, or absolute when the file is outside it:

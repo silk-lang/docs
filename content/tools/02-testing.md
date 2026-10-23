@@ -39,10 +39,8 @@ test fn withParam(x: i32) {
 
 ## Run the tests
 
-In this release, always pass `--no-cache`. Without it `silk test` prints a `SILK_GAP test-result-cache` line and exits with status 2 without running anything.
-
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -84,14 +82,20 @@ test effect fn diameterIsTwiceRadius() -> () ! AssertionError<'static> {
 
 Tests  2 passed, 1 failed (0 cached, 3 executed, 3 selected, 3 discovered)
 Time   60 us
-unhandled error: silk/testing.AssertionError<'static>
-  at silk/testing.Testing.expect (silk/testing:32:7)
-  at Circle.diameterIsTwiceRadius (Circle:9:3)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
-The other tests still run, and the command exits with status 1. When the failure is an `AssertionError`, the runner prints `assertion failed:` and the message you passed to `expect` under the test's name. The trace after the summary shows where the failure came from: `Circle:9:3` is line 9, column 3 of `src/Circle.silk`. A test that fails with another typed failure prints only `FAIL` and the trace, which names that failure's type.
+The other tests still run, and the command exits with status 1. When the failure is an `AssertionError`, the runner prints `assertion failed:` and the message you passed to `expect` under the test's name, so write the message as the expected fact. A test that fails with another typed failure prints `FAIL`, and an `unhandled error` trace on standard error names that failure's type and the line where it was created.
+
+A test that traps, for example on an index out of bounds, stops the runner process. `silk test` shows the trap report under the test's name, marks the test `FAIL  stopped the test process`, and starts the runner again after it, so the remaining tests still run and the command exits with status 1:
+
+```
+  lib::readsPastTheEnd
+fatal trap: index out of bounds
+  at lib.readsPastTheEnd (lib:18:11)
+    FAIL  stopped the test process
+  lib::sumsTheValues
+    PASS  <1 us
+```
 
 ## Which tests are discovered
 
@@ -102,7 +106,7 @@ That matters most for programs. A test in `src/extra.silk` is not found while `m
 - Start discovery from that file with `--root`. The path is relative to the package directory and must be under the source root:
 
   ```sh
-  silk test --no-cache --root src/extra.silk
+  silk test --root src/extra.silk
   ```
 
   ```
@@ -119,7 +123,7 @@ That matters most for programs. A test in `src/extra.silk` is not found while `m
 `--filter <text>` keeps the tests whose printed name, `module::name`, contains the text. Case is ignored for ASCII letters, so `--filter circle::` selects every test in `Circle`:
 
 ```sh
-silk test --no-cache --filter circle::
+silk test --filter circle::
 ```
 
 ```
@@ -198,7 +202,7 @@ hello, Grace
 The tests provide `Logger.inMemoryProvider()`, which keeps the lines instead of printing them. `provideMut` lends the provider to one computation and gives it back, so the test can then ask it how many lines arrived:
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -229,12 +233,12 @@ For memory, create an allocator in the test with `Allocator.systemAllocatorProvi
 
 ## Tests in a workspace
 
-Each package tests its own modules. At a workspace root, `silk test --no-cache` runs every member in dependency order, with a `Package` heading for each and a `Workspace summary` line at the end. `-p <name>` picks members and `--workspace` selects them all from inside a member. `--root` and `--file` name files of one package, so with several members selected they need `-p`. See **Workspaces** in Projects and packages.
+Each package tests its own modules. At a workspace root, `silk test` runs every member in dependency order, with a `Package` heading for each and a `Workspace summary` line at the end. `-p <name>` picks members and `--workspace` selects them all from inside a member. `--root` and `--file` name files of one package, so with several members selected they need `-p`. See **Workspaces** in Projects and packages.
 
 ## Summary
 
 - Mark a top-level function with `test`. Use `test effect fn` and `Testing.expect` for checks that can fail.
-- Run tests with `silk test --no-cache`. A failure prints `FAIL`, the `expect` message for an assertion, a stack with the failing line, and exits 1.
+- Run tests with `silk test`. A failure prints `FAIL` and the `expect` message for an assertion; a trapping test fails too and the rest still run. Any failure exits 1.
 - Tests are discovered by following imports from the root module (and a library's exports). Use `--root` or an import to reach other files.
 - `--filter` matches `module::name` without regard to ASCII case; `--file` selects one file. A selection that matches nothing exits 1.
 - Test effectful code by providing fakes such as `Logger.inMemoryProvider()` with `Effect.provideMut`, and provide every service inside the test: a test has no `?` row (SEM0218).

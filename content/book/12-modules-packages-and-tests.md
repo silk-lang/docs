@@ -103,7 +103,7 @@ test effect fn addsTwoNumbers() -> ()
 From the workspace root, `-p` (short for `--package`) picks one member to work on:
 
 ```sh
-silk test -p taskcore --no-cache
+silk test -p taskcore
 ```
 
 ```
@@ -291,7 +291,7 @@ Failed taskcore in 0.83s
 Failed 1 of 1 package in 0.84s
 ```
 
-`silk test --no-cache` stops on the same line and runs nothing. A mistake in an exported module can't hide, and neither can its tests. Take `broken` out again.
+`silk test` stops on the same line and runs nothing. A mistake in an exported module can't hide, and neither can its tests. Take `broken` out again.
 
 The list itself has to be right. An entry that names no module is refused before anything compiles. Misspell `"Store"` as `"Stores"` and check:
 
@@ -596,7 +596,7 @@ Run the library's tests from `taskcore/`:
 
 ```sh
 cd ../taskcore
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -617,7 +617,7 @@ Each test is named after its module. Then the program's tests from `tasks/`:
 
 ```sh
 cd ../tasks
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -637,7 +637,7 @@ Notice that the library's tests are not run again here. Each package tests its o
 `--filter` runs only the tests whose names contain some text:
 
 ```sh
-silk test --no-cache --filter Reminders
+silk test --filter Reminders
 ```
 
 ```
@@ -652,7 +652,7 @@ The text is matched against the name as it is printed, module included. So from 
 
 ```sh
 cd ../taskcore
-silk test --no-cache --filter Store::
+silk test --filter Store::
 ```
 
 ```
@@ -665,15 +665,13 @@ Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 4 discovered)
 Time   91 us
 ```
 
-Always pass `--no-cache` in this release. Without it, `silk test` prints a `SILK_GAP` line about the result cache and exits with status 2, without running anything.
-
 ### The whole workspace at once
 
 Changing to each folder in turn gets old quickly. `--workspace` runs every member, one after the other:
 
 ```sh
 cd ..
-silk test --workspace --no-cache
+silk test --workspace
 ```
 
 ```
@@ -722,7 +720,7 @@ The program runs in the folder you are in, though, so from the root it reads and
 To run just one member, name it with `-p`, as you did for the new library. You can repeat `-p` to pick several. A name that is not a member is refused, with the list of names that are:
 
 ```sh
-silk test -p taskscore --no-cache
+silk test -p taskscore
 ```
 
 ```
@@ -740,7 +738,7 @@ It helps to know what a failure looks like before you need it. Go back to `tasks
 
 ```sh
 cd tasks
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -754,14 +752,9 @@ silk test --no-cache
 
 Tests  2 passed, 1 failed (0 cached, 3 executed, 3 selected, 3 discovered)
 Time   395 us
-unhandled error: silk/testing.AssertionError<'static>
-  at silk/testing.Testing.expect (silk/testing:32:7)
-  at tests.slowRemindersAreCancelled (tests:84:3)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
-The run exits with status 1. The line under the test's name is the message you passed to `expect`. A failed `Testing.expect` is a typed failure, `AssertionError`, and the stack after the summary shows where it came from: `tests:84:3` is line 84 of `tests.silk`, the failing expectation. Change the 3 back to 2.
+The run exits with status 1. The line under the test's name is the message you passed to `expect`. A failed `Testing.expect` is a typed failure, `AssertionError`, and the message is the whole report, so write it as the fact you expect. Change the 3 back to 2.
 
 ## Formatting
 
@@ -799,6 +792,6 @@ Plain `silk format` rewrites the files in place. Nearly every file is listed bec
 - A library package names its `root` and its `exports`. Check, build and test cover every exported module, and an entry that names no module is refused.
 - `silk add ../taskcore` writes the `[dependencies]` entry, and the program imports `taskcore.Module { ... }`. Use `as` when a module and a name collide.
 - Package parameters live in the root module; pass their values to other modules as arguments.
-- `silk test --no-cache` runs a package's tests, `--workspace` and `-p` choose packages from one place, `--filter` narrows the tests by their `module::name`, and modules may import each other in a cycle.
+- `silk test` runs a package's tests, `--workspace` and `-p` choose packages from one place, `--filter` narrows the tests by their `module::name`, and modules may import each other in a cycle.
 
 The next chapter turns `tasks` into an HTTP service that runs the same `execute` for every request.

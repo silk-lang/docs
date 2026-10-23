@@ -110,7 +110,6 @@ This exits with status 1 and writes to standard error (for a root module named `
 unhandled error: main.NotFound
   at main.load (main:4:17)
   at main.main (main:9:15)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
 Echo the first argument, then return the number of bytes read from standard input:

@@ -175,7 +175,7 @@ test effect fn duplicatesAreConflicts() ! AssertionError<'static> | OutOfMemoryE
 The other, `doneRouteCarriesTheId`, checks that `POST /tasks/12/done` routes to `done 12` and that `DELETE /tasks` routes nowhere. Add `import Http { answer, route }` and `import silk.option { Option }` to `tests.silk`, then run everything:
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```
