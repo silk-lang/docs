@@ -560,7 +560,7 @@ x|h|1792458597|Call the plumber
 The tests from chapter 8 still pass without a single change. They run the real `execute` with fake providers, and nothing about the providers changed:
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```

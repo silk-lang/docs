@@ -351,7 +351,7 @@ test effect fn missingIsAStatusError() ! AssertionError<'static> | OutOfMemoryEr
 `request.resolveUrl(base)` gives the fake the full URL the real client would use, query string included. `Response.make(status, body)` and `Response.withHeaders(status, headers, body)` build canned responses.
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```

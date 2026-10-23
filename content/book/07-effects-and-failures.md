@@ -375,7 +375,6 @@ silk run
 unhandled error: main.NoSuchTask
   at main.complete (main:5:5)
   at main.main (main:11:3)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
 The program exits with status 1 and prints where the failure started. That is useful while developing, but users deserve better. Notice the `pub` on the struct: `main` is `pub`, and a public signature can only name public failure types. Without it, SEM0019 reports a public declaration whose signature mentions a private type.

@@ -388,7 +388,7 @@ effect<'sourceCall & 'targetCall> fn copyBoth<'sourceCall, 'targetCall>(
 - `copiesEveryByte` copies through a destination that accepts 3 bytes at a time.
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```

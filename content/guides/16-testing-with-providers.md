@@ -591,7 +591,7 @@ test effect fn logFailureComesAfterSending() ! AssertionError<'static> | FileErr
 ## Run the tests
 
 ```sh
-silk test --no-cache
+silk test
 ```
 
 ```
@@ -610,7 +610,7 @@ Tests  5 passed, 0 failed (0 cached, 5 executed, 5 selected, 5 discovered)
 Time   308 us
 ```
 
-The times vary from run to run; the results do not. `--no-cache` is required in this release.
+The times vary from run to run; the results do not.
 
 ## When a check fails
 
@@ -631,14 +631,9 @@ Suppose you expect the log line to say `in 0 ms`, as it did when you ran the pro
 
 Tests  4 passed, 1 failed (0 cached, 5 executed, 5 selected, 5 discovered)
 Time   359 us
-unhandled error: silk/testing.AssertionError<'static>
-  at silk/testing.Testing.expect (silk/testing:32:7)
-  at tests.sendsHeaderThenBody (tests:76:3)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
-  at silk/effect.Effect.flatMap (silk/effect:303:19)
 ```
 
-The command exits with status 1. The line under the test's name is the message of the failing `expect`, and the trace after the summary names its module and line: `tests:76:3` is line 76 of `src/tests.silk`. A message that says what was expected, like `log line uses virtual time`, tells you what broke before you open the file.
+The command exits with status 1. The line under the test's name is the message of the failing `expect`, and it is the whole report. A message that says what was expected, like `log line uses virtual time`, tells you what broke before you open the file.
 
 Forgetting to provide a fake is caught before anything runs. Remove the `Random` line from `send`, and `silk check` stops:
 
