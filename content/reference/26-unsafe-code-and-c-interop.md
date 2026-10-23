@@ -172,9 +172,9 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 ```silk
 import silk.pointer { Pointer }
 
-unsafe extern "C" fn strlen(text: [*] const u8) -> usize
+unsafe extern "C" fn strlen(text: [*]const u8) -> usize
 
-unsafe extern "C" fn snprintf(buffer: ?[*] mut u8, size: usize, format: ?[*] const u8, ...) -> i32
+unsafe extern "C" fn snprintf(buffer: ?[*]mut u8, size: usize, format: ?[*]const u8, ...) -> i32
 
 unsafe extern "C" fn getpid() -> i32
 
@@ -190,7 +190,7 @@ pub fn main() -> i32 {
   }
   let text = Pointer.fromSlice(&buffer)
   unsafe {
-    let many = Intrinsic.pointerRequalify<?[*] const u8, [*] const u8>(text)
+    let many = Intrinsic.pointerRequalify<?[*]const u8, [*]const u8>(text)
     if strlen(many) != 4 {
       return 3
     }
@@ -208,11 +208,11 @@ A C callback, sorting with libc `qsort`:
 import silk.pointer { Pointer }
 
 unsafe extern "C" fn qsort(
-  base: ?[*] mut i32,
+  base: ?[*]mut i32,
   count: usize,
   size: usize,
   compare: extern "C" fn(*const i32, *const i32) -> i32
-) -> () with Intrinsic .foreign (callbacks: ("compare",))
+) -> () with Intrinsic.foreign(callbacks: ("compare",))
 
 export "C" fn descending(left: *const i32, right: *const i32) -> i32 {
   let a = unsafe Pointer.read(left)
@@ -248,7 +248,7 @@ extern "C" struct Timespec {
 
 unsafe extern "C" fn clock_gettime(clock: i32, value: *mut Timespec) -> i32
 
-unsafe extern "C" static environment: ?[*] const ?[*] const u8 as "environ"
+unsafe extern "C" static environment: ?[*]const ?[*]const u8 as "environ"
 
 pub fn main() -> i32 {
   let mut now = Timespec { seconds: -1, nanoseconds: -1 }
