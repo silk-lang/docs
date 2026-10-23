@@ -654,10 +654,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:3: error[OWN0004] An assignment whose right side consumes the owner it is about to replace
+src/main.silk:6:3: error[OWN0004] `h.token` is consumed while computing its own replacement; move it out first with `let current = move h.token`, then assign `h.token` from `current`
 ```
-
-Message template, not filled by this compiler: `Assignment to {spelling} consumes the same owner before replacement commits`.
 
 Fix: Move the old value into a local first, then assign: `let old = move h.token` then `h.token = wrap(move old)`. See Ownership and moves.
 
@@ -1175,10 +1173,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:17: error[SEM0010] A known actor called with an unknown operation name
+src/main.silk:6:17: error[SEM0010] main.Point has no associated function `build`
 ```
-
-Message template, not filled by this compiler: `{actor} has no operation {spelling}`.
 
 Fix: Call an operation the type declares, here `Point.make()`. See Functions and methods.
 
@@ -1400,10 +1396,8 @@ pub struct Circle { radius: i32 }
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0021] Constructing a struct at a site where its raw constructor is not available
+src/main.silk:3:11: error[SEM0021] Cannot construct shapes.Circle here because it has fields private to its module; call a function that module provides to build one
 ```
-
-Message template, not filled by this compiler: `Cannot construct {type} because its raw constructor is not available at this site`.
 
 Fix: Construct the struct through a `pub` function of its module, or make every field `pub`. See Structs, tuples and arrays, Modules and imports.
 
@@ -1965,10 +1959,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:5:15: error[SEM0048] A pattern binding whose spelling collides with an existing declaration
+src/main.silk:5:15: error[SEM0048] `x` is already declared in this scope; bind field `x` to another name, as in `{ x: found }`
 ```
-
-Message template, not filled by this compiler: `Pattern binding {spelling} conflicts with an existing declaration`.
 
 Fix: Rename the binder: `Point { x: px, y }`. See Patterns and match.
 

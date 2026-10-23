@@ -108,17 +108,10 @@ static if Target.arch() == Arch.Wasm32 {
     }
   }
 
-  effect fn writeVectored(self: &mut RawStdout, vals: &[&[u8]]) -> ()
-    ! WriterError {
-    return run Writer.writeEach(&mut self, vals)
-  }
-
   effect fn flush(self: &mut RawStdout) -> () ! WriterError {}
 
   impl Writer for RawStdout {
     writeAll: RawStdout.writeAll
-
-    writeVectored: RawStdout.writeVectored
 
     flush: RawStdout.flush
   }
@@ -147,7 +140,7 @@ static if Target.arch() == Arch.Wasm32 {
 The rest is three versions of `main`, chosen by a module-level `static if`. `Target.arch()` from `silk/target` and `Compilation.libc()` from `silk/compilation` are static functions: the compiler knows their answers before it type-checks, so only the selected arm exists in the build. That is why each arm can import modules the others cannot use. See **Static control flow and reflection** in the reference.
 
 - On wasm32, `main` returns the number. The host reads it as the call's result. `silk/wasm_start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225: "Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements".
-- On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. `writeVectored`, which writes several slices as one, has no faster way here and hands each slice to `writeAll` through `Writer.writeEach`. With that provider, the same `report` runs unchanged.
+- On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. `writeVectored`, which writes several slices as one, has no faster way here, so it is left out and its default body calls `writeAll` for each slice. With that provider, the same `report` runs unchanged.
 - Everywhere else, `StdoutWriter` from `silk/os_writer` does the job.
 
 `silk/target` also has `operatingSystem()`, `abi()`, `endianness()`, `pointerBits` and `hasCpuFeature("...")`. `silk/compilation` reports the rest of the build request, such as `artifact()`, `safety()` and `threading()`.

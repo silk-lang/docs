@@ -654,7 +654,7 @@ Provide every service inside the test or in a helper it calls, as `send` does. T
 - Give each fake a way to fail on cue, like `failAt` here and in `Logger.inMemoryProviderFailAt`. Most bugs are in the failure paths.
 - Check what did not happen as well as what did: no bytes sent, no id drawn, nothing logged.
 - Keep fakes in their own module, such as `tests/Fakes.silk`, so tests in several modules can share them.
-- A fake for `Writer` works the same way: a struct with a buffer, and an `impl Writer` whose `writeAll` copies the bytes into it, whose `writeVectored` passes the slices to `Writer.writeEach`, and whose `flush` does nothing.
+- A fake for `Writer` works the same way: a struct with a buffer, and an `impl Writer` whose `writeAll` copies the bytes into it, whose `flush` does nothing, and no `writeVectored`, since its default body calls `writeAll` for each slice.
 
 ## API reference
 

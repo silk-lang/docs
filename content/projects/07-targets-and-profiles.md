@@ -341,7 +341,7 @@ Compiling bare (x86_64-unknown-linux-gnu, bare)
   check    1 module                          0.00s
   codegen  failed: 12 functions, 1 error     0.00s
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
+<silk>/lib/silk/stdlib/silk/raw_start.silk:29:5: unsupported[foreign-contract] not supported by the native compiler yet
 Failed bare in 0.10s
 ```
 
