@@ -345,7 +345,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-src/main.silk:76:18: error[SEM0058] A shared view cannot be reborrowed exclusively
+src/main.silk:76:18: error[SEM0058] `self` is a shared reference, so it cannot lend `&mut` access; take a `&mut` reference where it comes from to change what it points at
 Failed tasks in 0.17s
 ```
 
@@ -373,9 +373,9 @@ Checking tasks (x86_64-unknown-linux-gnu)
   check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:137:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
-  note: src/main.silk:136:15: related location
+  note: src/main.silk:136:15: the earlier borrow starts here
 src/main.silk:138:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
-  note: src/main.silk:136:15: related location
+  note: src/main.silk:136:15: the earlier borrow starts here
 Failed tasks in 0.17s
 ```
 

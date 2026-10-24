@@ -353,7 +353,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     59 modules, 1 in package          0.08s
   check    failed: 2 modules, 1 error        2.33s
 [x86_64-unknown-linux-gnu]
-src/main.silk:539:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:539:10: error[SEM0071] This `run` needs `&mut FileSystem`, which the enclosing function does not provide; add `? &mut FileSystem` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 Failed tasks in 2.41s
 ```
 
@@ -381,7 +381,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-src/main.silk:10:17: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:10:17: error[SEM0071] This `run` needs `&mut SystemClock`, which the enclosing function does not provide; add `? &mut SystemClock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 Failed scratch in 0.19s
 ```
 

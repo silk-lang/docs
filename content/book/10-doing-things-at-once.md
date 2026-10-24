@@ -440,7 +440,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-src/main.silk:16:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:16:10: error[SEM0071] This `run` needs `&mut Scheduler | &mut MonotonicClock`, which the enclosing function does not provide; add `? &mut Scheduler | &mut MonotonicClock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 Failed tasks in 0.14s
 ```
 

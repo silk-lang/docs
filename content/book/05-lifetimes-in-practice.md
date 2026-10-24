@@ -327,9 +327,9 @@ Checking tasks (x86_64-unknown-linux-gnu)
   check    failed: 2 modules, 2 errors       0.14s
 [x86_64-unknown-linux-gnu]
 src/main.silk:199:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
-  note: src/main.silk:198:17: related location
+  note: src/main.silk:198:17: the borrow starts here
 src/main.silk:200:57: error[OWN0019] A borrowed value is used beyond the validity of its referent
-  note: src/main.silk:198:17: related location
+  note: src/main.silk:198:17: the borrow starts here
 Failed tasks in 0.20s
 ```
 
@@ -388,8 +388,8 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-src/main.silk:21:6: error[OWN0019] A borrowed value is used beyond the validity of its referent
-  note: src/main.silk:19:35: related location
+src/main.silk:21:6: error[OWN0019] `board` is used after `buffer`, which it borrows, ended or was replaced
+  note: src/main.silk:19:35: the borrow starts here
 Failed scratch in 0.18s
 ```
 
