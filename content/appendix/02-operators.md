@@ -107,7 +107,7 @@ import silk.equal { Equal }
 import silk.order { Order, Ordering }
 
 struct N {
-  v: i32
+  v: i32,
 }
 
 fn add(a: N, b: N) -> N {

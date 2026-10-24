@@ -110,11 +110,11 @@ Selective and complete recovery of a two-member row:
 import silk.effect { Effect }
 
 struct Missing {
-  code: i32
+  code: i32,
 }
 
 struct Denied {
-  code: i32
+  code: i32,
 }
 
 effect fn open(mode: i32) -> i32
@@ -163,11 +163,11 @@ import silk.effect { Effect }
 import silk.result { Result }
 
 struct Missing {
-  code: i32
+  code: i32,
 }
 
 struct Wrapped {
-  inner: i32
+  inner: i32,
 }
 
 effect fn load(ok: bool) -> i32
@@ -211,11 +211,11 @@ import silk.effect { Effect }
 import silk.ownership { Drop }
 
 struct Problem {
-  code: i32
+  code: i32,
 }
 
 struct Guard<'a> {
-  count: &'a mut i32
+  count: &'a mut i32,
 }
 
 impl<'a> Drop for Guard<'a> {
@@ -230,7 +230,7 @@ service Journal {
 }
 
 struct Memory {
-  value: i32
+  value: i32,
 }
 
 effect fn mark(self: &mut Memory, value: i32) -> () {

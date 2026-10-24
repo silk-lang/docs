@@ -127,7 +127,7 @@ import silk.effect { Effect }
 import silk.shared { Shared }
 
 struct Counter {
-  value: i32
+  value: i32,
 }
 
 effect fn useCell() -> i32

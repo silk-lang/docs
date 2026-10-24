@@ -240,7 +240,7 @@ This prints `progress: 3/8` on standard error. Other threads that write to stand
 
 ```silk
 // Standard input that hands out a fixed text a few bytes at a time.
-struct ScriptedInput { text: &'static [u8] position: usize step: usize }
+struct ScriptedInput { text: &'static [u8], position: usize, step: usize }
 
 impl StandardInput for ScriptedInput {
   effect fn read(self: &mut Self, buffer: &mut [u8]) -> ReadOutcome ! StreamReadError {
@@ -267,7 +267,7 @@ impl StandardInput for ScriptedInput {
 
 ```silk
 // A Writer that keeps everything written to it.
-struct CapturingWriter { out: Bytes allocator: SystemAllocator }
+struct CapturingWriter { out: Bytes, allocator: SystemAllocator }
 
 effect fn appendBytes(out: &mut Bytes, bytes: &[u8]) -> () ! OutOfMemoryError ? &mut Allocator {
   run out.append(bytes)

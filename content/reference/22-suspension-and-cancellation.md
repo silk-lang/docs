@@ -95,12 +95,12 @@ import silk.shared { Shared }
 struct Empty {}
 
 struct Waiting {
-  wake: Wake
+  wake: Wake,
 }
 
 struct Mailbox {
-  slot: Empty | Waiting
-  readyCount: i32
+  slot: Empty | Waiting,
+  readyCount: i32,
 }
 
 fn install(mailbox: &mut Mailbox, wake: Wake) -> () {
@@ -142,12 +142,12 @@ fn onReady(mailbox: &Shared<Mailbox>) -> () {
 struct Idle {}
 
 struct Parked {
-  execution: Intrinsic.Execution<i32>
+  execution: Intrinsic.Execution<i32>,
 }
 
 struct Owner {
-  slot: Idle | Parked
-  result: i32
+  slot: Idle | Parked,
+  result: i32,
 }
 
 fn complete(owner: &mut Owner, value: i32) -> () {
@@ -209,7 +209,7 @@ import silk.ownership { Drop }
 import silk.shared { Shared }
 
 struct Log {
-  value: i32
+  value: i32,
 }
 
 fn push(log: &mut Log, digit: i32) -> () {
@@ -222,8 +222,8 @@ fn read(log: &Log) -> i32 {
 }
 
 struct Token {
-  log: Shared<Log>
-  digit: i32
+  log: Shared<Log>,
+  digit: i32,
 }
 
 impl Drop for Token {
@@ -234,7 +234,7 @@ impl Drop for Token {
 }
 
 struct Guard {
-  wake: Wake
+  wake: Wake,
 }
 
 fn register(wake: Wake) -> Guard {
@@ -307,7 +307,7 @@ import silk.scheduler { Scheduler, TaskIdExhaustedError }
 import silk.shared { Shared }
 
 struct Log {
-  drops: i32
+  drops: i32,
 }
 
 fn countDrop(log: &mut Log) -> () {
@@ -320,7 +320,7 @@ fn drops(log: &Log) -> i32 {
 }
 
 struct Token {
-  log: Shared<Log>
+  log: Shared<Log>,
 }
 
 impl Drop for Token {
@@ -333,11 +333,11 @@ impl Drop for Token {
 struct Empty {}
 
 struct Held {
-  fiber: Fiber<i32, never>
+  fiber: Fiber<i32, never>,
 }
 
 struct Slot {
-  phase: Empty | Held
+  phase: Empty | Held,
 }
 
 fn store(slot: &mut Slot, fiber: Fiber<i32, never>) -> () {
@@ -459,7 +459,7 @@ import silk.effect { Effect }
 import silk.shared { Shared }
 
 struct Counter {
-  value: i32
+  value: i32,
 }
 
 effect fn five() -> i32 {

@@ -174,7 +174,7 @@ pub fn main() -> i32 {
 
 ```silk
 struct Token {
-  value: i32
+  value: i32,
 }
 
 union Packet {
@@ -213,14 +213,14 @@ pub fn main() -> i32 {
 
 ```silk
 struct Left {
-  value: i32
+  value: i32,
 }
 
 struct Right {}
 
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 fn read(input: Left | Right) -> i32 {
@@ -260,8 +260,8 @@ enum Color {
 }
 
 struct Paint {
-  color: Color
-  amount: i32
+  color: Color,
+  amount: i32,
 }
 
 fn make(color: Color, amount: i32) -> Paint {

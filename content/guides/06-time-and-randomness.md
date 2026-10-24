@@ -36,7 +36,7 @@ The std lib has no calendar either: no dates, no time zones, no formatting of ti
 
 ```silk
 // A calendar date in UTC.
-struct Date { year: i64 month: i64 day: i64 }
+struct Date { year: i64, month: i64, day: i64 }
 
 // Converts days since 1970-01-01 to a date in the Gregorian calendar.
 // Works in 400-year eras of 146097 days, counted from March 1, year 0.
@@ -287,7 +287,7 @@ impl SystemClock for FixedClock {
 
 ```silk
 // A monotonic clock that never really waits. A wait moves its mark forward.
-struct VirtualClock { mark: Instant waits: u32 }
+struct VirtualClock { mark: Instant, waits: u32 }
 
 impl MonotonicClock for VirtualClock {
   effect fn now(self: &mut Self) -> Instant {

@@ -16,20 +16,20 @@ import silk.system_clock { Instant, SystemClock }
 
 pub struct StationDown { pub code: i32 }
 pub struct TimedOut {
-  pub budgetMs: i64
-  pub tookMs: i64
+  pub budgetMs: i64,
+  pub tookMs: i64,
 }
 
 pub struct Timed<A> {
-  pub value: A
-  pub tookMs: i64
+  pub value: A,
+  pub tookMs: i64,
 }
 
 struct Station {
-  failures: i32
-  code: i32
-  latencyMs: u64
-  reads: i32
+  failures: i32,
+  code: i32,
+  latencyMs: u64,
+  reads: i32,
 }
 
 effect fn readStation(station: &mut Station) -> i32

@@ -92,8 +92,8 @@ ExactType         = 'typeof' '(' Path ')'
 
 ```silk
 struct Pair<A, B> {
-  first: A
-  second: B
+  first: A,
+  second: B,
 }
 
 union Maybe<T> {
@@ -139,7 +139,7 @@ import silk.ops { Add }
 import silk.order { Order }
 
 struct Meters {
-  value: i32
+  value: i32,
 }
 
 fn addMeters(left: Meters, right: Meters) -> Meters {

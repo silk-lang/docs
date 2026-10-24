@@ -272,8 +272,8 @@ Afterwards, `outbound()` returns everything written, `audit()` lists the operati
 // Tests: a scripted in-memory stream stands in for the socket.
 
 struct ManualClock {
-  seconds: i64
-  nanoseconds: i64
+  seconds: i64,
+  nanoseconds: i64,
 }
 
 impl MonotonicClock for ManualClock {

@@ -22,8 +22,8 @@ The names are ordinary names. A local declaration named `Copy`, or a type parame
 import silk.ownership { Copy }
 
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 impl Copy for Point {}

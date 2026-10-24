@@ -179,7 +179,7 @@ service Counter {
 }
 
 struct Counting {
-  value: i32
+  value: i32,
 }
 
 effect fn peekCounting(self: &Counting) -> i32 {
@@ -232,7 +232,7 @@ service Journal {
 }
 
 struct Book {
-  entries: i32
+  entries: i32,
 }
 
 impl Journal for Book {
@@ -280,7 +280,7 @@ service Label {
 }
 
 struct Counting {
-  value: i32
+  value: i32,
 }
 
 impl Counter for Counting {
@@ -291,7 +291,7 @@ impl Counter for Counting {
 }
 
 struct Fixed {
-  value: i32
+  value: i32,
 }
 
 impl Label for Fixed {
@@ -340,7 +340,7 @@ service Counter {
 }
 
 struct Counting {
-  value: i32
+  value: i32,
 }
 
 impl Counter for Counting {
@@ -398,7 +398,7 @@ service Tracer {
 }
 
 struct Offset {
-  amount: i32
+  amount: i32,
 }
 
 impl Tracer for Offset {

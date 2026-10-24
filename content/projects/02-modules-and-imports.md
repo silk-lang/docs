@@ -78,8 +78,8 @@ src/
 ```silk
 /// A point on the plane.
 pub struct Point {
-  pub x: i32
-  pub y: i32
+  pub x: i32,
+  pub y: i32,
 }
 
 /// The squared distance from the origin.
@@ -99,8 +99,8 @@ pub import geometry.Point { Point, normSquared as norm2 }
 
 /// A rectangle given by two corners.
 pub struct Rect {
-  pub low: Point
-  pub high: Point
+  pub low: Point,
+  pub high: Point,
 }
 
 pub fn area(rect: &Rect) -> i32 {

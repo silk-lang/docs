@@ -45,8 +45,8 @@ import silk.logger { LogError }
 import silk.os_logger { StdoutLogger }
 
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 fn sum(p: &Point) -> i32 {

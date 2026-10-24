@@ -178,7 +178,7 @@ import silk.equal { Equal }
 import silk.ops { Add }
 
 struct Meters {
-  value: i32
+  value: i32,
 }
 
 fn addMeters(left: Meters, right: Meters) -> Meters {
@@ -209,7 +209,7 @@ pub fn main() -> i32 {
 
 ```silk
 struct Counter {
-  hits: i32
+  hits: i32,
 }
 
 fn bump(counter: &mut Counter) {

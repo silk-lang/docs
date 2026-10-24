@@ -115,14 +115,14 @@ Everything else moves. That includes exclusive references `&mut T` and `&mut [T]
 import silk.ownership { Copy }
 
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 impl Copy for Point {}
 
 struct Token {
-  id: i32
+  id: i32,
 }
 
 fn consume(token: Token) -> i32 {
@@ -146,12 +146,12 @@ Partial moves, `match move` and `Intrinsic.replace`:
 
 ```silk
 struct Token {
-  value: i32
+  value: i32,
 }
 
 struct Pair {
-  left: Token
-  right: Token
+  left: Token,
+  right: Token,
 }
 
 union Slot {
@@ -193,17 +193,17 @@ import silk.ownership { Drop }
 import silk.shared { Shared }
 
 struct Log {
-  order: i32
+  order: i32,
 }
 
 struct Tracer {
-  id: i32
-  log: Shared<Log>
+  id: i32,
+  log: Shared<Log>,
 }
 
 struct Pair {
-  first: Tracer
-  second: Tracer
+  first: Tracer,
+  second: Tracer,
 }
 
 fn record(log: &mut Log, id: i32) -> i32 {

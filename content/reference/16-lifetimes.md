@@ -91,7 +91,7 @@ Omitted lifetimes in a function signature follow these rules.
 
 ```silk
 struct View<'a> {
-  item: &'a i32
+  item: &'a i32,
 }
 
 impl<'a> View<'a> {
@@ -140,7 +140,7 @@ interface Source<'s> {
 }
 
 struct Fixed<'s> {
-  value: &'s i32
+  value: &'s i32,
 }
 
 impl<'s> Source<'s> for Fixed<'s> {
@@ -150,7 +150,7 @@ impl<'s> Source<'s> for Fixed<'s> {
 }
 
 struct Holder<'a, T: 'a> {
-  item: &'a T
+  item: &'a T,
 }
 
 fn read<'s, S: Source<'s>>(source: &S) -> i32 {
@@ -293,7 +293,7 @@ Implement it for every lifetime:
 import silk.ownership { Drop }
 
 struct Handle<'a> {
-  item: &'a i32
+  item: &'a i32,
 }
 
 impl<'a> Drop for Handle<'a> {
@@ -335,7 +335,7 @@ Store a borrow the caller provides:
 
 ```silk
 struct View<'a> {
-  item: &'a i32
+  item: &'a i32,
 }
 
 fn fill<'s>(out: &mut View<'s>, source: &'s i32) -> () {

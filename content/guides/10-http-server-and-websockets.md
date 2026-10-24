@@ -165,8 +165,8 @@ effect fn decimal(value: usize) -> Bytes ! OutOfMemoryError ? &mut Allocator {
 // Plain HTTP: read the body, pick a reply, write it.
 
 struct Reply {
-  status: u16
-  body: Bytes
+  status: u16,
+  body: Bytes,
 }
 
 effect fn readBody<'call, 'request: 'call, 'connection: 'request, 'transport: 'connection>(

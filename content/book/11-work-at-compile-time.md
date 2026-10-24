@@ -481,10 +481,10 @@ The last feature is `tasks export`, which prints the board as CSV. You could wri
 
 // Only `pub` fields are visible to reflection.
 struct Row<'text> {
-  pub id: u32
-  pub title: string<'text>
-  pub priority: Priority
-  pub done: string<'static>
+  pub id: u32,
+  pub title: string<'text>,
+  pub priority: Priority,
+  pub done: string<'static>,
 }
 ```
 

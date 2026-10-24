@@ -30,7 +30,7 @@ import silk.effect { Effect }
 import silk.writer { Writer, WriterError }
 
 struct CountingWriter {
-  count: usize
+  count: usize,
 }
 
 impl Writer for CountingWriter {

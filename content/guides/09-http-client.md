@@ -307,7 +307,7 @@ Code that requires `? &mut Http` runs unchanged on any provider. A fake is a str
 ```silk
 // A fake Http for tests: answers from a script and counts the calls.
 struct ScriptedHttp {
-  calls: i32
+  calls: i32,
 }
 
 impl Http for ScriptedHttp {

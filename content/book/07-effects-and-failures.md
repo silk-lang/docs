@@ -211,9 +211,9 @@ The arguments arrive as raw bytes. A small struct holds the three words `tasks` 
 ```silk
 // The words after the program name. Titles borrow from these bytes.
 struct Words {
-  command: Bytes
-  first: Bytes
-  second: Bytes
+  command: Bytes,
+  first: Bytes,
+  second: Bytes,
 }
 ```
 
@@ -611,7 +611,7 @@ import silk.os_logger { StdoutLogger }
 import silk.result { Result }
 
 struct NoSuchTask {
-  id: u32
+  id: u32,
 }
 
 effect fn complete(id: u32) -> u32

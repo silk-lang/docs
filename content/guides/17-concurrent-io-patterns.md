@@ -341,14 +341,14 @@ effect fn exchange(word: &[u8], deadline: &Instant) -> Bytes ! ByteIoError | Out
 // The mailbox between the producers and the consumer: one answer slot per word, and the order
 // in which the slots were filled.
 struct Mailbox {
-  answers: List<Option<Bytes>>
-  order: [usize; 16]
-  count: usize
+  answers: List<Option<Bytes>>,
+  order: [usize; 16],
+  count: usize,
 }
 
 struct Arrival {
-  index: usize
-  answer: Bytes
+  index: usize,
+  answer: Bytes,
 }
 
 fn post(mailbox: &mut Mailbox, index: usize, answer: Bytes) -> () {

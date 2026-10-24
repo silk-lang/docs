@@ -242,8 +242,8 @@ A C-layout record and a foreign static:
 import silk.pointer { Pointer }
 
 extern "C" struct Timespec {
-  seconds: i64
-  nanoseconds: i64
+  seconds: i64,
+  nanoseconds: i64,
 }
 
 unsafe extern "C" fn clock_gettime(clock: i32, value: *mut Timespec) -> i32

@@ -34,8 +34,8 @@ import silk.writer { Writer, WriterError }
 
 // A Writer provider that counts the calls and bytes it receives.
 struct CountingWriter {
-  calls: usize
-  bytes: usize
+  calls: usize,
+  bytes: usize,
 }
 
 impl Writer for CountingWriter {

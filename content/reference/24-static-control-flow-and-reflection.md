@@ -145,13 +145,13 @@ All of these are fixed by the build request (`--target`, `--release`, `--profile
 import silk.reflect { Reflect, namedKind }
 
 struct Point {
-  pub x: i32
-  pub y: i32
+  pub x: i32,
+  pub y: i32,
 }
 
 struct Sample {
-  pub flag: bool
-  pub count: i32
+  pub flag: bool,
+  pub count: i32,
 }
 
 fn total<T>(value: &T) -> i32 {
