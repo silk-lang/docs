@@ -276,8 +276,8 @@ Build instants with `SystemClock.make(seconds, nanoseconds)` and `MonotonicClock
 ```silk
 // Allocator: counts requests and refuses the one numbered `failAt` (counting from 1).
 pub struct CountingAllocator {
-  pub calls: usize
-  pub failAt: usize
+  pub calls: usize,
+  pub failAt: usize,
 }
 
 impl CountingAllocator {
@@ -306,8 +306,8 @@ impl Allocator for CountingAllocator {
 ```silk
 // FileSystem: one file at one path. Everything else is unsupported.
 pub struct MemoryFiles {
-  pub path: Bytes
-  pub contents: Bytes
+  pub path: Bytes,
+  pub contents: Bytes,
 }
 
 impl MemoryFiles {
@@ -421,13 +421,13 @@ import tests.Fakes { CountingAllocator, MemoryFiles, ScriptedRandom, VirtualCloc
 
 // Everything sendReport talks to, as fakes.
 struct World {
-  path: Path
-  files: MemoryFiles
-  peer: MemoryByteDuplex
-  clock: VirtualClock
-  random: ScriptedRandom
-  logger: InMemoryLogger
-  allocator: CountingAllocator
+  path: Path,
+  files: MemoryFiles,
+  peer: MemoryByteDuplex,
+  clock: VirtualClock,
+  random: ScriptedRandom,
+  logger: InMemoryLogger,
+  allocator: CountingAllocator,
 }
 
 // A peer that takes at most 5 bytes per write and is first ready `delayMs` after time zero.

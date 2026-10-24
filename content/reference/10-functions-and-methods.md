@@ -90,7 +90,7 @@ QualifiedCall   = TypePath TypeArguments? '.' Identifier '(' Arguments? ')'
 
 ```silk
 pub struct Counter {
-  value: i32
+  value: i32,
 }
 
 impl Counter {

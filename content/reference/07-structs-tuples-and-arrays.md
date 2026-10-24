@@ -116,13 +116,13 @@ UnitType       = '(' ')'
 
 ```silk
 pub struct Point {
-  pub x: i32
-  pub y: i32
+  pub x: i32,
+  pub y: i32,
 }
 
 struct Labeled<T> {
-  label: u8
-  value: T
+  label: u8,
+  value: T,
 }
 
 fn origin() -> Point {

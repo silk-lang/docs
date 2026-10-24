@@ -159,7 +159,7 @@ The map keeps its entries in bucket order, which is neither insertion order nor 
 
 ```silk
 // One row of the result: a word and how often it appeared.
-struct Count<'text> { term: Term<'text> count: u32 }
+struct Count<'text> { term: Term<'text>, count: u32 }
 
 impl<'text> Copy for Count<'text> {}
 

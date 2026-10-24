@@ -15,8 +15,8 @@ import silk.os_logger { StdoutLogger }
 import silk.result { Result }
 
 struct Item {
-  name: string
-  cents: i32
+  name: string,
+  cents: i32,
 }
 
 union Payment {
@@ -26,7 +26,7 @@ union Payment {
 }
 
 struct Declined {
-  reason: string
+  reason: string,
 }
 
 fn total(items: &List<Item>) -> i32 {
@@ -127,8 +127,8 @@ Nothing from the standard library is in scope until you import it. `silk.list` i
 
 ```silk
 struct Item {
-  name: string
-  cents: i32
+  name: string,
+  cents: i32,
 }
 
 union Payment {

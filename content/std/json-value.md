@@ -396,8 +396,8 @@ import silk.json_value { Json }
 import silk.writer { Writer, WriterError }
 
 struct CaptureWriter {
-  bytes: [u8; 64]
-  length: usize
+  bytes: [u8; 64],
+  length: usize,
 }
 
 impl Writer for CaptureWriter {
@@ -441,8 +441,8 @@ fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
 }
 
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 impl Serialize for Point {

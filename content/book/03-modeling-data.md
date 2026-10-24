@@ -99,10 +99,10 @@ Now put the pieces together:
 
 ```silk
 struct Task {
-  id: TaskId
-  title: string<'static>
-  priority: Priority
-  status: Status
+  id: TaskId,
+  title: string<'static>,
+  priority: Priority,
+  status: Status,
 }
 ```
 
@@ -317,10 +317,10 @@ union Status {
 }
 
 struct Task {
-  id: TaskId
-  title: string<'static>
-  priority: Priority
-  status: Status
+  id: TaskId,
+  title: string<'static>,
+  priority: Priority,
+  status: Status,
 }
 
 union Command {

@@ -20,10 +20,10 @@ The natural first try is to just drop the `'static` and write `string`. In your 
 
 ```silk
 struct Task {
-  id: TaskId
-  title: string
-  priority: Priority
-  status: Status
+  id: TaskId,
+  title: string,
+  priority: Priority,
+  status: Status,
 }
 ```
 
@@ -50,10 +50,10 @@ The fix is to stop hiding the lifetime. Give it a name, declare it on the struct
 ```silk
 // A task borrows its title from somewhere else: the text it was read from.
 struct Task<'text> {
-  id: TaskId
-  title: string<'text>
-  priority: Priority
-  status: Status
+  id: TaskId,
+  title: string<'text>,
+  priority: Priority,
+  status: Status,
 }
 
 impl<'text> Task<'text> {
@@ -80,14 +80,14 @@ Every struct that holds a task carries the lifetime along:
 
 ```silk
 struct Draft<'text> {
-  title: string<'text>
-  priority: Priority
+  title: string<'text>,
+  priority: Priority,
 }
 
 struct Board<'text> {
-  tasks: [Task<'text>; 4]
-  count: usize
-  nextId: u32
+  tasks: [Task<'text>; 4],
+  count: usize,
+  nextId: u32,
 }
 
 impl<'text> Board<'text> {
@@ -360,7 +360,7 @@ import silk.result { Result }
 import silk.string { String, InvalidUtf8 }
 
 struct Board<'text> {
-  first: string<'text>
+  first: string<'text>,
 }
 
 fn textOf(bytes: &[u8]) -> string {
@@ -445,10 +445,10 @@ union Status {
 
 // A task borrows its title from somewhere else: the text it was read from.
 struct Task<'text> {
-  id: TaskId
-  title: string<'text>
-  priority: Priority
-  status: Status
+  id: TaskId,
+  title: string<'text>,
+  priority: Priority,
+  status: Status,
 }
 
 impl<'text> Task<'text> {
@@ -465,14 +465,14 @@ impl<'text> Task<'text> {
 }
 
 struct Draft<'text> {
-  title: string<'text>
-  priority: Priority
+  title: string<'text>,
+  priority: Priority,
 }
 
 struct Board<'text> {
-  tasks: [Task<'text>; 4]
-  count: usize
-  nextId: u32
+  tasks: [Task<'text>; 4],
+  count: usize,
+  nextId: u32,
 }
 
 impl<'text> Board<'text> {

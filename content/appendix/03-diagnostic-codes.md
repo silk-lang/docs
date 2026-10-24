@@ -321,7 +321,7 @@ One required token that is absent at its insertion position.
 
 ```silk
 struct Point {
-  x: i32
+  x: i32,
   y i32
 }
 pub fn main() -> i32 {
@@ -601,7 +601,7 @@ A partial move out of a place whose boundary keeps the owner whole.
 import silk.ownership { Drop }
 struct Token { value: i32 }
 impl Drop for Token { fn drop(self: &mut Token) -> () { return () } }
-struct Pair { kept: Token  lost: Token }
+struct Pair { kept: Token,  lost: Token }
 fn pair() -> Pair { return Pair { kept: Token { value: 1 }, lost: Token { value: 2 } } }
 fn first() -> Token {
   return pair().kept
@@ -1310,7 +1310,7 @@ Fix: Rename the local declaration, or import under another name with `as`. See M
 A struct declaration that names one field twice.
 
 ```silk
-struct Point { x: i32 x: i32 }
+struct Point { x: i32, x: i32 }
 pub fn main() -> i32 { return 0 }
 ```
 
@@ -1414,7 +1414,7 @@ Fix: Construct the struct through a `pub` function of its module, or make every 
 A struct literal naming a field its type does not declare.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1, y: 2, z: 3 }
   return 0
@@ -1434,7 +1434,7 @@ Fix: Initialize only declared fields. See Structs, tuples and arrays, Enums and 
 A struct literal that initializes one field twice.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1, x: 2, y: 3 }
   return 0
@@ -1456,7 +1456,7 @@ Fix: Initialize each field once. See Structs, tuples and arrays, Enums and union
 A struct literal that omits a declared field.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1 }
   return 0
@@ -1478,7 +1478,7 @@ Fix: Initialize every field. See Structs, tuples and arrays, Enums and unions.
 A struct literal field whose value mismatches the field type.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1, y: true }
   return 0
@@ -1519,7 +1519,7 @@ Fix: Project fields only from structs. See Structs, tuples and arrays.
 A field projection naming a field its struct does not declare.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1, y: 2 }
   return p.z
@@ -1909,7 +1909,7 @@ Fix: Write a `bool` guard: `_ if n > 2`. See Patterns and match.
 A struct pattern that omits a field without a trailing `..`.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1, y: 2 }
   let Point { x } = move p
@@ -1932,7 +1932,7 @@ Fix: Name every field or end the pattern with `..`: `Point { x, .. }`. See Patte
 A struct pattern that names one field twice.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1, y: 2 }
   let Point { x, x: other, y } = move p
@@ -1955,7 +1955,7 @@ Fix: Name each field once. See Patterns and match.
 A pattern binding whose name is already declared in scope.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let x = 0
   let p = Point { x: 1, y: 2 }
@@ -3022,7 +3022,7 @@ A conformance requirement that does not descend toward a base witness.
 ```silk
 interface Eq2<T> { fn eq2(a: &Self, b: &T) -> bool }
 struct Box2<T> { v: T }
-struct Pair<A, B> { a: A b: B }
+struct Pair<A, B> { a: A, b: B }
 fn boxEq<T: Eq2<Pair<T, T>>>(a: &Box2<T>, b: &T) -> bool { return true }
 impl<T: Eq2<Pair<T, T>>> Eq2<T> for Box2<T> { eq2: Box2.boxEq }
 pub fn main() -> i32 { return 0 }
@@ -3856,7 +3856,7 @@ Fix: Pass one value per tuple element. See Structs, tuples and arrays.
 Using tuple syntax with a named struct or record syntax with a tuple.
 
 ```silk
-struct Point { x: i32 y: i32 }
+struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p: Point = (1, 2)
   return 0
@@ -4465,8 +4465,8 @@ A C-layout record that declares type parameters.
 
 ```silk
 extern "C" struct Pair<T> {
-  left: i32
-  right: i32
+  left: i32,
+  right: i32,
 }
 pub fn main() -> i32 { return 0 }
 ```
@@ -4487,8 +4487,8 @@ A C-layout record field outside the closed C object subset.
 
 ```silk
 extern "C" struct Flags {
-  on: bool
-  name: string
+  on: bool,
+  name: string,
 }
 pub fn main() -> i32 { return 0 }
 ```

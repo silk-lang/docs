@@ -184,15 +184,15 @@ Effect blocks, an anonymous effect function, an opaque result and a stored Effec
 import silk.effect { Effect }
 
 struct Token {
-  value: i32
+  value: i32,
 }
 
 struct Oops {
-  code: i32
+  code: i32,
 }
 
 struct Job<F: once Effect<'static; i32>> {
-  work: F
+  work: F,
 }
 
 effect fn take(token: Token) -> i32 {
@@ -235,7 +235,7 @@ A generic effect function over failure and requirement rows:
 import silk.effect { Effect }
 
 struct Problem {
-  code: i32
+  code: i32,
 }
 
 effect fn twice<'env, E, ? R>(step: Effect<'env; i32 ! E ? R>) -> i32

@@ -53,7 +53,7 @@ service Tracer {
 }
 
 struct Offset {
-  amount: i32
+  amount: i32,
 }
 
 impl Tracer for Offset {

@@ -177,7 +177,7 @@ import silk.static_text { StaticText }
 import silk.usize
 
 struct Config {
-  base: i32
+  base: i32,
 }
 
 static fn makeConfig(base: i32) -> Config {
@@ -284,8 +284,8 @@ SEM0176, field assignment in a `static fn`. Build a new value instead:
 
 ```silk
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 static fn shifted(p: Point) -> Point {

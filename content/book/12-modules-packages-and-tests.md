@@ -185,10 +185,10 @@ pub union Status {
 }
 
 pub struct Task<'text> {
-  pub id: TaskId
-  pub title: string<'text>
-  pub priority: Priority
-  pub status: Status
+  pub id: TaskId,
+  pub title: string<'text>,
+  pub priority: Priority,
+  pub status: Status,
 }
 
 impl<'text> Task<'text> {

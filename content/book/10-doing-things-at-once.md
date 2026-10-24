@@ -137,7 +137,7 @@ import silk.allocator { OutOfMemoryError }
 import silk.scheduler { Scheduler, TaskIdExhaustedError }
 
 struct NoSuchTask {
-  id: u32
+  id: u32,
 }
 
 effect fn lookup(id: u32) -> i32
@@ -307,12 +307,12 @@ fn delayFor(priority: Priority) -> u64 {
 
 // What a reminder fiber needs. Fibers outlive the function that forks them,
 // so they may only hold owned, 'static data: an id and a delay, not a borrowed title.
-struct Reminder { id: TaskId delay: u64 }
+struct Reminder { id: TaskId, delay: u64 }
 
 const MAX_REMINDERS: usize = 8
 
 // Reminders that went off, in the order they went off.
-struct Fired { ids: [u32; 8] count: usize }
+struct Fired { ids: [u32; 8], count: usize }
 
 fn record(fired: &mut Fired, id: TaskId) -> () {
   fired.ids[fired.count] = id.0

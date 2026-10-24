@@ -109,7 +109,7 @@ interface Shape {
 }
 
 struct Square {
-  side: i32
+  side: i32,
 }
 
 fn squareArea(shape: &Square) -> i32 {
@@ -167,8 +167,8 @@ import silk.equal { Equal }
 import silk.ops { Multiply, Negate }
 
 struct Vec2 {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 impl Vec2 {
@@ -234,7 +234,7 @@ interface Size {
 }
 
 struct Box<T> {
-  value: T
+  value: T,
 }
 
 struct Leaf {}

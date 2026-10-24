@@ -269,14 +269,14 @@ Ownership properties and an unsafe pointer member, without any import:
 
 ```silk
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 impl Intrinsic.Copy for Point {}
 
 struct Counter {
-  hits: *mut i32
+  hits: *mut i32,
 }
 
 impl Intrinsic.Drop for Counter {

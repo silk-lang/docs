@@ -165,10 +165,10 @@ Without the handler, a `JsonError` that escapes `main` ends the program with sta
 
 ```silk
 struct Item {
-  pub name: string<'static>
-  pub count: i32
-  pub tags: List<string<'static>>
-  note: string<'static>
+  pub name: string<'static>,
+  pub count: i32,
+  pub tags: List<string<'static>>,
+  note: string<'static>,
 }
 
 impl Serialize for Item {

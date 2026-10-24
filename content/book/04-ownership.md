@@ -30,10 +30,10 @@ union Status {
 }
 
 struct Task {
-  id: TaskId
-  title: string<'static>
-  priority: Priority
-  status: Status
+  id: TaskId,
+  title: string<'static>,
+  priority: Priority,
+  status: Status,
 }
 
 impl Task {
@@ -51,15 +51,15 @@ impl Task {
 
 // What the user asks for: a title and a priority. The board turns it into a Task.
 struct Draft {
-  title: string<'static>
-  priority: Priority
+  title: string<'static>,
+  priority: Priority,
 }
 
 // A board owns its tasks. It has room for four; chapter 9 lets it grow.
 struct Board {
-  tasks: [Task; 4]
-  count: usize
-  nextId: u32
+  tasks: [Task; 4],
+  count: usize,
+  nextId: u32,
 }
 
 impl Board {

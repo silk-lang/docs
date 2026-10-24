@@ -140,7 +140,7 @@ import silk.allocator { OutOfMemoryError }
 import silk.scheduler { Scheduler, TaskIdExhaustedError }
 
 struct Refused {
-  code: i32
+  code: i32,
 }
 
 effect fn slow() -> i32
@@ -212,7 +212,7 @@ import silk.scheduler { Scheduler, TaskIdExhaustedError }
 import silk.shared { Shared }
 
 struct Log {
-  value: i32
+  value: i32,
 }
 
 fn bump(log: &mut Log) -> () {

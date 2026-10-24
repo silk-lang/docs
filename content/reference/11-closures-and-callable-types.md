@@ -105,7 +105,7 @@ A callable's invocation mode follows from its captures:
 
 ```silk
 struct Token {
-  value: i32
+  value: i32,
 }
 
 fn consume(token: Token) -> i32 {
@@ -195,7 +195,7 @@ pub fn main() -> i32 {
 
 ```silk
 pub struct Counter {
-  value: i32
+  value: i32,
 }
 
 impl Counter {
@@ -210,7 +210,7 @@ impl Counter {
 }
 
 struct Holder<F: mut fn<'static>() -> i32> {
-  step: F
+  step: F,
 }
 
 fn drive<F: mut fn<'static>() -> i32>(holder: &mut Holder<F>) -> i32 {

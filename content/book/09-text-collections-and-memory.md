@@ -45,9 +45,9 @@ The message says it plainly: `+` belongs to an operator interface, and no impl o
 ```silk
 // The board grows as needed. It also indexes tasks by title to refuse duplicates.
 struct Board<'text> {
-  tasks: List<Task<'text>>
-  byTitle: HashMap<Title<'text>, TaskId>
-  nextId: u32
+  tasks: List<Task<'text>>,
+  byTitle: HashMap<Title<'text>, TaskId>,
+  nextId: u32,
 }
 ```
 
@@ -379,8 +379,8 @@ In chapter 8, `render` built each line by hand and even had its own digit-printi
 // A Writer that collects bytes in memory. It owns its allocator because a Writer
 // operation has no way to ask the caller for one.
 struct TextWriter {
-  out: Bytes
-  allocator: SystemAllocator
+  out: Bytes,
+  allocator: SystemAllocator,
 }
 
 impl TextWriter {

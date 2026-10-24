@@ -49,9 +49,9 @@ Start every doc comment with one sentence that says what the thing is or does, t
 /// An axis-aligned rectangle measured in whole units.
 pub struct Rect {
   /// The horizontal size.
-  pub width: i32
+  pub width: i32,
   /// The vertical size.
-  pub height: i32
+  pub height: i32,
 }
 ```
 

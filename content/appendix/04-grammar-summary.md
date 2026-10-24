@@ -238,8 +238,8 @@ This program uses most of the forms above. It builds and exits 0.
 
 ```silk
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 union Shape {

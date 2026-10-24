@@ -473,7 +473,7 @@ impl Notifier for Printing {
 
 // ...another only counts, which is what a test wants.
 struct Counting {
-  sent: i32
+  sent: i32,
 }
 
 impl Notifier for Counting {
@@ -540,9 +540,9 @@ impl SystemClock for FixedClock {
 ```silk
 // A file system that holds a single file in memory.
 struct MemoryFiles {
-  contents: Bytes
-  present: bool
-  allocator: SystemAllocator
+  contents: Bytes,
+  present: bool,
+  allocator: SystemAllocator,
 }
 
 effect fn unsupported() -> never ! FileError {

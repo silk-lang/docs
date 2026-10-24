@@ -87,8 +87,8 @@ ConstDeclaration = 'pub'? 'const' Identifier ':' Type '=' Expression
 
 ```silk
 struct Point {
-  x: i32
-  y: i32
+  x: i32,
+  y: i32,
 }
 
 fn reset(target: &mut i32) {
@@ -123,8 +123,8 @@ pub fn main() -> i32 {
 
 ```silk
 struct Pair {
-  left: i32
-  right: i32
+  left: i32,
+  right: i32,
 }
 
 fn make() -> Pair {

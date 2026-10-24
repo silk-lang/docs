@@ -88,7 +88,7 @@ See Patterns and match for patterns and `match place`.
 
 ```silk
 struct Counter {
-  value: i32
+  value: i32,
 }
 
 impl Counter {
@@ -192,7 +192,7 @@ Take `&mut` and leave a value behind:
 
 ```silk
 struct Tok {
-  v: i32
+  v: i32,
 }
 
 fn take(r: &mut Tok) -> Tok {
@@ -222,11 +222,11 @@ Copy the needed value out inside the arm:
 
 ```silk
 struct Tok {
-  v: i32
+  v: i32,
 }
 
 struct Box {
-  t: Tok
+  t: Tok,
 }
 
 fn value(b: Box) -> i32 {
