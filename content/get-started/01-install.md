@@ -1,6 +1,6 @@
 # Install
 
-Silk installs with one shell script. It downloads a release of the `silk` compiler and its standard library into `~/.silk`, as one toolchain among any others you install later. You also need Clang 18 or newer, because Silk builds programs through Clang.
+Silk installs with one shell script. It downloads a release of Silk, the `silkc` compiler and its standard library, into `~/.silk`, as one version among any others you install later, and installs `silk`, the command you type. `silk` runs each project with the Silk version it pins. You also need Clang 18 or newer, because Silk builds programs through Clang.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | sh
@@ -28,7 +28,9 @@ Downloading silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz from v0.1.0
 minisign is not installed; skipping the signature check of silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 
 Installed silk v0.1.0 to /home/you/.silk/toolchains/0.1.0
-It is the default toolchain; /home/you/.silk/bin/silk links to it.
+It is the default Silk version. Installed the silk tool to /home/you/.silk/bin/silk.
+silk runs each project with the Silk version it pins: silk build, silk test, silk run.
+Update the tool with: silk update self
 
 Add Silk to your PATH by adding this line to ~/.bashrc:
 
@@ -40,9 +42,10 @@ Step by step, the script:
 1. Picks a release from GitHub. It prefers the newest stable release. Before the first stable release exists, it takes the newest published dev release.
 2. Downloads `silk-<version>-<target>.tar.gz` for your host.
 3. Checks the archive's minisign signature, when `minisign` is installed (see below).
-4. Checks that `bin/silk` has the SHA-256 the release publishes in `native-seed.json`, that it reports the requested version, and that its bundled change snapshot matches the release's `changes-snapshot.toml`.
-5. Moves the release into `~/.silk/toolchains/<version>`, replacing an earlier install of the same version. Links `~/.silk/bin/silk` to it and makes it the default in `~/.silk/settings.toml`, keeping an `auto-install` line already there. Toolchains of other versions stay installed.
-6. Checks your Clang and your `PATH`, and prints what to fix.
+4. Checks that the compiler `bin/silkc` has the SHA-256 the release publishes in `native-seed.json`, that it reports the requested version, and that its bundled change snapshot matches the release's `changes-snapshot.toml`.
+5. Moves the release into `~/.silk/toolchains/<version>`, replacing an earlier install of the same version, and makes it the default in `~/.silk/settings.toml`, keeping an `auto-install` line already there. Other versions stay installed.
+6. Moves the release's `bin/silk`, the tool, to `~/.silk/bin/silk`, after checking that it runs the installed compiler. The toolchain keeps only the compiler.
+7. Checks your Clang and your `PATH`, and prints what to fix.
 
 Any failed check stops the script with a `silk-install:` message on standard error, and nothing is installed.
 
@@ -50,15 +53,15 @@ What lands in `~/.silk`:
 
 ```
 ~/.silk/
-  bin/silk                                  a link to the default toolchain's compiler
+  bin/silk                                  the silk tool, the command you type
   settings.toml                             default = "0.1.0"
   toolchains/0.1.0/
-    bin/silk                                the compiler and every tool
+    bin/silkc                               the compiler
     lib/silk/stdlib/                        the standard library, in source
     lib/silk/changes-snapshot.toml          the change history this compiler was built from
 ```
 
-The compiler finds its standard library at `../lib/silk/stdlib`, next to its own `bin` folder, following the link, so keep each toolchain's two folders together.
+The compiler finds its standard library at `../lib/silk/stdlib`, next to its own `bin` folder, so keep each version's two folders together. `~/.silk/bin/silk` is not a compiler: it runs the `silkc` of the version the directory selects. The compilers stay off your `PATH` on purpose, so that every command goes through the version a project pins.
 
 ## Settings
 
@@ -70,7 +73,7 @@ curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | SI
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `SILK_HOME` | Folder that holds the toolchains, `bin/silk` and `settings.toml` | `~/.silk` |
+| `SILK_HOME` | Folder that holds the Silk versions, `bin/silk` and `settings.toml` | `~/.silk` |
 | `SILK_RELEASE` | An exact release tag to install, such as `v0.1.0` | The newest release |
 | `SILK_CHANNEL` | `stable`, `dev` or `auto`. `auto` prefers stable and falls back to dev only before any stable release exists | `auto` |
 | `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit, useful on shared CI machines | none |
@@ -79,9 +82,9 @@ curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | SI
 
 ## Install Clang
 
-`silk` compiles your code to LLVM IR and hands it to Clang to make the executable. Clang 18 or newer builds ordinary programs. Programs for Linux without libc need Clang 22 or newer, because the inline assembly in their runtime uses LLVM 22 syntax. Clang 17 and older are untested. Install LLVM from your package manager or from llvm.org. The Clang that ships with Xcode ("Apple clang") does not qualify, and the installer warns about it; install LLVM's own Clang on macOS too.
+Silk compiles your code to LLVM IR and hands it to Clang to make the executable. Clang 18 or newer builds ordinary programs. Programs for Linux without libc need Clang 22 or newer, because the inline assembly in their runtime uses LLVM 22 syntax. Clang 17 and older are untested. Install LLVM from your package manager or from llvm.org. The Clang that ships with Xcode ("Apple clang") does not qualify, and the installer warns about it; install LLVM's own Clang on macOS too.
 
-`silk` uses the Clang named by `--clang <path>` on `silk build`, `silk run` or `silk test`, else the one named by the `SILK_CLANG` environment variable, else the first `clang` on your `PATH`.
+The compiler uses the Clang named by `--clang <path>` on `silk build`, `silk run` or `silk test`, else the one named by the `SILK_CLANG` environment variable, else the first `clang` on your `PATH`.
 
 The archiver comes from `SILK_LLVM_AR`, or else the `llvm-ar` in the same folder as that Clang.
 
@@ -140,7 +143,7 @@ The script does not edit your shell profile. When `~/.silk/bin` is not on your `
 export PATH="$HOME/.silk/bin:$PATH"
 ```
 
-Open a new terminal, or `source` the profile, and check that `silk` answers:
+Open a new terminal, or `source` the profile, and check that `silk` answers with the version it selects:
 
 ```sh
 silk --version
@@ -184,46 +187,48 @@ Signature and comment signature verified
 Trusted comment: silk v0.1.0 silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-Unpack it. The archive holds one folder, `silk-<version>-<target>/`, with `bin/silk` and `lib/silk/` inside:
+Unpack it. The archive holds one folder, `silk-<version>-<target>/`, with `bin/silk` (the tool), `bin/silkc` (the compiler) and `lib/silk/` inside:
 
 ```sh
 tar -xzf silk-0.1.0-x86_64-unknown-linux-gnu.tar.gz
 ```
 
-Move the unpacked folder to `~/.silk/toolchains/<version>`, named by the version without the leading `v`, and `silk toolchain list` finds it. Or move `bin` and `lib` together anywhere else you like, and put that `bin` on your `PATH`.
+Move its `bin/silk` to `~/.silk/bin/silk`, then move the unpacked folder to `~/.silk/toolchains/<version>`, named by the version without the leading `v`, and `silk use list` finds it. Or keep `bin` and `lib` together anywhere else you like and put that `bin` on your `PATH`: with no version selected, `silk` runs the `silkc` beside it.
 
 When you save a release asset with `curl -O`, the `+` in a dev version stays encoded as `%2B` in the file name. Use `curl -o <name>` to choose the name yourself.
 
 ## Upgrade
 
-Run the script again. It installs the newest release as a new toolchain, links `~/.silk/bin/silk` to it and makes it the default. The toolchains you had stay installed. Add `SILK_RELEASE` to install a specific version, older or newer. Running it again for a version you already have replaces that toolchain's folder whole, so files from an old standard library do not linger. Outside a project, `silk --version` shows the default you are on, and `silk toolchain list` shows every installed version.
+`silk use latest` installs the newest stable release beside the versions you have and makes it your default; `silk use latest --dev` takes the newest dev release. `silk update self` updates the tool itself. Running the script again does both. Add `SILK_RELEASE` to the script to install a specific version, older or newer. Installing a version you already have again with the script replaces its folder whole, so files from an old standard library do not linger. `silk use list` shows every installed version.
 
 ## Switch versions
 
-Each package records the toolchain it runs with in `silk.toml` as `silk-version`. `silk init` writes the version of the compiler that made it. Inside the package, an installed `silk` hands every command to that toolchain, so two projects on one machine can use different releases. A pin of `0.0.0` pins nothing.
+Each package records the Silk version it runs with in `silk.toml` as `silk-version`. `silk init` writes your default version. Inside the package, `silk` hands every command to that version, so two projects on one machine can use different releases. A pin of `0.0.0` pins nothing.
 
-Install and pin a version from inside a project with `silk toolchain use`:
+Pin a version from inside a project with `silk set`, then install it with `silk use`:
 
 ```sh
-silk toolchain use 0.1.0-dev.6+1aed5da1a342
+silk set 0.1.0-dev.11
+silk use
 ```
 
 ```
-Pinned Silk 0.1.0-dev.6+1aed5da1a342 in /home/you/app/silk.toml ([package].silk-version)
+Pinned Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/app/silk.toml ([package].silk-version)
+Installed Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/.silk/toolchains/0.1.0-dev.11+6de14da2a8a6
 ```
 
-When a project pins a version you do not have, its commands stop with exit status 3 and name the fix:
+After cloning someone's project, `silk use` alone installs the version it pins. When a project pins a version you do not have, its commands stop with exit status 3 and name the fix:
 
 ```
 silk: Silk 0.3.0 (package silk-version in /home/you/app/silk.toml) is not installed.
-Install it with: silk toolchain install 0.3.0
+Install it with: silk use
 ```
 
-Add `auto-install = true` to `~/.silk/settings.toml`, or set `SILK_AUTO_INSTALL=1`, to have missing pinned toolchains installed when a command needs them. `silk +<version> <command>` runs one command with another installed version, and `silk toolchain default <version>` changes the version used outside projects. `silk toolchain install` checks the same signature and SHA-256 as the script, and needs no `minisign`. See `silk toolchain` in the Command-line reference.
+Add `auto-install = true` to `~/.silk/settings.toml`, or set `SILK_AUTO_INSTALL=1`, to have missing pinned versions installed when a command needs them. `silk +<version> <command>` runs one command with another installed version, and `silk use <version>` changes the version used outside projects. `silk use` checks the same signature and SHA-256 as the script, and needs no `minisign`. See "Silk versions" in the Command-line reference.
 
 ## Uninstall
 
-Remove one version with `silk toolchain uninstall <version>`. It refuses to remove the toolchain `~/.silk/bin/silk` links to. To remove Silk entirely, delete the install folder and remove the `PATH` line from your shell profile:
+Remove one version with `silk use uninstall <version>`. To remove Silk entirely, delete the install folder and remove the `PATH` line from your shell profile:
 
 ```sh
 rm -rf ~/.silk

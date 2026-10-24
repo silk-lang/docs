@@ -115,7 +115,7 @@ const html = highlighter.highlightToHtml('let mut sum = 0', { lang: 'silk' })
 
 ## The language server
 
-`silk lsp` speaks the Language Server Protocol over standard input and output. The VS Code extension, from version 0.1.0, starts it for Silk files; the `silk.path` setting names the `silk` command it runs. It starts one server per workspace folder, in that folder. When the folder's `silk.toml` pins a toolchain that is not installed, the extension offers to install it with `silk toolchain install` instead of failing. In another editor, register `silk lsp` as the language server command for `.silk` files, with no arguments. When the toolchain the project pins is not installed there, the server starts anyway and shows an error naming the `silk toolchain install` command to run, instead of crashing.
+`silk lsp` speaks the Language Server Protocol over standard input and output. The VS Code extension, from version 0.1.0, starts it for Silk files; the `silk.path` setting names the `silk` command it runs, the tool, so each folder gets the version its project pins. It starts one server per workspace folder, in that folder. From version 0.2.0, when the folder's `silk.toml` pins a version that is not installed, the extension offers to install it with `silk use`, or to run your default version, instead of failing. In another editor, register `silk lsp` as the language server command for `.silk` files, with no arguments. When the version the project pins is not installed there, the server starts anyway and shows an error naming the `silk use` command to run, instead of crashing.
 
 | Feature | State in this release |
 | --- | --- |

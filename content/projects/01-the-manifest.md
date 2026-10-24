@@ -37,7 +37,7 @@ root = "src/main.silk"
 | `version` | yes | string | Full semantic version, such as `"0.1.0"`. `"0.1"` is refused. |
 | `root` | yes | string | The root module file, relative to the manifest. A program's root declares `main`. |
 | `source-root` | no | string | Directory that module paths are relative to. Default: the directory of `root`. `root` must be inside it. |
-| `silk-version` | no | string | The Silk toolchain the package runs with. `silk init` writes the running compiler's version. An installed `silk` hands every command in the package to that toolchain; `"0.0.0"` pins nothing. A workspace's own `silk-version` wins. See `silk toolchain` in the Command-line reference. |
+| `silk-version` | no | string | The Silk version the package runs with. `silk init` writes the running compiler's version. The `silk` tool hands every command in the package to that version's compiler; `"0.0.0"` pins nothing. A workspace's own `silk-version` wins. Set it with `silk set`; see "Silk versions" in the Command-line reference. |
 | `exports` | no | array of strings | Modules other packages may import, in import spelling (`"Board"`, `"codec.Json"`). Each must exist. |
 
 The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, bindings and symbol maps use it.
@@ -122,9 +122,9 @@ Profile names start with an ASCII letter, then letters, digits, `_` or `-`. Targ
 
 A manifest may hold both `[package]` and `[workspace]`. See **Workspaces**.
 
-## &#91;changes\]
+## &#91;release\]
 
-Read only by `silk changes`, the release-notes tool. Its keys (`repository`, `directory`, `version-file`) are described with that command in the Tools section. Builds ignore the table.
+Read only by `silk change`, the release notes command. Its keys (`repository`, `directory`, `version-file`) are described with that command in the Tools section. Builds ignore the table.
 
 ## Errors
 
@@ -210,7 +210,7 @@ LINE is the line of the key, or of the table header when the problem is the tabl
 
 Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `platform-supply` and its `support` entries, `[build.composition]` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `description` key stops the build.
 
-One table is not checked: `[changes]`. Builds ignore it; `silk changes` reads it.
+One table is not checked: `[release]`. Builds ignore it; `silk change` reads it.
 
 ## See also
 
