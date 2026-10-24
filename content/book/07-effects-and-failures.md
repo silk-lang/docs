@@ -138,7 +138,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-src/main.silk:5:5: error[SEM0063] Only effect functions may originate a typed failure
+src/main.silk:5:5: error[SEM0063] Only an `effect fn` can `fail`; declare `complete` as an `effect fn` that names the failure type after `!`
 Failed scratch in 0.17s
 ```
 
@@ -171,7 +171,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-src/main.silk:10:3: error[SEM0066] A `run` whose failures the enclosing signature does not declare
+src/main.silk:10:3: error[SEM0066] This `run` can fail with `NoSuchTask`, which the enclosing function does not declare; add `! NoSuchTask` to its signature, or handle the failure with `Effect.result`
 Failed scratch in 0.15s
 ```
 

@@ -4,9 +4,9 @@ Every compiler error carries a stable code: three letters for the family and fou
 
 ## Reading a diagnostic
 
-A diagnostic prints as `path:line:column: error[CODE] message`. When the compiler knows a second place that matters, such as the earlier declaration a duplicate clashes with, an indented `note: path:line:column: related location` line follows it. `silk check --json` prints one JSON object per diagnostic with `code`, `line`, `column`, `message`, `notes` and `related` locations. A failed check or build exits with status 1.
+A diagnostic prints as `path:line:column: error[CODE] message`. When the compiler knows a second place that matters, such as the earlier declaration a duplicate clashes with, an indented `note: path:line:column: related location` line follows it. Some codes say what that place is instead, such as `the earlier borrow starts here`. `silk check --json` prints one JSON object per diagnostic with `code`, `line`, `column`, `message`, `notes` and `related` locations. A failed check or build exits with status 1.
 
-The message is either a filled-in template, such as `Unknown type Size`, or, when the compiler cannot fill the template, the code's one-line meaning, such as ``A `run` whose failures the enclosing signature does not declare``. The meaning names the rule but not the names or values involved; read the line and column. Entries below give the template when the printed message is the meaning.
+The message is either a filled-in template, such as `Unknown type Size`, or, when the compiler cannot fill the template, the code's one-line meaning, such as `Invoking a stored callable through too weak an aggregate receiver access`. The meaning names the rule but not the names or values involved; read the line and column. Entries below give the template when the printed message is the meaning.
 
 A construct the compiler parses but cannot compile yet is not a coded error. It prints `unsupported: this construct is not supported by the native compiler yet` or `unsupported[Reason] not supported by the native compiler yet`, and the command exits with status 2.
 
@@ -791,8 +791,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
-  note: src/main.silk:5:14: related location
+src/main.silk:6:8: error[OWN0010] A mutable borrow of `t` conflicts with an earlier shared borrow of it that is still in use; use that borrow for the last time before this one
+  note: src/main.silk:5:14: the earlier borrow starts here
 ```
 
 Fix: End the shared loan before taking the exclusive one: read `view.value` before `bump(&mut t)`. See Borrowing, Services and providers.
@@ -814,13 +814,11 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:5:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
-  note: src/main.silk:4:14: related location
-src/main.silk:6:10: error[OWN0019] A borrowed value is used beyond the validity of its referent
-  note: src/main.silk:4:14: related location
+src/main.silk:5:3: error[OWN0011] Assigning `t` while a borrow of it is still in use; use that borrow for the last time before this
+  note: src/main.silk:4:14: the borrow starts here
+src/main.silk:6:10: error[OWN0019] `view` is used after `t`, which it borrows, ended or was replaced
+  note: src/main.silk:4:14: the borrow starts here
 ```
-
-Message template, not filled by this compiler: `{access} access to {spelling} conflicts with an active borrowed-view loan`.
 
 Fix: Finish using the borrow before changing the owner: read `view.value` before the assignment. See Borrowing.
 
@@ -973,11 +971,9 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:8:10: error[OWN0019] A borrowed value is used beyond the validity of its referent
-  note: src/main.silk:3:18: related location
+src/main.silk:8:10: error[OWN0019] `view` is used after a temporary value, which it borrows, ended or was replaced
+  note: src/main.silk:3:18: the borrow starts here
 ```
-
-Message template, not filled by this compiler: `Lifetime {lifetime} does not remain valid at this use`.
 
 Fix: Declare every referent before the borrow and in the same or an outer block, so it outlives each use. See Lifetimes, Borrowing.
 
@@ -1312,7 +1308,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:23: error[SEM0017] Duplicate field name x
+src/main.silk:1:24: error[SEM0017] Duplicate field name x
 ```
 
 Fix: Give each field its own name. See Structs, tuples and arrays.
@@ -1348,10 +1344,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:20: error[SEM0019] A public declaration whose signature mentions a private type
+src/main.silk:2:20: error[SEM0019] Public declaration exposes private type `Secret`
 ```
-
-Message template, not filled by this compiler: `Public declaration exposes private type {type}`.
 
 Fix: Make the type `pub`, or make the function private. See Functions and methods.
 
@@ -1461,10 +1455,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0024] A struct literal that omits a declared field
+src/main.silk:3:11: error[SEM0024] `Point { ... }` omits field `y`
 ```
-
-Message template, not filled by this compiler: `Missing initializer for {type}.{field}`.
 
 Fix: Initialize every field. See Structs, tuples and arrays, Enums and unions.
 
@@ -1872,7 +1864,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:10: error[SEM0044] Match does not cover Empty
+src/main.silk:4:10: error[SEM0044] Match over Shape does not cover Empty
 ```
 
 Fix: Add an arm for each missing member, or a final `_` arm. See Patterns and match.
@@ -2117,10 +2109,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:13: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
+src/main.silk:4:13: error[SEM0057] `n` is not mutable; declare it with `mut`, as in `let mut n`, to borrow it with `&mut`
 ```
-
-Message template, not filled by this compiler: `Exclusive borrowing requires mutable binding {spelling}`.
 
 Fix: Declare the binding `let mut n = 1`. See Borrowing, Functions and methods.
 
@@ -2137,7 +2127,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:33: error[SEM0058] A shared view cannot be reborrowed exclusively
+src/main.silk:2:33: error[SEM0058] `n` is a shared reference, so it cannot lend `&mut` access; take a `&mut` reference where it comes from to change what it points at
 ```
 
 Fix: Take `&mut i32` in the outer function, or only read through the shared borrow. See Borrowing, Functions and methods.
@@ -2196,7 +2186,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:3:3: error[SEM0063] Only effect functions may originate a typed failure
+src/main.silk:3:3: error[SEM0063] Only an `effect fn` can `fail`; declare `risky` as an `effect fn` that names the failure type after `!`
 ```
 
 Fix: Declare the function `effect fn` with a failure row: `effect fn risky() -> i32 ! Oops`. See Typed failures.
@@ -2262,10 +2252,8 @@ pub effect fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:10: error[SEM0066] A `run` whose failures the enclosing signature does not declare
+src/main.silk:6:10: error[SEM0066] This `run` can fail with `Oops`, which the enclosing function does not declare; add `! Oops` to its signature, or handle the failure with `Effect.result`
 ```
-
-Message template, not filled by this compiler: `Run leaves unhandled failures: {failures}`.
 
 Fix: Declare the failure on the caller (`! Oops`), or handle it with `Effect.catch`. See Typed failures, Effects and run.
 
@@ -2379,10 +2367,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:10: error[SEM0071] A `run` whose requirements the enclosing signature does not provide
+src/main.silk:6:10: error[SEM0071] This `run` needs `&Clock`, which the enclosing function does not provide; add `? &Clock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 ```
-
-Message template, not filled by this compiler: `Run leaves unsatisfied requirements: {requirements}`.
 
 Fix: Provide the service with `Effect.provide`, or declare it in the caller's row. See Services and providers.
 
@@ -2469,10 +2455,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:3: error[SEM0077] Invoking a stored callable through a place without the access its contract requires
+src/main.silk:4:3: error[SEM0077] `add` changes what it captures, so calling it needs a mutable binding; declare it `let mut add`
 ```
-
-Message template, not filled by this compiler: `Callable invocation requires {required} access`.
 
 Fix: Declare the binding `let mut add` so a `mut fn` can be called through it. See Closures and callable types.
 
@@ -3777,10 +3761,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0167] A variant selector absent from its resolved nominal union
+src/main.silk:3:11: error[SEM0167] Union `Shape` has no variant `Square`
 ```
-
-Message template, not filled by this compiler: `Union {unionName} has no variant {variantName}`.
 
 Fix: Name a declared variant. See Enums and unions.
 

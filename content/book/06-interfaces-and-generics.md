@@ -389,7 +389,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-src/main.silk:7:10: error[SEM0077] Invoking a stored callable through a place without the access its contract requires
+src/main.silk:7:10: error[SEM0077] `next` changes what it captures, so calling it needs a mutable binding; declare it `let mut next`
 Failed scratch in 0.16s
 ```
 

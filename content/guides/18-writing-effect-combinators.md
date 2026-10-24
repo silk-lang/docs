@@ -392,8 +392,8 @@ Checking weather (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.16s
 [x86_64-unknown-linux-gnu]
-src/main.silk:120:16: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
-  note: src/main.silk:119:38: related location
+src/main.silk:120:16: error[OWN0011] Reading `station.reads` while a borrow of it is still in use; use that borrow for the last time before this
+  note: src/main.silk:119:38: the borrow starts here
 Failed weather in 0.23s
 ```
 
