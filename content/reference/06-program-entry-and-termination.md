@@ -40,7 +40,7 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 | `pub effect fn main() -> i32 ! E` | The returned value, or 1 on an uncaught failure |
 | `pub effect fn main() ! E` | 0, or 1 on an uncaught failure |
 
-- The failure row `! E` is optional and may list several types: `! A | B`.
+- The failure row `! E` is optional and may list several types: `! A | B`. Each type must implement `Debug`, which the report uses to show the value. Otherwise `main` is rejected (SEM0225).
 - The only requirement the runtime provides is `? &mut HostInput` from `silk/host_input`. It holds an owned copy of the arguments and environment.
 - Any other requirement, such as `? &mut Allocator`, is rejected (SEM0225). Supply other services inside `main`, for example `Allocator.systemAllocatorProvider()`. See Services and providers.
 - Other result types, such as `u8` or `bool`, are rejected (SEM0225).
@@ -56,6 +56,7 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 - A failure that escapes an effect `main` ends the program with status 1. The payload is dropped first.
 - The runtime writes a report to standard error. The first line names the failure's type as `module.Type`. Each following line is a frame `at module.function (module:line:column)`, innermost first.
 - When a failure escapes from a handler that was handling another failure, the report adds a `while handling:` section for the earlier one.
+- The last line, `unhandled value:`, holds the failure's `Debug` form, written before the payload is dropped. A form longer than 1024 bytes is cut at a character boundary and ends with `[value truncated]`.
 - Typed failures, `fail` and `run` are covered in Effects and run and Typed failures.
 
 ## Traps
@@ -93,7 +94,16 @@ pub fn main() -> i32 {
 An uncaught failure:
 
 ```silk
-pub struct NotFound { code: i32 }
+import silk.format { Debug, Format, Formatter }
+import silk.writer { Writer, WriterError }
+
+pub struct NotFound { pub code: i32 }
+
+impl Debug for NotFound {
+  effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer {
+    return run Format.debugFields(self, "NotFound", &mut formatter)
+  }
+}
 
 effect fn load(present: bool) -> i32 ! NotFound {
   if !present { fail NotFound { code: 4 } }
@@ -110,8 +120,9 @@ This exits with status 1 and writes to standard error (for a root module named `
 
 ```
 unhandled error: main.NotFound
-  at main.load (main:4:17)
-  at main.main (main:9:15)
+  at main.load (main:13:17)
+  at main.main (main:18:15)
+unhandled value: NotFound { code: 4 }
 ```
 
 Echo the first argument, then return the number of bytes read from standard input:
