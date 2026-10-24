@@ -15,7 +15,7 @@ Manifest tables (TOML) that supply values:
 profile = ProfileName
 [[build.bindings]]                 (project tier)
 [profiles.ProfileName]
-target = Triple
+target = Triple                    (optional; the host by default)
 [[profiles.ProfileName.bindings]]  (override tier)
 ```
 
@@ -23,7 +23,7 @@ target = Triple
 
 - `param name: T = default` declares a private parameter. A private parameter must have a default.
 - `pub param name: T` may omit the default. Every build must then bind it.
-- Package parameters are read only from the root module of the package being built (the `root` of `[package]`).
+- Package parameters are read only from the root module of the package being built (`[package].main` below `[package].source`, by default `src/main.silk`).
 - A `param` in any other module, or in a dependency package, is not registered. Reading it is SEM0214, reported at the `param` declaration.
 - A `param` cannot appear inside a module-level `static if` arm. Parameters are fixed before `static if` selects declarations. Such a `param` is SEM0214 at its declaration.
 - A parameter is read-only. Assigning to it is SEM0036.
@@ -116,7 +116,7 @@ Value tables:
 
 ## Profiles and precedence
 
-- `[profiles.<name>]` is a named build profile. `target` is required. Other fields include `optimization`, `safety`, `threading`, `debug`, `libc` and `artifact`; `silk/compilation` and `silk/target` read them. The native compiler refuses `safety = "unchecked"` and `threading = "multi"` for now; see Targets and profiles in the Projects section.
+- `[profiles.<name>]` is a named build profile. `target` defaults to the host. Other fields include `optimization`, `safety`, `threading`, `debug`, `libc` and `artifact`; `silk/compilation` and `silk/target` read them. The native compiler refuses `safety = "unchecked"` and `threading = "multi"` for now; see Targets and profiles in the Projects section.
 - `[build].profile` names the default profile. `--profile <name>` selects another. An unknown name is refused, and so is an empty one: `profile = ""` is `InvalidInput: build.profile`.
 - A build of a named profile, selected by `--profile` or by `[build].profile`, writes its output to `build/llvm/<triple>/<name>/`. Other builds use `debug/` or `release/`.
 - `--profile-input <json>` supplies a complete profile, with the same fields and `bindings`, as JSON.
@@ -162,7 +162,6 @@ A required parameter and a profile override. `silk.toml`:
 name = "demo"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/main.silk"
 
 [build]
 profile = "dev"

@@ -112,7 +112,7 @@ silk test: the test did not finish within 2 s; pass --timeout <seconds> to chang
 
 ## Which tests are discovered
 
-`silk test` does not scan the source folder. It starts at the package's root module, the `root` in `silk.toml`, and follows imports, the same way `silk check` does. In a library, every module listed in `exports` is a starting point too. A test in a file that nothing imports is never discovered.
+`silk test` does not scan the source folder. It starts at the package's root module, `src/main.silk` unless `[package]` says otherwise, and follows imports, the same way `silk check` does. In a library, every module listed in `exports` is a starting point too. A test in a file that nothing imports is never discovered.
 
 That matters most for programs. A test in `src/extra.silk` is not found while `main.silk` does not import `extra`. Two ways to reach it:
 

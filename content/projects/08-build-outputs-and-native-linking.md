@@ -1,6 +1,6 @@
 # Build outputs and native linking
 
-`silk build` turns a package into LLVM IR, then hands it to Clang to produce the file `[build].artifact` and `[build].stage` ask for. Every file lands under the output directory, in a folder per target and profile.
+`silk build` turns a package into LLVM IR, then hands it to Clang to produce the file `[package].kind` and `[build].stage` ask for. Every file lands under the output directory, in a folder per target and profile.
 
 ## The build/ layout
 
@@ -20,9 +20,10 @@ build/
 
 ## File names
 
-| `[build].artifact` | `stage = "final"` (default) |
+| `[package].kind` | `stage = "final"` (default) |
 | --- | --- |
 | `executable` | `<name>` |
+| `library` | none: the package is checked |
 | `static-library` | `lib<name>.a` |
 | `shared-library` | `lib<name>.so`, `lib<name>.dylib` on macOS (not built yet) |
 | `object` | `<name>.o` |
@@ -85,13 +86,13 @@ Each of these fails the target and exits 2. `silk build` and `silk run` print th
 
 On macOS the link needs an SDK. The compiler resolves it once per build, in this order:
 
-1. `[build].platform-supply`, when the manifest sets one.
+1. `[native].platform-supply`, when the manifest sets one.
 2. `SDKROOT`, when set. An invalid `SDKROOT` fails; it never falls back.
 3. `xcrun` discovery, for the host target only.
 
 The SDK reaches Clang as `-isysroot`, with `-mmacosx-version-min` from the profile's `deployment`. Linux needs no SDK.
 
-`[build].platform-supply` takes one of:
+`[native].platform-supply` takes one of:
 
 | Value | Meaning |
 | --- | --- |
@@ -100,27 +101,27 @@ The SDK reaches Clang as `-isysroot`, with `-mmacosx-version-min` from the profi
 | `{ kind = "explicit", target = "...", root = "...", linker = "...", origin = "...", support = [...] }` | An installed SDK or sysroot at `root` (`-isysroot` on macOS, `--sysroot` on Linux), the linker at `linker` (`--ld-path`), and optional GCC support installations, each `{ root, target, origin }` (`--gcc-install-dir`). `origin` is a label. |
 | `{ kind = "managed", name = "..." }` | Recognized, not supported: `UnsupportedProvider: x (project)`. |
 
-Each kind takes only the keys shown. A key it does not take, here `name` under `kind = "native"`, is refused at its own line, and so is an extra key in a `support` entry (`build.platform-supply.support.<key>`):
+Each kind takes only the keys shown. A key it does not take, here `name` under `kind = "native"`, is refused at its own line, and so is an extra key in a `support` entry (`native.platform-supply.support.<key>`):
 
 ```toml
-[build.platform-supply]
+[native.platform-supply]
 kind = "native"
 name = "x"
 ```
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:9: build.platform-supply.name is not a supported field
+Invalid Silk project manifest /home/you/hello/silk.toml:8: native.platform-supply.name is not a supported field
 ```
 
-Any other shape, such as an unknown `kind`, a string instead of a table, or an `explicit` supply for a target it cannot serve, is refused at the line that writes `platform-supply`, or at the `[build.platform-supply]` header:
+Any other shape, such as an unknown `kind`, a string instead of a table, or an `explicit` supply for a target it cannot serve, is refused at the line that writes `platform-supply`, or at the `[native.platform-supply]` header:
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:8: InvalidConfiguration: platform-supply (/home/you/hello/silk.toml:build.platform-supply)
+Invalid Silk project manifest /home/you/hello/silk.toml:7: InvalidConfiguration: platform-supply (/home/you/hello/silk.toml:native.platform-supply)
 ```
 
 ## Extra native link inputs
 
-`[build].native-link-inputs` adds C objects, archives and libraries to the link. Each entry is a table with exactly one kind:
+`[native].link` adds C objects, archives and libraries to the link. Each entry is a table with exactly one kind:
 
 | Entry | Linker argument | Notes |
 | --- | --- | --- |
@@ -149,8 +150,8 @@ clang -c -fPIC native/scale.c -o native/scale.o
 ```
 
 ```toml
-[build]
-native-link-inputs = [{ object = "native/scale.o" }]
+[native]
+link = [{ object = "native/scale.o" }]
 ```
 
 ```silk
@@ -172,16 +173,16 @@ exit 42
 A bad entry stops the build with exit status 1 and names the manifest and the entry's index. A path must stay inside the package, so an absolute path, or one with `.` or `..` segments, is refused on purpose:
 
 ```
-silk: invalid native link input: /home/you/cmix/silk.toml: [build].native-link-inputs[0]: object /tmp/abs.o must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files
+silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: object /tmp/abs.o must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files
 ```
 
-An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. An entry for another platform is refused the same way: `silk: invalid native link input: /home/you/cmix/silk.toml: [build].native-link-inputs[0]: framework Security links only on macOS targets`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
+An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. An entry for another platform is refused the same way: `silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: framework Security links only on macOS targets`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
 
 See **Unsafe code and C interop** in the reference for `extern "C"`.
 
 ## Runtime composition (advanced)
 
-An executable starts in a runtime module that sets up the process and calls `main`. Without `[build].composition`, the compiler takes it from the std lib's catalog (`compositions.json`):
+An executable starts in a runtime module that sets up the process and calls `main`. Without `[unstable].composition`, the compiler takes it from the std lib's catalog (`compositions.json`):
 
 | Targets | libc | Runtime |
 | --- | --- | --- |
@@ -189,20 +190,20 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | Linux x86-64 and arm64 | `gnu` | `silk/native_start` (hosted) |
 | `wasm32-unknown-unknown` | `none` | `silk/wasm_start` (standalone) |
 
-`[build].composition` replaces the catalog for one package. Its keys:
+`[unstable].composition` replaces the catalog for one package. Its keys:
 
 | Key | Meaning |
 | --- | --- |
 | `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
-| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `build.composition.defaults entries must be runtime names`. A name not listed in `runtimes` is refused at its line: `build.composition.defaults entry "main" names no runtime in build.composition.runtimes; it lists "start"`, or `it lists none`. |
-| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `build.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `build.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. So is one that is not a string (`build.composition.components.bindings.operation must be a string: create, acquire, release or destroy`), and an entry with no `operation` at the entry's line (`build.composition.components.bindings entry has no operation; use create, acquire, release or destroy`). |
+| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `unstable.composition.defaults entries must be runtime names`. A name not listed in `runtimes` is refused at its line: `unstable.composition.defaults entry "main" names no runtime in unstable.composition.runtimes; it lists "start"`, or `it lists none`. |
+| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `unstable.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `unstable.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. So is one that is not a string (`unstable.composition.components.bindings.operation must be a string: create, acquire, release or destroy`), and an entry with no `operation` at the entry's line (`unstable.composition.components.bindings entry has no operation; use create, acquire, release or destroy`). |
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
-| `requirements` | Must be empty: `build.composition.requirements is not supported by the native compiler yet`. |
+| `requirements` | Must be empty: `unstable.composition.requirements is not supported by the native compiler yet`. |
 
-Any other key is refused at its line, as in `Invalid Silk project manifest /home/you/hello/silk.toml:8: build.composition.bogus is not a supported field`. So is a key the entries of these lists do not take, even inside an array written over several lines:
+Any other key is refused at its line, as in `Invalid Silk project manifest /home/you/hello/silk.toml:7: unstable.composition.bogus is not a supported field`. So is a key the entries of these lists do not take, even inside an array written over several lines:
 
 ```toml
-[build]
+[unstable]
 composition = { runtimes = [
   { name = "synchronous", module = "silk/native_start_sync" },
   { name = "hosted", modul = "silk/native_start" },
@@ -210,15 +211,15 @@ composition = { runtimes = [
 ```
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:10: build.composition.runtimes.modul is not a supported field
+Invalid Silk project manifest /home/you/hello/silk.toml:9: unstable.composition.runtimes.modul is not a supported field
 ```
 
-Line 10 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`build.composition.retention.decl is not a supported field`), and in a component's `bindings` entry as `build.composition.components.bindings.<key>`.
+Line 9 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`unstable.composition.retention.decl is not a supported field`), and in a component's `bindings` entry as `unstable.composition.components.bindings.<key>`.
 
 For example, `silk/native_start_sync` is a smaller hosted runtime for a `main` that returns `i32` and needs only `HostInput`:
 
 ```toml
-[build]
+[unstable]
 composition = { runtimes = [{ name = "synchronous", module = "silk/native_start_sync" }], defaults = ["synchronous"] }
 ```
 

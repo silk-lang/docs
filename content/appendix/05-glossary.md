@@ -60,7 +60,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Place | Something that can be assigned, borrowed or moved from: a `mut` local, a field `p.x`, an element `a[i]` or a referent `r.*`. | Bindings and statements, Borrowing |
 | Reborrow | Borrowing again through an existing reference, as in `&mut x.*`. | Borrowing |
 | Referent | The value a reference points to, reached with `.*`. | Borrowing |
-| Root module | The module named by `root` in `[package]`, usually `src/main.silk`. | The manifest |
+| Root module | The module `[package].main` names below `[package].source`; by default `src/main.silk`, or `src/lib.silk` for a library. | The manifest |
 | `run` | The prefix that executes an Effect and yields its success value. | Effects and run |
 | Row variable | `?R` in a generic list: a parameter that stands for a whole requirement row. | Services and providers |
 | Scheduler | The service that runs fibers. `LocalScheduler` is the provided implementation. | Fibers and scheduling |

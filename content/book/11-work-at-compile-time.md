@@ -230,7 +230,6 @@ Say you find 250 ms a bit short. You could edit the default, but the default is 
 name = "tasks"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/main.silk"
 
 [[build.bindings]]
 package = "tasks@0.1.0"
