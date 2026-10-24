@@ -50,8 +50,8 @@ ImportMembers = '{' { Identifier ( 'as' Identifier )? ',' } '}'
 Const         = 'pub'? 'const' Identifier ( ':' Type )? '=' Expression
 Param         = 'pub'? 'param' Identifier ':' Type ( '=' Expression )? ( 'where' Expression )?
 
-Struct        = 'pub'? ( 'extern' TextLit )? 'struct' Identifier GenericParams? '{' Field* '}'
-Field         = 'pub'? Identifier ':' Type                   (no commas between fields)
+Struct        = 'pub'? ( 'extern' TextLit )? 'struct' Identifier GenericParams? '{' { Field ',' }? '}'
+Field         = 'pub'? Identifier ':' Type
 Tuple         = 'pub'? 'tuple' Identifier GenericParams? '(' { Type ',' }? ')'
 Enum          = 'pub'? 'enum' ( '(' Type ')' )? Identifier GenericParams? '{' { EnumMember ',' }? '}'
 EnumMember    = Identifier ( '=' '-'? IntegerLit )?
@@ -216,7 +216,7 @@ Each row is a `src/main.silk` in `/home/you/demo`. The first column is the progr
 
 | Program | Result |
 | --- | --- |
-| `struct Point { x: i32, y: i32 }` | ``1:22: error[PAR0002] Unexpected `,`; expected valid syntax`` |
+| `struct Point { x: i32 y: i32 }` | `` 1:23: error[PAR0001] Expected `,` `` |
 | `if Point { x: 1 }.x == 1 { return 0 }` | ``3:15: error[PAR0002] Unexpected `:`; expected valid syntax`` and more errors |
 | `if (Point { x: 1 }).x == 1 && x(Point { x: 1 }) == 1 { return 0 }` | Builds and exits 0. |
 | `if let Slot.Full { value } = move Slot.Full { value: 2 } { return value }` | ``3:54: error[PAR0002] Unexpected `:`; expected valid syntax`` and more |

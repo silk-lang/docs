@@ -106,11 +106,11 @@ struct Task {
 }
 ```
 
-A `struct` has named fields, each with a type. In the declaration, fields are separated by line breaks, not commas.
+A `struct` has named fields, each with a type. Fields are separated by commas, and a trailing comma after the last one is allowed.
 
 The title is a `string<'static>`, text that lives as long as the program, like a literal. Real titles will come from the user and from a file, and they will not live forever. Chapter 5 teaches you to say how long text lives. Until then, `'static` keeps things simple. Writing a bare `string` here may seem to work at first, but it leads to confusing errors as soon as you add methods to the type. Write the `'static`.
 
-Build a task with a struct literal. Here, unlike in the declaration, fields are separated by commas:
+Build a task with a struct literal. Its fields are separated by commas too:
 
 ```silk
   let milk = Task {
@@ -231,7 +231,7 @@ union Command {
 }
 ```
 
-Put it after `Task`. Variant fields are separated by commas, unlike struct fields.
+Put it after `Task`. Variant fields are separated by commas, as struct fields are.
 
 To check that commands read well, describe one in words. Add this after `statusMark`:
 

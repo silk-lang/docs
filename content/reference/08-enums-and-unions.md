@@ -21,7 +21,7 @@ VariantValue      = TypePath TypeArguments? '.' Identifier ( '{' FieldInit ( ','
 ```
 
 - Enum members and union variants are separated by commas. A trailing comma is allowed.
-- Variant fields are separated by commas, unlike struct fields, which are separated by whitespace.
+- Variant fields are separated by commas, as struct fields are.
 - There are no tuple-like variants. A variant is either bare or has named fields.
 
 ## Scalar enums

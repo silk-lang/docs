@@ -28,7 +28,7 @@ UnitType       = '(' ')'
 
 ## Struct declarations
 
-- Fields are separated by whitespace, usually one per line. A comma between fields is a parse error (PAR0002).
+- Fields are separated by commas, usually one per line. A trailing comma is allowed.
 - A field name may appear once (SEM0017).
 - A struct may be empty: `struct Marker {}`.
 - `extern "C" struct Name { }` declares a C-layout record. It takes no type parameters (SEM0205), and its fields must be C object types (SEM0206). See Unsafe code and C interop.
