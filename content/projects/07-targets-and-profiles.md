@@ -137,7 +137,7 @@ Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.79s
 Named/full profiles conflict with target and optimization flags
 ```
 
-- Profiles also carry package parameter bindings, which win over `[[build.bindings]]`. See **Package parameters** in the reference and chapter 11 of the book.
+- A profile can also set package parameter values with `config.main.port = 9090`; they win over `[config]`. See **Package parameters** in the reference and chapter 11 of the book.
 
 ## Profile fields
 

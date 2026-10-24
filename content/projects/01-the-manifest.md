@@ -46,7 +46,7 @@ The root module is `src/main.silk` without saying so: the source starts in `src`
 
 A `library` is Silk source for other packages to import: `silk build` checks it and makes no file. The other library kinds make an archive or a shared library. `package.include` is reserved and refused as not supported yet.
 
-The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, bindings and symbol maps use it.
+The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, `[config]` values and symbol maps use it.
 
 ## &#91;build\]
 
@@ -56,7 +56,18 @@ The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, bind
 | `output-dir` | string | `"build"` | Output directory, relative to the manifest. Must not leave the package. Refused in a workspace member, which uses `workspace.output-dir`. |
 | `targets` | array of strings | `["host"]` | Targets that `build` and `check` cover when no `--target` is given. Each is `"host"` or a target name. |
 | `profile` | string | none | Default named profile, used when no `--target`, `--profile` or `--profile-input` is given. Must name a `[profiles.<name>]` table. |
-| `bindings` | array of tables | none | Project-tier package parameter bindings, written `[[build.bindings]]`. See **Package parameters** in the reference. |
+
+## &#91;config\]
+
+Values for the package's parameters, the `pub param` declarations in its root module. A key is the root module's path without `.silk`, then the parameter's name, and the value is plain TOML that Silk checks against the parameter's declared type:
+
+```toml
+[config]
+main.port = 8080
+main.weights = [3, 4]
+```
+
+An integer, a boolean, a string or an array of them is a value. Every build receives these values, and a profile's own `config` wins over them. See **Package parameters** in the reference.
 
 ## &#91;native\]
 
@@ -125,7 +136,7 @@ A named profile is a complete build configuration. Select it with `--profile <na
 | `cpu` | table: `model`, `features` | target default |
 | `entry` | `{ kind = "default" }`, `{ kind = "none" }`, `{ kind = "named", name = "..." }` | default |
 | `runtime` | same shape as `entry` | default |
-| `bindings` | `[[profiles.<name>.bindings]]` tables | none |
+| `config` | parameter values, as in `[config]`: `config.main.port = 9090` | none |
 
 Profile names start with an ASCII letter, then letters, digits, `_` or `-`. Targets and profiles explains what each field does today and which combinations are refused.
 
@@ -163,6 +174,8 @@ Before 0.1.0 some keys had other names. A manifest that still writes one is refu
 | `[build].platform-supply` | `[native].platform-supply` |
 | `[build].composition` | `[unstable].composition` |
 | `codeModel`, `maxMemory` in a profile | `code-model`, `max-memory` |
+| `[[build.bindings]]` tables with tagged values | `[config]`, as `main.port = 8080` |
+| `[[profiles.<name>.bindings]]` | `config` in the profile, as `config.main.port = 8080` |
 
 ```
 Invalid Silk project manifest /home/you/hello/silk.toml:4: build.artifact is an earlier spelling; write package.kind
@@ -237,26 +250,12 @@ Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profile
 | A value the native compiler cannot build yet | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
 | `[build].profile` names no profile | `InvalidInput: build.profile = "fats" names no [profiles.fats] table` |
 | `[build].profile = ""` | `InvalidInput: build.profile` |
-| A key bindings do not have | `build.bindings.extra is not a supported field`, or `profiles.fast.bindings.extra` for a profile's binding |
-| A key a binding's `origin` does not have | `build.bindings.origin.bogus is not a supported field`. `origin` takes `source`, `provenance` and `translator`. |
-| A binding with no `origin` | `InvalidInput: build.bindings: origin is missing; write origin = { source = "silk.toml", provenance = "literal" }` |
-| An `origin` that is not a table | `InvalidInput: build.bindings: origin must be a table such as { source = "silk.toml", provenance = "literal" }` |
-| A missing, empty or non-string `origin.source` | `InvalidInput: build.bindings: origin.source must be a non-empty string` |
-| A missing `origin.provenance`, or one that is not a string | `InvalidInput: build.bindings: origin.provenance is missing`, `InvalidInput: build.bindings: origin.provenance must be a string` |
-| A `provenance` of `"secret"`, `"physical-supply"` or `"runtime"` | `ForbiddenProvenance: build.bindings: origin.provenance = "secret" cannot be bound in a manifest` |
-| `"translated-public"` without a `translator` | `ForbiddenProvenance: build.bindings: origin.provenance = "translated-public" needs origin.translator` |
-| Any other `provenance` | `InvalidInput: build.bindings: origin.provenance = "bogus" is not literal, translated-public, secret, physical-supply or runtime` |
-| A `translator` that is empty or not a string | `InvalidInput: build.bindings: origin.translator must be a non-empty string` |
-| A `translator` on a binding whose `provenance` is not `"translated-public"` | `InvalidInput: build.bindings: origin.translator: only provenance "translated-public" names a translator` |
-| A key a binding's `value` does not have | `build.bindings.value.extra is not a supported field`. Inside an array the item number shows: `build.bindings.value.values.1.bogus` is the second element. |
-| A binding with no `package`, `module` or `parameter` | `InvalidInput: build.bindings: package is missing; a binding names its package, module and parameter`, or `profiles.fast.bindings: ...` for a profile's binding |
-| A `package`, `module` or `parameter` that is not a string | `InvalidInput: build.bindings: module must be a string` |
-| A binding with no `value` | `InvalidInput: build.bindings: value is missing` |
-| A `value` that is not a table, such as `value = 3` | `InvalidInput: build.bindings: value must be a table with a kind, such as { kind = "integer", value = "1" }` |
-| A `value` whose `kind` is not one of the value kinds | `InvalidInput: build.bindings: value.kind must be integer, boolean, string, enum, none, some, array or record` |
+| A profile's `bindings` | `InvalidInput: profiles.fast.bindings is an earlier spelling; write config` |
+| A `[config]` key with no module, such as `port = 1` | `InvalidInput: config.port: name the module before the parameter, as config.main.port` |
+| A `[config]` value that is a float, date or time | `InvalidInput: config.main.ratio: a package parameter value is an integer, a boolean, a string or an array of them` |
 | A bad profile name, quoted or not | ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` `` |
 
-LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name or a binding with a missing key. A binding's `origin` problems are at the line of its `origin`, or at the field's own line when `origin` is written as a `[build.bindings.origin]` sub-table. A mistyped `package`, `module`, `parameter` or `value` is at its own line. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes, except for the elements of an array `value`. Targets and profiles lists every refused combination.
+LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name. A `[config]` value of the wrong type, or one for a parameter the module does not declare, is refused with SEM0214 at the line of its key; see **Package parameters** in the reference. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes. Targets and profiles lists every refused combination.
 
 ## Keys that are not checked
 

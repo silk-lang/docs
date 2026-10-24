@@ -1,6 +1,6 @@
 # Package parameters
 
-A package parameter is a named static value that the build request may set. It is declared with `param` in a package's root module, takes its value from a `silk.toml` binding or from its default, and may be checked with a `where` predicate.
+A package parameter is a named static value that the build request may set. It is declared with `param` in a package's root module, takes its value from `[config]` in `silk.toml` or from its default, and may be checked with a `where` predicate.
 
 ## Syntax
 
@@ -11,12 +11,13 @@ ParameterDeclaration = 'pub'? 'param' Identifier ':' Type ('=' Expression)? ('wh
 Manifest tables (TOML) that supply values:
 
 ```
+[config]
+ModulePath.ParameterName = Value              (project tier)
 [build]
 profile = ProfileName
-[[build.bindings]]                 (project tier)
 [profiles.ProfileName]
-target = Triple                    (optional; the host by default)
-[[profiles.ProfileName.bindings]]  (override tier)
+target = Triple                               (optional; the host by default)
+config.ModulePath.ParameterName = Value       (override tier)
 ```
 
 ## Declarations
@@ -36,7 +37,7 @@ src/main.silk:1:1: error[SEM0214] Invalid compilation configuration: a private p
 - A `pub param` that nothing binds and that has no default is reported at its declaration, by `silk check` and `silk build`:
 
 ```
-src/main.silk:1:1: error[SEM0214] Invalid compilation configuration: package parameter `x` has no default value and no binding; give it a default or bind it in `[build].bindings` of silk.toml
+src/main.silk:1:1: error[SEM0214] Invalid compilation configuration: package parameter `x` has no default value and no binding; give it a default or set it under `[config]` in silk.toml
 ```
 
 - A refused schema does not hide syntax errors. `silk check` and `silk build` report the module's syntax errors first, then the SEM0214. With `pub param o: f64 = 1.0` on line 1 and a malformed `fn broken( { }` on line 5:
@@ -78,53 +79,52 @@ src/main.silk:1:1: error[SEM0214] Invalid compilation configuration: a package p
 
 ## `pub param`
 
-- Only a `pub param` accepts a binding. A binding that names a private parameter is refused.
+- Only a `pub param` accepts a value from `[config]`. A value for a private parameter is refused: "package parameter `x` is not `pub`, so it cannot be bound".
 - `pub` is what makes a parameter part of the package's configurable surface. Without it, the default is the only value.
 
-## Bindings
+## Setting values with `[config]`
 
-A binding is a TOML table in `[[build.bindings]]` or `[[profiles.<name>.bindings]]`. It has exactly these keys:
+A value is one line under `[config]`. The key is the root module's path without `.silk`, then the parameter's name: `main.port = 8080` sets `port` of `src/main.silk`, and `lib.level = 2` sets `level` of `src/lib.silk` in a library. A module below the source root spells its directories with dots: `net.http.retries = 3` is `src/net/http.silk`.
 
-| Key | Content |
+```toml
+[config]
+main.port = 8080
+main.weights = [3, 4]
+
+[config.main]           # the same, written as a table
+label = "edge"
+```
+
+The value is plain TOML. Silk checks it against the parameter's declared type:
+
+| Declared type | TOML value |
 | --- | --- |
-| `package` | `"name@version"` of the package, such as `"demo@0.1.0"` |
-| `module` | The root module's path without `.silk`, such as `"main"` for `src/main.silk` |
-| `parameter` | The parameter's name |
-| `value` | A typed value table, below |
-| `origin` | `{ source = "...", provenance = "..." }`, plus `translator` when `provenance` is `"translated-public"` |
+| An integer type | An integer, such as `8080`, `-3`, `1_000` or `0xff`. It must fit the type. `-0` reads as `0`. |
+| `bool` | `true` or `false` |
+| `string` | A string |
+| `[T; N]` | An array of exactly `N` values of `T`, such as `[3, 4]` for `[i32; 2]` |
 
-Value tables:
+- Every value in a manifest is a literal. Values that come from somewhere else, such as a secret or the environment, cannot be written there.
+- A key with no module before the parameter is refused at its line: `InvalidInput: config.port: name the module before the parameter, as config.main.port`.
+- A float, date or time is refused at its line: `InvalidInput: config.main.ratio: a package parameter value is an integer, a boolean, a string or an array of them`.
+- A value for an unknown parameter, of the wrong type, or out of range is refused with SEM0214 at the line of its key, naming the parameter, as in ``silk.toml:6: error[SEM0214] invalid package parameter binding: the value bound to `port` does not have its parameter's type``. An unknown name reads "module `main.silk` declares no package parameter `prot`". An array of the wrong length or element type is refused the same way.
+- Every value is type-checked, including one that loses on precedence.
+- `[config]` only reaches the package the manifest describes. A dependency's parameters keep their defaults.
+- Before 0.1.0 values were written as `[[build.bindings]]` tables with tagged values. `build.bindings` and a profile's `bindings` are now refused at their line: `build.bindings is an earlier spelling; write config, as config.main.limit = 42`.
 
-| `kind` | Other keys | For |
-| --- | --- | --- |
-| `"integer"` | `value = "decimal text"` | integer types; must fit the declared type |
-| `"boolean"` | `value = true \| false` | `bool` |
-| `"string"` | `value = "text"` | `string` |
-| `"array"` | `values = [ ... ]`, each element a value table | fixed arrays; the length and element kinds must match |
-| `"enum"` | `type`, `member` | enums (no parameter can have this type yet) |
-| `"none"`, `"some"` | `value` for `some` | two-variant unions (not yet) |
-| `"record"` | `fields = { name = ..., ... }` | structs (not yet) |
-
-- Integer values are decimal strings, not TOML numbers. `"-0"` reads as `0`.
-- An array binding lists one value table per element: `value = { kind = "array", values = [{ kind = "integer", value = "3" }, { kind = "integer", value = "4" }] }` binds a `[i32; 2]` parameter.
-- `provenance` is `"literal"`, or `"translated-public"` with a `translator` key.
-- Only `"translated-public"` takes a `translator`. A `"literal"` binding with one is refused at the line of its `origin`: `InvalidInput: build.bindings: origin.translator: only provenance "translated-public" names a translator`.
-- `"secret"`, `"physical-supply"` and `"runtime"` are forbidden, with or without a `translator`. So is `"translated-public"` without a `translator`. One such binding anywhere in the manifest, even in an unselected profile, stops every build. The refusal follows the manifest path and the line of the binding's `origin`, and names the provenance: `ForbiddenProvenance: build.bindings: origin.provenance = "secret" cannot be bound in a manifest`, or `origin.provenance = "translated-public" needs origin.translator`. A profile's binding reads `profiles.<name>.bindings: ...`. Another spelling is `InvalidInput: build.bindings: origin.provenance = "bogus" is not literal, translated-public, secret, physical-supply or runtime`.
-- A missing or mistyped field is named. A missing `origin`, `package`, `module`, `parameter` or `value` is refused at the line of the binding's `[[...]]` header, as in `InvalidInput: build.bindings: package is missing; a binding names its package, module and parameter` and `InvalidInput: build.bindings: value is missing`. A field of the wrong type is refused at its own line: `module must be a string`, `origin.source must be a non-empty string`, `origin.provenance must be a string`, `origin.translator must be a non-empty string`. An empty `source = ""` or `translator = ""` is refused the same way. A missing `source` or `provenance` is refused at the line of `origin`. When `origin` is written as a `[build.bindings.origin]` sub-table, each of these refusals is at the line of the field. A `value` that is not a table is refused at its line: `value must be a table with a kind, such as { kind = "integer", value = "1" }`. An unknown kind is `value.kind must be integer, boolean, string, enum, none, some, array or record`. An extra key is refused at its own line and named: `build.bindings.extra is not a supported field`. An extra key inside the `value` or `origin` table is refused at its own line too, named by its path: `build.bindings.value.extra`, `build.bindings.origin.bogus`. Inside an array value the element's number shows, counted from 0: `build.bindings.value.values.1.bogus is not a supported field` is an extra key in the second element. A profile's binding reads `profiles.<name>.bindings.value.extra`.
-- A binding for an unknown parameter, a value of the wrong kind, or an integer out of range is refused with SEM0214 at the binding's `parameter` line in `silk.toml`, naming the parameter, as in ``silk.toml:10: error[SEM0214] invalid package parameter binding: the value bound to `x` does not have its parameter's type``. An unknown name reads "module `main.silk` declares no package parameter `y`". An array of the wrong length or element kind is refused the same way.
-- Every binding is type-checked, including one that loses on precedence.
+`--profile-input` JSON still carries tagged `bindings`, the transport tools use. Each binding has `package` (`"name@version"`), `module` (`"main"`), `parameter`, `value` and `origin`. A value is `{ "kind": "integer", "value": "8080" }`, `{ "kind": "boolean", "value": true }`, `{ "kind": "string", "value": "x" }` or `{ "kind": "array", "values": [ ... ] }`. `origin` is `{ "source": "...", "provenance": "literal" }`, or `"translated-public"` with a `translator`; `"secret"`, `"physical-supply"` and `"runtime"` are refused.
 
 ## Profiles and precedence
 
 - `[profiles.<name>]` is a named build profile. `target` defaults to the host. Other fields include `optimization`, `safety`, `threading`, `debug`, `libc` and `artifact`; `silk/compilation` and `silk/target` read them. The native compiler refuses `safety = "unchecked"` and `threading = "multi"` for now; see Targets and profiles in the Projects section.
 - `[build].profile` names the default profile. `--profile <name>` selects another. An unknown name is refused, and so is an empty one: `profile = ""` is `InvalidInput: build.profile`.
 - A build of a named profile, selected by `--profile` or by `[build].profile`, writes its output to `build/llvm/<triple>/<name>/`. Other builds use `debug/` or `release/`.
-- `--profile-input <json>` supplies a complete profile, with the same fields and `bindings`, as JSON.
+- `--profile-input <json>` supplies a complete profile, with the same fields and tagged `bindings`, as JSON.
 - `--profile` and `--profile-input` cannot be combined with `--target`, `--release` or `--optimization`.
-- `[[build.bindings]]` are project-tier bindings. Every build receives them, including `--release` builds without a profile.
-- Bindings of the selected profile and of `--profile-input` are override-tier bindings. An override binding beats a project binding for the same parameter.
-- Two bindings for one parameter at the same tier conflict, even with equal values. The build is refused.
-- Without any binding, a parameter takes its default.
+- `[config]` values are project-tier. Every build receives them, including `--release` builds without a profile.
+- A profile's `config` values (`config.main.verbose = true` in `[profiles.<name>]`) and the bindings of `--profile-input` are override-tier. An override value beats a project value for the same parameter.
+- Two values for one parameter at the same tier conflict, even when they are equal. The build is refused.
+- Without any value, a parameter takes its default.
 
 ## Examples
 
@@ -163,25 +163,14 @@ name = "demo"
 version = "0.1.0"
 silk-version = "0.1.0"
 
+[config]
+main.port = 8080
+
 [build]
 profile = "dev"
 
-[[build.bindings]]
-package = "demo@0.1.0"
-module = "main"
-parameter = "port"
-value = { kind = "integer", value = "8080" }
-origin = { source = "silk.toml", provenance = "literal" }
-
 [profiles.dev]
-target = "x86_64-unknown-linux-gnu"
-
-[[profiles.dev.bindings]]
-package = "demo@0.1.0"
-module = "main"
-parameter = "verbose"
-value = { kind = "boolean", value = true }
-origin = { source = "silk.toml", provenance = "literal" }
+config.main.verbose = true
 ```
 
 `src/main.silk`:

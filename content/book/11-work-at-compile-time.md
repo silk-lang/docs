@@ -221,9 +221,9 @@ tasks file /tasks.txt, reminders wait 250ms
 
 Release builds go to their own `release` directory. See **Static control flow and reflection** in the reference for every target and build query.
 
-## Binding parameters in silk.toml
+## Setting parameters in silk.toml
 
-Say you find 250 ms a bit short. You could edit the default, but the default is the library author's choice. The person building the program sets their own value in `silk.toml`, with a binding:
+Say you find 250 ms a bit short. You could edit the default, but the default is the library author's choice. The person building the program sets their own value in `silk.toml`, under `[config]`:
 
 ```toml
 [package]
@@ -231,15 +231,11 @@ name = "tasks"
 version = "0.1.0"
 silk-version = "0.1.0"
 
-[[build.bindings]]
-package = "tasks@0.1.0"
-module = "main"
-parameter = "remindBudgetMs"
-value = { kind = "integer", value = "300" }
-origin = { source = "silk.toml", provenance = "literal" }
+[config]
+main.remindBudgetMs = 300
 ```
 
-A binding is wordy on purpose. It names the package with its version, the root module and the parameter. The value is typed: an `integer` kind with its digits as a string. `origin` records where the value came from, so a build can always say why a parameter has the value it has.
+The key reads like an import: the root module `main`, then the parameter. The value is plain TOML. Silk checks it against the parameter's declared type, so a string here, or a number too big for an `i32`, is refused.
 
 ```sh
 silk build
@@ -271,7 +267,7 @@ reminder: #1 Buy milk
 time 0.303s
 ```
 
-The `where` clause guards bindings too. Change the value to `"90000"` and check:
+The `where` clause guards values from `silk.toml` too. Change the value to `90000` and check:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
@@ -283,34 +279,27 @@ Failed tasks in 0.09s
 
 Line 248 is the `param` declaration, and column 43 is its predicate. The error points at the rule the value broke, not at `silk.toml`.
 
-A typo in the parameter name is a different mistake, so it points somewhere else. With `parameter = "remindBudget"`:
+A typo in the parameter name is a different mistake, so it points somewhere else. With `main.remindBudget = 300`:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
   load     failed: 1 error                   0.10s
-/home/you/tasks/silk.toml:10: error[SEM0214] invalid package parameter binding: module `main.silk` declares no package parameter `remindBudget`
+/home/you/tasks/silk.toml:7: error[SEM0214] invalid package parameter binding: module `main.silk` declares no package parameter `remindBudget`
 Failed tasks in 0.10s
 ```
 
-It is the same code as before, but this time the location is line 10 of `silk.toml`, the `parameter` line, and the message names the module and the name it could not find. Put the value back to `"300"` and the name to `remindBudgetMs`.
+It is the same code as before, but this time the location is line 7 of `silk.toml`, the line that sets the value, and the message names the module and the name it could not find. Put the value back to `300` and the name to `remindBudgetMs`.
 
 ## Profiles
 
-A profile is a named set of build settings with its own bindings. Add a `demo` profile that keeps its tasks in a separate file:
+A profile is a named set of build settings with its own parameter values. Add a `demo` profile that keeps its tasks in a separate file:
 
 ```toml
 [profiles.demo]
-target = "x86_64-unknown-linux-gnu"
-
-[[profiles.demo.bindings]]
-package = "tasks@0.1.0"
-module = "main"
-parameter = "fileName"
-value = { kind = "string", value = "/demo-tasks.txt" }
-origin = { source = "silk.toml", provenance = "literal" }
+config.main.fileName = "/demo-tasks.txt"
 ```
 
-A profile must name its target. Its bindings win over the `[[build.bindings]]` ones, and the `[[build.bindings]]` still apply, so the budget stays 300. Build with `--profile`:
+A profile builds for your machine unless it names a `target`. Its `config` values win over the ones in `[config]`, and the `[config]` ones still apply, so the budget stays 300. Build with `--profile`:
 
 ```sh
 silk build --profile demo

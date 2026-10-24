@@ -326,7 +326,7 @@ silk add ../taskcore
 Added dependency taskcore = { path = "../taskcore" } to /home/you/tasks-workspace/tasks/silk.toml
 ```
 
-`silk add` reads the library's manifest first, so a wrong path or a dependency cycle is refused before anything is written. `silk remove taskcore` takes the line out again, and the table too once it is empty. Here is `tasks/silk.toml` now. `silk add` puts the new `[dependencies]` table right after `[package]`; the bindings and profile come from chapter 11:
+`silk add` reads the library's manifest first, so a wrong path or a dependency cycle is refused before anything is written. `silk remove taskcore` takes the line out again, and the table too once it is empty. Here is `tasks/silk.toml` now. `silk add` puts the new `[dependencies]` table right after `[package]`; the `[config]` value and the profile come from chapter 11:
 
 ```
 [package]
@@ -337,22 +337,11 @@ silk-version = "0.1.0"
 [dependencies]
 taskcore = { path = "../taskcore" }
 
-[[build.bindings]]
-package = "tasks@0.1.0"
-module = "main"
-parameter = "remindBudgetMs"
-value = { kind = "integer", value = "300" }
-origin = { source = "silk.toml", provenance = "literal" }
+[config]
+main.remindBudgetMs = 300
 
 [profiles.demo]
-target = "x86_64-unknown-linux-gnu"
-
-[[profiles.demo.bindings]]
-package = "tasks@0.1.0"
-module = "main"
-parameter = "fileName"
-value = { kind = "string", value = "/demo-tasks.txt" }
-origin = { source = "silk.toml", provenance = "literal" }
+config.main.fileName = "/demo-tasks.txt"
 ```
 
 `path` is relative to the manifest. Now the program imports the library's modules with the package name in front:
