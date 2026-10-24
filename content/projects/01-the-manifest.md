@@ -140,7 +140,7 @@ A manifest may hold both `[package]` and `[workspace]`. See **Workspaces**.
 
 ## &#91;release\]
 
-Read only by `silk change`, the release notes command. Its keys (`repository`, `directory`, `version-file`) are described with that command in the Tools section. Builds ignore the table. `[changes]` is its earlier name and is still accepted.
+Read only by `silk change`, the release notes command. Its keys (`repository`, `directory`, `version-file`) are described with that command in the Tools section. Builds ignore the table. It was called `[changes]` before; a manifest that still uses that name is refused.
 
 ## &#91;tool.\<name>\]
 
