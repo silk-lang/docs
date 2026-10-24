@@ -117,7 +117,7 @@ A damaged file is skipped, not guessed at. Fix the syntax error first; `silk che
 
 ## Workspaces
 
-At a workspace root, `silk format` and `silk format --check` cover the source root of every member. Inside a member, they cover only that member. See **Workspaces** in Projects and packages.
+At a workspace root, `silk format` and `silk format --check` cover the source root of every member, and so does `silk format .`; at a package root, `.` selects its source root. Inside a member, they cover only that member. See **Workspaces** in Projects and packages.
 
 ## Summary
 

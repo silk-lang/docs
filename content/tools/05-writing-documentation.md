@@ -166,7 +166,7 @@ when the caller is ready to consume the option.
 
 ## Examples in comments
 
-A fenced block whose info string is `silk` is an example, and `silk doctest` type-checks it. Make each example a complete module: its own imports, and usually a `pub fn main() -> i32` that returns 0 when the example behaves as described. A reader can then copy it into a file and run it.
+A fenced block whose info string is `silk` is an example, and `silk doctest` type-checks it. Make each example a complete module: its own imports, and usually a `pub fn main() -> i32` that returns 0 when the example behaves as described. `silk doctest` runs an example with a `main` and fails it when `main` returns anything else, and a reader can copy it into a file and run it too.
 
 Other fences, such as `text` or `toml`, are shown as they are and not checked. To show Silk code that should not be checked, such as a fragment, mark the fence `silk,ignore`:
 
@@ -176,7 +176,7 @@ Other fences, such as `text` or `toml`, are shown as they are and not checked. T
 /// ```
 ````
 
-`ignore` is the only attribute. Any other word after `silk,` makes the example fail, so a typo cannot quietly turn a check off. **Doc tests and reference generation** shows how to run the checks and how examples import your package.
+To check an example with a `main` without running it, such as a server that never stops, mark the fence `silk,no_run`. `ignore` and `no_run` are the only attributes. Any other word after `silk,` makes the example fail, so a typo cannot quietly turn a check off. **Doc tests and reference generation** shows how to run the checks and how examples import your package.
 
 ## Style
 
@@ -193,4 +193,4 @@ Follow the standard library's voice so your pages read like its pages:
 - `///` documents the next line's declaration; `//!` at the top of a file documents the module. Blank lines and `//` comments detach a doc comment.
 - Start with a one-sentence summary, then use `# When to use`, `# Details`, `# Gotchas` and `# Examples` as needed.
 - Link with ``[`Name`]``, ``[`Type.member`]`` or ``[`Self`]``. Unresolved links stay plain text, and `silk doc` warns about each one.
-- `silk` fences are checked by `silk doctest`; mark fragments `silk,ignore`.
+- `silk` fences are checked by `silk doctest`, and those with a `main` are run; mark fragments `silk,ignore` and programs that must not run `silk,no_run`.

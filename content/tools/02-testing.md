@@ -76,6 +76,7 @@ test effect fn diameterIsTwiceRadius() -> () ! AssertionError<'static> {
 ```
   Circle::diameterIsTwiceRadius
     assertion failed: radius 5
+      at Circle.diameterIsTwiceRadius (Circle:9:3)
     FAIL  15 us
   lib::areaMultipliesSides
     PASS  <1 us
@@ -86,20 +87,28 @@ Tests  2 passed, 1 failed (0 cached, 3 executed, 3 selected, 3 discovered)
 Time   60 us
 ```
 
-The other tests still run, and the command exits with status 1. When the failure is an `AssertionError`, the runner prints `assertion failed:` and the message you passed to `expect` under the test's name, so write the message as the expected fact. A test that fails with another typed failure prints `FAIL`, and an `unhandled error` trace on standard error names that failure's type and the line where it was created.
+The other tests still run, and the command exits with status 1. When the failure is an `AssertionError`, the runner prints `assertion failed:` and the message you passed to `expect` under the test's name, so write the message as the expected fact. The `at` line below it is the call that failed: `Circle:9:3` is line 9, column 3 of `src/Circle.silk`. A test that fails with another typed failure prints `unhandled error:` and the failure's type instead, with the calls that led to it, innermost first:
+
+```
+  faults::typedFailure
+    unhandled error: faults.NotFound
+      at faults.lookup (faults:6:3)
+      at faults.typedFailure (faults:10:15)
+    FAIL  39 us
+```
 
 A test that traps, for example on an index out of bounds, stops the runner process. `silk test` shows the trap report under the test's name, marks the test `FAIL  stopped the test process`, and starts the runner again after it, so the remaining tests still run and the command exits with status 1:
 
 ```
   lib::readsPastTheEnd
-fatal trap: index out of bounds
-  at lib.readsPastTheEnd (lib:18:11)
+    fatal trap: index out of bounds
+      at lib.readsPastTheEnd (lib:18:11)
     FAIL  stopped the test process
   lib::sumsTheValues
     PASS  <1 us
 ```
 
-Deep recursion fails the same way, with `fatal trap: stack overflow` and no frames. A test that never finishes is stopped after 60 seconds, and the rest still run. `--timeout <seconds>` changes the limit, and `--timeout 0` removes it:
+Deep recursion fails the same way, with `fatal trap: stack overflow` and no frames, printed at the start of the line because it comes from the process's fault handler on standard error. A test that never finishes is stopped after 60 seconds, and the rest still run. `--timeout <seconds>` changes the limit, and `--timeout 0` removes it:
 
 ```
   lib::overflows
@@ -114,7 +123,9 @@ silk test: the test did not finish within 2 s; pass --timeout <seconds> to chang
 
 `silk test` does not scan the source folder. It starts at the package's root module, `src/main.silk` unless `[package]` says otherwise, and follows imports, the same way `silk check` does. In a library, every module listed in `exports` is a starting point too. A test in a file that nothing imports is never discovered.
 
-That matters most for programs. A test in `src/extra.silk` is not found while `main.silk` does not import `extra`. Two ways to reach it:
+In a library, a test file that no exported module imports is not checked either, so even a type error in it goes unnoticed by `silk check` and `silk test`. Import it from an exported module, or keep the tests in a file such as `src/tests.silk` and run them with `--root`.
+
+In a program, a test in `src/extra.silk` is not found while `main.silk` does not import `extra`. Two ways to reach it:
 
 - Start discovery from that file with `--root`. The path is relative to the package directory and must be under the source root:
 
@@ -256,7 +267,7 @@ Each package tests its own modules. At a workspace root, `silk test` runs every 
 ## Summary
 
 - Mark a top-level function with `test`. Use `test effect fn` and `Testing.expect` for checks that can fail.
-- Run tests with `silk test`. A failure prints `FAIL` and the `expect` message for an assertion; a trapping, overflowing or hanging test (60 s by default, `--timeout`) fails too and the rest still run. Any failure exits 1.
+- Run tests with `silk test`. A failure prints `FAIL`, the `expect` message or the failure type, and the line that failed; a trapping, overflowing or hanging test (60 s by default, `--timeout`) fails too and the rest still run. Any failure exits 1.
 - An unchanged rerun reuses the runner; `--no-cache` builds it again.
 - Tests are discovered by following imports from the root module (and a library's exports). Use `--root` or an import to reach other files.
 - `--filter` matches `module::name` without regard to ASCII case; `--file` selects one file. A selection that matches nothing exits 1.

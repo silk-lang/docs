@@ -1,6 +1,6 @@
 # Doc tests and reference generation
 
-Three commands work with documentation comments. `silk doc` extracts your package's documentation as JSON. `silk doctest` type-checks every Silk example in it, so the examples cannot drift away from the code. `silk doc-reference` turns the standard library's documentation into the Markdown API reference. How to write the comments themselves is in **Writing documentation**.
+Three commands work with documentation comments. `silk doc` extracts your package's documentation as JSON. `silk doctest` type-checks every Silk example in your package and runs each one that is a program, so the examples cannot drift away from the code. `silk doc-reference` turns the standard library's documentation into the Markdown API reference. How to write the comments themselves is in **Writing documentation**.
 
 ## Extract documentation with silk doc
 
@@ -41,10 +41,10 @@ The format is marked `"experimental": true` and may change. Its outline:
 
 ## Check examples with silk doctest
 
-`silk doctest` reads the JSON that `silk doc` wrote and checks each `silk` fence in it:
+Run `silk doctest` anywhere inside a package. It extracts the package's documentation the way `silk doc` does, in memory, and checks each `silk` fence in it:
 
 ```sh
-silk doctest -i build/documentation.json --source-root src
+silk doctest
 ```
 
 ```
@@ -53,16 +53,17 @@ silk doctest -i build/documentation.json --source-root src
 Doctest: 2 collected, 2 passed, 0 skipped, 0 failed.
 ```
 
-Each line names the file and the line where the example's fence opens. `-i` is short for `--input`.
+Each line names the file and the line where the example's fence opens. At a workspace root, `silk doctest` checks and runs the examples of every member, each member's results under a `Package <name>` line, and fails when any example fails or no member has one. `--manifest-path <member>/silk.toml` checks one member. A JSON file that `silk doc` already wrote can be checked instead with `silk doctest -i build/documentation.json --source-root src`; `-i` is short for `--input`.
 
 What a check does:
 
-- Each example is type-checked as a complete module of its own, with every declaration and import checked. It is not built or run, and it does not need a `main`.
-- Examples are checked one at a time, in source order, and each result is printed before the next starts.
-- A `silk,ignore` fence counts as skipped. A fence with any other attribute fails without being checked.
-- The target is the one in the JSON, or `--target <triple>`.
+- Each example is type-checked as a complete module of its own, with every declaration and import checked.
+- An example that declares a `main` is then built for your machine with the package's default profile and run in the package directory. It passes when `main` returns 0. Any other status fails it, and its output is printed under the result line.
+- An example without a `main` is only type-checked, and so is one marked `silk,no_run`, such as a server that never stops.
+- Results are printed in source order. A `silk,ignore` fence counts as skipped. A fence with any other attribute fails without being checked.
+- With `--target <triple>` for another platform, or with `-i` or `--stdlib`, examples are only type-checked, not run.
 
-A failing example prints its diagnostics, located in the example itself as `example:line:column`:
+An example that does not type-check prints its diagnostics, located in the example itself as `example:line:column`:
 
 ```
 /home/you/shapes/src/lib.silk:39 (byte 977): PASSED
@@ -71,11 +72,17 @@ example:4:27: error[SEM0135] Operator - does not accept (i32, string<'static>)
 Doctest: 2 collected, 1 passed, 0 skipped, 1 failed.
 ```
 
-Line 4 of that example is `return circumference(2) - "12"`.
+Line 4 of that example is `return circumference(2) - "12"`. An example whose program returns something other than 0 says so:
+
+```
+/home/you/shapes/src/lib.silk:39 (byte 977): FAILED: the example exited with status 1
+```
+
+An example program is built like any program of the package, into `build/doctest/`, so the first run takes as long as a build. A program that never stops keeps `silk doctest` waiting, so mark it `silk,no_run`.
 
 ### How examples import your package
 
-An example sees the standard library. With `--source-root <directory>`, it also sees your package, by the package's name or by each module's path below that directory. The name comes from the nearest `silk.toml` above the source root. With `--source-root src` in the `shapes` package, `src/lib.silk` is `shapes.lib` or `lib`, and `src/Circle.silk` is `shapes.Circle` or `Circle`:
+An example sees the standard library and your package, by the package's name or by each module's path below the source root. In the `shapes` package, `src/lib.silk` is `shapes.lib` or `lib`, and `src/Circle.silk` is `shapes.Circle` or `Circle`. A hyphenated name is written with underscores, as a dependent package writes it: package `round-shapes` is `round_shapes.lib`. This example imports `shapes.Circle` by the package name:
 
 ````silk
 /// ```silk
@@ -87,7 +94,7 @@ An example sees the standard library. With `--source-root <directory>`, it also 
 /// ```
 ````
 
-The package name makes an example read like code in a package that depends on yours. Unlike a dependent package, an example can also name modules the package does not export, such as `shapes.Circle` here. Without `--source-root`, neither form resolves, and each failing import is reported once:
+The package name makes an example read like code in a package that depends on yours. Unlike a dependent package, an example can also name modules the package does not export, such as `shapes.Circle` here. When you check a JSON file with `-i`, pass `--source-root src` too; the package name then comes from the nearest `silk.toml` above that directory. Without it, neither form resolves, and each failing import is reported once:
 
 ```
 /home/you/shapes/src/lib.silk:39 (byte 977): FAILED
@@ -114,10 +121,10 @@ No Silk examples collected; nothing was verified.
 
 ### In CI
 
-Run the two commands in a row:
+One command is enough:
 
 ```sh
-silk doc && silk doctest -i build/documentation.json --source-root src
+silk doctest
 ```
 
 `silk doctest --stdlib` checks the standard library's own examples, with no JSON file needed. It is how the std lib keeps its 73 examples honest, and a quick way to confirm an installation works.
@@ -151,6 +158,6 @@ It exits 1 when anything differs and 0 when the pages are current, so CI can fai
 ## Summary
 
 - `silk doc` writes `build/documentation.json`; `--include-private` adds private declarations.
-- `silk doctest -i build/documentation.json --source-root src` type-checks every `silk` example and exits 1 when one fails or none are found.
-- With `--source-root`, examples import your modules by package name, such as `import shapes.Circle { ... }`, or by their path under the source root.
+- `silk doctest` type-checks every `silk` example of the package it runs in, runs each one with a `main`, and exits 1 when one fails or none are found. Mark examples that must not run `silk,no_run`.
+- Examples import your modules by package name, with `_` for `-` in a hyphenated name, such as `import shapes.Circle { ... }`, or by their path under the source root.
 - `silk doc-reference -o <dir>` regenerates the std lib Markdown reference; `--check` verifies it is current.
