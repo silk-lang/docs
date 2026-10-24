@@ -1,6 +1,6 @@
 # Libraries and exports
 
-A library is a package that other packages depend on. Its `[package].exports` lists the modules they may import. Its `[build].artifact` says what `silk build` makes on its own, for use outside Silk.
+A library is a package that other packages depend on. Its `[package].exports` lists the modules they may import. Its `[package].kind` says what `silk build` makes on its own: nothing for a `library`, or a file for use outside Silk.
 
 ## Exports
 
@@ -9,15 +9,13 @@ A library is a package that other packages depend on. Its `[package].exports` li
 name = "text-utils"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/lib.silk"
-source-root = "src"
+kind = "static-library"
 exports = ["lib", "Ffi"]
-
-[build]
-artifact = "static-library"
 ```
 
-- Each entry is a module name in import spelling, relative to `source-root`: `"lib"`, `"codec.Json"`.
+A library kind's root module defaults to `src/lib.silk`.
+
+- Each entry is a module name in import spelling, relative to the source root: `"lib"`, `"codec.Json"`.
 - Every entry must name an existing file. The list is checked before anything compiles.
 - A module not listed is internal. Other packages that import it get MOD0003. With `exports = ["codec.Unit"]`, `app`'s import of `text_utils.lib` fails:
 
@@ -43,16 +41,17 @@ Failed app in 0.16s
 
 ## Library artifacts
 
-Packages that depend on a library compile its source with their own. The artifact matters only when something outside Silk links the library.
+Packages that depend on a library compile its source with their own. The file matters only when something outside Silk links the library. When nothing does, `kind = "library"` makes no file at all: `silk build` checks the package.
 
-| `[build].artifact` | File | Status |
+| `[package].kind` | File | Status |
 | --- | --- | --- |
+| `"library"` | none | Works. Checked only. |
 | `"static-library"` | `lib<name>.a` | Works. An archive of one object. |
 | `"object"` | `<name>.o` | Works. One relocatable object. |
 | `"shared-library"` | `lib<name>.so`, or `lib<name>.dylib` on macOS | Not built yet: `SILK_GAP artifact-form: the shared-library form is not native yet`, exit 2. |
 | `"executable"` (default) | `<name>` | A program. |
 
-Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`. A profile's `artifact` must name the same form as `[build].artifact`, or the manifest is refused. See **Targets and profiles**.
+Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`. A profile's `artifact` must name the same form as `[package].kind`, or the manifest is refused. See **Targets and profiles**.
 
 - A library has no runtime. Its roots are its `export "C"` functions and statics, plus what they reach. A library with no C exports builds an empty archive: the build's `codegen` row reads `0 functions`.
 - The archive holds the compiled Silk code, not libc. Link it with a C toolchain that supplies libc.
@@ -96,7 +95,7 @@ export "C" fn tu_is_space(byte: u8) -> i32 {
 }
 ```
 
-With `exports = ["lib", "Ffi"]`, as above, build the library on its own:
+With `exports = ["lib", "Ffi"]` and `kind = "static-library"`, as above, build the library on its own. (`silk init --lib` writes `kind = "library"`, which makes no file; a C program needs the archive.)
 
 ```sh
 cd text-utils

@@ -316,8 +316,8 @@ clang -c -fPIC native/vec.c -o native/vec.o
 ```
 
 ```toml
-[build]
-native-link-inputs = [{ object = "native/vec.o" }]
+[native]
+link = [{ object = "native/vec.o" }]
 ```
 
 ```silk

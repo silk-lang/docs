@@ -21,7 +21,6 @@ Added dependency text_utils = { path = "../text-utils", package = "text-utils" }
 name = "app"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/main.silk"
 
 [dependencies]
 text_utils = { path = "../text-utils", package = "text-utils" }
