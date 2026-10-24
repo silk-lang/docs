@@ -77,7 +77,7 @@ Creates a package in `path`, or in the current directory. The package name comes
 | Form | Creates |
 | --- | --- |
 | `silk init app` | An executable: `silk.toml`, `src/main.silk`, `.gitignore` |
-| `silk init --lib util` | A static library: `src/lib.silk`, `exports = ["lib"]`, `[build] artifact = "static-library"` |
+| `silk init --lib util` | A library: `src/lib.silk`, `kind = "library"`, `exports = ["lib"]` |
 | `silk init --workspace ws` | A workspace root: `[workspace] members = []` and `.gitignore` |
 
 Inside a workspace, `silk init` also appends the new package to the root's `members`:

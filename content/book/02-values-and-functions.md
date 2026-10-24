@@ -137,11 +137,11 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-src/main.silk:15:13: error[PAR0001] Expected identifier
+src/main.silk:15:12: error[PAR0010] Silk has no compound assignment; write `x = x + 1` instead of `x += 1`
 Failed tasks in 0.16s
 ```
 
-PAR codes come from the parser, which reads the shape of your code before any types are checked. It got as far as `+` and then found `=` where it expected a name. The error does not say "no `+=` in Silk", so remember it: write `open = open + 1`.
+PAR codes come from the parser, which reads the shape of your code before any types are checked. PAR0010 is the parser recognizing a habit from another language and naming the Silk spelling. Write `open = open + 1`. The same code covers `x++`, `for ... in`, `var` and `c ? a : b`.
 
 ## Loops and conditions
 

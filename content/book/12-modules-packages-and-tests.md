@@ -244,21 +244,14 @@ Here is the manifest that `silk init --lib` wrote, `taskcore/silk.toml`, after o
 name = "taskcore"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/lib.silk"
-source-root = "src"
+kind = "library"
 exports = ["Board", "Task", "Text", "Store"]
-
-[build]
-artifact = "static-library"
 ```
 
-Three lines deserve a closer look:
+Two lines deserve a closer look:
 
-- `root` is the module where the package starts. A library has no `main`, so its root is `lib.silk`.
-- `source-root` is the folder that module paths are relative to. `src/Board.silk` is the module `Board`.
+- `kind = "library"` says this package is Silk source for other packages, not a program. `silk build` checks it and makes no file of its own. Its root module, where the package starts, is `src/lib.silk`, since a library has no `main`. Module paths are relative to `src`, so `src/Board.silk` is the module `Board`.
 - `exports` lists the modules that other packages may import. The rest stay internal to `taskcore`.
-
-`artifact = "static-library"` tells `silk build` to make a library archive, not a program.
 
 The change is `exports`. The generated manifest said `exports = ["lib"]`, because `add` lived in `lib`. Now the board code lives in `Board.silk`, `Store.silk`, `Task.silk` and `Text.silk`, so those are the modules to export. The example `add` and its test go, and `lib.silk` keeps only a comment:
 
@@ -311,16 +304,14 @@ silk build
 ```
 
 ```
-Compiling taskcore (x86_64-unknown-linux-gnu, debug)
+Checking taskcore (x86_64-unknown-linux-gnu)
   load     47 modules, 5 in package          0.05s
   check    5 modules                         0.67s
-  codegen  0 functions                       0.00s
   borrow   191 bodies                        0.01s
-  link     clang                             0.05s
-Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/libtaskcore.a in 0.80s
+Finished taskcore in 0.74s
 ```
 
-Note the path in the last line: every package in a workspace builds into one shared `build` folder at the workspace root. That folder is outside `taskcore/`, where you ran the command, so the path is printed in full. The archive is empty, which is fine: `codegen` emitted no functions. The program that depends on `taskcore` compiles its source along with its own. What the library build tells you is that the package is sound on its own.
+The first line says `Checking`, not `Compiling`, and no file is made. A `library` is Silk source for other packages, so there is nothing to link: the program that depends on `taskcore` compiles its source along with its own. What the library build tells you is that the package is sound on its own.
 
 ## Depending on `taskcore`
 
@@ -335,34 +326,22 @@ silk add ../taskcore
 Added dependency taskcore = { path = "../taskcore" } to /home/you/tasks-workspace/tasks/silk.toml
 ```
 
-`silk add` reads the library's manifest first, so a wrong path or a dependency cycle is refused before anything is written. `silk remove taskcore` takes the line out again, and the table too once it is empty. Here is `tasks/silk.toml` now. `silk add` puts the new `[dependencies]` table right after `[package]`; the bindings and profile come from chapter 11:
+`silk add` reads the library's manifest first, so a wrong path or a dependency cycle is refused before anything is written. `silk remove taskcore` takes the line out again, and the table too once it is empty. Here is `tasks/silk.toml` now. `silk add` puts the new `[dependencies]` table right after `[package]`; the `[config]` value and the profile come from chapter 11:
 
 ```
 [package]
 name = "tasks"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/main.silk"
 
 [dependencies]
 taskcore = { path = "../taskcore" }
 
-[[build.bindings]]
-package = "tasks@0.1.0"
-module = "main"
-parameter = "remindBudgetMs"
-value = { kind = "integer", value = "300" }
-origin = { source = "silk.toml", provenance = "literal" }
+[config]
+main.remindBudgetMs = 300
 
 [profiles.demo]
-target = "x86_64-unknown-linux-gnu"
-
-[[profiles.demo.bindings]]
-package = "tasks@0.1.0"
-module = "main"
-parameter = "fileName"
-value = { kind = "string", value = "/demo-tasks.txt" }
-origin = { source = "silk.toml", provenance = "literal" }
+config.main.fileName = "/demo-tasks.txt"
 ```
 
 `path` is relative to the manifest. Now the program imports the library's modules with the package name in front:
@@ -789,7 +768,7 @@ Plain `silk format` rewrites the files in place. Nearly every file is listed bec
 - A file is a module, named by its path: `src/cli/Command.silk` is `cli.Command`.
 - Everything is private to its module until marked `pub`, including struct fields and union variant fields.
 - `silk init --workspace` makes a workspace, and `silk init --lib` inside it adds a library package to `members`.
-- A library package names its `root` and its `exports`. Check, build and test cover every exported module, and an entry that names no module is refused.
+- A library package sets `kind = "library"` and names its `exports`. Check, build and test cover every exported module, and an entry that names no module is refused.
 - `silk add ../taskcore` writes the `[dependencies]` entry, and the program imports `taskcore.Module { ... }`. Use `as` when a module and a name collide.
 - Package parameters live in the root module; pass their values to other modules as arguments.
 - `silk test` runs a package's tests, `--workspace` and `-p` choose packages from one place, `--filter` narrows the tests by their `module::name`, and modules may import each other in a cycle.

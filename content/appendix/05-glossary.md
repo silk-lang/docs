@@ -17,7 +17,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Role | A name declared with `role Name` that distinguishes requirement entries for the same service: `&S at Audit` and `&S` are separate entries with separate providers. A role has no body and no values. | Services and providers |
 | Suspension | A running Effect stopping at a `run` and resuming later. A suspension point is a `run` whose Effect can suspend; parking an `Execution` is the only external suspension. | Suspension and cancellation |
 | Trap | A fatal runtime error, such as arithmetic overflow, division by zero or an out-of-bounds index. It does not unwind and runs no cleanup, finalizers or `Drop` hooks. | Program entry and termination |
-| Profile | A named build configuration, `[profiles.<name>]` in `silk.toml`. It must set `target` and may set `optimization`, `safety`, `debug` and other fields, plus parameter bindings. Selected with `--profile` or `[build].profile`. | Package parameters |
+| Profile | A named build configuration, `[profiles.<name>]` in `silk.toml`. It builds for the host unless it sets `target`, and may set `optimization`, `safety`, `debug` and other fields, plus parameter values under `config`. Selected with `--profile` or `[build].profile`. | Package parameters |
 | Target | The machine a build compiles for, given as a triple such as `x86_64-unknown-linux-gnu` by `--target` or a profile. `silk/target` exposes its architecture, operating system and other facts to static code. | Static control flow and reflection |
 
 ## Other terms
@@ -25,7 +25,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Term | Meaning | Reference page |
 | --- | --- | --- |
 | Anonymous aggregate | A record `.{ ... }` or tuple `( ... )` literal with no type context. Each literal has its own type. | Structs, tuples and arrays |
-| Binding (manifest) | A TOML table in `[[build.bindings]]` or `[[profiles.<name>.bindings]]` that sets a package parameter's value. | Package parameters |
+| Config (manifest) | A line under `[config]` in `silk.toml`, or `config.<module>.<parameter>` in a profile, that sets a package parameter's value, such as `main.port = 8080`. | Package parameters |
 | Binding (variable) | A name introduced by `let`, a parameter or a pattern. | Bindings and statements |
 | Borrow | `&e` or `&mut e`: a reference to a place that lends access without moving the value. | Borrowing |
 | Bound | A requirement on a type parameter, as in `T: Order` or `T: 'a`. | Generics |
@@ -55,12 +55,12 @@ Terms the book and the reference use, with the reference page that defines each 
 | Nominal union | A `union` declaration whose variants may carry named fields. | Enums and unions |
 | Outcome | The success value or failure of an Effect, held or returned as data, as by `Effect.result`. | Typed failures |
 | Package | A unit of compilation described by a manifest, named `name@version`. | The manifest |
-| Package parameter | A named static value declared with `param` in a package's root module and set by a binding or its default. | Package parameters |
+| Package parameter | A named static value declared with `param` in a package's root module and set under `[config]` in `silk.toml` or by its default. | Package parameters |
 | Park | Giving up the current `Execution` until a `Wake` makes it eligible again. | Suspension and cancellation |
 | Place | Something that can be assigned, borrowed or moved from: a `mut` local, a field `p.x`, an element `a[i]` or a referent `r.*`. | Bindings and statements, Borrowing |
 | Reborrow | Borrowing again through an existing reference, as in `&mut x.*`. | Borrowing |
 | Referent | The value a reference points to, reached with `.*`. | Borrowing |
-| Root module | The module named by `root` in `[package]`, usually `src/main.silk`. | The manifest |
+| Root module | The module `[package].main` names below `[package].source`; by default `src/main.silk`, or `src/lib.silk` for a library. | The manifest |
 | `run` | The prefix that executes an Effect and yields its success value. | Effects and run |
 | Row variable | `?R` in a generic list: a parameter that stands for a whole requirement row. | Services and providers |
 | Scheduler | The service that runs fibers. `LocalScheduler` is the provided implementation. | Fibers and scheduling |

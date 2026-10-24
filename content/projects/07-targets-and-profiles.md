@@ -22,10 +22,10 @@ What works for each target with this compiler:
 | --- | --- | --- | --- |
 | The host's own target | yes | yes | yes |
 | Another macOS or Linux target | yes | no: `Cannot link an executable for target aarch64-apple-darwin on host x86_64-unknown-linux-gnu` | yes |
-| Linux without libc | yes | not yet (see below) | `artifact = "object"` builds |
+| Linux without libc | yes | not yet (see below) | `kind = "object"` builds |
 | `wasm32-unknown-unknown` | yes | yes, a WebAssembly module, on any host (see below) | yes |
 
-To cross-compile, set `[build].stage = "object"` (or `llvm-ir`, `assembly`, `llvm-bitcode`), or `[build].artifact = "object"` or `"static-library"`, and link the result with your own toolchain:
+To cross-compile, set `[build].stage = "object"` (or `llvm-ir`, `assembly`, `llvm-bitcode`), or `[package].kind = "object"` or `"static-library"`, and link the result with your own toolchain:
 
 ```sh
 silk build --target aarch64-unknown-linux-gnu
@@ -127,16 +127,17 @@ Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.79s
 ```
 
 - A named profile builds into a directory with its own name, beside `debug` and `release`.
-- `target` is required. Every other field has a default, so a profile turns on optimization only when it says `optimization = "speed"`.
+- `target` defaults to the compiler's host. Every other field has a default too, so a profile turns on optimization only when it says `optimization = "speed"`.
+- `dev` and `release` exist without a table. `dev` builds for the host without optimization and with debug information; `release` builds with `optimization = "speed"` and without it. A `[profiles.dev]` or `[profiles.release]` table replaces the built-in one.
 - `[build].profile = "fast"` makes it the default for builds with no `--target`, `--profile` or `--profile-input`.
-- `--profile-input '<json>'` passes a whole profile as JSON, with the same fields. Its directory comes from its optimization and debug settings.
+- `--profile-input '<json>'` passes a whole profile as JSON, with the same fields, except that `code-model` and `max-memory` are spelled `codeModel` and `maxMemory`. Its directory comes from its optimization and debug settings.
 - A named or JSON profile cannot be combined with `--target`, `--release` or `--optimization`:
 
 ```
 Named/full profiles conflict with target and optimization flags
 ```
 
-- Profiles also carry package parameter bindings, which win over `[[build.bindings]]`. See **Package parameters** in the reference and chapter 11 of the book.
+- A profile can also set package parameter values with `config.main.port = 9090`; they win over `[config]`. See **Package parameters** in the reference and chapter 11 of the book.
 
 ## Profile fields
 
@@ -148,15 +149,15 @@ The manifest page lists every field and its values. The native build applies the
 | `optimization` | `none` passes `-O0` to Clang; `speed` passes `-O2`. |
 | `debug` | `true` passes `-g`. |
 | `libc` | Chooses the runtime from the std lib catalog. Linux takes `gnu` or `none`; macOS takes `system` (or `none` for object and archive output only); wasm takes `none`. |
-| `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[build].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. `"default"` and `"none"` take no other key, so `{ kind = "default", name = "x" }` is refused as `profiles.u.runtime.name is not a supported field`. See Build outputs and native linking. |
+| `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[unstable].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. `"default"` and `"none"` take no other key, so `{ kind = "default", name = "x" }` is refused as `profiles.u.runtime.name is not a supported field`. See Build outputs and native linking. |
 | `relocation` | `pic` or `static` code for object, archive and IR output. |
 | `deployment` | macOS minimum version for the link. Only `aarch64-apple-darwin` takes it. |
 | `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere; x86-64 Linux also takes the levels `x86-64-v2`, `x86-64-v3` and `x86-64-v4`. |
-| `codeModel` | `large` passes `-mcmodel=large`. x86-64 targets only. |
+| `code-model` | `large` passes `-mcmodel=large`. x86-64 targets only. |
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
-| `artifact` | Must name the same form as `[build].artifact`. Set the output form there. |
+| `artifact` | Must name the same form as `[package].kind`. Set the output form there. |
 | `threading` | `multi` on wasm32 builds with atomics and a shared memory (see below). Refused on other targets. |
-| `maxMemory` | wasm32 only: the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
+| `max-memory` | wasm32 only: the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
 
 `cpu.features` takes these names:
 
@@ -209,7 +210,7 @@ The other fields are valid values that the native compiler cannot build yet. Rat
 | `safety` | `"unchecked"` | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
 | `threading` | `"multi"`, except on wasm32 | `profiles.fast.threading = "multi" is not supported by the native compiler yet` |
 | `entry` | `{ kind = "none" }` or `{ kind = "named", ... }` | `profiles.fast.entry is not supported by the native compiler yet` |
-| `codeModel` | `"large"` on an arm64 target | `profiles.arm.codeModel = "large" is not supported by the native compiler yet` |
+| `code-model` | `"large"` on an arm64 target | `profiles.arm.code-model = "large" is not supported by the native compiler yet` |
 
 `--profile-input` is checked the same way. Its errors name the flag, not the manifest, and the field as `--profile-input.<field>`:
 
@@ -229,15 +230,15 @@ These combinations are refused when the manifest is read:
 | --- | --- |
 | `libc` not valid for the target | `UnsupportedCombination: profiles.fast.libc = "system"` |
 | `deployment` on a Linux target | `UnsupportedCombination: profiles.fast.deployment = "14.0"` |
-| wasm with `link`, `relocation`, `codeModel`, `unwind`, `deployment` or `sanitizers` changed from its defaults | `UnsupportedCombination: profiles.web.target = "wasm32-unknown-unknown"` |
+| wasm with `link`, `relocation`, `code-model`, `unwind`, `deployment` or `sanitizers` changed from its defaults | `UnsupportedCombination: profiles.web.target = "wasm32-unknown-unknown"` |
 | `sanitizers` with both `address` and `thread` | `UnsupportedCombination: profiles.fast.sanitizers` |
 | `thread` sanitizer without `threading = "multi"` | `UnsupportedCombination: profiles.fast.threading` |
 | macOS executable with `link = "static"` | `UnsupportedCombination: profiles.mac.link = "static"` |
 | `target = "host"` | `UnsupportedCombination: profiles.fast.target = "host"` |
-| `maxMemory` on a target other than wasm32 | `UnsupportedCombination: profiles.hostmem.maxMemory = "256MiB"` |
+| `max-memory` on a target other than wasm32 | `UnsupportedCombination: profiles.hostmem.max-memory = "256MiB"` |
 | `cpu.model` other than the target's default | `UnsupportedCombination: profiles.fast.cpu.model = "znver3"` |
 | a `cpu.features` entry the target does not have | `UnsupportedCombination: profiles.fast.cpu.features` |
-| `artifact` different from `[build].artifact` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [build].artifact = "executable"; set [build].artifact to choose the artifact, and omit the profile's artifact or write it as "executable"` |
+| `artifact` different from `[package].kind` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [package].kind = "executable"; set [package].kind to choose the artifact, and omit the profile's artifact or write it as "executable"` |
 
 The profile names in these messages are the ones used to produce them; yours shows its own. LINE is the line of the field, or of the `[profiles.<name>]` header when the field is missing, as for the thread sanitizer without `threading`. A field inside an inline table written over several lines, such as `features` in `cpu = { model = "x86-64",` followed by `features = ["avx512"] }` on the next line, is reported at the line that writes it.
 
@@ -322,7 +323,7 @@ pub fn main(inputs: &ProcessInputs) -> i32 {
 [build]
 profile = "bare"
 
-[build.composition]
+[unstable.composition]
 runtimes = [{ name = "raw", module = "silk/raw_start" }]
 defaults = ["raw"]
 
@@ -351,7 +352,7 @@ Without the composition, `libc = "none"` finds no runtime in the std lib catalog
 
 ## WebAssembly
 
-`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. Clang 18 builds it. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name:
+`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. Clang 18 builds it. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name. The program `silk init` writes does not build for wasm32 as it is, because it imports `silk.os_logger`, which needs an operating system to write to; a wasm32 program starts from a `main` like this one:
 
 ```silk
 export "C" fn add(left: i32, right: i32) -> i32 {
@@ -377,7 +378,7 @@ Compiling web (wasm32-unknown-unknown, debug)
 Finished build/llvm/wasm32-unknown-unknown/debug/web in 0.23s
 ```
 
-A host instantiates it with an empty import object and calls `main()` (42) or `add(2, 3)` (5). `node <silk>/lib/silk/stdlib/host/wasm-runner.mjs <module>` runs `main` and exits with its result. On wasm32, a C function takes and returns scalars and pointers only; C statics, variadic functions and callbacks are refused. `artifact = "object"` and `"static-library"` build too.
+A host instantiates it with an empty import object and calls `main()` (42) or `add(2, 3)` (5). `node <silk>/lib/silk/stdlib/host/wasm-runner.mjs <module>` runs `main` and exits with its result. On wasm32, a C function takes and returns scalars and pointers only; C statics, variadic functions and callbacks are refused. `kind = "object"` and `"static-library"` build too.
 
 A wasm32 profile may set `threading = "multi"`:
 
@@ -385,10 +386,10 @@ A wasm32 profile may set `threading = "multi"`:
 [profiles.threads]
 target = "wasm32-unknown-unknown"
 threading = "multi"
-maxMemory = "256MiB"
+max-memory = "256MiB"
 ```
 
-The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `maxMemory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.maxMemory = "100KiB"`. A threaded module needs Clang 19 or newer, because Clang 18 crashes on it or writes a module the host rejects; `silk build` refuses an older Clang and names it.
+The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `max-memory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.max-memory = "100KiB"`. A threaded module needs Clang 19 or newer, because Clang 18 crashes on it or writes a module the host rejects; `silk build` refuses an older Clang and names it.
 
 The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32 and runs it in Node.
 

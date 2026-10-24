@@ -508,7 +508,6 @@ pub fn main() -> i32 { return salt() }
 name = "demo"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/main.silk"
 
 [dependencies]
 shapes = { path = "../shapes" }
@@ -521,12 +520,8 @@ shapes = { path = "../shapes" }
 name = "shapes"
 version = "0.1.0"
 silk-version = "0.1.0"
-root = "src/lib.silk"
-source-root = "src"
+kind = "static-library"
 exports = ["lib"]
-
-[build]
-artifact = "static-library"
 ```
 
 `/home/you/shapes/src/lib.silk`:

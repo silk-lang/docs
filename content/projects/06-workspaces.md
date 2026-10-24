@@ -73,13 +73,11 @@ silk build
 ```
 
 ```
-Compiling pricing (x86_64-unknown-linux-gnu, debug)
+Checking pricing (x86_64-unknown-linux-gnu)
   load     41 modules, 1 in package          0.05s
   check    1 module                          0.00s
-  codegen  0 functions                       0.00s
   borrow   3 bodies                          0.00s
-  link     clang                             0.03s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a in 0.10s
+Finished pricing in 0.06s
 Compiling store (x86_64-unknown-linux-gnu, debug)
   load     53 modules, 1 in package          0.04s
   check    1 module                          0.00s
@@ -87,10 +85,10 @@ Compiling store (x86_64-unknown-linux-gnu, debug)
   borrow   115 bodies                        0.00s
   link     clang                             0.19s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s
-Finished 2 packages in 0.59s
+Finished 2 packages in 0.55s
 ```
 
-- Each member reports its own phases and ends with its own `Finished` or `Failed` line. The path in a member's `Finished` line is relative to the folder you ran the command in. Run from inside a member, it is outside that folder, so it is printed in full: `Finished /home/you/shop/build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s`.
+- Each member reports its own phases and ends with its own `Finished` or `Failed` line. `pricing` is a `library`, so it is checked and makes no file. The path in a member's `Finished` line is relative to the folder you ran the command in. Run from inside a member, it is outside that folder, so it is printed in full: `Finished /home/you/shop/build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s`.
 - The last line counts packages. A failing member does not stop the others; the last line then reads like `Failed 1 of 3 packages in 2.10s`, and the command exits 1.
 - On a terminal, each finished member collapses to one line, and the member in progress is labeled with its position, such as `[2/2] store`. See **Diagnostics and silk check** in Tools for how progress output works.
 - `silk test` still prints a `Package <name> (<dir>)` heading for each member and ends with `Workspace summary: 2 packages succeeded, 0 failed`.

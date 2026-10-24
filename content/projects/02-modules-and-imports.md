@@ -16,8 +16,8 @@ Member      = Identifier ('as' Identifier)?
 
 ## Files are modules
 
-- The module name is the file's path below `[package].source-root`, without `.silk`, with `/` written as `.`. `src/geometry/Point.silk` is `geometry.Point` when the source root is `src`.
-- The source root defaults to the directory of `[package].root`. See **The manifest**.
+- The module name is the file's path below `[package].source`, without `.silk`, with `/` written as `.`. `src/geometry/Point.silk` is `geometry.Point` when the source root is `src`.
+- The source root defaults to `src`. See **The manifest**.
 - Names match file names exactly, case included. `import geometry.point` does not find `Point.silk`.
 - A directory is not a module. `import geometry` fails when only `geometry/` exists.
 - There is no module declaration inside the file.
