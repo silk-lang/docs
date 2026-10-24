@@ -17,7 +17,7 @@ Every `silk` command, its options and its exit status. `silk` is the tool you ty
 | `silk format [paths]` | Rewrite source files in the standard layout |
 | `silk lsp` | Run the language server for an editor |
 | `silk doc` | Write the package's documentation as JSON |
-| `silk doctest` | Type-check the Silk examples in documentation comments |
+| `silk doctest` | Check and run the Silk examples in documentation comments |
 | `silk doc-reference` | Generate the Markdown std lib reference |
 | `silk change <subcommand>` | Record changes, version and release the package |
 | `silk use`, `silk set`, `silk update self` | Install, pin and select Silk versions, and update the tool |
@@ -45,7 +45,7 @@ When no manifest is found, the command stops with exit status 2:
 No silk.toml found from /home/you; run `silk init` to create a package here, or `silk init <name>` for a new folder
 ```
 
-A manifest that has `[workspace]` and no `[package]` is a workspace root. At a root, `check`, `build` and `test` run every member, and `format` and `doc` cover every member. See **Workspaces** in Projects and packages.
+A manifest that has `[workspace]` and no `[package]` is a workspace root. At a root, `check`, `build`, `test` and `doctest` run every member, and `format` and `doc` cover every member. See **Workspaces** in Projects and packages.
 
 ## Shared project options
 
@@ -233,11 +233,12 @@ Runs a language server that speaks the Language Server Protocol over standard in
 
 ```
 silk doc [--manifest-path <path> | --stdlib] [-o <json>] [--include-private] [--target <triple>] [--stdlib-root <directory>]
+silk doctest [--manifest-path <path>] [--target <triple>] [--stdlib-root <directory>]
 silk doctest (-i <json> | --stdlib) [--source-root <directory>] [--target <triple>] [--stdlib-root <directory>]
 silk doc-reference [--stdlib-root <directory>] -o <directory> [--check]
 ```
 
-`-o` is short for `--output` and `-i` for `--input`. `silk doc --help`, `silk doctest --help` and `silk doc-reference --help` print these three lines. `silk doc` warns on standard error about each documentation link that names no declaration. A link to a private declaration resolves only with `--include-private`. See **Doc tests and reference generation**.
+`-o` is short for `--output` and `-i` for `--input`. `silk doc --help`, `silk doctest --help` and `silk doc-reference --help` print these lines. `silk doc` warns on standard error about each documentation link that names no declaration. A link to a private declaration resolves only with `--include-private`. See **Doc tests and reference generation**.
 
 ## change
 
