@@ -4760,12 +4760,12 @@ pub fn main() -> u64 { return 0 }
 `silk build` prints:
 
 ```text
-src/main.silk:1:8: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput`
+src/main.silk:1:8: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` and whose errors all implement `Debug`
 ```
 
 The message describes the runtime that was selected. For a wasm32 build with `silk/wasm_start`, `pub effect fn main() -> i32` gives ``Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements``.
 
-Fix: Return `i32` or `()` from `main`, or an Effect that produces one of them. See Program entry and termination.
+Fix: Return `i32` or `()` from `main`, or an Effect that produces one of them. Implement `Debug` for each failure type `main` can raise, for example with `Format.debugFields`. See Program entry and termination.
 
 ### SEM0226
 
