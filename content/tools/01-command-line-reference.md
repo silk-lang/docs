@@ -1,6 +1,6 @@
 # Command-line reference
 
-Every `silk` command, its options and its exit status, and `sew`, which installs Silk versions and runs each command in the version a project pins. `silk help` (or `silk --help`) prints one line for each command, and `silk help <command>` (or `silk <command> --help`) prints that command's options. The pages after this one explain testing, formatting, diagnostics, documentation and changesets in more depth.
+Every `silk` command, its options and its exit status. `silk` is the tool you type: it installs Silk versions, records release notes, and hands every other command to `silkc`, the compiler of the version a project pins. `silk help` (or `silk --help`) prints one line for each command, and `silk help <command>` (or `silk <command> --help`) prints that command's options. The pages after this one explain testing, formatting, diagnostics, documentation and changesets in more depth.
 
 ## Commands
 
@@ -19,7 +19,8 @@ Every `silk` command, its options and its exit status, and `sew`, which installs
 | `silk doc` | Write the package's documentation as JSON |
 | `silk doctest` | Type-check the Silk examples in documentation comments |
 | `silk doc-reference` | Generate the Markdown std lib reference |
-| `silk changes <subcommand>` | Record changes, version and release the package |
+| `silk change <subcommand>` | Record changes, version and release the package |
+| `silk use`, `silk set`, `silk update self` | Install, pin and select Silk versions, and update the tool |
 | `silk help`, `silk --help`, `-h` | Print one line for each command and exit 0 |
 | `silk help <command>`, `silk <command> --help`, `-h` | Print that command's usage lines and exit 0 |
 | `silk --version`, `-v` | Print `silk v0.1.0` and exit 0 |
@@ -238,67 +239,68 @@ silk doc-reference [--stdlib-root <directory>] -o <directory> [--check]
 
 `-o` is short for `--output` and `-i` for `--input`. `silk doc --help`, `silk doctest --help` and `silk doc-reference --help` print these three lines. `silk doc` warns on standard error about each documentation link that names no declaration. A link to a private declaration resolves only with `--include-private`. See **Doc tests and reference generation**.
 
-## changes
+## change
 
 ```
-silk changes [--dir <path>] add patch|minor|major "Summary" [--migration "Guidance"]
-silk changes [--dir <path>] status [--tag <name>]
-silk changes [--dir <path>] version [--tag <name>]
-silk changes [--dir <path>] release [--json]
-silk changes [--dir <path>] snapshot --commit <sha> [--dev <n>] [--json]
-silk changes [--dir <path>] since [version|dependency] [--to <version>] [--from <version>] [--source <path>] [--json]
-silk changes [--dir <path>] recover
+silk change [--dir <path>] patch|minor|major "Summary" [--migration "Guidance"]
+silk change [--dir <path>] status [--tag <name>]
+silk change [--dir <path>] version [--tag <name>]
+silk change [--dir <path>] release [--json]
+silk change [--dir <path>] snapshot --commit <sha> [--dev <n>] [--json]
+silk change [--dir <path>] since [version|dependency] [--to <version>] [--from <version>] [--source <path>] [--json]
+silk change [--dir <path>] recover
 ```
 
-`silk changes --help` prints the full usage with notes. See **Changesets and releases**.
+`silk change --help` prints the full usage with notes. The `silk` tool runs these itself, whatever version the project pins. See **Changesets and releases**.
 
-## sew
+## Silk versions
 
 ```
-sew use [--json]
-sew use <version> [--dev] [--json]
-sew use list [--json]
-sew use which [--json]
-sew use uninstall <version>
-sew set <version> [--dev] [--json]
-sew update self [--dev]
-sew +<version> <command> [args]
-sew <command> [args]
+silk use [--json]
+silk use <version> [--dev] [--json]
+silk use list [--json]
+silk use which [--json]
+silk use uninstall <version>
+silk set <version> [--dev] [--json]
+silk update self [--dev]
+silk +<version> <command> [args]
 ```
 
-sew is the command you type for Silk, and the installer puts it on your `PATH` beside `silk`. It manages the Silk versions installed side by side in `$SILK_HOME/toolchains/<version>` (`SILK_HOME` defaults to `~/.silk`) and runs every other command, unchanged, in the version the directory selects: `sew build` is `silk build` from the pinned version. `$SILK_HOME/bin/silk` is a second name for the same program. Run as `silk`, it has no commands of its own and forwards every command the same way, for editors and scripts. The compiler itself has no version commands; a compiler you start directly runs itself.
+Silk ships as two programs. `silk` is the tool, the command you type, and the installer puts it on your `PATH`. `silkc` is the compiler, one per installed version. The tool manages the Silk versions installed side by side in `$SILK_HOME/toolchains/<version>` (`SILK_HOME` defaults to `~/.silk`) and runs every other command, unchanged, with the `silkc` of the version the directory selects: `silk build` is `silkc build` from the pinned version. The compilers are not on your `PATH`, so editors, scripts and habit always reach the pinned one. When nothing selects a version, the tool runs the `silkc` in the same folder as itself, which is how a release archive, Homebrew or mise works without `~/.silk`.
 
-Each installed version is a release archive unpacked as is: `bin/silk` beside `lib/silk/stdlib`. No command prompts. Results go to standard output, and `--json` prints one JSON object instead. `sew --help` prints the usage with notes, and `sew --version` prints `sew 0.1.0`. When `SILK_HOME` is unset and `HOME` names no existing directory, commands that need the store exit 1 with `sew: cannot find the toolchain directory; set SILK_HOME to an absolute path, or HOME to an existing directory`.
+Each installed version is a release archive unpacked as is, without its `bin/silk`: `bin/silkc` beside `lib/silk/stdlib`. No command prompts. Results go to standard output, and `--json` prints one JSON object instead. `silk --help` prints the usage with notes, and `silk --version` prints the version the directory selects, as `silk v0.1.0`. When `SILK_HOME` is unset and `HOME` names no existing directory, commands that need the store exit 1 with `silk: cannot find the toolchain directory; set SILK_HOME to an absolute path, or HOME to an existing directory`.
 
 | Command | What it does |
 | --- | --- |
 | `use` | Install the version this project pins. Leaves your default alone. Exits 2 where nothing is pinned |
-| `use <version>` | Install that version and make it your default, used outside projects and by `sew init`. Never edits a project |
+| `use <version>` | Install that version and make it your default, used outside projects and by `silk init`. Never edits a project |
 | `use list` | Every installed version, newest first. `*` marks the one selected here; tags say `pinned here` and `default` |
-| `use which` | The selected version, why it was selected, and the path of its `silk`. Exits 3 when it is not installed |
+| `use which` | The selected version, why it was selected, and the path of its `silkc`. Exits 3 when it is not installed |
 | `use uninstall <version>` | Delete that version's directory |
 | `set <version>` | Pin the project to that version in `silk.toml`. Downloads nothing |
-| `update self` | Replace sew with the one from the newest release. Installs no Silk version |
+| `update self` | Replace the tool with the one from the newest release. Installs no Silk version |
 
 A version is a release such as `0.1.0` or `0.1.0-dev.11`, `latest` (the newest stable release) or `dev` (the newest release, dev releases included); `latest --dev` is the same as `dev`. `use <version>` and `set` always write the full version, build metadata included.
 
 ```
-$ sew use list
-* 0.1.0-dev.11+6de14da2a8a6  (pinned here, default)  /home/you/.silk/toolchains/0.1.0-dev.11+6de14da2a8a6/bin/silk
-$ sew use which
-0.1.0-dev.11 (package silk-version in /home/you/app/silk.toml)
-/home/you/.silk/toolchains/0.1.0-dev.11+6de14da2a8a6/bin/silk
-$ sew use which --json
-{"version":"0.1.0-dev.11","origin":"package","manifest":"/home/you/app/silk.toml","installed":true,"path":"/home/you/.silk/toolchains/0.1.0-dev.11+6de14da2a8a6/bin/silk","install":"sew use"}
+$ silk use list
+* 0.1.0-dev.14+0066f03c8c33  (pinned here, default)  /home/you/.silk/toolchains/0.1.0-dev.14+0066f03c8c33/bin/silkc
+$ silk use which
+0.1.0-dev.14 (package silk-version in /home/you/app/silk.toml)
+/home/you/.silk/toolchains/0.1.0-dev.14+0066f03c8c33/bin/silkc
+$ silk use which --json
+{"version":"0.1.0-dev.14","origin":"package","manifest":"/home/you/app/silk.toml","installed":true,"path":"/home/you/.silk/toolchains/0.1.0-dev.14+0066f03c8c33/bin/silkc","install":"silk use"}
 ```
+
+A version released before the compiler was named `silkc` holds only `bin/silk`, the compiler; the tool runs that one instead.
 
 ### Which version a command runs
 
-sew picks a version before every command it forwards. The first of these that is set wins:
+The tool picks a version before every command it forwards. The first of these that is set wins:
 
 | Origin | `which` says | JSON `origin` |
 | --- | --- | --- |
-| `sew +<version> <command>` | `selected with +<version>` | `command-line` |
+| `silk +<version> <command>` | `selected with +<version>` | `command-line` |
 | `SILK_TOOLCHAIN` | `selected by SILK_TOOLCHAIN` | `environment` |
 | `[workspace].silk-version` of a workspace that lists the package | `workspace silk-version in <manifest>` | `workspace` |
 | `[package].silk-version` of the nearest `silk.toml` | `package silk-version in <manifest>` | `package` |
@@ -306,45 +308,45 @@ sew picks a version before every command it forwards. The first of these that is
 
 `silk-version = "0.0.0"` pins nothing. A version without build metadata, such as `0.1.0-dev.11`, matches the newest installed build of it, such as `0.1.0-dev.11+6de14da2a8a6`.
 
-sew then replaces itself with that version's `silk`, passing the arguments unchanged without the `+<version>`, and sets `SILK_TOOLCHAIN` to the full version and `SILK_HOME`. sew never reads a forwarded command's options, so a compiler command sew does not know still works.
+The tool then replaces itself with that version's `silkc`, passing the arguments unchanged without the `+<version>`, and sets `SILK_TOOLCHAIN` to the full version and `SILK_HOME`. It never reads a forwarded command's options, so a compiler command the tool does not know still works.
 
 When the selected version is not installed, the command does not run. It exits 3:
 
 ```
-$ sew build
-sew: Silk 0.1.0-dev.10+3934b61998da (package silk-version in /home/you/app/silk.toml) is not installed.
-Install it with: sew use
+$ silk build
+silk: Silk 0.1.0-dev.10+3934b61998da (package silk-version in /home/you/app/silk.toml) is not installed.
+Install it with: silk use
 ```
 
-When nothing selects a version, it also exits 3, with `sew: no Silk version is selected here: no project pins one and there is no default. Install the newest Silk as the default with: sew use latest`. A `+` argument that is not a semantic version is a usage error, exit 2:
+When nothing selects a version and no `silkc` sits beside the tool, it also exits 3, with `silk: no Silk version is selected here: no project pins one and there is no default. Install the newest Silk as the default with: silk use latest`. A `+` argument that is not a semantic version is a usage error, exit 2:
 
 ```
-$ sew +garbage build
-sew: `+garbage` is not a Silk version; +<version> takes a semantic version such as +0.1.0-dev.11
+$ silk +garbage build
+silk: `+garbage` is not a Silk version; +<version> takes a semantic version such as +0.1.0-dev.11
 ```
 
-A `silk-version` sew cannot read, such as a form a newer sew understands, is a configuration error, exit 2, ending with `A newer sew may read it; update sew with: sew update self`. sew never guesses what such a pin means.
+A `silk-version` the tool cannot read, such as a form a newer tool understands, is a configuration error, exit 2, ending with `A newer tool may read it; update silk with: silk update self`. The tool never guesses what such a pin means.
 
-With `SILK_AUTO_INSTALL=1` in the environment, or `auto-install = true` in `$SILK_HOME/settings.toml`, a missing version is installed first, with the notice `sew: installing Silk <version> (auto-install is on)` and the install output on standard error, so the command's own output stays alone on standard output. This install does not change your default.
+With `SILK_AUTO_INSTALL=1` in the environment, or `auto-install = true` in `$SILK_HOME/settings.toml`, a missing version is installed first, with the notice `silk: installing Silk <version> (auto-install is on)` and the install output on standard error, so the command's own output stays alone on standard output. This install does not change your default.
 
-`sew lsp` and `silk lsp` behave differently, because an editor starts them. When the version is missing, sew prints the same lines on standard error and then serves a minimal language server: it answers `initialize` with no capabilities, shows the message in the editor with `window/showMessage`, answers other requests with a `MethodNotFound` error, and exits 0 after `shutdown` and `exit`.
+`silk lsp` behaves differently, because an editor starts it. When the version is missing, the tool prints the same lines on standard error and then serves a minimal language server: it answers `initialize` with no capabilities, shows the message in the editor with `window/showMessage`, answers other requests with a `MethodNotFound` error, and exits 0 after `shutdown` and `exit`.
 
 ### use
 
 `use` downloads `silk-<version>-<target>.tar.gz`, its `.minisig` signature and `native-seed.json` from the silk-lang/silk GitHub releases, over HTTPS. Before installing, it checks:
 
 - the archive is signed by the Silk release key, and the trusted comment reads `silk v<version> <archive name>`;
-- `bin/silk` has the SHA-256 that `native-seed.json` names for the host target;
-- the archive holds `bin/silk` and `lib/silk/stdlib` and no path outside its top folder.
+- the compiler `bin/silkc` has the SHA-256 that `native-seed.json` names for the host target;
+- the archive holds the compiler and `lib/silk/stdlib` and no path outside its top folder.
 
-It unpacks into a hidden staging folder in `$SILK_HOME/toolchains` and renames it into place only when every check passes, so a failed or interrupted install leaves nothing. Installs hold a lock on `$SILK_HOME/.install.lock`, so two at once download a release once. Installing a version that is already there downloads nothing. Inside a project that pins another version, `use <version>` adds a note on standard error saying how to move the project with `sew set`.
+It unpacks into a hidden staging folder in `$SILK_HOME/toolchains` and renames it into place only when every check passes, so a failed or interrupted install leaves nothing. Installs hold a lock on `$SILK_HOME/.install.lock`, so two at once download a release once. Installing a version that is already there downloads nothing. Inside a project that pins another version, `use <version>` adds a note on standard error saying how to move the project with `silk set`.
 
 A version without build metadata is resolved to its newest published build, which needs the GitHub release listing. A full version does not.
 
-`SILK_TOOLCHAIN_MIRROR` names an absolute directory to install from instead of GitHub, for machines without access to it. It holds one `v<version>` folder of release assets per release, and the same checks apply. A relative path is refused with exit status 1: `sew: SILK_TOOLCHAIN_MIRROR must be an absolute directory path`. A tampered archive is refused with exit status 5:
+`SILK_TOOLCHAIN_MIRROR` names an absolute directory to install from instead of GitHub, for machines without access to it. It holds one `v<version>` folder of release assets per release, and the same checks apply. A relative path is refused with exit status 1: `silk: SILK_TOOLCHAIN_MIRROR must be an absolute directory path`. A tampered archive is refused with exit status 5:
 
 ```
-sew: silk-0.1.0-dev.11+6de14da2a8a6-x86_64-unknown-linux-gnu.tar.gz is not signed by the Silk release key: the signature does not match the file
+silk: silk-0.1.0-dev.14+0066f03c8c33-x86_64-unknown-linux-gnu.tar.gz is not signed by the Silk release key: the signature does not match the file
 ```
 
 ### set
@@ -352,45 +354,44 @@ sew: silk-0.1.0-dev.11+6de14da2a8a6-x86_64-unknown-linux-gnu.tar.gz is not signe
 `set` writes `silk-version` into the `[workspace]` table of the workspace that lists the package, or into the package's own `[package]` table, and moves the members' own pins along with a workspace pin. It downloads nothing, so it also works offline for a full version:
 
 ```
-$ sew set 0.1.0-dev.10
-Pinned Silk 0.1.0-dev.10+3934b61998da in /home/you/app/silk.toml ([package].silk-version)
-Silk 0.1.0-dev.10+3934b61998da is not installed yet. Install it with: sew use
-Was 0.1.0-dev.11. See what changed since then: silk changes since 0.1.0-dev.11
+$ silk set 0.1.0-dev.13
+Pinned Silk 0.1.0-dev.13+e62f1b34f810 in /home/you/app/silk.toml ([package].silk-version, was 0.1.0-dev.14+0066f03c8c33)
+Silk 0.1.0-dev.13+e62f1b34f810 is not installed yet. Install it with: silk use
 ```
 
-The last two lines go to standard error. Outside a project, `set` exits 2 with `` sew set: no silk.toml here or above; start a project with `sew init` ``. `set` refuses `0.0.0`.
+The last line goes to standard error. Outside a project, `set` exits 2 with `` silk set: no silk.toml here or above; start a project with `silk init` ``. `set` refuses `0.0.0`.
 
 ### uninstall
 
 ```
-$ sew use uninstall 0.1.0-dev.11
-Removed 0.1.0-dev.11+6de14da2a8a6
-It was your default; choose another with: sew use <version>
-This project pins it (package silk-version in /home/you/app/silk.toml), so its commands stop until you reinstall it with: sew use
-$ sew use uninstall 0.5.0
+$ silk use uninstall 0.1.0-dev.14
+Removed 0.1.0-dev.14+0066f03c8c33
+It was your default; choose another with: silk use <version>
+This project pins it (package silk-version in /home/you/app/silk.toml), so its commands stop until you reinstall it with: silk use
+$ silk use uninstall 0.5.0
 0.5.0 is not installed; nothing to remove
 ```
 
 ### update
 
-`sew update self`, or `sew update sew`, takes the newest stable release (the newest dev release while none is stable, or always with `--dev`), checks its archive's signature, and replaces `$SILK_HOME/bin/sew` and `$SILK_HOME/bin/silk` with its `bin/sew`. It installs no Silk version, and leaves a sew that is already as new alone. This and the installer are the only ways sew changes; it never updates itself on its own.
+`silk update self` takes the newest stable release (the newest dev release while none is stable, or always with `--dev`), checks its archive's signature, and replaces `$SILK_HOME/bin/silk` with its `bin/silk`. It installs no Silk version, and leaves a tool that is already as new alone. This and the installer are the only ways the tool changes; it never updates itself on its own.
 
-`sew update silk` changes nothing and exits 2, because Silk versions are installed side by side rather than updated:
+`silk update silk` changes nothing and exits 2, because Silk versions are installed side by side rather than updated:
 
 ```
-$ sew update silk
-sew update silk: Silk versions are not updated in place.
-To install the newest Silk as your default: sew use latest
-To move this project to it: sew set latest, then sew use
+$ silk update silk
+silk update silk: Silk versions are not updated in place.
+To install the newest Silk as your default: silk use latest
+To move this project to it: silk set latest, then silk use
 ```
 
-### Exit status of sew
+### Exit status of the tool
 
 | Status | Meaning |
 | --- | --- |
 | 0 | Success, including a command that changed nothing |
-| 1 | Failure: no toolchain directory, a mirror that cannot be read, a version that cannot be removed, a release without sew for `update self` |
-| 2 | Usage or configuration error: unknown subcommand or option, a version that is not a semantic version, `use` or `set` with no project, a pin sew cannot read |
+| 1 | Failure: no toolchain directory, a mirror that cannot be read, a version that cannot be removed, a release without the silk tool for `update self` |
+| 2 | Usage or configuration error: unknown subcommand or option, a version that is not a semantic version, `use` or `set` with no project, a pin the tool cannot read |
 | 3 | The selected version is not installed, or nothing selects one. Any forwarded command can exit 3 this way |
 | 4 | A download failed |
 | 5 | A release failed verification |
@@ -424,9 +425,9 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | Status | Meaning |
 | --- | --- |
 | 0 | Success. For `format --check`: every file is already formatted |
-| 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, a source file or folder named `silk` or `Intrinsic`, any `silk changes` error including a malformed `silk changes` command line |
+| 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, a source file or folder named `silk` or `Intrinsic`, any `silk change` error including a malformed `silk change` command line |
 | 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
-| 3, 4, 5 | From sew: the selected version is not installed, a download failed, or a release failed verification. See "Exit status of sew" |
+| 3, 4, 5 | From the tool: the selected version is not installed, a download failed, or a release failed verification. See "Exit status of the tool" |
 | other | `silk run` only: the program's own status |
 
 In a workspace, each member gets a status and the command exits with the worst one: 2 over 1 over 0.
@@ -435,7 +436,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 
 | Variable | Used for |
 | --- | --- |
-| `PATH` | Finding `clang`, and finding the installed `silk` and its std lib |
+| `PATH` | Finding `clang`, and finding the `silk` tool |
 | `SILK_CLANG` | The Clang executable, when `--clang` is not given |
 | `SILK_LLVM_AR` | The archiver for static libraries; default is `llvm-ar` beside Clang |
 | `SDKROOT`, `DEVELOPER_DIR` | macOS SDK selection; an invalid `SDKROOT` is an error |
@@ -444,14 +445,14 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
 | `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
-| `SSL_CERT_FILE` | The certificate bundle for `silk changes since` and `sew use` when they fetch releases over HTTPS |
-| `SILK_HOME` | For sew: where versions, `bin/sew` and `settings.toml` live; default `~/.silk`. Must be an absolute path |
-| `SILK_TOOLCHAIN` | For sew: the version to run, overriding the project's pin. sew sets it to the full version it runs |
-| `SILK_AUTO_INSTALL` | For sew: `1` installs a missing selected version before running the command |
-| `SILK_TOOLCHAIN_MIRROR` | For sew: an absolute directory of release assets to install from instead of GitHub |
+| `SSL_CERT_FILE` | The certificate bundle for `silk change since` and `silk use` when they fetch releases over HTTPS |
+| `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path |
+| `SILK_TOOLCHAIN` | For the tool: the version to run, overriding the project's pin. The tool sets it to the full version it runs |
+| `SILK_AUTO_INSTALL` | For the tool: `1` installs a missing selected version before running the command |
+| `SILK_TOOLCHAIN_MIRROR` | For the tool: an absolute directory of release assets to install from instead of GitHub |
 | `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE` | Passed through to Clang; no other variable is |
 
-The installer reads `SILK_HOME`, `SILK_RELEASE` and `SILK_CHANNEL`; see **Install**. The std lib is found at `lib/silk/stdlib` beside the `bin` directory that holds `silk`, following symbolic links.
+The installer reads `SILK_HOME`, `SILK_RELEASE` and `SILK_CHANNEL`; see **Install**. The std lib is found at `lib/silk/stdlib` beside the `bin` directory that holds `silkc`, following symbolic links.
 
 ## Output streams
 

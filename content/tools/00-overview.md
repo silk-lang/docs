@@ -10,4 +10,4 @@ The `silk` command does more than compile. This section covers the tools around 
 - **Diagnostics and silk check**: read a compiler error and the progress rows, what the code families mean, find slow modules, and get diagnostics as JSON.
 - **Writing documentation**: doc comments, the standard headings, links to declarations, and examples.
 - **Doc tests and reference generation**: extract documentation with `silk doc`, check its examples with `silk doctest`, and generate the std lib reference.
-- **Changesets and releases**: record changes, choose versions, write the changelog and publish notes with `silk changes`.
+- **Changesets and releases**: record changes, choose versions, write the changelog and publish notes with `silk change`.
