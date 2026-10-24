@@ -22,7 +22,7 @@ import silk.effect { Effect }
 import silk.logger { LogError }
 import silk.os_logger { StdoutLogger }
 
-struct Point { x: i32
+struct Point { x: i32,
   y: i32 }
 
 fn sum(p: &Point) -> i32 { return p.x + p.y }

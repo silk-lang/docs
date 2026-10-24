@@ -25,7 +25,7 @@ There is no streaming in either direction. You cannot write to the child's stand
 
 ```silk
 // A request for `program` with the given arguments, in order.
-effect fn command(program: string, args: &[&[u8]]) -> ProcessRequest ! FileError | OutOfMemoryError ? &mut Allocator {
+effect fn command(program: string, args: &[string]) -> ProcessRequest ! FileError | OutOfMemoryError ? &mut Allocator {
   let path = run Path.make(program)
   let mut request = run ChildProcess.request(&path)
   let mut index: usize = 0
@@ -37,11 +37,11 @@ effect fn command(program: string, args: &[&[u8]]) -> ProcessRequest ! FileError
 }
 ```
 
-`ChildProcess.addArgument(&mut request, bytes)` appends one argument. Arguments are bytes, not text, so a value you got from the host can be passed on unchanged. The one rule: no NUL byte in an argument, a variable name or a value. The request uses NUL to separate entries.
+`ChildProcess.addArgument(&mut request, text)` appends one argument. Arguments are bytes to the operating system, so a value you got from the host as bytes, which need not be valid UTF-8, can be passed on unchanged with `ChildProcess.addArgumentBytes`. The one rule: no NUL byte in an argument, a variable name or a value. The request uses NUL to separate entries.
 
 `addArgument` and `setVariable` are declared on `ChildProcess`, not on `ProcessRequest`, so call them as `ChildProcess.addArgument(&mut request, ...)`. `request.addArgument(...)` is SEM0010, "A known actor called with an unknown operation name".
 
-For a program with no arguments, pass an empty array. An empty array literal takes its type from what it is assigned to, so name the type in a `let`: `let none: [&[u8]; 0] = []`, then `command("/bin/cat", &none)`. Written directly as an argument, `command("/bin/cat", &[])` is SEM0029, "An empty array literal needs an expected Array type", because the parameter is a slice, not an array.
+For a program with no arguments, pass an empty array. An empty array literal takes its type from what it is assigned to, so name the type in a `let`: `let none: [string; 0] = []`, then `command("/bin/cat", &none)`. Written directly as an argument, `command("/bin/cat", &[])` is SEM0029, "An empty array literal needs an expected Array type", because the parameter is a slice, not an array.
 
 ## Reading the outcome
 
@@ -149,24 +149,24 @@ effect fn demo() -> ()
 ! ProcessError | FileError | OutOfMemoryError | LogError
 ? &mut ChildProcess | &mut Allocator | &mut Logger {
   // Arguments are passed as they are. Nothing is split or expanded.
-  let echo = run command("/bin/echo", &[b"two  spaces", b"$HOME", b"*.silk"])
+  let echo = run command("/bin/echo", &["two  spaces", "$HOME", "*.silk"])
   run report("echo", &echo)
 
   // An empty argument list. `[]` takes its type from the annotation.
-  let none: [&[u8]; 0] = []
+  let none: [string; 0] = []
 
   // The environment starts empty. The child sees only what you set.
   let mut env = run command("/usr/bin/env", &none)
-  run ChildProcess.setVariable(&mut env, b"GREETING", b"hello")
-  run ChildProcess.setVariable(&mut env, b"LANG", b"C")
+  run ChildProcess.setVariable(&mut env, "GREETING", "hello")
+  run ChildProcess.setVariable(&mut env, "LANG", "C")
   run report("env", &env)
 
   // A nonzero exit is a normal outcome, with both streams captured.
-  let failing = run command("/bin/sh", &[b"-c", b"echo working; echo 'disk full' >&2; exit 3"])
+  let failing = run command("/bin/sh", &["-c", "echo working; echo 'disk full' >&2; exit 3"])
   run report("sh exit 3", &failing)
 
   // A child killed by a signal is reported differently from an exit code.
-  let killed = run command("/bin/sh", &[b"-c", b"kill -TERM $$"])
+  let killed = run command("/bin/sh", &["-c", "kill -TERM $$"])
   run report("sh kill", &killed)
 
   // The child's standard input is closed, so cat sees the end at once.
@@ -197,7 +197,7 @@ pub effect fn main() -> () ! ProcessError | FileError | OutOfMemoryError | LogEr
 
 When you need a shell feature such as a pipe or a redirect, run `/bin/sh` with `-c` and the script as one argument, as the third and fourth requests do. Then the shell's quoting rules apply to that script, so never build it from untrusted input.
 
-`ChildProcess.setVariable` appends one `name=value` entry. To pass on a variable of your own process, read it with `HostInput.variable` and set it on the request. `ChildProcess.requestWithin(&program, &directory)` picks the working directory.
+`ChildProcess.setVariable` appends one `name=value` entry. To pass on a variable of your own process, read it with `HostInput.variableNamed`, which gives bytes, and set it on the request with `ChildProcess.setVariableBytes`. `ChildProcess.requestWithin(&program, &directory)` picks the working directory.
 
 The imports:
 
