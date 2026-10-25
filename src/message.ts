@@ -21,6 +21,7 @@ export const Message = defineMessageUnion({
     document: Markdown.MarkdownDocument,
   },
   FailedLoadDocument: { key: Schema.String },
+  PointedAtDocLink: { key: Schema.String },
   UpdatedSidebarQuery: { value: Schema.String },
   ClickedSidebarGroup: { groupKey: Schema.String },
   PressedSearchShortcut: {},

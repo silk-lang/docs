@@ -287,6 +287,43 @@ const pager = (page: Catalog.DocPage, h: HtmlBuilder<Message>): Html => {
 const statusMessage = (text: string, h: HtmlBuilder<Message>): Html =>
   h.p([h.Role('status'), h.Class('leading-prose text-muted')], [text])
 
+// Stands in for the article while its document downloads. It stays invisible
+// for a moment (`docs-skeleton` in styles.css) so a quick load never flashes.
+const skeletonLines = (
+  widths: ReadonlyArray<string>,
+  lineClass: string,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.div(
+    [h.Class('flex flex-col gap-3')],
+    Array.map(widths, width =>
+      h.div([h.Class(`${lineClass} ${width} rounded-full bg-rule`)]),
+    ),
+  )
+
+const loadingSkeleton = (h: HtmlBuilder<Message>): Html =>
+  h.div(
+    [
+      h.Role('status'),
+      h.AriaBusy(true),
+      h.Class('docs-skeleton flex flex-col gap-6'),
+    ],
+    [
+      h.span([h.Class('sr-only')], ['Loading this page.']),
+      skeletonLines(['w-full', 'w-11/12', 'w-3/5'], 'h-4.5', h),
+      h.div(
+        [h.AriaHidden(true), h.Class('flex flex-col gap-5')],
+        [
+          skeletonLines(['w-full', 'w-full', 'w-4/5'], 'h-3.5', h),
+          h.div([h.Class('h-6 w-2/5 rounded-full bg-rule')]),
+          skeletonLines(['w-full', 'w-10/12'], 'h-3.5', h),
+          h.div([h.Class('h-44 rounded-2xl bg-rule/60')]),
+          skeletonLines(['w-full', 'w-full', 'w-2/3'], 'h-3.5', h),
+        ],
+      ),
+    ],
+  )
+
 const articleBody = (
   model: Model,
   page: Catalog.DocPage,
@@ -294,8 +331,8 @@ const articleBody = (
 ): Html => {
   const key = Catalog.pageKey(page)
   return DocState.match(model.doc, {
-    Idle: () => statusMessage('Loading this page.', h),
-    Loading: () => statusMessage('Loading this page.', h),
+    Idle: () => loadingSkeleton(h),
+    Loading: () => loadingSkeleton(h),
     Failed: () =>
       statusMessage(
         'This page could not be loaded. Check your connection and reload.',
@@ -303,7 +340,7 @@ const articleBody = (
       ),
     Loaded: loaded => {
       if (loaded.key !== key) {
-        return statusMessage('Loading this page.', h)
+        return loadingSkeleton(h)
       }
       const { maybeLede, body } = DocsMarkdown.splitLede(loaded.document)
       return h.keyed('div')(

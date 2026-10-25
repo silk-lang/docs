@@ -14,8 +14,8 @@ const HEAD = [
   '<link rel="icon" type="image/svg+xml" href="/brand/silk-avatar-light.svg" media="(prefers-color-scheme: light)">',
   '<link rel="icon" type="image/svg+xml" href="/brand/silk-avatar-dark.svg" media="(prefers-color-scheme: dark)">',
   '<link rel="apple-touch-icon" href="/brand/silk-avatar-dark.png">',
-  '<link rel="preload" href="/fonts/SpaceMono-Regular.ttf" as="font" type="font/ttf" crossorigin>',
-  '<link rel="preload" href="/fonts/SpaceMono-Bold.ttf" as="font" type="font/ttf" crossorigin>',
+  '<link rel="preload" href="/fonts/SpaceMono-Regular.woff2" as="font" type="font/woff2" crossorigin>',
+  '<link rel="preload" href="/fonts/SpaceMono-Bold.woff2" as="font" type="font/woff2" crossorigin>',
 ].join('')
 
 export const renderDocument: Server.DocumentRenderer = (application, assets) =>

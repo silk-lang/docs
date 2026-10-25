@@ -1,6 +1,7 @@
 import {
   Array,
   Effect,
+  HashMap,
   HashSet,
   Option,
   Queue,
@@ -19,7 +20,11 @@ import {
 import { type Document, type Html, type HtmlBuilder } from 'foldkit/html'
 import { UrlRequest, load, pushUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
-import { type Url, toString as urlToString } from 'foldkit/url'
+import {
+  type Url,
+  fromString as urlFromString,
+  toString as urlToString,
+} from 'foldkit/url'
 
 import * as Catalog from './docs/catalog'
 import * as Content from './docs/content'
@@ -58,6 +63,22 @@ const docStateKey = (doc: DocState): Option.Option<string> =>
     Failed: ({ key }) => Option.some(key),
   })
 
+const routeKey = (route: AppRoute): Option.Option<string> =>
+  Option.map(routePage(route), Catalog.pageKey)
+
+// The pages a reader is likely to open next, fetched ahead of time.
+const neighborKeys = (route: AppRoute): ReadonlyArray<string> =>
+  Option.match(routePage(route), {
+    onNone: () => [],
+    onSome: page => {
+      const { maybePrevious, maybeNext } = Catalog.neighbors(page)
+      return Array.map(
+        Array.getSomes([maybeNext, maybePrevious]),
+        Catalog.pageKey,
+      )
+    },
+  })
+
 const openGroupsFor = (
   openGroups: HashSet.HashSet<string>,
   route: AppRoute,
@@ -93,24 +114,30 @@ export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
     openGroups: openGroupsFor(HashSet.empty(), route),
     maybeActiveSection: Option.none(),
     maybePendingAnchor: Option.none(),
+    documents: HashMap.empty(),
+    requestedDocumentKeys: HashSet.empty(),
   }
 
   return Option.match(maybePage, {
     onNone: () => ({ model: baseModel }),
     onSome: page =>
       Option.match(maybeFlaggedDocument, {
-        onSome: ({ key, document }) => ({
-          model: modifyFields(baseModel, {
-            doc: () => DocState.Loaded({ key, document }),
-          }),
-        }),
-        onNone: () => ({
-          model: modifyFields(baseModel, {
-            doc: () => DocState.Loading({ key: Catalog.pageKey(page) }),
-            maybePendingAnchor: () => url.hash,
-          }),
-          commands: [LoadDocument({ key: Catalog.pageKey(page) })],
-        }),
+        onSome: ({ key, document }) =>
+          requestDocuments(
+            modifyFields(baseModel, {
+              doc: () => DocState.Loaded({ key, document }),
+              documents: HashMap.set(key, document),
+            }),
+            neighborKeys(route),
+          ),
+        onNone: () =>
+          requestDocuments(
+            modifyFields(baseModel, {
+              doc: () => DocState.Loading({ key: Catalog.pageKey(page) }),
+              maybePendingAnchor: () => url.hash,
+            }),
+            [Catalog.pageKey(page)],
+          ),
       }),
   })
 }
@@ -189,6 +216,47 @@ export const FocusSearch = Command.define('FocusSearch', {
 
 type UpdateReturn = Update.Return<Model, Message>
 
+// Starts a download for each key that is neither downloaded nor on its way.
+// Vite keeps every loaded chunk, so a document is fetched once per visit.
+const requestDocuments = (
+  model: Model,
+  keys: ReadonlyArray<string>,
+  commands: ReadonlyArray<Command.Command<Message>> = [],
+): UpdateReturn => {
+  const missingKeys = Array.dedupe(
+    Array.filter(
+      keys,
+      key =>
+        !HashMap.has(model.documents, key) &&
+        !HashSet.has(model.requestedDocumentKeys, key),
+    ),
+  )
+  return Array.isReadonlyArrayEmpty(missingKeys) &&
+    Array.isReadonlyArrayEmpty(commands)
+    ? { model }
+    : {
+        model: modifyFields(model, {
+          requestedDocumentKeys: requestedKeys =>
+            Array.reduce(missingKeys, requestedKeys, (keySet, key) =>
+              HashSet.add(keySet, key),
+            ),
+        }),
+        commands: [
+          ...commands,
+          ...Array.map(missingKeys, key => LoadDocument({ key })),
+        ],
+      }
+}
+
+const scrollCommands = (
+  url: Url,
+  isSamePath: boolean,
+): ReadonlyArray<Command.Command<Message>> =>
+  Option.match(url.hash, {
+    onNone: () => (isSamePath ? [] : [ScrollToTop()]),
+    onSome: hash => [ScrollToAnchor({ hash })],
+  })
+
 const changeUrl = (model: Model, url: Url): UpdateReturn => {
   const nextRoute = urlToAppRoute(url)
   const isSamePath = routePath(nextRoute) === routePath(model.route)
@@ -209,30 +277,53 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
   })
 
   return Option.match(maybeNextKey, {
-    onSome: key =>
-      isDocumentCurrent
-        ? {
-            model: nextModel,
-            commands: Option.match(url.hash, {
-              onNone: () => (isSamePath ? [] : [ScrollToTop()]),
-              onSome: hash => [ScrollToAnchor({ hash })],
+    onSome: key => {
+      if (isDocumentCurrent) {
+        return { model: nextModel, commands: scrollCommands(url, isSamePath) }
+      }
+      return Option.match(HashMap.get(model.documents, key), {
+        onSome: document =>
+          requestDocuments(
+            modifyFields(nextModel, {
+              doc: () => DocState.Loaded({ key, document }),
             }),
-          }
-        : {
-            model: modifyFields(nextModel, {
+            neighborKeys(nextRoute),
+            scrollCommands(url, isSamePath),
+          ),
+        onNone: () =>
+          requestDocuments(
+            modifyFields(nextModel, {
               doc: () => DocState.Loading({ key }),
               maybePendingAnchor: () => url.hash,
             }),
-            commands: [LoadDocument({ key }), ScrollToTop()],
-          },
+            [key],
+            [ScrollToTop()],
+          ),
+      })
+    },
     onNone: () => ({
       model: nextModel,
-      commands: Option.match(url.hash, {
-        onNone: () => (isSamePath ? [] : [ScrollToTop()]),
-        onSome: hash => [ScrollToAnchor({ hash })],
-      }),
+      commands: scrollCommands(url, isSamePath),
     }),
   })
+}
+
+// The page key a link points at, when it is a docs page.
+const docLinkKey = (target: EventTarget | null): Option.Option<string> => {
+  if (!(target instanceof Element)) {
+    return Option.none()
+  }
+  const anchor = target.closest('a[href]')
+  if (
+    !(anchor instanceof HTMLAnchorElement) ||
+    anchor.origin !== window.location.origin
+  ) {
+    return Option.none()
+  }
+  return pipe(
+    urlFromString(anchor.href),
+    Option.flatMap(url => routeKey(urlToAppRoute(url))),
+  )
 }
 
 // Static files such as /releases/index.json sit beside the pages but are not
@@ -278,25 +369,38 @@ export const update = (model: Model, message: Message) =>
     CompletedWaitBeforeHidingCopied: ({ codeId }) => ({
       model: modifyFields(model, { copiedCodeIds: HashSet.remove(codeId) }),
     }),
-    SucceededLoadDocument: ({ key, document }) =>
-      Option.contains(docStateKey(model.doc), key)
-        ? {
-            model: modifyFields(model, {
+    SucceededLoadDocument: ({ key, document }) => {
+      const cachedModel = modifyFields(model, {
+        documents: HashMap.set(key, document),
+        requestedDocumentKeys: HashSet.remove(key),
+      })
+      return model.doc._tag === 'Loading' && model.doc.key === key
+        ? requestDocuments(
+            modifyFields(cachedModel, {
               doc: () => DocState.Loaded({ key, document }),
               maybePendingAnchor: () => Option.none(),
             }),
-            commands: Option.match(model.maybePendingAnchor, {
+            neighborKeys(model.route),
+            Option.match(model.maybePendingAnchor, {
               onNone: () => [],
               onSome: hash => [ScrollToAnchor({ hash })],
             }),
-          }
-        : { model },
-    FailedLoadDocument: ({ key }) =>
-      Option.contains(docStateKey(model.doc), key)
+          )
+        : { model: cachedModel }
+    },
+    FailedLoadDocument: ({ key }) => {
+      const nextModel = modifyFields(model, {
+        requestedDocumentKeys: HashSet.remove(key),
+      })
+      return model.doc._tag === 'Loading' && model.doc.key === key
         ? {
-            model: modifyFields(model, { doc: () => DocState.Failed({ key }) }),
+            model: modifyFields(nextModel, {
+              doc: () => DocState.Failed({ key }),
+            }),
           }
-        : { model },
+        : { model: nextModel }
+    },
+    PointedAtDocLink: ({ key }) => requestDocuments(model, [key]),
     UpdatedSidebarQuery: ({ value }) => ({
       model: modifyFields(model, { sidebarQuery: () => value }),
     }),
@@ -352,6 +456,29 @@ export const subscriptions = Subscription.make<Model, Message>()(entry => ({
             },
           }),
           Effect.sync(() => isDocsRoute),
+        ),
+    },
+  ),
+  // Hovering, focusing or touching a docs link starts downloading its page, so
+  // the document is usually there by the time the click lands.
+  docLinkIntent: entry(
+    { isListening: Schema.Boolean },
+    {
+      modelToDependencies: () => ({ isListening: true }),
+      dependenciesToStream: () =>
+        Stream.mergeAll(
+          Array.map(['pointerover', 'focusin', 'touchstart'] as const, type =>
+            Dom.streamFromEventFilterMap({
+              target: document,
+              type,
+              options: { passive: true },
+              filterMapEvent: event =>
+                Option.map(docLinkKey(event.target), key =>
+                  Message.PointedAtDocLink({ key }),
+                ),
+            }),
+          ),
+          { concurrency: 'unbounded' },
         ),
     },
   ),

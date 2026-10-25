@@ -1,4 +1,4 @@
-import { HashSet, Option } from 'effect'
+import { HashMap, HashSet, Option } from 'effect'
 
 import { DocState, Model } from './model'
 import { type AppRoute } from './route'
@@ -12,4 +12,6 @@ export const testModel = (route: AppRoute): Model =>
     openGroups: HashSet.empty(),
     maybeActiveSection: Option.none(),
     maybePendingAnchor: Option.none(),
+    documents: HashMap.empty(),
+    requestedDocumentKeys: HashSet.empty(),
   })
