@@ -407,7 +407,12 @@ const toHit = (
   snippet: String.isEmpty(section.text)
     ? []
     : highlight(snippetText(section.text, queryWords), queryWords),
-  signature: section.signature.split('\n')[0] ?? '',
+  // A long signature wraps its parameters over several lines; joined, it
+  // reads as one line that the view truncates.
+  signature: section.signature
+    .replace(/\(\s+/g, '(')
+    .replace(/,?\s*\n\s*\)/g, ')')
+    .replace(/\s+/g, ' '),
 })
 
 // Hits stay in score order inside a page, and pages in the order of their best
