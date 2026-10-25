@@ -4,6 +4,7 @@ import { defineTaggedUnion } from 'foldkit/schema'
 import * as Markdown from '@foldkit/markdown'
 
 import { AppRoute } from './route'
+import * as Search from './search'
 
 export const DocState = defineTaggedUnion({
   Idle: {},
@@ -17,7 +18,6 @@ export const Model = Schema.Struct({
   route: AppRoute,
   copiedCodeIds: Schema.HashSet(Schema.String),
   doc: DocState,
-  sidebarQuery: Schema.String,
   openGroups: Schema.HashSet(Schema.String),
   maybeActiveSection: Schema.Option(Schema.String),
   maybePendingAnchor: Schema.Option(Schema.String),
@@ -25,6 +25,7 @@ export const Model = Schema.Struct({
   // opening a prefetched one shows it without a loading state.
   documents: Schema.HashMap(Schema.String, Markdown.MarkdownDocument),
   requestedDocumentKeys: Schema.HashSet(Schema.String),
+  search: Search.Model,
 })
 export type Model = typeof Model.Type
 

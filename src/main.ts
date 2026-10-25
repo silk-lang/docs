@@ -9,14 +9,7 @@ import {
   Stream,
   pipe,
 } from 'effect'
-import {
-  Command,
-  Dom,
-  Render,
-  Runtime,
-  Subscription,
-  type Update,
-} from 'foldkit'
+import { Command, Dom, Render, Runtime, Subscription, Update } from 'foldkit'
 import { type Document, type Html, type HtmlBuilder } from 'foldkit/html'
 import { UrlRequest, load, pushUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
@@ -36,6 +29,7 @@ import * as DocsPage from './page/docs'
 import * as Home from './page/home'
 import * as Releases from './page/releases'
 import { AppRoute, homeRouter, urlToAppRoute } from './route'
+import * as Search from './search'
 
 export { Flags, Message, Model }
 
@@ -94,10 +88,12 @@ const openGroupsFor = (
 
 // INIT
 
-export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
-  flags,
-  url,
-) => {
+export const init: Runtime.RoutingApplicationInit<
+  Model,
+  Message,
+  Flags,
+  Search.SearchIndexService
+> = (flags, url) => {
   const route = urlToAppRoute(url)
   const maybePage = routePage(route)
   const maybeFlaggedDocument = pipe(
@@ -110,12 +106,12 @@ export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
     route,
     copiedCodeIds: HashSet.empty(),
     doc: DocState.Idle(),
-    sidebarQuery: '',
     openGroups: openGroupsFor(HashSet.empty(), route),
     maybeActiveSection: Option.none(),
     maybePendingAnchor: Option.none(),
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
+    search: Search.init().model,
   }
 
   return Option.match(maybePage, {
@@ -204,17 +200,39 @@ export const LoadDocument = Command.define('LoadDocument', {
     ),
 })
 
-export const FocusSearch = Command.define('FocusSearch', {
-  messages: [Message.CompletedFocusSearch],
-  execute: Dom.focus(`#${DocsPage.SEARCH_INPUT_ID}`).pipe(
-    Effect.ignore,
-    Effect.as(Message.CompletedFocusSearch()),
-  ),
-})
-
 // UPDATE
 
-type UpdateReturn = Update.Return<Model, Message>
+type UpdateReturn = Update.Return<Model, Message, Search.SearchIndexService>
+
+const readSearch = (model: Model): Option.Option<Search.Model> =>
+  Option.some(model.search)
+
+const writeSearch = (model: Model, nextSearch: Search.Model): Model =>
+  modifyFields(model, { search: () => nextSearch })
+
+const toGotSearchMessage = (message: Search.Message): Message =>
+  Message.GotSearchMessage({ message })
+
+const foldSearch = Update.foldChild({
+  update: Search.update,
+  read: readSearch,
+  write: writeSearch,
+  toParentMessage: toGotSearchMessage,
+})
+
+const foldSearchOpen = Update.foldChildStep({
+  update: Search.open,
+  read: readSearch,
+  write: writeSearch,
+  toParentMessage: toGotSearchMessage,
+})
+
+const foldSearchRouteChanged = Update.foldChildStep({
+  update: Search.informRouteChanged,
+  read: readSearch,
+  write: writeSearch,
+  toParentMessage: toGotSearchMessage,
+})
 
 // Starts a download for each key that is neither downloaded nor on its way.
 // Vite keeps every loaded chunk, so a document is fetched once per visit.
@@ -347,7 +365,11 @@ export const update = (model: Model, message: Message) =>
           commands: [LoadExternal({ href })],
         }),
       }),
-    ChangedUrl: ({ url }) => changeUrl(model, url),
+    ChangedUrl: ({ url }) =>
+      Update.combine(model, [
+        foldSearchRouteChanged,
+        stepModel => changeUrl(stepModel, url),
+      ]),
     CompletedNavigateInternal: () => ({ model }),
     CompletedLoadExternal: () => ({ model }),
     CompletedScrollToTop: () => ({ model }),
@@ -401,9 +423,6 @@ export const update = (model: Model, message: Message) =>
         : { model: nextModel }
     },
     PointedAtDocLink: ({ key }) => requestDocuments(model, [key]),
-    UpdatedSidebarQuery: ({ value }) => ({
-      model: modifyFields(model, { sidebarQuery: () => value }),
-    }),
     ClickedSidebarGroup: ({ groupKey }) => ({
       model: modifyFields(model, {
         openGroups: openGroups =>
@@ -412,8 +431,9 @@ export const update = (model: Model, message: Message) =>
             : HashSet.add(openGroups, groupKey),
       }),
     }),
-    PressedSearchShortcut: () => ({ model, commands: [FocusSearch()] }),
-    CompletedFocusSearch: () => ({ model }),
+    PressedSearchShortcut: () => foldSearchOpen(model),
+    ClickedOpenSearch: () => foldSearchOpen(model),
+    GotSearchMessage: ({ message }) => foldSearch(model, message),
     ChangedActiveSection: ({ sectionId }) => ({
       model: modifyFields(model, {
         maybeActiveSection: () => Option.some(sectionId),
@@ -433,14 +453,14 @@ const loadedTableOfContents = (model: Model): ReadonlyArray<string> =>
   })
 
 export const subscriptions = Subscription.make<Model, Message>()(entry => ({
+  // `/` or Cmd+K (Ctrl+K off macOS) opens search from any page.
   searchShortcut: entry(
-    { isDocsRoute: Schema.Boolean },
+    { isSearchOpen: Schema.Boolean },
     {
       modelToDependencies: model => ({
-        isDocsRoute:
-          model.route._tag === 'Docs' || model.route._tag === 'DocPage',
+        isSearchOpen: model.search.dialog.isOpen,
       }),
-      dependenciesToStream: ({ isDocsRoute }) =>
+      dependenciesToStream: ({ isSearchOpen }) =>
         Stream.when(
           Dom.streamFromEventFilterMapPreventDefault({
             target: document,
@@ -449,13 +469,18 @@ export const subscriptions = Subscription.make<Model, Message>()(entry => ({
               const target = event.target
               const isTyping =
                 target instanceof HTMLInputElement ||
-                target instanceof HTMLTextAreaElement
-              return event.key === '/' && !isTyping
+                target instanceof HTMLTextAreaElement ||
+                (target instanceof HTMLElement && target.isContentEditable)
+              const isSlash = event.key === '/' && !isTyping
+              const isCommandK =
+                (event.metaKey || event.ctrlKey) &&
+                event.key.toLowerCase() === 'k'
+              return isSlash || isCommandK
                 ? Option.some(Message.PressedSearchShortcut())
                 : Option.none()
             },
           }),
-          Effect.sync(() => isDocsRoute),
+          Effect.sync(() => !isSearchOpen),
         ),
     },
   ),
@@ -613,7 +638,15 @@ const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
     NotFound: () => notFound(h),
   })
 
+const searchView = (model: Model, h: HtmlBuilder<Message>): Html =>
+  h.submodel({
+    slotId: 'search',
+    model: model.search,
+    view: Search.view,
+    toParentMessage: toGotSearchMessage,
+  })
+
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
   title: routeTitle(model.route),
-  body: pageView(model, h),
+  body: h.div([], [pageView(model, h), searchView(model, h)]),
 })

@@ -37,6 +37,16 @@ export const arrowUpRight = <Message>(
   h: HtmlBuilder<Message>,
 ): Html => strokeIcon('M4.5 11.5l7-7M5.5 4.5h6v6', className, h)
 
+export const search = <Message>(
+  className: string,
+  h: HtmlBuilder<Message>,
+): Html =>
+  strokeIcon(
+    'M7 12.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM14.5 14.5l-3.6-3.6',
+    className,
+    h,
+  )
+
 export const chevronDown = <Message>(
   className: string,
   h: HtmlBuilder<Message>,

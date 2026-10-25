@@ -1,7 +1,9 @@
 import { type Html, type HtmlBuilder } from 'foldkit/html'
 
 import * as Icon from './icon'
+import { Message } from './message'
 import { docsRouter, homeRouter, releasesRouter } from './route'
+import * as Search from './search'
 
 export const GITHUB_URL = 'https://github.com/silk-lang/silk'
 
@@ -32,10 +34,26 @@ const navLink = <Message>(
     [label],
   )
 
-export const siteNav = <Message>(
-  current: NavSection,
-  h: HtmlBuilder<Message>,
-): Html =>
+const searchButton = (h: HtmlBuilder<Message>): Html =>
+  h.button(
+    [
+      h.Type('button'),
+      h.AriaLabel('Search'),
+      h.AriaHasPopup('dialog'),
+      h.OnClick(Message.ClickedOpenSearch(), {
+        focusSelector: `#${Search.KEYBOARD_WARMUP_INPUT_ID}`,
+      }),
+      h.Class(
+        'flex cursor-pointer items-center gap-1.5 text-ink hover:underline underline-offset-4',
+      ),
+    ],
+    [
+      Icon.search('size-3.5', h),
+      h.span([h.Class('hidden sm:inline')], ['Search']),
+    ],
+  )
+
+export const siteNav = (current: NavSection, h: HtmlBuilder<Message>): Html =>
   h.header(
     [h.Class('border-b border-rule')],
     [
@@ -54,6 +72,7 @@ export const siteNav = <Message>(
           h.div(
             [h.Class('flex items-center gap-6 text-sm md:gap-9')],
             [
+              searchButton(h),
               navLink('Docs', docsRouter(), current === 'Docs', h),
               navLink('Releases', releasesRouter(), current === 'Releases', h),
               h.a(
@@ -115,7 +134,7 @@ export const siteFooter = <Message>(h: HtmlBuilder<Message>): Html =>
     ],
   )
 
-export const page = <Message>(
+export const page = (
   current: NavSection,
   content: ReadonlyArray<Html>,
   h: HtmlBuilder<Message>,

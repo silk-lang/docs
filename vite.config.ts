@@ -5,6 +5,7 @@ import { foldkit } from '@foldkit/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 
 import { releases } from './scripts/releases.ts'
+import { searchIndex } from './scripts/search-index.ts'
 import { islandAttributes } from './src/docs/islands.ts'
 
 export default defineConfig({
@@ -19,6 +20,7 @@ export default defineConfig({
     }),
     markdown({ islands: islandAttributes }),
     releases(),
+    searchIndex(),
   ],
   optimizeDeps: {
     entries: ['src/entry.ts'],
