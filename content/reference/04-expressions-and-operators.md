@@ -166,7 +166,8 @@ pub fn main() -> i32 {
   if (2 |> subtract(5)) != -3 {
     return 6
   }
-  if false && 1 / 0 == 0 {
+  let zero = 0
+  if false && 1 / zero == 0 {
     return 7
   }
   return 0

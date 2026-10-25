@@ -99,7 +99,7 @@ src/main.silk:8:7: error[SEM0177] template placeholder 3 `{}` has no positional 
 A value whose type has no `Display` stops the build at the call too, with SEM0121. For a struct `Plain` without an `impl Display`:
 
 ```
-src/main.silk:10:7: error[SEM0121] `main.Plain: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Plain`
+src/main.silk:10:7: error[SEM0121] `main.Plain: silk.format.Display` cannot be proved: no implementation of `silk.format.Display` exists for `main.Plain`
 ```
 
 Implement `Display` for the type, as the next sections show, or pass one of its fields instead.

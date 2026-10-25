@@ -46,11 +46,11 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
-src/main.silk:13:7: error[SEM0121] `main.Status: silk/format.Display` cannot be proved: no implementation of `silk/format.Display` exists for `main.Status`
+src/main.silk:13:7: error[SEM0121] `main.Status: silk.format.Display` cannot be proved: no implementation of `silk.format.Display` exists for `main.Status`
 Failed scratch in 0.25s
 ```
 
-The error points at the `Effect.log` call. `Effect.log` walks the template at compile time, and for each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface from `silk/format`. The message reads as a claim the compiler had to prove, `main.Status: silk/format.Display`, "`Status` in module `main` implements `Display`", and the reason it could not: there is no implementation.
+The error points at the `Effect.log` call. `Effect.log` walks the template at compile time, and for each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface from `silk/format`. The message reads as a claim the compiler had to prove, `main.Status: silk.format.Display`, "`Status` in module `main` implements `Display`", and the reason it could not: there is no implementation.
 
 So when a template fails, check two things: the placeholder names, and whether every value you pass has `Display`. Numbers, strings, `bool` and `char` have it. So do your own types once you write an impl.
 
@@ -449,7 +449,7 @@ The first five lines match chapter 5 exactly, though the code that prints them c
 
 ## Summary
 
-- You can implement a standard interface such as `Display` so templates print your types, and you know that SEM0121 naming `silk/format.Display` means a value lacks `Display`.
+- You can implement a standard interface such as `Display` so templates print your types, and you know that SEM0121 naming `silk.format.Display` means a value lacks `Display`.
 - You can give your types `<`, `>=`, `==` and friends with `Order` and `Equal`, and you compare them through references: `&a >= &b`.
 - You can declare an interface, implement it with full bodies or with `name: function` bindings, and read SEM0083 when an impl doesn't fit.
 - You can write a generic function with a bound, `count<F: Filter>`, which compiles to a direct call for each type.

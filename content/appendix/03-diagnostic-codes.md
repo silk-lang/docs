@@ -1012,10 +1012,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:19: error[SEM0002] A literal outside its selected integer range
+src/main.silk:2:19: error[SEM0002] Integer literal 300 is outside the u8 range, 0 through 255
 ```
-
-Message template, not filled by this compiler: `Integer literal {spelling} exceeds the {type} range {minimum} through {maximum}`.
 
 Fix: Use a literal that fits the type, or a wider type: `let small: u16 = 300`. See Values and primitive types.
 
@@ -1171,7 +1169,7 @@ pub fn main() -> i32 {
 src/main.silk:6:17: error[SEM0010] main.Point has no associated function `build`
 ```
 
-A call on a value names the method instead, such as ``silk/list.List<i32> has no method `push` ``.
+A call on a value names the method instead, such as ``silk.list.List<i32> has no method `push` ``.
 
 Fix: Call a function or method the type declares, here `Point.make()`. See Functions and methods.
 
@@ -1230,7 +1228,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:19: error[SEM0014] Module silk/list has no member Stack
+src/main.silk:1:19: error[SEM0014] Module silk.list has no member Stack
 ```
 
 Fix: Import a member the module declares, here `List`. See Modules and imports.
@@ -1255,12 +1253,12 @@ fn secret() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:16: error[SEM0015] An import or qualified reference naming a private member of another module
+src/main.silk:1:16: error[SEM0015] `secret` is private to helper; mark it `pub` there to use it here
 ```
 
-Message template, not filled by this compiler: `{module}.{spelling} is private`.
+A name that the module only imports is not its member either. Importing it through that module names the module that declares it, as in ``error[SEM0015] `ParseError` is not declared in silk.i64, which only imports it; import it from silk.format``.
 
-Fix: Mark the member `pub` in its module. See Modules and imports.
+Fix: Mark the member `pub` in its module, or import the name from the module that declares it. See Modules and imports.
 
 ### SEM0016
 
@@ -1275,7 +1273,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:8: error[SEM0016] Multiple bindings claim List
+src/main.silk:2:8: error[SEM0016] Multiple bindings claim List; rename one with `as`, as in `import a.b as other` or `import a.b { List as other }`
   note: src/main.silk:1:19: related location
 ```
 
@@ -1290,7 +1288,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:23: error[SEM0016] Multiple bindings claim Format
+src/main.silk:2:23: error[SEM0016] Multiple bindings claim Format; rename one with `as`, as in `import a.b as other` or `import a.b { Format as other }`
   note: src/main.silk:1:22: related location
 ```
 
@@ -1547,10 +1545,8 @@ impl Circle {
 `silk check` prints:
 
 ```text
-src/main.silk:4:12: error[SEM0028] A field projection naming a private field of another module's struct
+src/main.silk:4:12: error[SEM0028] Field `radius` of shapes.Circle is private; mark it `pub radius` to use it outside its module
 ```
-
-Message template, not filled by this compiler: `{type}.{field} is private`.
 
 Fix: Mark the field `pub`, or read it through a `pub` method. See Enums and unions, Structs, tuples and arrays.
 
@@ -2166,7 +2162,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:21: error[SEM0062] Only effect functions may declare a failure channel
+src/main.silk:2:21: error[SEM0062] Only an effect function can declare failures; write `effect fn` instead of `fn`
 ```
 
 Fix: Declare the function `effect fn`. See Typed failures.
@@ -2306,7 +2302,7 @@ pub effect fn main() -> i32 ! LogError {
 `silk check` prints:
 
 ```text
-src/main.silk:18:41: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union
+src/main.silk:18:41: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
 ```
 
 The message names the missing failures the same way when the parameter is a union that lacks a member, when the handled Effect has a single failure, and in the pipeline form, `work() |> Effect.catchAll(explain)`. With several missing it says ``does not accept `main.B`, `main.C`, failures of the handled Effect; add them to the parameter's union``.
@@ -2769,7 +2765,7 @@ pub fn add(a: i32) -> i32 { return a }
 `silk check` prints:
 
 ```text
-src/main.silk:2:4: error[SEM0016] Multiple bindings claim add
+src/main.silk:2:4: error[SEM0016] Multiple bindings claim add; rename one with `as`, as in `import a.b as other` or `import a.b { add as other }`
   note: src/main.silk:1:16: related location
 src/main.silk:3:14: error[SEM0109] A `typeof` item whose name belongs to more than one declaration
 ```
@@ -4125,7 +4121,7 @@ pub fn main() -> i32 { unsafe { if flag(1.0) { return 0 } } return 1 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:36: error[SEM0187] A foreign parameter or result type outside the C-compatible scalar subset
+src/main.silk:2:36: error[SEM0187] bool is not admitted by the C ABI
 ```
 
 A vector with no C vector type fills the template `{type} is not admitted by the {abi} ABI`: `mask<N>`, `simd<isize, N>` and `simd<usize, N>` print, for example, `mask<4> is not admitted by the C ABI`. For an imported function it is reported at each call, at the callee's name, and a declaration that is never called is not checked. For an `export "C"` function it is reported at the parameter or result type.
@@ -4473,11 +4469,9 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:7: error[SEM0206] A C-layout record field outside the closed C object subset
-src/main.silk:3:9: error[SEM0206] A C-layout record field outside the closed C object subset
+src/main.silk:2:7: error[SEM0206] Field on of C-layout record main.Flags<'_> has unsupported type bool
+src/main.silk:3:9: error[SEM0206] Field name of C-layout record main.Flags<'_> has unsupported type string
 ```
-
-Message template, not filled by this compiler: `Field {field} of C-layout record {record} has unsupported type {type}`.
 
 Fix: Use C object types in C-layout fields: integers, floats, raw pointers, nested C-layout structs. See Unsafe code and C interop.
 
@@ -4551,7 +4545,7 @@ Fix: Declare each lifetime once. See Lifetimes.
 
 ### SEM0212
 
-A lifetime that must outlive another but is not known to.
+A lifetime that must outlive another, with no declared bound saying it does.
 
 ```silk
 fn keep(x: &'static i32) -> i32 { return x.* }
@@ -4564,7 +4558,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:15: error[SEM0212] A lifetime that must outlive another but is not known to
+src/main.silk:4:15: error[SEM0212] A lifetime that must outlive another, with no declared bound saying it does
 ```
 
 Message template, not filled by this compiler: `Lifetime {longer} does not outlive {shorter}`.
@@ -4619,10 +4613,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:15: error[SEM0218] A `test` qualifier marks a function outside the finite executable test contract
+src/main.silk:1:15: error[SEM0218] Invalid test declaration: a test takes no parameters; the test runner calls it with none
 ```
-
-Message template, not filled by this compiler: `Invalid test declaration: {detail}`.
 
 A test with a requirement row is refused with the filled message, at the row:
 
