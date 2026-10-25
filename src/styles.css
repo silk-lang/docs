@@ -5,7 +5,7 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('/fonts/SpaceMono-Regular.ttf') format('truetype');
+  src: url('/fonts/SpaceMono-Regular.woff2') format('woff2');
 }
 
 @font-face {
@@ -13,7 +13,7 @@
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('/fonts/SpaceMono-Bold.ttf') format('truetype');
+  src: url('/fonts/SpaceMono-Bold.woff2') format('woff2');
 }
 
 /* Design tokens from the Elyx design (tokens/colors.elyx and colors-dark.elyx). */
@@ -116,5 +116,32 @@
 
   &::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* The docs loading skeleton waits 150ms before fading in, so a document that
+   arrives quickly replaces it before it is ever seen. It then pulses gently. */
+@utility docs-skeleton {
+  animation:
+    skeleton-appear 200ms ease-out 150ms both,
+    skeleton-pulse 1.6s ease-in-out 350ms infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: skeleton-appear 200ms ease-out 150ms both;
+  }
+}
+
+@keyframes skeleton-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.55;
   }
 }

@@ -21,6 +21,10 @@ export const Model = Schema.Struct({
   openGroups: Schema.HashSet(Schema.String),
   maybeActiveSection: Schema.Option(Schema.String),
   maybePendingAnchor: Schema.Option(Schema.String),
+  // Documents already downloaded, by page key, so returning to a page or
+  // opening a prefetched one shows it without a loading state.
+  documents: Schema.HashMap(Schema.String, Markdown.MarkdownDocument),
+  requestedDocumentKeys: Schema.HashSet(Schema.String),
 })
 export type Model = typeof Model.Type
 
