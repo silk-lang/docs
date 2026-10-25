@@ -227,7 +227,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-src/main.silk:10:12: error[SEM0121] `main.Title: silk/hash.HashKey` cannot be proved: no implementation of `silk/hash.HashKey` exists for `main.Title`
+src/main.silk:10:12: error[SEM0121] `main.Title: silk.hash.HashKey` cannot be proved: no implementation of `silk.hash.HashKey` exists for `main.Title`
 Failed scratch in 0.19s
 ```
 

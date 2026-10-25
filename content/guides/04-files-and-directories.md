@@ -272,7 +272,7 @@ Checking notes (x86_64-unknown-linux-gnu)
   load     57 modules, 1 in package          0.09s
   check    failed: 2 modules, 1 error        0.74s
 [x86_64-unknown-linux-gnu]
-src/main.silk:190:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk/filesystem.AtomicWriteError | silk/filesystem.FileError | silk/allocator.OutOfMemoryError` does not accept `silk/logger.LogError`, a failure of the handled Effect; add it to the parameter's union
+src/main.silk:190:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk.filesystem.AtomicWriteError | silk.filesystem.FileError | silk.allocator.OutOfMemoryError` does not accept `silk.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
 Failed notes in 0.84s
 ```
 

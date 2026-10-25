@@ -146,7 +146,7 @@ Checking shapes (x86_64-unknown-linux-gnu)
   load     53 modules, 3 in package          0.06s
   check    failed: 4 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-src/main.silk:1:25: error[SEM0015] An import or qualified reference naming a private member of another module
+src/main.silk:1:25: error[SEM0015] `secret` is private to geometry.Point; mark it `pub` there to use it here
 Failed shapes in 0.20s
 ```
 
@@ -158,8 +158,8 @@ Failed shapes in 0.20s
 | MOD0002 | A module imports itself. Only the import is reported, with no follow-on SEM0016 in that module or in modules that import it |
 | MOD0003 | Another package's module that its `exports` does not list |
 | MOD0004 | An import of `Intrinsic`, or of a module under it other than `Intrinsic.application`. `Intrinsic` needs no import. See **The standard library** for reserved names |
-| SEM0014 | The module has no such member: `Module geometry/Point has no member Nope` |
-| SEM0015 | The member exists but is private |
+| SEM0014 | The module has no such member: `Module geometry.Point has no member Nope` |
+| SEM0015 | The member exists but is private, or the module only imports it from another module, which the message names |
 | SEM0016 | Two bindings with the same name in one scope, such as a module and a type both called `Board` |
 | SEM0019 | A `pub` signature mentions a private type |
 | SEM0021 | Struct literal outside its module while a field is private |

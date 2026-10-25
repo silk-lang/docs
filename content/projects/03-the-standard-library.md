@@ -73,7 +73,7 @@ Checking hello (wasm32-unknown-unknown)
   load     50 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.05s
 [wasm32-unknown-unknown]
-src/main.silk:3:25: error[SEM0014] Module silk/os_logger has no member StdoutLogger
+src/main.silk:3:25: error[SEM0014] Module silk.os_logger has no member StdoutLogger
 Failed hello in 0.11s
 ```
 

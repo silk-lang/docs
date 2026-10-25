@@ -329,10 +329,10 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 4 errors       0.12s
 [x86_64-unknown-linux-gnu]
-src/main.silk:135:20: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
-src/main.silk:136:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
-src/main.silk:137:14: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
-src/main.silk:139:12: error[SEM0057] An exclusive borrow of a binding that is not declared mutable
+src/main.silk:144:20: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
+src/main.silk:145:14: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
+src/main.silk:146:14: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
+src/main.silk:148:12: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
 Failed tasks in 0.17s
 ```
 
@@ -372,16 +372,16 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
-src/main.silk:137:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
-  note: src/main.silk:136:15: the earlier borrow starts here
-src/main.silk:138:8: error[OWN0010] A mutable borrowed-view loan conflicts with an active shared loan
-  note: src/main.silk:136:15: the earlier borrow starts here
+src/main.silk:146:8: error[OWN0010] A mutable borrow of `board` conflicts with an earlier shared borrow of it that is still in use; use that borrow for the last time before this one
+  note: src/main.silk:145:15: the earlier borrow starts here
+src/main.silk:147:8: error[OWN0010] A mutable borrow of `board` conflicts with an earlier shared borrow of it that is still in use; use that borrow for the last time before this one
+  note: src/main.silk:145:15: the earlier borrow starts here
 Failed tasks in 0.17s
 ```
 
-Both notes point at `&board.tasks[0]` on line 136, where the shared loan began.
+Both notes point at `&board.tasks[0]` on line 145, where the shared loan began.
 
-OWN0010 says a new loan conflicts with an active loan on the same storage, the same memory, and it names both kinds: the new loan is mutable, the active one is shared. The errors point at `board` in the two `add` calls. Each call needs `&mut board`, but `first` is still a live shared loan on part of the board, because `run show(first)` reads it later.
+OWN0010 says a new borrow conflicts with an earlier one on the same storage, the same memory, that is still in use, and it names both kinds: the new borrow is mutable, the earlier one is shared. The errors point at `board` in the two `add` calls. Each call needs `&mut board`, but `first` is still a live shared loan on part of the board, because `run show(first)` reads it later.
 
 Think about what could go wrong if Silk allowed it. `add` writes into `self.tasks`. Today the array has a fixed size, but in chapter 9 the board grows, and growing can move every task to new memory. Then `first` would point at memory the board no longer uses. Even with a fixed array, a method holding `&mut` is free to overwrite the slot `first` is looking at. The reader would see a task change under it, or see garbage. The one-writer rule makes both impossible without any check at run time.
 

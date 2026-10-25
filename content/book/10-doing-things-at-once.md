@@ -226,11 +226,11 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-src/main.silk:14:49: error[SEM0076] A callable value whose signature cannot satisfy the expected callable type
+src/main.silk:14:49: error[SEM0076] The Effect passed here also requires &mut Logger, but the expected Effect may only require &mut Scheduler | &mut MonotonicClock; provide &mut Logger inside it, or run that work before passing it
 Failed tasks in 0.17s
 ```
 
-The message is general. Column 49 is the argument to `forkChild`, and the "expected callable type" is what a fiber may be: `shout()` needs a `Logger`, and a fiber is not allowed to ask for one. Replace `shout` with a child that borrows a title instead:
+Column 49 is the argument to `forkChild`. The message names the problem: `shout()` needs a `Logger`, and a fiber may only ask for the scheduler and the clock. Replace `shout` with a child that borrows a title instead:
 
 ```silk
 effect fn measure(title: string) -> usize ? &mut Scheduler | &mut MonotonicClock {
@@ -251,7 +251,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-src/main.silk:14:15: error[SEM0212] A lifetime that must outlive another but is not known to
+src/main.silk:14:15: error[SEM0212] A lifetime that must outlive another, with no declared bound saying it does
 Failed tasks in 0.19s
 ```
 

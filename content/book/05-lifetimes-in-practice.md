@@ -328,14 +328,14 @@ Checking tasks (x86_64-unknown-linux-gnu)
 [x86_64-unknown-linux-gnu]
 src/main.silk:199:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
   note: src/main.silk:198:17: the borrow starts here
-src/main.silk:200:57: error[OWN0019] A borrowed value is used beyond the validity of its referent
+src/main.silk:200:57: error[OWN0019] `longest` is used after `board`, which it borrows, ended or was replaced
   note: src/main.silk:198:17: the borrow starts here
 Failed tasks in 0.20s
 ```
 
 Both notes point at `board.longestTitle()` on line 198, where the loan began.
 
-OWN0011 at `drop board` means you touched an owner while a loan on it was still active. As far as the signature says, `longest` borrows the board, and it is used on the next line. OWN0019 at `longest` says a borrow was used after the thing it borrows from stopped being valid. The board is gone, so a view into the board would point at freed memory.
+OWN0011 at `drop board` means you touched an owner while a loan on it was still active. As far as the signature says, `longest` borrows the board, and it is used on the next line. OWN0019 at `longest` says the borrow was used after `board`, the thing it borrows from, stopped being valid. The board is gone, so a view into the board would point at freed memory.
 
 Here, that fear is wrong: the title really points into `SEED`, which lives forever. But the compiler checks callers against the signature, not against the body. The signature is the contract. Put `string<'text>` back, keep the new `report` lines, and it runs:
 

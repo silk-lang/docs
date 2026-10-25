@@ -92,8 +92,8 @@ Unsafe operations (the caller proves the storage contract):
 - `unsafe extern "C" fn name(...) -> T` declares a C function. It has no body.
 - The declaration must be `unsafe` (SEM0186) and its ABI string must be `"C"` (SEM0185). It may not have generic parameters or be `static` or `effect` (SEM0188). Each is reported at the declaration by `silk check`, whether or not the function is called.
 - `as "symbol"` links to a different native name. Without it, the Silk name is the symbol.
-- Parameter and result types must be C-compatible scalars: integer and float types, `usize`, `isize`, raw pointers, C function pointers, and `()` as a result. SIMD vectors cross too, with the limits in SIMD vectors at the C boundary below.
-- `bool` and `char` are rejected (SEM0187). A call that passes or returns a struct, `string` or reference by value is reported as `unsupported[ForeignAggregate]`.
+- Parameter and result types must be C-compatible: integer and float types, `usize`, `isize`, raw pointers, C function pointers, `extern "C" struct` types by value, and `()` as a result. SIMD vectors cross too, with the limits in SIMD vectors at the C boundary below.
+- Any other type is rejected at the declaration (SEM0187): `bool`, `char`, `string` and references are "not admitted by the C ABI", and the message for a struct without `extern "C"` says it has no C layout and to declare it `extern "C" struct`.
 - A trailing `...` declares a C variadic function. Variadic arguments follow the named ones.
 - A foreign function cannot be used as a value; it can only be called (SEM0189).
 
@@ -165,7 +165,7 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 - A C-layout record cannot have type parameters (SEM0205).
 - Fields may be C scalars (integers, floats, `usize`, `isize`), raw pointers, C function addresses (`extern "C" fn` types), fixed arrays, other C-layout records, and enums with a representation (`enum(u8) Name`).
 - Any other field type is SEM0206. That includes `bool`, `char`, `string`, `()`, references, ordinary structs, Silk callables and enums without `(R)`.
-- Pass C-layout records to C through pointers, for example `Pointer.fromMutRef(&mut value)`.
+- Pass a C-layout record to C by value, as a C struct is, or through a pointer, for example `Pointer.fromMutRef(&mut value)`.
 
 ## Examples
 

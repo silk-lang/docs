@@ -79,7 +79,7 @@ Checking hello (x86_64-unknown-linux-gnu)
 [x86_64-unknown-linux-gnu]
 src/main.silk:5:4: error[SEM0003] Duplicate declaration name half
   note: src/main.silk:1:4: related location
-src/main.silk:5:4: error[SEM0016] Multiple bindings claim half
+src/main.silk:5:4: error[SEM0016] Multiple bindings claim half; rename one with `as`, as in `import a.b as other` or `import a.b { half as other }`
   note: src/main.silk:1:4: related location
 Failed hello in 0.14s
 ```

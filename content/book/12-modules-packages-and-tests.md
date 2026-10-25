@@ -371,7 +371,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     78 modules, 7 in package          0.09s
   check    failed: 8 modules, 1 error        1.67s
 [x86_64-unknown-linux-gnu]
-tasks/src/main.silk:19:38: error[SEM0015] An import or qualified reference naming a private member of another module
+tasks/src/main.silk:19:38: error[SEM0015] `fileText` is private to Store; mark it `pub` there to use it here
 Failed tasks in 1.76s
 ```
 

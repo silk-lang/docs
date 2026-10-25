@@ -197,7 +197,7 @@ Checking squares (wasm32-unknown-unknown)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.07s
 [wasm32-unknown-unknown]
-src/main.silk:23:27: error[SEM0014] Module silk/os_writer has no member StdoutWriter
+src/main.silk:23:27: error[SEM0014] Module silk.os_writer has no member StdoutWriter
 Failed squares in 0.13s
 ```
 
