@@ -17,6 +17,7 @@ A library kind's root module defaults to `src/lib.silk`.
 
 - Each entry is a module name in import spelling, relative to the source root: `"lib"`, `"codec.Json"`.
 - Every entry must name an existing file. The list is checked before anything compiles.
+- An entry may name a directory whose `mod.silk` is a barrel module: `exports = ["codec"]` publishes `src/codec/mod.silk`. The modules it re-exports from stay internal unless listed. See **Modules and imports**.
 - A module not listed is internal. Other packages that import it get MOD0003. With `exports = ["codec.Unit"]`, `app`'s import of `text_utils.lib` fails:
 
 ```
@@ -38,6 +39,8 @@ Failed app in 0.16s
 | `exports = "lib"` | `silk: invalid exports of text-utils@0.1.0: [package].exports must be an array of module names` |
 | `exports = ["codec/Unit"]` | `` silk: invalid exports of text-utils@0.1.0: codec/Unit is not a module name such as `codec.Json`  `` |
 | `exports = ["Hiddn"]` | `silk: invalid exports of text-utils@0.1.0: Hiddn is not a module of the package` |
+| `exports = ["codec.mod"]` | ``silk: invalid exports of text-utils@0.1.0: codec.mod names a `mod.silk` file; list its directory's path without `.mod` `` |
+| `exports = ["codec"]` with both `codec.silk` and `codec/mod.silk` | ``silk: invalid exports of text-utils@0.1.0: codec names both a module file and its directory's `mod.silk`; remove or rename one of them`` |
 
 ## Library artifacts
 
