@@ -27,7 +27,7 @@ const index: SearchIndex = {
       'Method',
       [],
       'Adds value at the end of the list.',
-      'pub effect fn append(self: &mut Self, value: T) -> ()',
+      'pub effect fn append(\n    self: &mut Self,\n    value: T,\n  ) -> ()',
     ],
     [
       1,
@@ -82,6 +82,13 @@ describe('search', () => {
     const outcome = search(prepared, 'borowing', 'All')
     expect(outcome.maybeCorrectedQuery).toEqual(Option.some('borrowing'))
     expect(outcome.groups[0]?.pageTitle).toBe('4. Ownership')
+  })
+
+  test('a signature over several lines is shown on one line', () => {
+    const { groups } = search(prepared, 'List.append', 'All')
+    expect(groups[0]?.hits[0]?.signature).toBe(
+      'pub effect fn append(self: &mut Self, value: T) -> ()',
+    )
   })
 
   test('a query that matches nothing returns no groups', () => {
