@@ -1,4 +1,4 @@
-import { Array, HashSet, Option, String, pipe } from 'effect'
+import { Array, HashSet, Option, pipe } from 'effect'
 import { type Html, type HtmlBuilder } from 'foldkit/html'
 
 import * as Catalog from '../docs/catalog'
@@ -8,13 +8,9 @@ import * as Layout from '../layout'
 import { Message } from '../message'
 import { DocState, type Model } from '../model'
 import { docsRouter } from '../route'
-
-export const SEARCH_INPUT_ID = 'docs-search'
+import * as Search from '../search'
 
 // SIDEBAR
-
-const matchesQuery = (query: string) => (page: Catalog.DocPage) =>
-  String.includes(query.trim().toLowerCase())(page.title.toLowerCase())
 
 const sidebarItem = (
   page: Catalog.DocPage,
@@ -85,27 +81,24 @@ const sidebarGroup = (
     ],
   )
 
-const searchBox = (query: string, h: HtmlBuilder<Message>): Html =>
-  h.label(
+// Opens the search dialog. The click focuses the dialog's warm-up input
+// first, so iOS shows the keyboard (see `keyboardWarmupInput` in search/view.ts).
+export const searchTrigger = (h: HtmlBuilder<Message>): Html =>
+  h.button(
     [
+      h.Type('button'),
+      h.AriaLabel('Search docs'),
+      h.AriaHasPopup('dialog'),
+      h.OnClick(Message.ClickedOpenSearch(), {
+        focusSelector: `#${Search.KEYBOARD_WARMUP_INPUT_ID}`,
+      }),
       h.Class(
-        'flex items-center justify-between gap-3 rounded-full border border-rule px-3.5 py-2.5 focus-within:border-ink',
+        'flex w-full cursor-pointer items-center gap-3 rounded-full border border-rule px-3.5 py-2.5 text-left text-sm leading-tight text-muted hover:border-ink hover:text-ink',
       ),
     ],
     [
-      h.input([
-        h.Id(SEARCH_INPUT_ID),
-        h.Type('search'),
-        h.Value(query),
-        h.Placeholder('Search docs'),
-        h.AriaLabel('Search docs'),
-        h.Autocomplete('off'),
-        h.Spellcheck(false),
-        h.OnInput(value => Message.UpdatedSidebarQuery({ value })),
-        h.Class(
-          'min-w-0 flex-1 bg-transparent text-sm leading-tight text-ink outline-none placeholder:text-muted',
-        ),
-      ]),
+      Icon.search('size-3.5 shrink-0', h),
+      h.span([h.Class('flex-1')], ['Search docs']),
       h.kbd(
         [
           h.AriaHidden(true),
@@ -122,53 +115,33 @@ const sidebar = (
   model: Model,
   maybeCurrent: Option.Option<Catalog.DocPage>,
   h: HtmlBuilder<Message>,
-): Html => {
-  const query = model.sidebarQuery
-  const isSearching = String.isNonEmpty(query.trim())
-  const visibleGroups = Array.flatMap(Catalog.groups, group => {
-    const pages = isSearching
-      ? Array.filter(group.pages, matchesQuery(query))
-      : group.pages
-    return isSearching && Array.isReadonlyArrayEmpty(pages)
-      ? []
-      : [{ group, pages }]
-  })
-
-  return h.nav(
+): Html =>
+  h.nav(
     [
       h.AriaLabel('Documentation'),
       h.Class('flex flex-col gap-5 md:max-h-screen md:py-1'),
     ],
     [
       // Only the page list scrolls, so the search stays put above it.
-      searchBox(query, h),
-      Array.match(visibleGroups, {
-        onEmpty: () =>
-          h.p(
-            [h.Class('border-t border-rule pt-4 text-sm text-muted')],
-            [`No pages match "${query.trim()}".`],
+      searchTrigger(h),
+      h.ul(
+        [
+          h.Class(
+            'flex flex-col border-t border-rule pt-2 md:min-h-0 md:scrollbar-none md:overflow-y-auto md:overscroll-contain',
           ),
-        onNonEmpty: nonEmptyGroups =>
-          h.ul(
-            [
-              h.Class(
-                'flex flex-col border-t border-rule pt-2 md:min-h-0 md:scrollbar-none md:overflow-y-auto md:overscroll-contain',
-              ),
-            ],
-            Array.map(nonEmptyGroups, ({ group, pages }) =>
-              sidebarGroup(
-                group,
-                pages,
-                isSearching || HashSet.has(model.openGroups, group.key),
-                maybeCurrent,
-                h,
-              ),
-            ),
+        ],
+        Array.map(Catalog.groups, group =>
+          sidebarGroup(
+            group,
+            group.pages,
+            HashSet.has(model.openGroups, group.key),
+            maybeCurrent,
+            h,
           ),
-      }),
+        ),
+      ),
     ],
   )
-}
 
 // ON THIS PAGE
 

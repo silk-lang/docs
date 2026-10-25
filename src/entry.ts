@@ -9,6 +9,7 @@ import {
   update,
   view,
 } from './main'
+import * as Search from './search'
 import './styles.css'
 
 const application = Runtime.makeApplication({
@@ -18,6 +19,7 @@ const application = Runtime.makeApplication({
   update,
   view,
   subscriptions,
+  resources: Search.SearchIndexService.Default,
   container: document.getElementById('root'),
   routing: {
     onUrlRequest: request => Message.ClickedLink({ request }),

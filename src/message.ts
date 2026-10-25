@@ -5,6 +5,8 @@ import { Url } from 'foldkit/url'
 
 import * as Markdown from '@foldkit/markdown'
 
+import * as Search from './search'
+
 export const Message = defineMessageUnion({
   ClickedLink: { request: UrlRequest },
   ChangedUrl: { url: Url },
@@ -22,10 +24,10 @@ export const Message = defineMessageUnion({
   },
   FailedLoadDocument: { key: Schema.String },
   PointedAtDocLink: { key: Schema.String },
-  UpdatedSidebarQuery: { value: Schema.String },
   ClickedSidebarGroup: { groupKey: Schema.String },
   PressedSearchShortcut: {},
-  CompletedFocusSearch: {},
+  ClickedOpenSearch: {},
+  GotSearchMessage: { message: Search.Message },
   ChangedActiveSection: { sectionId: Schema.String },
 })
 export type Message = typeof Message.Type
