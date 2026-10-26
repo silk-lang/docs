@@ -161,6 +161,24 @@ Reports that no task is ready and no event registration remains while the root i
 [`LocalScheduler.execute`](#LocalScheduler.impl.execute) raises it when no task is ready, no timer is waiting, and the root is
 not finished. It cancels and releases the incomplete task tree before it raises this error.
 
+::Anchor{id="StalledError.impl.Debug"}
+
+## Implementation `Debug for StalledError`
+
+```silk
+impl Debug for StalledError
+```
+
+::Anchor{id="StalledError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `StalledError`.
+
 Category: Concurrency.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

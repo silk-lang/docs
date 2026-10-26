@@ -96,6 +96,24 @@ pub code: i32
 
 The error number `pthread_create` returned.
 
+::Anchor{id="SpawnError.impl.Debug"}
+
+## Implementation `Debug for SpawnError`
+
+```silk
+impl Debug for SpawnError
+```
+
+::Anchor{id="SpawnError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `SpawnError { code: ... }`.
+
 ::Anchor{id="JoinHandle"}
 
 ## `JoinHandle`
@@ -240,4 +258,4 @@ runtime's entry module exports the thread entry and forwards here.
 
 Category: Concurrency.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -102,7 +102,7 @@ impl MonotonicClock for FixedMonotonic {
 
 effect fn program() -> i32
   ! ResolverError | OutOfMemoryError {
-  let host = match Host.parse(b"example.com") {
+  let host = match Host.parse("example.com") {
     Result<Host, AddressError>.Success { value } => value
     Result<Host, AddressError>.Failure { error: _ } => {
       return 1
@@ -221,6 +221,24 @@ TooManyResults
 
 `maxResults` is more than 64.
 
+::Anchor{id="ResolverInputReason.impl.Debug"}
+
+## Implementation `Debug for ResolverInputReason`
+
+```silk
+impl Debug for ResolverInputReason
+```
+
+::Anchor{id="ResolverInputReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `ZeroResults`.
+
 ::Anchor{id="NativeResolverOperation"}
 
 ## `NativeResolverOperation`
@@ -240,6 +258,24 @@ GetAddrInfo
 ```
 
 The `getaddrinfo` call.
+
+::Anchor{id="NativeResolverOperation.impl.Debug"}
+
+## Implementation `Debug for NativeResolverOperation`
+
+```silk
+impl Debug for NativeResolverOperation
+```
+
+::Anchor{id="NativeResolverOperation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `GetAddrInfo`.
 
 ::Anchor{id="NativeResultReason"}
 
@@ -290,6 +326,24 @@ ShortAddress
 ```
 
 A native address is shorter than its family requires.
+
+::Anchor{id="NativeResultReason.impl.Debug"}
+
+## Implementation `Debug for NativeResultReason`
+
+```silk
+impl Debug for NativeResultReason
+```
+
+::Anchor{id="NativeResultReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `NullChain`.
 
 ::Anchor{id="ResolverError"}
 
@@ -411,6 +465,26 @@ SystemResources
 
 The system did not have the resources, such as memory, for the lookup.
 
+::Anchor{id="ResolverError.Provider"}
+
+### `Provider`
+
+```silk
+Provider
+```
+
+A host resolver failed with a provider-specific code, such as a WASI network error ordinal.
+
+::Anchor{id="ResolverError.Provider.code"}
+
+#### Field `code`
+
+```silk
+pub code: i32
+```
+
+The code reported by the provider. Its provider module defines the domain.
+
 ::Anchor{id="ResolverError.LimitExceeded"}
 
 ### `LimitExceeded`
@@ -500,6 +574,24 @@ pub errno: Option<i32>
 ```
 
 The `errno` value, when the code is `EAI_SYSTEM`.
+
+::Anchor{id="ResolverError.impl.Debug"}
+
+## Implementation `Debug for ResolverError`
+
+```silk
+impl Debug for ResolverError
+```
+
+::Anchor{id="ResolverError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidInput { ... }`.
 
 ::Anchor{id="ResolveRequest"}
 
@@ -778,4 +870,4 @@ most the `maxResults` of the request, and never more than 64.
 
 Category: Networking.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -95,6 +95,24 @@ pub struct HostInputError
 
 The error when a host input provider cannot answer a lookup.
 
+::Anchor{id="HostInputError.impl.Debug"}
+
+## Implementation `Debug for HostInputError`
+
+```silk
+impl Debug for HostInputError
+```
+
+::Anchor{id="HostInputError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `HostInputError`.
+
 ::Anchor{id="HostInput"}
 
 ## `HostInput`
@@ -271,4 +289,4 @@ To pass a value on, keep the bytes.
 
 Category: System.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

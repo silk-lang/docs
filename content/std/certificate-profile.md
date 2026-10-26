@@ -239,6 +239,24 @@ ResourceLimit
 
 A configured finite budget or target size bound is exceeded.
 
+::Anchor{id="ProfileClass.impl.Debug"}
+
+## Implementation `Debug for ProfileClass`
+
+```silk
+impl Debug for ProfileClass
+```
+
+::Anchor{id="ProfileClass.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Malformed`.
+
 ::Anchor{id="ProfileOffsetSpace"}
 
 ## `ProfileOffsetSpace`
@@ -268,6 +286,24 @@ ConfiguredConstraintDer
 ```
 
 Offset in caller-supplied configured NameConstraints DER.
+
+::Anchor{id="ProfileOffsetSpace.impl.Debug"}
+
+## Implementation `Debug for ProfileOffsetSpace`
+
+```silk
+impl Debug for ProfileOffsetSpace
+```
+
+::Anchor{id="ProfileOffsetSpace.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `CertificateDer`.
 
 ::Anchor{id="ProfileReason"}
 
@@ -619,6 +655,24 @@ NameComparisons
 
 The caller-supplied name/subtree comparison budget is exhausted.
 
+::Anchor{id="ProfileReason.impl.Debug"}
+
+## Implementation `Debug for ProfileReason`
+
+```silk
+impl Debug for ProfileReason
+```
+
+::Anchor{id="ProfileReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Version`.
+
 ::Anchor{id="ProfileError"}
 
 ## `ProfileError`
@@ -679,6 +733,24 @@ pub offset: usize
 ```
 
 Byte offset in the selected coordinate system.
+
+::Anchor{id="ProfileError.impl.Debug"}
+
+## Implementation `Debug for ProfileError`
+
+```silk
+impl Debug for ProfileError
+```
+
+::Anchor{id="ProfileError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ProfileError { kind: ..., reason: ..., ... }`.
 
 ::Anchor{id="KeyUsage"}
 
@@ -1060,4 +1132,4 @@ authentication.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

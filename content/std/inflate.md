@@ -433,6 +433,24 @@ MemoryLimit
 
 [`Limits.maxMemoryBytes`](#Limits.maxMemoryBytes) is less than [`MEMORY_BOUND`](#MEMORY_BOUND).
 
+::Anchor{id="ErrorKind.impl.Debug"}
+
+## Implementation `Debug for ErrorKind`
+
+```silk
+impl Debug for ErrorKind
+```
+
+::Anchor{id="ErrorKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidHeader`.
+
 ::Anchor{id="DecodeError"}
 
 ## `DecodeError`
@@ -476,6 +494,24 @@ pub written: usize
 ```
 
 The number of output bytes that this call wrote before it failed.
+
+::Anchor{id="DecodeError.impl.Debug"}
+
+## Implementation `Debug for DecodeError`
+
+```silk
+impl Debug for DecodeError
+```
+
+::Anchor{id="DecodeError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `DecodeError { kind: ..., consumed: ..., ... }`.
 
 ::Anchor{id="Decoder"}
 
@@ -589,4 +625,4 @@ failure, discard all output of the stream.
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -152,6 +152,24 @@ OutputTooSmall
 
 The output slice is too short. `required` and `available` give the two lengths.
 
+::Anchor{id="Base64Reason.impl.Debug"}
+
+## Implementation `Debug for Base64Reason`
+
+```silk
+impl Debug for Base64Reason
+```
+
+::Anchor{id="Base64Reason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidLength`.
+
 ::Anchor{id="Base64Error"}
 
 ## `Base64Error`
@@ -206,6 +224,24 @@ pub available: Option<usize>
 ```
 
 For `OutputTooSmall`, the length of the output that you gave.
+
+::Anchor{id="Base64Error.impl.Debug"}
+
+## Implementation `Debug for Base64Error`
+
+```silk
+impl Debug for Base64Error
+```
+
+::Anchor{id="Base64Error.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `Base64Error { reason: ..., offset: ..., ... }`.
 
 ::Anchor{id="Base64"}
 
@@ -324,4 +360,4 @@ encoding.
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

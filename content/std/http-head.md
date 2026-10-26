@@ -23,8 +23,9 @@ The head and its fields borrow the parser. Call `copy` to keep them after a `res
 
 ## Gotchas
 The parser is strict. Lines must end with CRLF, and the start line uses one space between its
-parts. These fail: a bare LF, a space before `:` in a field, a folded line, empty lines before
-the start line, and HTTP/0.9.
+parts. These fail: a bare LF, a space before `:` in a field, a folded request line, empty lines
+before the start line, and HTTP/0.9. A folded response field is joined with spaces.
+A status line with no reason phrase may leave out the space after the code: `HTTP/1.1 200`.
 
 ## Examples
 ### Parse a response head
@@ -407,6 +408,24 @@ LineEnding
 
 A line ending.
 
+::Anchor{id="ParseComponent.impl.Debug"}
+
+## Implementation `Debug for ParseComponent`
+
+```silk
+impl Debug for ParseComponent
+```
+
+::Anchor{id="ParseComponent.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Parser`.
+
 ::Anchor{id="ParseLimitKind"}
 
 ## `ParseLimitKind`
@@ -517,6 +536,24 @@ OwnedBytes
 
 `maxOwnedBytes`: the memory of the parser.
 
+::Anchor{id="ParseLimitKind.impl.Debug"}
+
+## Implementation `Debug for ParseLimitKind`
+
+```silk
+impl Debug for ParseLimitKind
+```
+
+::Anchor{id="ParseLimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `HeadBytes`.
+
 ::Anchor{id="ParseReason"}
 
 ## `ParseReason`
@@ -536,7 +573,7 @@ InvalidStartLine
 ```
 
 The start line does not have the form `METHOD SP target SP version` or `version SP status SP
-reason`.
+reason`, or `version SP status` with no reason.
 
 ::Anchor{id="ParseReason.UnsupportedVersion"}
 
@@ -646,7 +683,8 @@ A field has a space or a tab between its name and the `:`.
 ObsFold
 ```
 
-A field line starts with a space or a tab. Folded lines are not accepted.
+A field line starts with a space or a tab. Requests do not accept folded lines; a response
+accepts one only after its first field, and joins it to that field with spaces.
 
 ::Anchor{id="ParseReason.MissingHost"}
 
@@ -757,6 +795,24 @@ head.
 impl Copy for ParseReason
 ```
 
+::Anchor{id="ParseReason.impl.Debug"}
+
+## Implementation `Debug for ParseReason`
+
+```silk
+impl Debug for ParseReason
+```
+
+::Anchor{id="ParseReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidStartLine`.
+
 ::Anchor{id="ParseError"}
 
 ## `ParseError`
@@ -818,6 +874,24 @@ pub fieldIndex: Option<usize>
 
 The position of the field, from 0, when the error is in a field.
 
+::Anchor{id="ParseError.impl.Debug"}
+
+## Implementation `Debug for ParseError`
+
+```silk
+impl Debug for ParseError
+```
+
+::Anchor{id="ParseError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ParseError { reason: ..., component: ..., ... }`.
+
 ::Anchor{id="validateLimits"}
 
 ## `validateLimits`
@@ -854,8 +928,9 @@ failed until `reset`.
 ### Gotchas
 
 The parser is strict. Lines must end with CRLF, and the start line uses one space between its
-parts. These fail: a bare LF, a space before `:` in a field, a folded line, empty lines before
-the start line, and HTTP/0.9.
+parts. These fail: a bare LF, a space before `:` in a field, a folded request line, empty lines
+before the start line, and HTTP/0.9. A folded response field is joined with spaces.
+A status line with no reason phrase may leave out the space after the code: `HTTP/1.1 200`.
 
 ::Anchor{id="ResponseParser"}
 
@@ -878,8 +953,9 @@ failed until `reset`.
 ### Gotchas
 
 The parser is strict. Lines must end with CRLF, and the start line uses one space between its
-parts. These fail: a bare LF, a space before `:` in a field, a folded line, empty lines before
-the start line, and HTTP/0.9.
+parts. These fail: a bare LF, a space before `:` in a field, a folded request line, empty lines
+before the start line, and HTTP/0.9. A folded response field is joined with spaces.
+A status line with no reason phrase may leave out the space after the code: `HTTP/1.1 200`.
 
 ::Anchor{id="RequestHead"}
 
@@ -1360,8 +1436,9 @@ Parses a request head from the start of `input`. The bytes after the head start 
 ### Gotchas
 
 The parser is strict. Lines must end with CRLF, and the start line uses one space between its
-parts. These fail: a bare LF, a space before `:` in a field, a folded line, empty lines before
-the start line, and HTTP/0.9.
+parts. These fail: a bare LF, a space before `:` in a field, a folded request line, empty lines
+before the start line, and HTTP/0.9. A folded response field is joined with spaces.
+A status line with no reason phrase may leave out the space after the code: `HTTP/1.1 200`.
 
 ::Anchor{id="parseResponse"}
 
@@ -1380,8 +1457,9 @@ Parses a response head from the start of `input`. The bytes after the head start
 ### Gotchas
 
 The parser is strict. Lines must end with CRLF, and the start line uses one space between its
-parts. These fail: a bare LF, a space before `:` in a field, a folded line, empty lines before
-the start line, and HTTP/0.9.
+parts. These fail: a bare LF, a space before `:` in a field, a folded request line, empty lines
+before the start line, and HTTP/0.9. A folded response field is joined with spaces.
+A status line with no reason phrase may leave out the space after the code: `HTTP/1.1 200`.
 
 ::Anchor{id="requestSerializedSize"}
 
@@ -1441,4 +1519,4 @@ start of `output`. Returns the length. If `output` is too small, it writes nothi
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

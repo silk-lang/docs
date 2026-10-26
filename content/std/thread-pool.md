@@ -167,6 +167,10 @@ Starts `task` as a new pool task and returns the handle that joins it.
 #### Details
 The task is ready at once. It can start on any worker before this call returns.
 
+#### Gotchas
+`task` cannot fail. For a task that can, such as an `effect fn` call with
+`! OutOfMemoryError`, spawn `Effect.result(task)` and handle the `Result` that `join` returns.
+
 ::Anchor{id="Pool.impl.block"}
 
 ### Method `block`
@@ -277,4 +281,4 @@ fn drop(self: &mut ThreadPool) -> ()
 
 Category: Concurrency.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

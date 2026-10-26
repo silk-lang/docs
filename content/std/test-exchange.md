@@ -19,6 +19,11 @@ integers are little-endian. There are two modes:
 A receipt starts with the magic `SLKTRCP1`, the version, the mode, the nonce of the plan, and
 the SHA-256 of the complete plan. It ends with the counts and the status.
 
+A progress record lets the host continue a run after a test traps. It is exactly 48 bytes: the
+magic `SLKTPRG1`, the ordinal of the test that is starting, then the cached, executed, passed
+and failed counts before that test. The runner writes one before each test body runs, so after
+an abnormal exit the record names the test that stopped the process.
+
 ## Gotchas
 - A [`Plan`](#Plan) does not stop at the first error. After a failure it reads as empty, and [`failed`](#failed)
   stays true. Check [`failed`](#failed) or the `bool` results before a test body runs.
@@ -26,7 +31,7 @@ the SHA-256 of the complete plan. It ends with the counts and the status.
 
 Import as `TestExchange` with `import silk.test_exchange as TestExchange`.
 
-Public declarations: 18.
+Public declarations: 21.
 
 ::Anchor{id="Plan"}
 
@@ -51,6 +56,70 @@ pub struct Entry<'a>
 ```
 
 One borrowed per-test catalog entry.
+
+::Anchor{id="Progress"}
+
+## `Progress`
+
+```silk
+pub struct Progress
+```
+
+A run's position when a test started: the catalog ordinal of that test and the counts before it.
+
+### Details
+The runner writes it with [`progressRecord`](#progressRecord) before each test body runs. After the process
+stops abnormally, [`readProgress`](#readProgress) reads it back, and a new runner continues after that test.
+
+::Anchor{id="Progress.ordinal"}
+
+### Field `ordinal`
+
+```silk
+pub ordinal: u64
+```
+
+The catalog ordinal of the test that was starting.
+
+::Anchor{id="Progress.cachedCount"}
+
+### Field `cachedCount`
+
+```silk
+pub cachedCount: u64
+```
+
+The cached passes before that test.
+
+::Anchor{id="Progress.executed"}
+
+### Field `executed`
+
+```silk
+pub executed: u64
+```
+
+The tests executed before that test.
+
+::Anchor{id="Progress.passed"}
+
+### Field `passed`
+
+```silk
+pub passed: u64
+```
+
+The tests that passed before that test, cached passes included.
+
+::Anchor{id="Progress.failedCount"}
+
+### Field `failedCount`
+
+```silk
+pub failedCount: u64
+```
+
+The tests that failed before that test.
 
 ::Anchor{id="Receipt"}
 
@@ -257,6 +326,33 @@ Appends the counts and the status, and returns the receipt bytes.
 
 In uncached mode the receipt is padded to exactly 256 bytes.
 
+::Anchor{id="progressRecord"}
+
+## `progressRecord`
+
+```silk
+pub effect fn progressRecord(progress: &Progress) -> Bytes ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns the 48-byte progress record of `progress`.
+
+### Details
+The record is the magic `SLKTPRG1`, then the ordinal and the four counts as 8-byte
+little-endian integers.
+
+::Anchor{id="readProgress"}
+
+## `readProgress`
+
+```silk
+pub fn readProgress(bytes: &[u8]) -> Option<Progress>
+```
+
+Reads a progress record that [`progressRecord`](#progressRecord) wrote.
+
+### Details
+It returns `None` unless `bytes` is exactly one record with the `SLKTPRG1` magic.
+
 Category: Testing.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

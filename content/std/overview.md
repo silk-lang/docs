@@ -30,7 +30,9 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.char`](/docs/std/char) | Text | `char` | Conversion between \`char\` and integers, and named comparison functions for \`char\`. |
 | [`silk.child_process`](/docs/std/child-process) | System | `ChildProcess` | Run another program, wait for it to end, and get its exit code and all of its output. |
 | [`silk.compilation`](/docs/std/compilation) | Core | `Compilation` | Build choices of the current compilation, such as safety, threading, and artifact kind, for use in static evaluation. |
+| [`silk.compression`](/docs/std/compression) | Data formats | `compression` | Resource limits and failures for complete-buffer compression codecs. |
 | [`silk.cpu`](/docs/std/cpu) | SIMD | `CpuFeatures` | Runtime detection of the CPU features that the running machine has. |
+| [`silk.deflate`](/docs/std/deflate) | Data formats | `Deflate` | Compress bytes as raw DEFLATE, zlib, or gzip with a bounded LZ77 match table. |
 | [`silk.ed25519`](/docs/std/ed25519) | Cryptography | `Ed25519PublicKey` | Ed25519 signature verification for 32-byte public keys and 64-byte signatures (RFC 8032). |
 | [`silk.effect`](/docs/std/effect) | Core | `Effect` | Combinators for lazy effect values: transform success, recover typed failures, supply services, and run cleanup. |
 | [`silk.equal`](/docs/std/equal) | Core | `Equal` | The interface that gives user types the \`==\` and \`!=\` operators. |
@@ -48,12 +50,19 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.hkdf`](/docs/std/hkdf) | Cryptography | `HkdfSha256` | Derive keys with HKDF (RFC 5869) over SHA-256 or SHA-384. |
 | [`silk.hmac`](/docs/std/hmac) | Cryptography | `HmacSha256` | Compute HMAC tags (RFC 2104) with SHA-256 or SHA-384. |
 | [`silk.host_input`](/docs/std/host-input) | System | `HostInput` | The \`HostInput\` effect: the command-line arguments, environment variables, and working directory of the process, as bytes. |
+| [`silk.hpack`](/docs/std/hpack) | HTTP | `Decoder` | HTTP/2 field compression as defined by RFC 7541. |
 | [`silk.http`](/docs/std/http) | HTTP | `Version` | HTTP/1.0 and HTTP/1.1 values: versions, methods, statuses, header fields, and message heads. |
+| [`silk.http2`](/docs/std/http2) | HTTP | `Connection` | A transport-independent HTTP/2 connection for clients and servers (RFC 9113). |
+| [`silk.http2_connection`](/docs/std/http2-connection) | HTTP | `Driver` | HTTP/2 over the existing plain or TLS \`HttpTransport\` service. |
+| [`silk.http2_frame`](/docs/std/http2-frame) | HTTP | `FrameHeader` | HTTP/2 wire frame headers, error codes, and frame serialization from RFC 9113. |
+| [`silk.http2_headers`](/docs/std/http2-headers) | HTTP | `Message` | HTTP/2 field validation for requests, responses, and trailers under RFC 9113 section 8. |
 | [`silk.http_basic`](/docs/std/http-basic) | HTTP | `HttpBasic` | Make the value of an \`Authorization: Basic\` header from a username and a password. |
 | [`silk.http_body`](/docs/std/http-body) | HTTP | `Decoder` | Read and write the body of an HTTP/1 message: fixed length, chunked, or until the connection closes. |
 | [`silk.http_client`](/docs/std/http-client) | HTTP | `HttpClient` | A simple HTTP client: send a request, and get the whole response in memory. |
 | [`silk.http_client_native`](/docs/std/http-client-native) | HTTP | `HttpClientNative` | The native provider for the \`Http\` service of \[\`silk.http\_client\`\]. |
 | [`silk.http_client_native`](/docs/std/http-client-native) | HTTP | `HttpClientNative` | The native provider for the \`Http\` service of \[\`silk.http\_client\`\]. |
+| [`silk.http_client_wasi`](/docs/std/http-client-wasi) | HTTP | `WasiHttp` | The WASI Preview 2 provider for the portable \`Http\` service. |
+| [`silk.http_client_wasi`](/docs/std/http-client-wasi) | HTTP | `WasiHttp` | The WASI Preview 2 provider for the portable \`Http\` service. |
 | [`silk.http_connection_pool`](/docs/std/http-connection-pool) | HTTP | `Pool` | A bounded pool of HTTP/1 connections, for reuse across requests to the same origin. |
 | [`silk.http_connection_pool_native`](/docs/std/http-connection-pool-native) | HTTP | `PoolNative` | Connection pools that open native TCP, HTTPS, and Unix socket connections. |
 | [`silk.http_content`](/docs/std/http-content) | HTTP | `ContentReader` | Decode the content of an HTTP response: gzip, deflate, and Zstandard, as named in \`Content-Encoding\`. |
@@ -95,6 +104,9 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.list`](/docs/std/list) | Collections | `List` | Growable lists that own their elements, with stable sorting and binary search. |
 | [`silk.local_scheduler`](/docs/std/local-scheduler) | Concurrency | `LocalScheduler` | A deterministic, single-threaded scheduler for structured Fibers. |
 | [`silk.logger`](/docs/std/logger) | Input and output | `Logger` | The \`Logger\` effect: log messages with a level, a template, and values. |
+| [`silk.lzma`](/docs/std/lzma) | Data formats | `Lzma` | Decode complete LZMA-alone streams into caller-owned byte buffers. |
+| [`silk.lzma2`](/docs/std/lzma2) | Data formats | `Lzma2` | Decode complete raw LZMA2 streams into caller-owned byte buffers. |
+| [`silk.md5`](/docs/std/md5) | Cryptography | `Md5` | Compute MD5 digests for legacy formats, including UUID version 3. |
 | [`silk.memory_byte_duplex`](/docs/std/memory-byte-duplex) | Input and output | `MemoryByteDuplex` | A scripted \`ByteDuplex\` transport in memory, for tests of protocol code. |
 | [`silk.memory_trust_source`](/docs/std/memory-trust-source) | TLS and certificates | `MemoryTrustSource` | A \`TrustSource\` provider that holds a trust snapshot in memory. |
 | [`silk.metrics`](/docs/std/metrics) | Memory | `AllocationMetrics` | Allocation counters that an \`Allocator\` provider can keep and publish. |
@@ -192,13 +204,18 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.simd.u8x32`](/docs/std/u8x32) | SIMD | `u8x32` | Operations on \`simd\<u8, 32\>\`: thirty-two unsigned 8-bit integer lanes in one 256-bit vector. |
 | [`silk.slice`](/docs/std/slice) | Collections | `Slice` | Borrowed subranges of slices, with no copy and no allocation. |
 | [`silk.slot`](/docs/std/slot) | Memory | `Slot` | Initialization-state changes for one element slot of raw storage. |
+| [`silk.stack`](/docs/std/stack) | Memory | `Stack` | The native stack of the running thread: the address of the current frame, and scratch storage that lives on the stack instead of in an allocator. |
 | [`silk.standard_input`](/docs/std/standard-input) | Input and output | `StandardInput` | The \`StandardInput\` effect: read raw bytes from standard input. |
 | [`silk.static_sequence`](/docs/std/static-sequence) | Core | `StaticSequence` | Immutable lists of values that exist only during static evaluation. |
 | [`silk.static_text`](/docs/std/static-text) | Core | `StaticText` | Operations on string literals during static evaluation: length, byte access, concatenation, and slices. |
-| [`silk.string`](/docs/std/string) | Text | `String` | UTF-8 text: owned strings, validation of bytes, and traversal one Unicode scalar at a time. |
+| [`silk.string`](/docs/std/string) | Text | `String` | UTF-8 text: owned strings, validation of bytes, search, splitting, trimming, and traversal one Unicode scalar at a time. |
 | [`silk.support.bcmp`](/docs/std/bcmp) | Compiler support | Not applicable | Word-wise compiler support with explicit C linkage and no runtime services. |
 | [`silk.support.bzero`](/docs/std/bzero) | Compiler support | Not applicable | Source-owned word-wise clearing for the Darwin LLVM zero-fill helper. |
 | [`silk.support.certificate_pem`](/docs/std/certificate-pem) | Compiler support | `Pem` | Internal strict PEM framing and canonical base64 for owned certificate decoders. |
+| [`silk.support.compression_checksum`](/docs/std/compression-checksum) | Compiler support | `CompressionChecksum` | CRC checksums used by gzip and XZ containers. |
+| [`silk.support.hpack_tables`](/docs/std/hpack-tables) |  | Not applicable | RFC 7541 Appendix A static fields and Appendix B Huffman decoding trie. |
+| [`silk.support.lzma2_decode`](/docs/std/lzma2-decode) | Compiler support | `Lzma2Stream` | LZMA2 chunk framing shared by raw LZMA2 and XZ decoders. |
+| [`silk.support.lzma_decode`](/docs/std/lzma-decode) | Compiler support | `LzmaState` | Shared LZMA range decoder and probability models for LZMA, LZMA2, and XZ. |
 | [`silk.support.memcmp`](/docs/std/memcmp) | Compiler support | Not applicable | Word-wise compiler support with explicit C linkage and no runtime services. |
 | [`silk.support.memcpy`](/docs/std/memcpy) | Compiler support | Not applicable | Word-wise compiler support with explicit C linkage and no runtime services. |
 | [`silk.support.memmove`](/docs/std/memmove) | Compiler support | Not applicable | Word-wise compiler support with explicit C linkage and no runtime services. |
@@ -237,12 +254,41 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.uri_reference`](/docs/std/uri-reference) | Data formats | `UriReference` | Parse a URI or a relative reference (RFC 3986) and read its components without allocation. |
 | [`silk.usize`](/docs/std/usize) | Numbers | `usize` | Pointer-width unsigned integers for lengths, indices, capacities, and allocation sizes. |
 | [`silk.utf8_decoder`](/docs/std/utf8-decoder) | Text | `Utf8Decoder` | Decoding of UTF-8 one byte at a time, for input that arrives in chunks. No allocation. |
+| [`silk.uuid`](/docs/std/uuid) | Data Formats | `Uuid` | UUID values and constructors for versions 1 through 8, with RFC 9562 byte order. |
+| [`silk.wasi`](/docs/std/wasi) | Native platform | `wasi` | The WASI Preview 1 canonical ABI, also used inside Preview 2 command components. |
+| [`silk.wasi`](/docs/std/wasi) | Native platform | `wasi` | The WASI Preview 1 canonical ABI, also used inside Preview 2 command components. |
+| [`silk.wasi_clock`](/docs/std/wasi-clock) | Native platform | `WasiClock` | WASI wall-clock and monotonic-clock operations. |
+| [`silk.wasi_clock`](/docs/std/wasi-clock) | Native platform | `WasiClock` | WASI wall-clock and monotonic-clock operations. |
+| [`silk.wasi_component`](/docs/std/wasi-component) | Native platform | `wasi_component` | Memory and polling operations shared by WASI Preview 2 providers. |
+| [`silk.wasi_component`](/docs/std/wasi-component) | Native platform | `wasi_component` | Memory and polling operations shared by WASI Preview 2 providers. |
+| [`silk.wasi_datagram`](/docs/std/wasi-datagram) | Networking | `UdpSocket` | Owned UDP sockets and complete datagrams through WASI Preview 2. |
+| [`silk.wasi_datagram`](/docs/std/wasi-datagram) | Networking | `UdpSocket` | Owned UDP sockets and complete datagrams through WASI Preview 2. |
+| [`silk.wasi_descriptor`](/docs/std/wasi-descriptor) | Native platform | `WasiDescriptor` | Descriptor reads and writes through WASI. |
+| [`silk.wasi_descriptor`](/docs/std/wasi-descriptor) | Native platform | `WasiDescriptor` | Descriptor reads and writes through WASI. |
+| [`silk.wasi_filesystem`](/docs/std/wasi-filesystem) | Native platform | `WasiFileSystem` | Descriptor-relative file operations within WASI preopened directories. |
+| [`silk.wasi_filesystem`](/docs/std/wasi-filesystem) | Native platform | `WasiFileSystem` | Descriptor-relative file operations within WASI preopened directories. |
+| [`silk.wasi_host_input`](/docs/std/wasi-host-input) | Native platform | `WasiHostInput` | A snapshot of WASI command arguments and environment variables. |
+| [`silk.wasi_host_input`](/docs/std/wasi-host-input) | Native platform | `WasiHostInput` | A snapshot of WASI command arguments and environment variables. |
+| [`silk.wasi_http`](/docs/std/wasi-http) | HTTP | `wasi_http` | Ownership and canonical ABI operations for WASI Preview 2 HTTP providers. |
+| [`silk.wasi_http`](/docs/std/wasi-http) | HTTP | `wasi_http` | Ownership and canonical ABI operations for WASI Preview 2 HTTP providers. |
+| [`silk.wasi_http_server`](/docs/std/wasi-http-server) | HTTP | `WasiHttpServer` | HTTP requests delivered to a WASI Preview 2 component. |
+| [`silk.wasi_http_server`](/docs/std/wasi-http-server) | HTTP | `WasiHttpServer` | HTTP requests delivered to a WASI Preview 2 component. |
+| [`silk.wasi_preview2`](/docs/std/wasi-preview2) | Native platform | `wasi_preview2` | Raw imports for the WASI Preview 2 canonical ABI. |
+| [`silk.wasi_preview2`](/docs/std/wasi-preview2) | Native platform | `wasi_preview2` | Raw imports for the WASI Preview 2 canonical ABI. |
+| [`silk.wasi_resolver`](/docs/std/wasi-resolver) | Networking | `WasiResolver` | DNS resolution through a WASI Preview 2 network capability. |
+| [`silk.wasi_resolver`](/docs/std/wasi-resolver) | Networking | `WasiResolver` | DNS resolution through a WASI Preview 2 network capability. |
+| [`silk.wasi_socket`](/docs/std/wasi-socket) | Networking | `wasi_socket` | TCP connections and listeners through WASI Preview 2 network capabilities. |
+| [`silk.wasi_socket`](/docs/std/wasi-socket) | Networking | `wasi_socket` | TCP connections and listeners through WASI Preview 2 network capabilities. |
+| [`silk.wasi_start`](/docs/std/wasi-start) | Native platform | `wasi_start` | The command entry for WASI Preview 1 and Preview 2. |
+| [`silk.wasi_stream`](/docs/std/wasi-stream) | Native platform | `wasi_stream` | Owned Preview 2 input and output streams with partial transfers and deadlines. |
+| [`silk.wasi_stream`](/docs/std/wasi-stream) | Native platform | `wasi_stream` | Owned Preview 2 input and output streams with partial transfers and deadlines. |
 | [`silk.wasm_start`](/docs/std/wasm-start) | Native platform | `WasmStart` | The program entry for the standalone LLVM-to-WebAssembly profile. |
 | [`silk.websocket_server`](/docs/std/websocket-server) | HTTP | `WebSocketServer` | WebSocket messages on the server side, over a channel from an accepted handshake. |
 | [`silk.websocket_upgrade`](/docs/std/websocket-upgrade) | HTTP | `WebSocketUpgrade` | The server side of the WebSocket opening handshake (RFC 6455, version 13). |
 | [`silk.work_queue`](/docs/std/work-queue) | Concurrency | `WorkDeque` | Queues that move owned values between native threads, for work-stealing schedulers. |
 | [`silk.writer`](/docs/std/writer) | Input and output | `Writer` | The \`Writer\` effect: write bytes without knowing where they go. |
 | [`silk.x25519`](/docs/std/x25519) | Cryptography | `X25519` | Agree on a shared secret with X25519 (RFC 7748) Diffie-Hellman. |
+| [`silk.xz`](/docs/std/xz) | Data formats | `Xz` | Decode XZ containers and verify their blocks, index, and footer. |
 | [`silk.zstd`](/docs/std/zstd) | Data formats | `Zstd` | Decompress Zstandard data (RFC 8878) in steps, with fixed memory and limits that you set. |
 
 Profile identities:
@@ -253,6 +299,8 @@ Profile identities:
 - `x86_64-unknown-linux-gnu`: target `x86_64-unknown-linux-gnu`.
 - `x86_64-unknown-linux-gnu-no-libc`: target `x86_64-unknown-linux-gnu`.
 - `wasm32-unknown-unknown`: target `wasm32-unknown-unknown`.
+- `wasm32-wasip1`: target `wasm32-wasip1`.
+- `wasm32-wasip2`: target `wasm32-wasip2`.
 
 ## See also
 

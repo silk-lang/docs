@@ -122,6 +122,24 @@ The error when a logger provider cannot log a message.
 It has a code that the provider defines. Get it with [`Logger.errorCode`](#Logger.impl.errorCode). The same code can
 mean different things for different providers.
 
+::Anchor{id="LogError.impl.Debug"}
+
+## Implementation `Debug for LogError`
+
+```silk
+impl Debug for LogError
+```
+
+::Anchor{id="LogError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the code, as `LogError { code: ... }`.
+
 ::Anchor{id="Logger"}
 
 ## `Logger`
@@ -358,4 +376,4 @@ log: InMemoryLogger.record
 
 Category: Input and output.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -745,6 +745,24 @@ Discard
 
 A [`Decoder.discard`](#Decoder.impl.discard) call.
 
+::Anchor{id="BodyComponent.impl.Debug"}
+
+## Implementation `Debug for BodyComponent`
+
+```silk
+impl Debug for BodyComponent
+```
+
+::Anchor{id="BodyComponent.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Selection`.
+
 ::Anchor{id="BodyLimitKind"}
 
 ## `BodyLimitKind`
@@ -874,6 +892,24 @@ OwnedBytes
 ```
 
 The owned-storage byte budget.
+
+::Anchor{id="BodyLimitKind.impl.Debug"}
+
+## Implementation `Debug for BodyLimitKind`
+
+```silk
+impl Debug for BodyLimitKind
+```
+
+::Anchor{id="BodyLimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `WireBytes`.
 
 ::Anchor{id="BodyReason"}
 
@@ -1103,6 +1139,24 @@ The call is not valid now, for example a `step` after the body is complete or af
 impl Copy for BodyReason
 ```
 
+::Anchor{id="BodyReason.impl.Debug"}
+
+## Implementation `Debug for BodyReason`
+
+```silk
+impl Debug for BodyReason
+```
+
+::Anchor{id="BodyReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidFraming`.
+
 ::Anchor{id="BodyError"}
 
 ## `BodyError`
@@ -1192,6 +1246,24 @@ pub fieldIndex: Option<usize>
 ```
 
 The position of the trailer field, from 0, when the error is in a trailer.
+
+::Anchor{id="BodyError.impl.Debug"}
+
+## Implementation `Debug for BodyError`
+
+```silk
+impl Debug for BodyError
+```
+
+::Anchor{id="BodyError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `BodyError { reason: ..., component: ..., ... }`.
 
 ::Anchor{id="TrailerPolicy"}
 
@@ -1661,4 +1733,4 @@ incomplete.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

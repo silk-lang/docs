@@ -227,6 +227,24 @@ IdleTimeout
 
 `idleTimeoutNanoseconds` is zero.
 
+::Anchor{id="ConfigField.impl.Debug"}
+
+## Implementation `Debug for ConfigField`
+
+```silk
+impl Debug for ConfigField
+```
+
+::Anchor{id="ConfigField.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `MaxTotal`.
+
 ::Anchor{id="PoolError"}
 
 ## `PoolError`
@@ -305,6 +323,24 @@ The deadline passed before or while the connection was opened. A new connection 
 ```silk
 impl Copy for PoolError
 ```
+
+::Anchor{id="PoolError.impl.Debug"}
+
+## Implementation `Debug for PoolError`
+
+```silk
+impl Debug for PoolError
+```
+
+::Anchor{id="PoolError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidConfig { ... }`.
 
 ::Anchor{id="Counts"}
 
@@ -964,4 +1000,4 @@ connections fail to close, it still closes the others, and then fails with the f
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

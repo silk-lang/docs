@@ -215,6 +215,24 @@ Metadata
 
 A list in a field such as `Connection`, `Content-Encoding`, or `Transfer-Encoding`.
 
+::Anchor{id="ValueComponent.impl.Debug"}
+
+## Implementation `Debug for ValueComponent`
+
+```silk
+impl Debug for ValueComponent
+```
+
+::Anchor{id="ValueComponent.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Version`.
+
 ::Anchor{id="LimitKind"}
 
 ## `LimitKind`
@@ -304,6 +322,24 @@ UniqueField
 ```
 
 A field must occur at most one time, but it occurred more times.
+
+::Anchor{id="LimitKind.impl.Debug"}
+
+## Implementation `Debug for LimitKind`
+
+```silk
+impl Debug for LimitKind
+```
+
+::Anchor{id="LimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `MethodBytes`.
 
 ::Anchor{id="ValueReason"}
 
@@ -505,6 +541,24 @@ The length of the buffer that you gave.
 impl Copy for ValueReason
 ```
 
+::Anchor{id="ValueReason.impl.Debug"}
+
+## Implementation `Debug for ValueReason`
+
+```silk
+impl Debug for ValueReason
+```
+
+::Anchor{id="ValueReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidToken`.
+
 ::Anchor{id="ValueError"}
 
 ## `ValueError`
@@ -560,6 +614,24 @@ pub offset: usize
 
 The byte offset in the part where the rule failed.
 
+::Anchor{id="ValueError.impl.Debug"}
+
+## Implementation `Debug for ValueError`
+
+```silk
+impl Debug for ValueError
+```
+
+::Anchor{id="ValueError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ValueError { reason: ..., component: ..., ... }`.
+
 ::Anchor{id="Version"}
 
 ## `Version`
@@ -589,6 +661,24 @@ Http11
 ```
 
 HTTP/1.1.
+
+::Anchor{id="Version.impl.Debug"}
+
+## Implementation `Debug for Version`
+
+```silk
+impl Debug for Version
+```
+
+::Anchor{id="Version.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Http10`.
 
 ::Anchor{id="Version.impl"}
 
@@ -846,6 +936,24 @@ An HTTP status code from 100 to 599. Codes without a name, such as 299, are kept
 ```silk
 impl Copy for Status
 ```
+
+::Anchor{id="Status.impl.Debug"}
+
+## Implementation `Debug for Status`
+
+```silk
+impl Debug for Status
+```
+
+::Anchor{id="Status.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the code, as `Status { code: 404 }`.
 
 ::Anchor{id="Status.impl"}
 
@@ -1215,6 +1323,24 @@ pub struct OwnedResponseHead
 A response head that owns its memory. Get a [`ResponseHead`](#ResponseHead) from it with
 [`OwnedResponseHead.view`](#OwnedResponseHead.impl.view).
 
+::Anchor{id="OwnedResponseHead.impl.Debug"}
+
+## Implementation `Debug for OwnedResponseHead`
+
+```silk
+impl Debug for OwnedResponseHead
+```
+
+::Anchor{id="OwnedResponseHead.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the version and the status, as `OwnedResponseHead { version: Http11, status: Status { code: 407 } }`. It leaves out the reason phrase and the headers.
+
 ::Anchor{id="OwnedResponseHead.impl"}
 
 ## Implementation `OwnedResponseHead`
@@ -1235,4 +1361,4 @@ Returns the head as a [`ResponseHead`](#ResponseHead) that borrows this value.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

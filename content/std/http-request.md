@@ -614,6 +614,24 @@ InvalidTarget
 
 A direct request has an absolute target for another origin.
 
+::Anchor{id="RequestError.impl.Debug"}
+
+## Implementation `Debug for RequestError`
+
+```silk
+impl Debug for RequestError
+```
+
+::Anchor{id="RequestError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Value { ... }`.
+
 ::Anchor{id="PreparedRequest"}
 
 ## `PreparedRequest`
@@ -806,4 +824,4 @@ By default, Basic credentials fail over plain HTTP with `InsecureBasic`.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

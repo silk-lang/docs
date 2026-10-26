@@ -1,0 +1,96 @@
+Compute MD5 digests for legacy formats, including UUID version 3.
+
+## When to use
+Use [`Md5`](#Md5) only for a format that requires MD5. Use SHA-256 for new cryptographic protocols.
+
+## Details
+The streaming state does not allocate. Call `make`, `update`, and `finish`, or use `hash`.
+
+## Gotchas
+MD5 permits deliberate collisions. It does not protect data against tampering.
+
+## Examples
+### Hash a message in parts
+```silk
+import silk.md5 { Md5 }
+
+pub fn main() -> i32 {
+  let mut state = Md5.make()
+  state.update(b"a")
+  state.update(b"bc")
+  let digest = state.finish()
+  if digest[0] != 0x90 || digest[15] != 0x72 {
+    return 1
+  }
+  return 0
+}
+```
+
+## See also
+[RFC 1321](https://www.rfc-editor.org/rfc/rfc1321.html) defines the MD5 algorithm.
+
+Import as `Md5` with `import silk.md5 { Md5 }`.
+
+Public declarations: 1.
+
+::Anchor{id="Md5"}
+
+## `Md5`
+
+```silk
+pub struct Md5
+```
+
+A streaming MD5 state. It does not allocate and is unsuitable for security checks.
+
+::Anchor{id="Md5.impl"}
+
+## Implementation `Md5`
+
+```silk
+impl Md5
+```
+
+::Anchor{id="Md5.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Self
+```
+
+Returns a state for an empty message.
+
+::Anchor{id="Md5.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds bytes to the message. The length in bits wraps modulo 2^64, as MD5 requires.
+
+::Anchor{id="Md5.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> [u8; 16]
+```
+
+Consumes the state and returns its 16-byte digest in MD5 byte order.
+
+::Anchor{id="Md5.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8]) -> [u8; 16]
+```
+
+Returns the 16-byte MD5 digest of `bytes`. It does not allocate.
+
+Category: Cryptography.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

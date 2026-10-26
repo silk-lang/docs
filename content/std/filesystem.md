@@ -303,12 +303,13 @@ Returns the path that `relativeText` names when you start at `base`.
 
 Each `..` removes one component, `.` and empty text keep the current path, and other
 components are added. For example, `"../docs"` from `/workspace/app` gives `/workspace/docs`.
-It only computes the path. It does not access the file system, so it does not follow links.
+A single trailing `/` is ignored, so `"docs/"` gives the same path as `"docs"`. It only
+computes the path. It does not access the file system, so it does not follow links.
 
 #### Errors
 
 - `FileError` with reason `InvalidPath` if `relativeText` starts with `/`, contains NUL or an
-  empty component, or goes above the root.
+  empty component such as `"a//b"`, or goes above the root.
 - `OutOfMemoryError` if the `Allocator` cannot supply the path.
 
 ::Anchor{id="Path.impl.parent"}
@@ -371,8 +372,8 @@ directory.
 pub struct DirectoryEntryKind
 ```
 
-The kind of a directory entry: a file or a directory. Compare with [`FileSystem.file`](#FileSystem.impl.file) and
-[`FileSystem.directory`](#FileSystem.impl.directory).
+The kind of a directory entry: a file, a directory, or a symbolic link. Compare with
+[`FileSystem.file`](#FileSystem.impl.file), [`FileSystem.directory`](#FileSystem.impl.directory), and [`FileSystem.symbolicLink`](#FileSystem.impl.symbolicLink).
 
 ::Anchor{id="DirectoryEntryKind.code"}
 
@@ -382,7 +383,7 @@ The kind of a directory entry: a file or a directory. Compare with [`FileSystem.
 pub code: i32
 ```
 
-The kind code: 0 for a file, 1 for a directory.
+The kind code: 0 for a file, 1 for a directory, 2 for a symbolic link.
 
 ::Anchor{id="DirectoryEntry"}
 
@@ -435,6 +436,24 @@ pub code: i32
 
 The operation code.
 
+::Anchor{id="FileOperation.impl.Debug"}
+
+## Implementation `Debug for FileOperation`
+
+```silk
+impl Debug for FileOperation
+```
+
+::Anchor{id="FileOperation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the code, such as `ReadFile`, or the code when it has no name.
+
 ::Anchor{id="FileReason"}
 
 ## `FileReason`
@@ -455,6 +474,24 @@ pub code: i32
 ```
 
 The reason code.
+
+::Anchor{id="FileReason.impl.Debug"}
+
+## Implementation `Debug for FileReason`
+
+```silk
+impl Debug for FileReason
+```
+
+::Anchor{id="FileReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the code, such as `NotFound`, or the code when it has no name.
 
 ::Anchor{id="FileError"}
 
@@ -491,6 +528,25 @@ pub reason: FileReason
 ```
 
 The portable reason. Use it to decide how to recover.
+
+::Anchor{id="FileError.impl.Debug"}
+
+## Implementation `Debug for FileError`
+
+```silk
+impl Debug for FileError
+```
+
+::Anchor{id="FileError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `FileError { operation: ReadFile, reason: NotFound, providerCode: 2 }`.
+It leaves out `providerCode` when there is none.
 
 ::Anchor{id="PublicationPolicy"}
 
@@ -602,6 +658,24 @@ pub stagingName: Bytes
 
 The name of the temporary file that is still in the destination directory if the removal
 failed. Empty otherwise.
+
+::Anchor{id="AtomicWriteError.impl.Debug"}
+
+## Implementation `Debug for AtomicWriteError`
+
+```silk
+impl Debug for AtomicWriteError
+```
+
+::Anchor{id="AtomicWriteError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `AtomicWriteError { published: ..., cause: ..., ... }`.
 
 ::Anchor{id="FileSystem"}
 
@@ -805,7 +879,8 @@ Returns the direct children of the directory at `path`, sorted by path bytes.
 #### Details
 
 The listing does not include children of children. Each entry owns its path, so you can keep
-it after you drop the list.
+it after you drop the list. An entry that is a symbolic link has the kind
+[`FileSystem.symbolicLink`](#FileSystem.impl.symbolicLink), whatever it points to.
 
 #### Errors
 
@@ -837,7 +912,8 @@ Creates the directory `path`. Its parent must exist.
 effect fn removeFile(path: &Path) -> () ! FileError ? &mut FileSystem
 ```
 
-Removes the regular file at `path`.
+Removes the regular file or symbolic link at `path`. A link is removed itself, not what it
+points to.
 
 #### Errors
 
@@ -953,6 +1029,17 @@ pub fn directory() -> DirectoryEntryKind
 
 Constructs the directory [`DirectoryEntryKind`](#DirectoryEntryKind).
 
+::Anchor{id="FileSystem.impl.symbolicLink"}
+
+### Associated function `symbolicLink`
+
+```silk
+pub fn symbolicLink() -> DirectoryEntryKind
+```
+
+Constructs the symbolic-link [`DirectoryEntryKind`](#DirectoryEntryKind). A listing reports a link itself, not
+what it points to, so a walk of the tree does not follow it.
+
 ::Anchor{id="FileSystem.impl.entryKindCode"}
 
 ### Associated function `entryKindCode`
@@ -961,7 +1048,7 @@ Constructs the directory [`DirectoryEntryKind`](#DirectoryEntryKind).
 pub fn entryKindCode(kind: DirectoryEntryKind) -> i32
 ```
 
-Returns the code of `kind`: 0 for a file, 1 for a directory.
+Returns the code of `kind`: 0 for a file, 1 for a directory, 2 for a symbolic link.
 
 ::Anchor{id="FileSystem.impl.fileInfo"}
 
@@ -1366,7 +1453,8 @@ Removes the directory at `path`, all files in it, and all directories in it.
 #### Details
 
 It removes the files first and then the directories, deepest first. It does not recurse, so a
-deep tree uses list memory, not stack.
+deep tree uses list memory, not stack. A symbolic link in the tree is removed itself; what it
+points to stays.
 
 #### Errors
 
@@ -1468,4 +1556,4 @@ The path of the directory.
 
 Category: System.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

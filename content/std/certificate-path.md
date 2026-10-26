@@ -217,6 +217,24 @@ ResourceLimit
 
 An inclusive caller-supplied resource or work bound is exceeded.
 
+::Anchor{id="ValidationClass.impl.Debug"}
+
+## Implementation `Debug for ValidationClass`
+
+```silk
+impl Debug for ValidationClass
+```
+
+::Anchor{id="ValidationClass.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidInput`.
+
 ::Anchor{id="ValidationReason"}
 
 ## `ValidationReason`
@@ -437,6 +455,24 @@ SizeOverflow
 
 A checked length or counter sum is not representable.
 
+::Anchor{id="ValidationReason.impl.Debug"}
+
+## Implementation `Debug for ValidationReason`
+
+```silk
+impl Debug for ValidationReason
+```
+
+::Anchor{id="ValidationReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `UnsupportedVersion`.
+
 ::Anchor{id="ValidationLocation"}
 
 ## `ValidationLocation`
@@ -514,6 +550,24 @@ The validation call rather than one certificate.
 ```silk
 impl Copy for ValidationLocation
 ```
+
+::Anchor{id="ValidationLocation.impl.Debug"}
+
+## Implementation `Debug for ValidationLocation`
+
+```silk
+impl Debug for ValidationLocation
+```
+
+::Anchor{id="ValidationLocation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Leaf`.
 
 ::Anchor{id="ValidationLimit"}
 
@@ -695,6 +749,24 @@ Arithmetic
 
 Checked arithmetic representation.
 
+::Anchor{id="ValidationLimit.impl.Debug"}
+
+## Implementation `Debug for ValidationLimit`
+
+```silk
+impl Debug for ValidationLimit
+```
+
+::Anchor{id="ValidationLimit.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `PeerCertificates`.
+
 ::Anchor{id="ValidationError"}
 
 ## `ValidationError`
@@ -780,6 +852,24 @@ pub offset: usize
 ```
 
 Byte offset in the relevant certificate or configured constraint input.
+
+::Anchor{id="ValidationError.impl.Debug"}
+
+## Implementation `Debug for ValidationError`
+
+```silk
+impl Debug for ValidationError
+```
+
+::Anchor{id="ValidationError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ValidationError { kind: ..., reason: ..., ... }`.
 
 ::Anchor{id="RevocationStatus"}
 
@@ -960,4 +1050,4 @@ intermediates, and browser root policies are not checked.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

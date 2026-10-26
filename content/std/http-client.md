@@ -227,6 +227,24 @@ Decode
 
 The response body could not be decoded as requested.
 
+::Anchor{id="HttpErrorKind.impl.Debug"}
+
+## Implementation `Debug for HttpErrorKind`
+
+```silk
+impl Debug for HttpErrorKind
+```
+
+::Anchor{id="HttpErrorKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidUrl`.
+
 ::Anchor{id="HttpCause"}
 
 ## `HttpCause`
@@ -246,6 +264,36 @@ None
 ```
 
 No lower-level error.
+
+::Anchor{id="HttpCause.Provider"}
+
+### `Provider`
+
+```silk
+Provider
+```
+
+An HTTP host interface failed with a provider-specific error code.
+
+::Anchor{id="HttpCause.Provider.provider"}
+
+#### Field `provider`
+
+```silk
+pub provider: string<'static>
+```
+
+The host interface identifying the code's domain.
+
+::Anchor{id="HttpCause.Provider.code"}
+
+#### Field `code`
+
+```silk
+pub code: u32
+```
+
+The host's error code, such as a WASI HTTP error variant ordinal.
 
 ::Anchor{id="HttpCause.Uri"}
 
@@ -447,6 +495,24 @@ pub error: InvalidUtf8
 
 The decoding failure.
 
+::Anchor{id="HttpCause.impl.Debug"}
+
+## Implementation `Debug for HttpCause`
+
+```silk
+impl Debug for HttpCause
+```
+
+::Anchor{id="HttpCause.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `None`.
+
 ::Anchor{id="HttpError"}
 
 ## `HttpError`
@@ -501,6 +567,24 @@ pub cause: HttpCause
 ```
 
 The lower-level error, when there is one.
+
+::Anchor{id="HttpError.impl.Debug"}
+
+## Implementation `Debug for HttpError`
+
+```silk
+impl Debug for HttpError
+```
+
+::Anchor{id="HttpError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `HttpError { kind: ..., message: ..., ... }`.
 
 ::Anchor{id="HttpError.impl"}
 
@@ -1264,4 +1348,4 @@ Sends `value` as JSON in a POST request to `url`.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -399,6 +399,24 @@ Extensions
 
 `Sec-WebSocket-Extensions` is not valid.
 
+::Anchor{id="ValidationReason.impl.Debug"}
+
+## Implementation `Debug for ValidationReason`
+
+```silk
+impl Debug for ValidationReason
+```
+
+::Anchor{id="ValidationReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Request`.
+
 ::Anchor{id="LimitKind"}
 
 ## `LimitKind`
@@ -469,6 +487,24 @@ SizeOverflow
 
 A size does not fit in `usize`.
 
+::Anchor{id="LimitKind.impl.Debug"}
+
+## Implementation `Debug for LimitKind`
+
+```silk
+impl Debug for LimitKind
+```
+
+::Anchor{id="LimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Protocols`.
+
 ::Anchor{id="DecisionReason"}
 
 ## `DecisionReason`
@@ -509,6 +545,24 @@ Status
 ```
 
 A `Reject` status is less than 200.
+
+::Anchor{id="DecisionReason.impl.Debug"}
+
+## Implementation `Debug for DecisionReason`
+
+```silk
+impl Debug for DecisionReason
+```
+
+::Anchor{id="DecisionReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Protocol`.
 
 ::Anchor{id="UpgradeError"}
 
@@ -629,6 +683,24 @@ pub error: ValueError
 ```
 
 The value error.
+
+::Anchor{id="UpgradeError.impl.Debug"}
+
+## Implementation `Debug for UpgradeError`
+
+```silk
+impl Debug for UpgradeError
+```
+
+::Anchor{id="UpgradeError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Validation { ... }`.
 
 ::Anchor{id="Offer"}
 
@@ -1004,4 +1076,4 @@ It sends the status of [`rejectionStatus`](#rejectionStatus). For `UnsupportedVe
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

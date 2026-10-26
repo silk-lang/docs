@@ -681,6 +681,24 @@ EndInput
 
 Transport input end.
 
+::Anchor{id="ClientOperation.impl.Debug"}
+
+## Implementation `Debug for ClientOperation`
+
+```silk
+impl Debug for ClientOperation
+```
+
+::Anchor{id="ClientOperation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `FeedInput`.
+
 ::Anchor{id="ProtocolReason"}
 
 ## `ProtocolReason`
@@ -800,6 +818,24 @@ InternalState
 ```
 
 The client reached an impossible private transition.
+
+::Anchor{id="ProtocolReason.impl.Debug"}
+
+## Implementation `Debug for ProtocolReason`
+
+```silk
+impl Debug for ProtocolReason
+```
+
+::Anchor{id="ProtocolReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Record`.
 
 ::Anchor{id="TlsLimitKind"}
 
@@ -1001,6 +1037,24 @@ CertificateProfile
 
 The configured semantic certificate-profile policy.
 
+::Anchor{id="TlsLimitKind.impl.Debug"}
+
+## Implementation `Debug for TlsLimitKind`
+
+```silk
+impl Debug for TlsLimitKind
+```
+
+::Anchor{id="TlsLimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `HandshakeBodyBytes`.
+
 ::Anchor{id="CertificateIdentityFailure"}
 
 ## `CertificateIdentityFailure`
@@ -1051,6 +1105,24 @@ pub error: IdentityError
 
 The complete HTTPS identity failure.
 
+::Anchor{id="CertificateIdentityFailure.impl.Debug"}
+
+## Implementation `Debug for CertificateIdentityFailure`
+
+```silk
+impl Debug for CertificateIdentityFailure
+```
+
+::Anchor{id="CertificateIdentityFailure.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Decode { ... }`.
+
 ::Anchor{id="CertificateVerifyFailure"}
 
 ## `CertificateVerifyFailure`
@@ -1081,6 +1153,26 @@ pub error: P256SignatureError
 
 The exact primitive failure.
 
+::Anchor{id="CertificateVerifyFailure.EcdsaP384"}
+
+### `EcdsaP384`
+
+```silk
+EcdsaP384
+```
+
+ECDSA-P384/SHA-384 verification failed.
+
+::Anchor{id="CertificateVerifyFailure.EcdsaP384.error"}
+
+#### Field `error`
+
+```silk
+pub error: P384SignatureError
+```
+
+The exact primitive failure.
+
 ::Anchor{id="CertificateVerifyFailure.Rsa"}
 
 ### `Rsa`
@@ -1100,6 +1192,24 @@ pub error: RsaError
 ```
 
 The exact primitive failure.
+
+::Anchor{id="CertificateVerifyFailure.impl.Debug"}
+
+## Implementation `Debug for CertificateVerifyFailure`
+
+```silk
+impl Debug for CertificateVerifyFailure
+```
+
+::Anchor{id="CertificateVerifyFailure.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Ecdsa { ... }`.
 
 ::Anchor{id="TlsError"}
 
@@ -1352,6 +1462,24 @@ NoApplicationProtocol
 
 The server omits a required ALPN selection or selects a protocol that was not offered.
 
+::Anchor{id="TlsError.impl.Debug"}
+
+## Implementation `Debug for TlsError`
+
+```silk
+impl Debug for TlsError
+```
+
+::Anchor{id="TlsError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `PeerAlert { ... }`.
+
 ::Anchor{id="CertificateVerifyFailure.impl.Copy"}
 
 ## Implementation `Copy for CertificateVerifyFailure`
@@ -1491,9 +1619,10 @@ works in two steps: write [`Client.pendingOutput`](#Client.impl.pendingOutput) t
 [`ClientLimits`](#ClientLimits) bound all memory and work.
 
 It supports TLS 1.3 only, with the cipher suites ChaCha20-Poly1305, AES-128-GCM, and
-AES-256-GCM, and the key exchange groups X25519 and P-256. It checks the certificate chain
-against your `TrustSnapshot`, the host name of your `ReferenceIdentity`, the CertificateVerify
-signature, and the Finished message. It gives no application data before all checks pass.
+AES-256-GCM, the key exchange groups X25519 and P-256, and server keys ECDSA P-256, ECDSA P-384,
+and RSA (PSS with SHA-256). It checks the certificate chain against your `TrustSnapshot`, the
+host name of your `ReferenceIdentity`, the CertificateVerify signature, and the Finished
+message. It gives no application data before all checks pass.
 
 ### Gotchas
 A [`TlsError`](#TlsError) is permanent for the client. Dropping the client does not send `close_notify`.
@@ -1665,4 +1794,4 @@ Tells the client that the transport has no more input. Pending output stays pend
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

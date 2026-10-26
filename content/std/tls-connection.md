@@ -99,7 +99,7 @@ fn reference<'a>(host: &'a [u8]) -> ReferenceIdentity<'a> {
   return match move HttpsIdentity.reference(OriginHost<'a>.Dns { bytes: host }) {
     Result.Success { value } => value
     Result.Failure { error } => {
-      let invalid = 1 / 0
+      Intrinsic.trap("unexpected failure")
       return reference(host)
     }
   }
@@ -112,7 +112,7 @@ fn emptyTrust() -> TrustSnapshot {
   ) {
     Result.Success { value } => move value
     Result.Failure { error } => {
-      let invalid = 1 / 0
+      Intrinsic.trap("unexpected failure")
       return emptyTrust()
     }
   }
@@ -297,6 +297,24 @@ HandshakeTimeout
 ```
 
 The handshake did not complete before its deadline.
+
+::Anchor{id="ConnectionError.impl.Debug"}
+
+## Implementation `Debug for ConnectionError`
+
+```silk
+impl Debug for ConnectionError
+```
+
+::Anchor{id="ConnectionError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Tls { ... }`.
 
 ::Anchor{id="ConnectionOptions"}
 
@@ -577,4 +595,4 @@ returns, fails, or is cancelled. Errors from that close are ignored. Call
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

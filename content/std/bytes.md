@@ -54,6 +54,24 @@ An owned sequence of bytes. Dropping it releases its storage.
 The length is the number of bytes in the value. The length grows with [`Bytes.append`](#Bytes.impl.append). The
 capacity of the storage is not part of the public contract.
 
+::Anchor{id="Bytes.impl.Debug"}
+
+## Implementation `Debug for Bytes`
+
+```silk
+impl Debug for Bytes
+```
+
+::Anchor{id="Bytes.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes each byte as a number, as `[104, 105]`, like a `&[u8]`.
+
 ::Anchor{id="Bytes.impl"}
 
 ## Implementation `Bytes`
@@ -222,4 +240,4 @@ rejects other uses of the value, such as [`Bytes.append`](#Bytes.impl.append), w
 
 Category: Collections.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

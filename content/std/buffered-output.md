@@ -52,12 +52,6 @@ impl Writer for CountingWriter {
     ? &mut Writer {
     return ()
   }
-
-  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
-    ! WriterError
-    ? &mut Writer {
-    return run Writer.writeEach(&mut self, vals)
-  }
 }
 
 pub effect fn main() -> i32
@@ -456,4 +450,4 @@ When this function returns, [`BufferedOutput.pending`](#BufferedOutput.impl.pend
 
 Category: Input and output.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
