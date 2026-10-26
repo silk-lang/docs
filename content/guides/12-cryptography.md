@@ -33,6 +33,7 @@ import silk.blake2b { Blake2b512 }
 import silk.chacha20_poly1305 { AeadError, ChaCha20Poly1305 }
 import silk.ed25519 { Ed25519PublicKey }
 import silk.effect { Effect }
+import silk.format { Debug, Format, Formatter }
 import silk.hkdf { HkdfSha256 }
 import silk.hmac { HmacSha256 }
 import silk.logger { LogError, Logger }
@@ -46,9 +47,16 @@ import silk.sha3 { Sha3_256 }
 import silk.slice { Slice }
 import silk.string { String }
 import silk.u8
+import silk.writer { Writer, WriterError }
 import silk.x25519 { X25519 }
 
-pub struct Broken { step: string<'static> }
+pub struct Broken { pub step: string<'static> }
+
+impl Debug for Broken {
+  effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer {
+    return run Format.debugFields(self, "Broken", &mut formatter)
+  }
+}
 
 fn hex<'a>(bytes: &[u8], out: &'a mut [u8]) -> string<'a> {
   let digits = b"0123456789abcdef"
@@ -63,7 +71,7 @@ fn hex<'a>(bytes: &[u8], out: &'a mut [u8]) -> string<'a> {
 }
 ```
 
-`Broken` is the program's one failure type. Each step that can go wrong fails with it and names itself.
+`Broken` is the program's one failure type. Each step that can go wrong fails with it and names itself. `main` can fail with it, so it implements `Debug`: when a step fails, the runtime prints the value, as `Broken { step: "seal" }`. `Format.debugFields` writes the struct's `pub` fields, which is why `step` is `pub`.
 
 `hex` writes two hex digits per byte into a buffer you lend it and returns the filled part as text. The std lib has no hex formatter, and templates cannot print a byte array, so you write this once. `Slice.view` from `silk/slice` borrows the first `bytes.length * 2` bytes. `String.fromUtf8Unchecked` is `unsafe` because it skips validation; the digits are ASCII, so that is safe here. Use the checked `String.fromUtf8` when you do not know the bytes.
 
