@@ -50,7 +50,7 @@ The compiler picks one capture mode per outer binding from how the body uses it.
 A callable's invocation mode follows from its captures:
 
 - `fn`: only Copy and Shared captures. It can be called any number of times through a shared binding, and it is copied when passed.
-- `mut fn`: at least one Mutable capture. Calling it needs a `let mut` binding or a `mut` parameter (SEM0077). Passing it needs `move`.
+- `mut fn`: at least one Mutable capture. Calling it needs a `let mut` binding or a `mut` parameter (SEM0077). Passing the binding to a `mut fn` or `once fn` parameter lends it for that call, so it stays usable afterwards. Passing it to a type parameter such as `F: mut fn(i32) -> i32`, or binding it to another name, needs `move`.
 - `once fn`: at least one Move capture. It can be called once; a second call is OWN0001. Passing it needs `move`.
 - A parameter of type `mut fn` accepts a `fn`. A parameter of type `once fn` accepts a `fn` or `mut fn`. The reverse is SEM0076 at the argument, naming both modes, as in "Callable value with mode `once` cannot satisfy a parameter with mode `mut`, which may call it more than once".
 
