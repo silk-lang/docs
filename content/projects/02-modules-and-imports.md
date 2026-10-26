@@ -19,7 +19,7 @@ Member      = Identifier ('as' Identifier)?
 - The module name is the file's path below `[package].source`, without `.silk`, with `/` written as `.`. `src/geometry/Point.silk` is `geometry.Point` when the source root is `src`.
 - The source root defaults to `src`. See **The manifest**.
 - Names match file names exactly, case included. `import geometry.point` does not find `Point.silk`.
-- A directory is not a module. `import geometry` fails when only `geometry/` exists.
+- A directory is a module only through its barrel file `mod.silk`. `import geometry` finds `src/geometry.silk` or `src/geometry/mod.silk`, and fails when only `geometry/` exists. See **Barrel modules**.
 - There is no module declaration inside the file.
 - A module named `tests` and a directory `tests/` can sit side by side: `tests` is `src/tests.silk`, `tests.Fakes` is `src/tests/Fakes.silk`.
 
@@ -47,6 +47,40 @@ pub import geometry.Point { Point, normSquared as norm2 }
 ```
 
 Another module can then write `import geometry.Shapes { Point, norm2 }`, or call `S.norm2(...)` through a module binding.
+
+## Barrel modules
+
+A directory's `mod.silk` is the module named by the directory's path, like `mod.rs` in Rust. It usually re-exports what the directory's other modules declare, so an importer names one module:
+
+```
+src/
+  main.silk
+  shapes/
+    mod.silk
+    circle.silk
+    square.silk
+```
+
+`src/shapes/mod.silk`:
+
+```silk
+pub import shapes.circle { Circle }
+pub import shapes.square { Square, area }
+```
+
+`src/main.silk`:
+
+```silk
+import shapes { Circle, Square, area }
+```
+
+- `import shapes` reads `src/shapes.silk` or `src/shapes/mod.silk`, whichever exists. Both existing is MOD0005.
+- A barrel is named only by its directory: `import shapes.mod` is MOD0006.
+- Imports inside `mod.silk` still start at the source root: `shapes.circle`, not `circle`.
+- The children stay importable on their own: `import shapes.circle { Circle }` still works.
+- `import shapes` inside `shapes/mod.silk` imports itself (MOD0002).
+- The same rule holds for a dependency's modules and for `exports`: `exports = ["shapes"]` publishes the barrel. Its children stay internal unless listed too.
+- `src/mod.silk` at the top of the source root is an ordinary module that no import can name.
 
 ## Visibility
 
@@ -158,6 +192,8 @@ Failed shapes in 0.20s
 | MOD0002 | A module imports itself. Only the import is reported, with no follow-on SEM0016 in that module or in modules that import it |
 | MOD0003 | Another package's module that its `exports` does not list |
 | MOD0004 | An import of `Intrinsic`, or of a module under it other than `Intrinsic.application`. `Intrinsic` needs no import. See **The standard library** for reserved names |
+| MOD0005 | Both `geometry.silk` and `geometry/mod.silk` exist, so `import geometry` is ambiguous |
+| MOD0006 | An import that names a barrel by its file name, such as `import geometry.mod` |
 | SEM0014 | The module has no such member: `Module geometry.Point has no member Nope` |
 | SEM0015 | The member exists but is private, or the module only imports it from another module, which the message names |
 | SEM0016 | Two bindings with the same name in one scope, such as a module and a type both called `Board` |

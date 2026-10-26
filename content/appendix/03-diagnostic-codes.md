@@ -14,7 +14,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | --- | --- | --- |
 | LEX | Lexing tokens and literals | LEX0001-LEX0014 |
 | PAR | Parsing | PAR0001-PAR0007 |
-| MOD | Module and package resolution | MOD0001-MOD0004 |
+| MOD | Module and package resolution | MOD0001-MOD0006 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
 | SEM | Names, types, effects and everything else | SEM0001-SEM0245 |
 
@@ -562,6 +562,46 @@ src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `Intrinsi
 Any import whose path starts with `Intrinsic`, such as `import Intrinsic.helpers { hi }`, is MOD0004, except `import Intrinsic.application`. The message names the imported path: `Module Intrinsic.helpers cannot be imported: ...`. An unknown `silk.` path, such as `import silk.nope`, is MOD0001 instead. A local module named `silk` or `Intrinsic` at the top of the source root is refused before checking starts, with `silk: invalid module ...` and exit status 1.
 
 Fix: Remove the import and write `Intrinsic.replace(...)` directly; `Intrinsic` needs no import. Rename a local module that uses a reserved name. See The standard library, Intrinsics.
+
+### MOD0005
+
+An import path that names both a module file and a directory's `mod.silk` barrel file.
+
+With both `src/util.silk` and `src/util/mod.silk`:
+
+```silk
+import util { one }
+pub fn main() -> i32 { return one() }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:1:8: error[MOD0005] Module util names both `util.silk` and `util/mod.silk`; remove or rename one of them
+```
+
+The file paths are relative to the source root of the package that holds them. Every import of the path reports it.
+
+Fix: Keep one of the two files. Move the module file's declarations into `mod.silk`, or rename the directory. See Modules and imports.
+
+### MOD0006
+
+An import that names a directory's `mod.silk` barrel file by its file name instead of the directory's path.
+
+With `src/util/mod.silk`:
+
+```silk
+import util.mod { one }
+pub fn main() -> i32 { return one() }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:1:8: error[MOD0006] Module util.mod names a `mod.silk` file, which is imported by the path of its directory without `.mod`
+```
+
+Fix: Write `import util { one }`. See Modules and imports.
 
 ## OWN: ownership and borrowing
 
