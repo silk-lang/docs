@@ -19,6 +19,9 @@ frames.
 - There is no scheduler or event loop. If `main` parks, the program fails with status 1. Make
   your own execution for code that parks.
 - A trap does not unwind, so cleanup code does not run.
+- A stack overflow on the main thread prints `fatal trap: stack overflow`, and another invalid
+  memory access prints `fatal trap: segmentation fault`, without frames. The process then ends
+  with the signal, as it would without the report.
 
 Public declarations: 0.
 
@@ -26,4 +29,4 @@ This module declares no public items.
 
 Category: Native platform.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

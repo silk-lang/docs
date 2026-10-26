@@ -76,27 +76,7 @@ pub effect fn main() -> i32
 
 Import as `List` with `import silk.list { List }`.
 
-Public declarations: 3.
-
-::Anchor{id="Empty"}
-
-## `Empty`
-
-```silk
-pub struct Empty<T>
-```
-
-The storage state of a [`List`](#List) that has no allocation. User code does not use it.
-
-::Anchor{id="Full"}
-
-## `Full`
-
-```silk
-pub struct Full<T>
-```
-
-The storage state of a [`List`](#List) that has an allocation. User code does not use it.
+Public declarations: 1.
 
 ::Anchor{id="List"}
 
@@ -373,8 +353,8 @@ capacity by doubling until the elements fit. The length does not change.
 
 #### Errors
 
-- `OutOfMemoryError` if the `Allocator` cannot supply the new storage. The list does not
-  change.
+- `OutOfMemoryError` if `length + additional` overflows `usize`, or the `Allocator` cannot
+  supply the new storage. The list does not change.
 
 ::Anchor{id="List.impl.reserveExact"}
 
@@ -542,4 +522,4 @@ A `count` of 0 does nothing and does not allocate.
 
 Category: Collections.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

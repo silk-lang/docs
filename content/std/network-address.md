@@ -27,7 +27,7 @@ import silk.network_address { AddressError, Host, Ipv6Address, Port }
 import silk.result { Result }
 
 pub fn main() -> i32 {
-  let host = match Host.parse(b"[2001:DB8:0:0::1]") {
+  let host = match Host.parse("[2001:DB8:0:0::1]") {
     Result<Host, AddressError>.Success { value } => value
     Result<Host, AddressError>.Failure { error: _ } => {
       return 1
@@ -159,6 +159,24 @@ CompressionWithoutOmission
 
 The IPv6 text has `::` together with all 8 parts, so `::` replaces nothing.
 
+::Anchor{id="AddressReason.impl.Debug"}
+
+## Implementation `Debug for AddressReason`
+
+```silk
+impl Debug for AddressReason
+```
+
+::Anchor{id="AddressReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Empty`.
+
 ::Anchor{id="HostReason"}
 
 ## `HostReason`
@@ -280,6 +298,24 @@ NumericFinalLabel
 
 The last label has only digits, so the name looks like an IPv4 address.
 
+::Anchor{id="HostReason.impl.Debug"}
+
+## Implementation `Debug for HostReason`
+
+```silk
+impl Debug for HostReason
+```
+
+::Anchor{id="HostReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `EmptyName`.
+
 ::Anchor{id="UnsupportedHostForm"}
 
 ## `UnsupportedHostForm`
@@ -349,6 +385,24 @@ UriDelimiter
 ```
 
 The input has `/`, `?`, or `#`. Give only the host.
+
+::Anchor{id="UnsupportedHostForm.impl.Debug"}
+
+## Implementation `Debug for UnsupportedHostForm`
+
+```silk
+impl Debug for UnsupportedHostForm
+```
+
+::Anchor{id="UnsupportedHostForm.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `IpvFuture`.
 
 ::Anchor{id="AddressError"}
 
@@ -499,6 +553,24 @@ pub available: usize
 ```
 
 The length of the buffer that you gave.
+
+::Anchor{id="AddressError.impl.Debug"}
+
+## Implementation `Debug for AddressError`
+
+```silk
+impl Debug for AddressError
+```
+
+::Anchor{id="AddressError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidAddress { ... }`.
 
 ::Anchor{id="Ipv4Address"}
 
@@ -773,10 +845,24 @@ Returns the IPv4 address with these 4 bytes, in network order.
 ### Associated function `parse`
 
 ```silk
-pub fn parse(bytes: &[u8]) -> Result<Ipv4Address, AddressError>
+pub fn parse(text: string) -> Result<Ipv4Address, AddressError>
 ```
 
 Parses decimal dotted text, such as `192.0.2.1`. Each part is 0 to 255 without leading zeros.
+
+::Anchor{id="Ipv4Address.impl.parseBytes"}
+
+### Associated function `parseBytes`
+
+```silk
+pub fn parseBytes(bytes: &[u8]) -> Result<Ipv4Address, AddressError>
+```
+
+Parses decimal dotted text, such as `192.0.2.1`. Each part is 0 to 255 without leading zeros.
+
+#### When to use
+Use it for text that you have as bytes, such as part of a request you read. For a `string`,
+use `Ipv4Address.parse`.
 
 ::Anchor{id="Ipv4Address.impl.octets"}
 
@@ -832,11 +918,26 @@ Returns the IPv6 address with these 16 bytes, in network order.
 ### Associated function `parse`
 
 ```silk
-pub fn parse(bytes: &[u8]) -> Result<Ipv6Address, AddressError>
+pub fn parse(text: string) -> Result<Ipv6Address, AddressError>
 ```
 
 Parses hexadecimal IPv6 text, such as `2001:db8::1`, without brackets or a zone. A dotted IPv4
 end, as in `::ffff:192.0.2.1`, is not accepted.
+
+::Anchor{id="Ipv6Address.impl.parseBytes"}
+
+### Associated function `parseBytes`
+
+```silk
+pub fn parseBytes(bytes: &[u8]) -> Result<Ipv6Address, AddressError>
+```
+
+Parses hexadecimal IPv6 text, such as `2001:db8::1`, without brackets or a zone. A dotted IPv4
+end, as in `::ffff:192.0.2.1`, is not accepted.
+
+#### When to use
+Use it for text that you have as bytes, such as part of a request you read. For a `string`,
+use `Ipv6Address.parse`.
 
 ::Anchor{id="Ipv6Address.impl.octets"}
 
@@ -1008,10 +1109,36 @@ impl DomainHost
 ### Associated function `make`
 
 ```silk
-pub fn make(bytes: &[u8]) -> Result<DomainHost, AddressError>
+pub fn make(text: string) -> Result<DomainHost, AddressError>
+```
+
+Checks the text `text` as a domain name and copies it.
+
+#### Details
+The name must be plain ASCII, 1 to 253 bytes, with labels of 1 to 63 bytes that do not begin
+or end with a hyphen. A label that starts with `xn--` must be valid Punycode. The last label
+must not be only digits.
+
+#### Errors
+- [`AddressError.InvalidHost`](#AddressError.InvalidHost) with a [`HostReason`](#HostReason) and the byte offset if a rule fails. A
+  trailing dot, as in `example.com.`, fails with `TrailingDot`.
+
+#### Gotchas
+Convert an internationalized name to its `xn--` form first.
+
+::Anchor{id="DomainHost.impl.makeBytes"}
+
+### Associated function `makeBytes`
+
+```silk
+pub fn makeBytes(bytes: &[u8]) -> Result<DomainHost, AddressError>
 ```
 
 Checks `bytes` as a domain name and copies it.
+
+#### When to use
+Use it for a name that you have as bytes, such as part of a request you read. For a `string`,
+use `DomainHost.make`.
 
 #### Details
 The name must be plain ASCII, 1 to 253 bytes, with labels of 1 to 63 bytes that do not begin
@@ -1068,10 +1195,38 @@ impl Host
 ### Associated function `parse`
 
 ```silk
-pub fn parse(bytes: &[u8]) -> Result<Host, AddressError>
+pub fn parse(text: string) -> Result<Host, AddressError>
 ```
 
 Parses the host part of a URI.
+
+#### Details
+`[...]` is parsed as IPv6, decimal dotted text is parsed as IPv4, and all other text as a
+domain name. Give only the host, without user information or a port. The result does not
+allocate. Give it to `silk.resolver` to get endpoints, and keep it to check the identity of
+an HTTPS server.
+
+#### Errors
+- [`AddressError`](#AddressError) with the rule that failed and the byte offset where it failed.
+
+#### Gotchas
+These forms fail: a trailing dot, percent escapes, an IPv6 zone such as `%eth0`, IPvFuture,
+user information, a port, non-ASCII names, and old IPv4 forms such as `127.1` or
+`0x7f.0.0.1`.
+
+::Anchor{id="Host.impl.parseBytes"}
+
+### Associated function `parseBytes`
+
+```silk
+pub fn parseBytes(bytes: &[u8]) -> Result<Host, AddressError>
+```
+
+Parses the host part of a URI.
+
+#### When to use
+Use it for a host that you have as bytes, such as the host of a URI you parsed. For a
+`string`, use `Host.parse`.
 
 #### Details
 `[...]` is parsed as IPv6, decimal dotted text is parsed as IPv4, and all other text as a
@@ -1163,4 +1318,4 @@ effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? 
 
 Category: Networking.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

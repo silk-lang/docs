@@ -23,7 +23,8 @@ a buffer that you give. [`classifyConnect`](#classifyConnect) reads the response
 
 ## Gotchas
 Only plain `http` proxies are supported. An `https` proxy URI fails with
-`UnsupportedProxyTransport`. Environment variables such as `HTTPS_PROXY` are not read.
+`UnsupportedProxyTransport`. This module reads no environment variables;
+`NativeHttp.fromEnvironment` in `silk.http_client_native` reads `HTTPS_PROXY` and the others.
 
 ## Examples
 ### Select routes
@@ -51,14 +52,14 @@ fn origin(text: string<'static>) -> Origin {
   let uri = match Uri.parse(text) {
     Result<Uri, ParseError>.Success { value } => value
     Result<Uri, ParseError>.Failure { error: _ } => {
-      let invalid = 1 / 0
+      Intrinsic.trap("unexpected failure")
       return origin(text)
     }
   }
   return match Origin.fromUri(&uri) {
     Result<Origin, OriginError>.Success { value } => value
     Result<Origin, OriginError>.Failure { error: _ } => {
-      let invalid = 1 / 0
+      Intrinsic.trap("unexpected failure")
       return origin(text)
     }
   }
@@ -200,6 +201,24 @@ Route
 
 A route that was used for the wrong operation, or for another origin.
 
+::Anchor{id="ProxyComponent.impl.Debug"}
+
+## Implementation `Debug for ProxyComponent`
+
+```silk
+impl Debug for ProxyComponent
+```
+
+::Anchor{id="ProxyComponent.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `ProxyUri`.
+
 ::Anchor{id="ProxyLimit"}
 
 ## `ProxyLimit`
@@ -239,6 +258,24 @@ OwnedConfigurationBytes
 ```
 
 The `maxOwnedConfigBytes` of the configuration.
+
+::Anchor{id="ProxyLimit.impl.Debug"}
+
+## Implementation `Debug for ProxyLimit`
+
+```silk
+impl Debug for ProxyLimit
+```
+
+::Anchor{id="ProxyLimit.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `AuthenticationBytes`.
 
 ::Anchor{id="ProxyReason"}
 
@@ -351,6 +388,24 @@ InvalidRoute
 
 The route mode or its origin does not fit the operation.
 
+::Anchor{id="ProxyReason.impl.Debug"}
+
+## Implementation `Debug for ProxyReason`
+
+```silk
+impl Debug for ProxyReason
+```
+
+::Anchor{id="ProxyReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidProxyUri`.
+
 ::Anchor{id="ProxyAdmissionError"}
 
 ## `ProxyAdmissionError`
@@ -380,6 +435,24 @@ pub reason: ProxyReason
 ```
 
 The rule that failed.
+
+::Anchor{id="ProxyAdmissionError.impl.Debug"}
+
+## Implementation `Debug for ProxyAdmissionError`
+
+```silk
+impl Debug for ProxyAdmissionError
+```
+
+::Anchor{id="ProxyAdmissionError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ProxyAdmissionError { component: ..., reason: ... }`.
 
 ::Anchor{id="ProxyError"}
 
@@ -474,6 +547,24 @@ InvalidConnectResponse
 
 [`classifyConnect`](#classifyConnect) was called before a final response.
 
+::Anchor{id="ProxyError.impl.Debug"}
+
+## Implementation `Debug for ProxyError`
+
+```silk
+impl Debug for ProxyError
+```
+
+::Anchor{id="ProxyError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Admission { ... }`.
+
 ::Anchor{id="ProxyConfigId"}
 
 ## `ProxyConfigId`
@@ -560,7 +651,8 @@ a buffer that you give.
 ### Gotchas
 
 Only plain `http` proxies are supported. An `https` proxy URI fails with
-`UnsupportedProxyTransport`. Environment variables such as `HTTPS_PROXY` are not read.
+`UnsupportedProxyTransport`. This module reads no environment variables;
+`NativeHttp.fromEnvironment` in `silk.http_client_native` reads `HTTPS_PROXY` and the others.
 
 ::Anchor{id="RouteMode"}
 
@@ -1186,4 +1278,4 @@ Returns `true` if the mode, the origin, the proxy, and the two identities are eq
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

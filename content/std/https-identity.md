@@ -122,6 +122,24 @@ SrvId
 
 An SRV-ID reference is unsupported for HTTPS.
 
+::Anchor{id="UnsupportedForm.impl.Debug"}
+
+## Implementation `Debug for UnsupportedForm`
+
+```silk
+impl Debug for UnsupportedForm
+```
+
+::Anchor{id="UnsupportedForm.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `IpvFuture`.
+
 ::Anchor{id="OriginHost"}
 
 ## `OriginHost`
@@ -413,6 +431,24 @@ EmptySanExtension
 
 A present SAN extension has no GeneralNames.
 
+::Anchor{id="CertificateStructureError.impl.Debug"}
+
+## Implementation `Debug for CertificateStructureError`
+
+```silk
+impl Debug for CertificateStructureError
+```
+
+::Anchor{id="CertificateStructureError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidDer`.
+
 ::Anchor{id="CertificateIdentities"}
 
 ## `CertificateIdentities`
@@ -604,6 +640,24 @@ MissingWildcardSuffix
 
 A wildcard name has no suffix.
 
+::Anchor{id="NameError.impl.Debug"}
+
+## Implementation `Debug for NameError`
+
+```silk
+impl Debug for NameError
+```
+
+::Anchor{id="NameError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `EmptyName`.
+
 ::Anchor{id="CertificateIdentityError"}
 
 ## `CertificateIdentityError`
@@ -634,6 +688,24 @@ WrongGeneralNameTag
 
 An Other descriptor uses tag two, seven, or a number above eight.
 
+::Anchor{id="CertificateIdentityError.impl.Debug"}
+
+## Implementation `Debug for CertificateIdentityError`
+
+```silk
+impl Debug for CertificateIdentityError
+```
+
+::Anchor{id="CertificateIdentityError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidIpLength`.
+
 ::Anchor{id="LimitKind"}
 
 ## `LimitKind`
@@ -663,6 +735,24 @@ SanBytes
 ```
 
 The sum of payload lengths exceeds the configured budget.
+
+::Anchor{id="LimitKind.impl.Debug"}
+
+## Implementation `Debug for LimitKind`
+
+```silk
+impl Debug for LimitKind
+```
+
+::Anchor{id="LimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `SanCount`.
 
 ::Anchor{id="IdentityError"}
 
@@ -823,6 +913,24 @@ NoMatch
 ```
 
 No eligible SAN matches the reference.
+
+::Anchor{id="IdentityError.impl.Debug"}
+
+## Implementation `Debug for IdentityError`
+
+```silk
+impl Debug for IdentityError
+```
+
+::Anchor{id="IdentityError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `MalformedReference { ... }`.
 
 ::Anchor{id="IdentityLimits"}
 
@@ -1082,4 +1190,4 @@ check the chain, the dates, or the TLS handshake. The common name (CN) is never 
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

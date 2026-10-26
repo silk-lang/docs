@@ -200,6 +200,24 @@ pub error: ConnectionError
 
 The error of the TLS connection.
 
+::Anchor{id="TransportError.impl.Debug"}
+
+## Implementation `Debug for TransportError`
+
+```silk
+impl Debug for TransportError
+```
+
+::Anchor{id="TransportError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Plain { ... }`.
+
 ::Anchor{id="HttpTransport"}
 
 ## `HttpTransport`
@@ -582,4 +600,4 @@ closeRaw: Loan.closeBytes
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

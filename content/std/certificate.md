@@ -212,6 +212,24 @@ ResourceLimit
 
 The input goes over a [`DecodeLimits`](#DecodeLimits) value or a size that the target can hold.
 
+::Anchor{id="DecodeClass.impl.Debug"}
+
+## Implementation `Debug for DecodeClass`
+
+```silk
+impl Debug for DecodeClass
+```
+
+::Anchor{id="DecodeClass.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Malformed`.
+
 ::Anchor{id="DecodeReason"}
 
 ## `DecodeReason`
@@ -492,6 +510,24 @@ SizeOverflow
 
 A length, a tag number, or an allocation size does not fit in `usize`.
 
+::Anchor{id="DecodeReason.impl.Debug"}
+
+## Implementation `Debug for DecodeReason`
+
+```silk
+impl Debug for DecodeReason
+```
+
+::Anchor{id="DecodeReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `EmptyInput`.
+
 ::Anchor{id="DecodeOffsetSpace"}
 
 ## `DecodeOffsetSpace`
@@ -522,6 +558,24 @@ Der
 
 The offset is a position in the DER of the PEM block at `certificateIndex`, after Base64
 decoding.
+
+::Anchor{id="DecodeOffsetSpace.impl.Debug"}
+
+## Implementation `Debug for DecodeOffsetSpace`
+
+```silk
+impl Debug for DecodeOffsetSpace
+```
+
+::Anchor{id="DecodeOffsetSpace.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Input`.
 
 ::Anchor{id="CertificateVersion"}
 
@@ -635,6 +689,24 @@ The position of the byte or tag that failed, or the position where missing data 
 ```silk
 impl Copy for DecodeError
 ```
+
+::Anchor{id="DecodeError.impl.Debug"}
+
+## Implementation `Debug for DecodeError`
+
+```silk
+impl Debug for DecodeError
+```
+
+::Anchor{id="DecodeError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `DecodeError { kind: ..., reason: ..., ... }`.
 
 ::Anchor{id="CertificateTime"}
 
@@ -1292,4 +1364,4 @@ value is not decoded.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

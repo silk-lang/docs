@@ -17,9 +17,10 @@ client. Client frames must be masked. Server frames are not masked. The channel 
 the callback of [`withServer`](#withServer) ends.
 
 When a client frame breaks a rule, the session fails, and later calls fail with
-`PreviousFailure`. If there is a deadline that has not passed, the server first sends Close with
-a code: 1002 for a protocol error, 1003 for fragmentation, 1007 for bad UTF-8, and 1009 for a
-message that is too large.
+`PreviousFailure`. Unless the deadline has passed, the server first sends Close with a code:
+1002 for a protocol error, 1003 for fragmentation, 1007 for bad UTF-8, and 1009 for a message
+that is too large for the limits or the buffer. With no deadline, it allows that Close one
+second.
 
 ## Errors
 [`WebSocketError`](#WebSocketError) tells the rule, limit, state, or transport error.
@@ -27,7 +28,6 @@ message that is too large.
 ## Gotchas
 - Fragmented messages, extensions, and compression are not supported. A fragmented message fails
   the session.
-- With no deadline, a failure closes the channel without a Close frame.
 - If a message is larger than your buffer, the session fails with `BufferTooSmall`. Give a
   buffer of `maxMessageBytes`.
 
@@ -457,6 +457,24 @@ Arithmetic
 
 A size does not fit in its type.
 
+::Anchor{id="LimitKind.impl.Debug"}
+
+## Implementation `Debug for LimitKind`
+
+```silk
+impl Debug for LimitKind
+```
+
+::Anchor{id="LimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `MessageBytes`.
+
 ::Anchor{id="State"}
 
 ## `State`
@@ -507,6 +525,24 @@ Failed
 ```
 
 An error ended the session. All later frame operations fail.
+
+::Anchor{id="State.impl.Debug"}
+
+## Implementation `Debug for State`
+
+```silk
+impl Debug for State
+```
+
+::Anchor{id="State.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Open`.
 
 ::Anchor{id="Operation"}
 
@@ -587,6 +623,24 @@ FinishClose
 ```
 
 [`finishClose`](#finishClose).
+
+::Anchor{id="Operation.impl.Debug"}
+
+## Implementation `Debug for Operation`
+
+```silk
+impl Debug for Operation
+```
+
+::Anchor{id="Operation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `ReadEvent`.
 
 ::Anchor{id="ProtocolReason"}
 
@@ -688,6 +742,24 @@ CloseCode
 
 A Close frame has a code that is not allowed.
 
+::Anchor{id="ProtocolReason.impl.Debug"}
+
+## Implementation `Debug for ProtocolReason`
+
+```silk
+impl Debug for ProtocolReason
+```
+
+::Anchor{id="ProtocolReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `MaskRequired`.
+
 ::Anchor{id="Utf8Component"}
 
 ## `Utf8Component`
@@ -717,6 +789,24 @@ CloseReason
 ```
 
 The reason of a Close frame.
+
+::Anchor{id="Utf8Component.impl.Debug"}
+
+## Implementation `Debug for Utf8Component`
+
+```silk
+impl Debug for Utf8Component
+```
+
+::Anchor{id="Utf8Component.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Text`.
 
 ::Anchor{id="CloseDataReason"}
 
@@ -748,6 +838,24 @@ ReasonTooLarge
 
 The reason has more than 123 bytes.
 
+::Anchor{id="CloseDataReason.impl.Debug"}
+
+## Implementation `Debug for CloseDataReason`
+
+```silk
+impl Debug for CloseDataReason
+```
+
+::Anchor{id="CloseDataReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Code`.
+
 ::Anchor{id="CloseLimitKind"}
 
 ## `CloseLimitKind`
@@ -777,6 +885,24 @@ Bytes
 ```
 
 `maxCloseBytes`.
+
+::Anchor{id="CloseLimitKind.impl.Debug"}
+
+## Implementation `Debug for CloseLimitKind`
+
+```silk
+impl Debug for CloseLimitKind
+```
+
+::Anchor{id="CloseLimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Frames`.
 
 ::Anchor{id="Failure"}
 
@@ -868,6 +994,24 @@ Transport
 
 A read, write, or close failed.
 
+::Anchor{id="Failure.impl.Debug"}
+
+## Implementation `Debug for Failure`
+
+```silk
+impl Debug for Failure
+```
+
+::Anchor{id="Failure.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Protocol`.
+
 ::Anchor{id="WebSocketError"}
 
 ## `WebSocketError`
@@ -880,9 +1024,10 @@ The error of a WebSocket operation: the rule, limit, state, or transport error.
 
 ### Details
 When a client frame breaks a rule, the session fails, and later calls fail with
-`PreviousFailure`. If there is a deadline that has not passed, the server first sends Close with
-a code: 1002 for a protocol error, 1003 for fragmentation, 1007 for bad UTF-8, and 1009 for a
-message that is too large. With no deadline, a failure closes the channel without a Close frame.
+`PreviousFailure`. Unless the deadline has passed, the server first sends Close with a code:
+1002 for a protocol error, 1003 for fragmentation, 1007 for bad UTF-8, and 1009 for a message
+that is too large for the limits or the buffer. With no deadline, it allows that Close one
+second.
 
 ::Anchor{id="WebSocketError.InvalidLimits"}
 
@@ -1193,6 +1338,24 @@ pub error: ByteIoError
 ```
 
 The transport error.
+
+::Anchor{id="WebSocketError.impl.Debug"}
+
+## Implementation `Debug for WebSocketError`
+
+```silk
+impl Debug for WebSocketError
+```
+
+::Anchor{id="WebSocketError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidLimits { ... }`.
 
 ::Anchor{id="ControlPayload"}
 
@@ -1685,4 +1848,4 @@ the session.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

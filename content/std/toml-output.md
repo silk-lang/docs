@@ -57,12 +57,6 @@ impl Writer for CaptureWriter {
     ? &mut Writer {
     return ()
   }
-
-  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
-    ! WriterError
-    ? &mut Writer {
-    return run Writer.writeEach(&mut self, vals)
-  }
 }
 
 fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
@@ -183,4 +177,4 @@ empty key, are written with [`TomlOutput.writeString`](#TomlOutput.impl.writeStr
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

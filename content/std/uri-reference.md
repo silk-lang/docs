@@ -123,6 +123,24 @@ IpvFuture
 
 A future IP literal in brackets, such as `[v1.x]`.
 
+::Anchor{id="HostKind.impl.Debug"}
+
+## Implementation `Debug for HostKind`
+
+```silk
+impl Debug for HostKind
+```
+
+::Anchor{id="HostKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `RegName`.
+
 ::Anchor{id="Component"}
 
 ## `Component`
@@ -213,6 +231,24 @@ Fragment
 
 The fragment after `#`.
 
+::Anchor{id="Component.impl.Debug"}
+
+## Implementation `Debug for Component`
+
+```silk
+impl Debug for Component
+```
+
+::Anchor{id="Component.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Scheme`.
+
 ::Anchor{id="ParseReason"}
 
 ## `ParseReason`
@@ -284,6 +320,24 @@ MissingScheme
 
 The text has no scheme, but a function such as `Uri.parse` needs one.
 
+::Anchor{id="ParseReason.impl.Debug"}
+
+## Implementation `Debug for ParseReason`
+
+```silk
+impl Debug for ParseReason
+```
+
+::Anchor{id="ParseReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidCharacter`.
+
 ::Anchor{id="ParseError"}
 
 ## `ParseError`
@@ -332,6 +386,24 @@ missing, it is the position where it must be.
 ```silk
 impl Copy for ParseError
 ```
+
+::Anchor{id="ParseError.impl.Debug"}
+
+## Implementation `Debug for ParseError`
+
+```silk
+impl Debug for ParseError
+```
+
+::Anchor{id="ParseError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ParseError { reason: ..., component: ..., ... }`.
 
 ::Anchor{id="UriReference"}
 
@@ -604,4 +676,4 @@ Returns the text and consumes the value. It does not copy.
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

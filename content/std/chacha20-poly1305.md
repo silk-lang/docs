@@ -134,6 +134,24 @@ AuthenticationFailed
 
 The tag is not correct for the key, nonce, associated data, and ciphertext.
 
+::Anchor{id="AeadError.impl.Debug"}
+
+## Implementation `Debug for AeadError`
+
+```silk
+impl Debug for AeadError
+```
+
+::Anchor{id="AeadError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidKey`.
+
 ::Anchor{id="ChaCha20Poly1305"}
 
 ## `ChaCha20Poly1305`
@@ -233,4 +251,4 @@ Authentication does not stop replay: an attacker can send an old valid message a
 
 Category: Cryptography.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

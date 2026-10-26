@@ -335,6 +335,24 @@ A URI that owns its text and its parsed ranges.
 [`OwnedUri.view`](#OwnedUri.impl.view) returns a [`Uri`](#Uri) that borrows it, and the view cannot live longer than the
 `OwnedUri`.
 
+::Anchor{id="OwnedUri.impl.Debug"}
+
+## Implementation `Debug for OwnedUri`
+
+```silk
+impl Debug for OwnedUri
+```
+
+::Anchor{id="OwnedUri.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the text, as `OwnedUri { text: "https://example.com/" }`.
+
 ::Anchor{id="OwnedUri.impl"}
 
 ## Implementation `OwnedUri`
@@ -381,4 +399,4 @@ Returns the text and consumes the value. It does not copy.
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

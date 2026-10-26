@@ -67,12 +67,6 @@ impl Writer for CaptureWriter {
     ? &mut Writer {
     return ()
   }
-
-  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
-    ! WriterError
-    ? &mut Writer {
-    return run Writer.writeEach(&mut self, vals)
-  }
 }
 
 fn holds(writer: &CaptureWriter, expected: &[u8]) -> bool {
@@ -149,7 +143,7 @@ pub fn main() -> i32 {
 
 Import as `Format` with `import silk.format { Format }`.
 
-Public declarations: 13.
+Public declarations: 14.
 
 ::Anchor{id="Format"}
 
@@ -722,6 +716,95 @@ Use it to implement `Debug` for a type that holds a sequence. The pretty form
 - `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
   failure stay written. Nothing is rolled back.
 
+::Anchor{id="Format.impl.debugRecord"}
+
+### Associated function `debugRecord`
+
+```silk
+pub effect fn debugRecord(
+    name: string,
+    formatter: &mut Formatter
+  ) -> DebugRecord ! WriterError ? &mut Writer
+```
+
+Starts the [`Debug`](#Debug) form of a value with labeled fields by writing `name`.
+
+#### When to use
+
+Use it to implement `Debug` by hand when [`Format.debugFields`](#Format.impl.debugFields) does not fit: the type has
+private fields, or it is a union with fields in a variant. Write each field with
+[`Format.debugField`](#Format.impl.debugField) and end with [`Format.debugFinish`](#Format.impl.debugFinish). This one leaves out a secret:
+
+```silk
+import silk.format { Debug, Format, Formatter }
+import silk.writer { Writer, WriterError }
+
+struct Account {
+  pub name: string,
+  secret: string,
+}
+
+impl Debug for Account {
+  effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer {
+    let mut record = run Format.debugRecord("Account", &mut formatter)
+    run Format.debugField(&mut record, "name", &self.name, &mut formatter)
+    return run Format.debugFinish(record, &mut formatter)
+  }
+}
+
+pub fn main() -> i32 {
+  let account = Account { name: "ada", secret: "hunter2" }
+  return 0
+}
+```
+
+It writes `Account { name: "ada" }`. A record with no field writes only its name. The pretty
+form ([`Format.alternate`](#Format.impl.alternate)) puts each field on its own line.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="Format.impl.debugField"}
+
+### Associated function `debugField`
+
+```silk
+pub effect fn debugField<T: Debug>(
+    record: &mut DebugRecord,
+    label: string,
+    value: &T,
+    formatter: &mut Formatter
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Writes one field of a record that [`Format.debugRecord`](#Format.impl.debugRecord) started, as `label: value`.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
+::Anchor{id="Format.impl.debugFinish"}
+
+### Associated function `debugFinish`
+
+```silk
+pub effect fn debugFinish(
+    record: DebugRecord,
+    formatter: &mut Formatter
+  ) -> () ! WriterError ? &mut Writer
+```
+
+Ends a record that [`Format.debugRecord`](#Format.impl.debugRecord) started. It writes the closing `}` when the record
+has a field.
+
+#### Errors
+
+- `WriterError` if the ambient `Writer` fails. The bytes that the writer accepted before the
+  failure stay written. Nothing is rolled back.
+
 ::Anchor{id="Format.impl.format"}
 
 ### Associated function `format`
@@ -811,12 +894,6 @@ impl Writer for CaptureWriter {
     ! WriterError
     ? &mut Writer {
     return ()
-  }
-
-  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
-    ! WriterError
-    ? &mut Writer {
-    return run Writer.writeEach(&mut self, vals)
   }
 }
 
@@ -1514,6 +1591,25 @@ A `Formatter` holds options only. The output goes to the ambient `Writer`, not t
 Width counts Unicode scalars, not UTF-8 bytes and not terminal columns.
 Read the options with [`Format.width`](#Format.impl.width), [`Format.sign`](#Format.impl.sign), and the other accessors.
 
+::Anchor{id="DebugRecord"}
+
+## `DebugRecord`
+
+```silk
+pub struct DebugRecord
+```
+
+A record that a hand-written [`Debug`](#Debug) implementation is writing. Start one with
+[`Format.debugRecord`](#Format.impl.debugRecord).
+
+::Anchor{id="DebugRecord.impl.Copy"}
+
+## Implementation `Copy for DebugRecord`
+
+```silk
+impl Copy for DebugRecord
+```
+
 ::Anchor{id="Display"}
 
 ## `Display`
@@ -1566,12 +1662,6 @@ impl Writer for CaptureWriter {
     ! WriterError
     ? &mut Writer {
     return ()
-  }
-
-  effect fn writeVectored(self: &mut Self, vals: &[&[u8]]) -> ()
-    ! WriterError
-    ? &mut Writer {
-    return run Writer.writeEach(&mut self, vals)
   }
 }
 
@@ -1728,15 +1818,21 @@ its fields. For a struct, call [`Format.debugFields`](#Format.impl.debugFields);
 
 The standard integers and `bool` write the same text as `Display`. Floats also do, but a whole
 number ends in `.0`, as `1.0`. `string` and `char` write quotes and escapes. `Option` and
-`Result` write the variant and its value, such as `Some(3)`. `List` writes its elements, as
-`[1, 2, 3]`. [`Format.alternate`](#Format.impl.alternate) selects the pretty form, which puts each field on its own
-line. Nested values share the formatter, so the pretty form indents at each level.
+`Result` write the variant and its value, such as `Some(3)`. `List` and slices write their
+elements, as `[1, 2, 3]`. [`Format.alternate`](#Format.impl.alternate) selects the pretty form, which puts each field on
+its own line. Nested values share the formatter, so the pretty form indents at each level.
+
+A fixed array and an anonymous tuple or record cannot implement `Debug`. They still have a
+`Debug` form wherever the type is known as a field: as a `{:?}` argument of [`Format.format`](#Format.impl.format)
+and as a field that [`Format.debugFields`](#Format.impl.debugFields) writes. An array writes `[1, 2]`, an anonymous tuple
+`(1, "a")`, and an anonymous record `{ x: 1 }`.
 
 ### Gotchas
 
-Slices, arrays, and anonymous tuples and records have no `Debug` implementation, because only a
-declared type can implement an interface. Write them with [`Format.debugList`](#Format.impl.debugList) and
-[`Format.debugFields`](#Format.impl.debugFields) with an empty name, which writes `(1, 2)` or `{ x: 1 }`.
+[`Format.debug`](#Format.impl.debug) and a `T: Debug` bound still need a `Debug` implementation, so an array or an
+anonymous tuple cannot be passed to `Format.debug` or held in an `Option` or a `List` that
+writes its `Debug` form. Pass it as a `{:?}` argument instead, as
+`Format.format("{:?}", &(values, ))`, or write a slice of an array with `&values`.
 
 ::Anchor{id="Debug.debug"}
 
@@ -1777,6 +1873,24 @@ pub offset: usize
 The byte offset of the first character that is not accepted. It is the length of the text if a
 digit is missing at the end.
 
+::Anchor{id="NotANumber.impl.Debug"}
+
+## Implementation `Debug for NotANumber`
+
+```silk
+impl Debug for NotANumber
+```
+
+::Anchor{id="NotANumber.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `NotANumber { offset: ... }`.
+
 ::Anchor{id="OutOfRange"}
 
 ## `OutOfRange`
@@ -1787,6 +1901,24 @@ pub struct OutOfRange
 
 The reason for a [`ParseError`](#ParseError) when the text is a number but the value does not fit the target
 type.
+
+::Anchor{id="OutOfRange.impl.Debug"}
+
+## Implementation `Debug for OutOfRange`
+
+```silk
+impl Debug for OutOfRange
+```
+
+::Anchor{id="OutOfRange.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `OutOfRange`.
 
 ::Anchor{id="ParseError"}
 
@@ -1811,6 +1943,24 @@ pub reason: NotANumber | OutOfRange
 ```
 
 Why the text was not accepted.
+
+::Anchor{id="ParseError.impl.Debug"}
+
+## Implementation `Debug for ParseError`
+
+```silk
+impl Debug for ParseError
+```
+
+::Anchor{id="ParseError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the reason, as `ParseError { reason: NotANumber { offset: 2 } }`.
 
 ::Anchor{id="u8.impl.Display"}
 
@@ -2462,6 +2612,42 @@ effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &m
 
 Writes `Success(` or `Failure(`, the `Debug` form of the payload, and `)`.
 
+::Anchor{id="a.impl.Debug"}
+
+## Implementation `Debug for &'a [T]`
+
+```silk
+impl<'a, T: Debug> Debug for &'a [T]
+```
+
+::Anchor{id="a.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the `Debug` form of each element, as `[1, 2, 3]`. See [`Format.debugList`](#Format.impl.debugList).
+
+::Anchor{id="a.impl.Debug-2"}
+
+## Implementation `Debug for &'a mut [T]`
+
+```silk
+impl<'a, T: Debug> Debug for &'a mut [T]
+```
+
+::Anchor{id="a.impl.Debug.debug-2"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the `Debug` form of each element, as `[1, 2, 3]`. See [`Format.debugList`](#Format.impl.debugList).
+
 ::Anchor{id="List.impl.Debug"}
 
 ## Implementation `Debug for List<T>`
@@ -2719,4 +2905,4 @@ that it reads as a float. A set precision writes the same text as `Display`.
 
 Category: Text.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

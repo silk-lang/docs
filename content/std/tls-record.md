@@ -468,6 +468,24 @@ KeyUsageExhausted
 
 The traffic key protected [`RECORDS_PER_EPOCH`](#RECORDS_PER_EPOCH) records. Install a new key.
 
+::Anchor{id="RecordError.impl.Debug"}
+
+## Implementation `Debug for RecordError`
+
+```silk
+impl Debug for RecordError
+```
+
+::Anchor{id="RecordError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidSecretLength { ... }`.
+
 ::Anchor{id="RecordView"}
 
 ## `RecordView`
@@ -812,4 +830,4 @@ Releases the ready record, so that the receiver can take the next one.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

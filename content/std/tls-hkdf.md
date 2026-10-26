@@ -188,6 +188,24 @@ pub maximum: u64
 
 The largest accepted length in bytes.
 
+::Anchor{id="LabelError.impl.Debug"}
+
+## Implementation `Debug for LabelError`
+
+```silk
+impl Debug for LabelError
+```
+
+::Anchor{id="LabelError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `LabelLength { ... }`.
+
 ::Anchor{id="TlsHkdfSha256"}
 
 ## `TlsHkdfSha256`
@@ -382,4 +400,4 @@ secret.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

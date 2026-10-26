@@ -168,6 +168,24 @@ AuthenticationFailed
 The tag is not correct for the key, nonce, associated data, and ciphertext. The message was
 changed, or a value is wrong.
 
+::Anchor{id="AesGcmError.impl.Debug"}
+
+## Implementation `Debug for AesGcmError`
+
+```silk
+impl Debug for AesGcmError
+```
+
+::Anchor{id="AesGcmError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidKeyLength`.
+
 ::Anchor{id="AesGcm"}
 
 ## `AesGcm`
@@ -281,4 +299,4 @@ function does not erase its copy of the key.
 
 Category: Cryptography.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

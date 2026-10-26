@@ -93,6 +93,24 @@ pub struct TaskIdExhaustedError
 
 A typed failure that reports exhaustion of the task identity space.
 
+::Anchor{id="TaskIdExhaustedError.impl.Debug"}
+
+## Implementation `Debug for TaskIdExhaustedError`
+
+```silk
+impl Debug for TaskIdExhaustedError
+```
+
+::Anchor{id="TaskIdExhaustedError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `TaskIdExhaustedError`.
+
 ::Anchor{id="PublicationResponse"}
 
 ## `PublicationResponse`
@@ -480,4 +498,4 @@ prepared task remains unpublished and must not have received initial readiness.
 
 Category: Concurrency.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

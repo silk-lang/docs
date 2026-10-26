@@ -55,7 +55,7 @@ pub effect fn main() -> i32
   let mut provider = Completed {}
   let path = run Path.make("/usr/bin/git") |> Effect.provideMut<Allocator>(&mut allocator)
   let mut request = run ChildProcess.request(&path) |> Effect.provideMut<Allocator>(&mut allocator)
-  run ChildProcess.addArgument(&mut request, b"status")
+  run ChildProcess.addArgument(&mut request, "status")
     |> Effect.provideMut<Allocator>(&mut allocator)
   let outcome = run ChildProcess.submit(&request) |> Effect.provideMut<ChildProcess>(&mut provider)
     |> Effect.provideMut<Allocator>(&mut allocator)
@@ -90,6 +90,24 @@ pub code: i32
 
 The stable numeric code for the provider-reported execution stage.
 
+::Anchor{id="ProcessOperation.impl.Debug"}
+
+## Implementation `Debug for ProcessOperation`
+
+```silk
+impl Debug for ProcessOperation
+```
+
+::Anchor{id="ProcessOperation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the code, such as `Spawn`, or the code when it has no name.
+
 ::Anchor{id="ProcessReason"}
 
 ## `ProcessReason`
@@ -110,6 +128,24 @@ pub code: i32
 ```
 
 The stable numeric code for the portable recovery category.
+
+::Anchor{id="ProcessReason.impl.Debug"}
+
+## Implementation `Debug for ProcessReason`
+
+```silk
+impl Debug for ProcessReason
+```
+
+::Anchor{id="ProcessReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the code, such as `NotFound`, or the code when it has no name.
 
 ::Anchor{id="ProcessError"}
 
@@ -147,6 +183,25 @@ pub reason: ProcessReason
 ```
 
 The portable category that callers can use for recovery.
+
+::Anchor{id="ProcessError.impl.Debug"}
+
+## Implementation `Debug for ProcessError`
+
+```silk
+impl Debug for ProcessError
+```
+
+::Anchor{id="ProcessError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ProcessError { operation: Spawn, reason: NotFound, providerCode: 2 }`.
+It leaves out `providerCode` when there is none.
 
 ::Anchor{id="ProcessRequest"}
 
@@ -511,11 +566,38 @@ Returns a request to run `program` in `directory`, with no arguments and an empt
 ```silk
 pub effect fn addArgument(
     self: &mut ProcessRequest,
+    value: string
+  ) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Adds a copy of the text `value` as the next argument.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage. Do not use the request
+  again, because it can contain part of the argument.
+
+#### Gotchas
+
+`value` must not contain NUL.
+
+::Anchor{id="ChildProcess.impl.addArgumentBytes"}
+
+### Method `addArgumentBytes`
+
+```silk
+pub effect fn addArgumentBytes(
+    self: &mut ProcessRequest,
     value: &[u8]
   ) -> () ! OutOfMemoryError ? &mut Allocator
 ```
 
-Adds a copy of `value` as the next argument.
+Adds a copy of `value` as the next argument. The bytes do not have to be valid UTF-8.
+
+#### When to use
+
+Use it for an argument that you got as bytes, such as a host path from `Path.rawBytes` or a
+program argument, so you can pass it on without changes.
 
 #### Errors
 
@@ -533,12 +615,45 @@ Adds a copy of `value` as the next argument.
 ```silk
 pub effect fn setVariable(
     self: &mut ProcessRequest,
+    name: string,
+    value: string
+  ) -> () ! OutOfMemoryError ? &mut Allocator
+```
+
+Adds the environment entry `name=value`, where `name` and `value` are text.
+
+#### Details
+
+The environment of the request starts empty. This function does not read the environment of
+the caller. It does not check that `name` is a valid variable name.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the storage. Do not use the request
+  again, because it can contain part of the entry.
+
+#### Gotchas
+
+`name` and `value` must not contain NUL.
+
+::Anchor{id="ChildProcess.impl.setVariableBytes"}
+
+### Method `setVariableBytes`
+
+```silk
+pub effect fn setVariableBytes(
+    self: &mut ProcessRequest,
     name: &[u8],
     value: &[u8]
   ) -> () ! OutOfMemoryError ? &mut Allocator
 ```
 
-Adds the environment entry `name=value`.
+Adds the environment entry `name=value`. The bytes do not have to be valid UTF-8.
+
+#### When to use
+
+Use it for a value that you got as bytes, such as a copy of a variable from `HostInput`, so
+you can pass it on without changes.
 
 #### Details
 
@@ -719,4 +834,4 @@ standard error. An exit code other than 0 is a normal outcome.
 
 Category: System.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

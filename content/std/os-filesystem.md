@@ -7,7 +7,8 @@ Provide [`OsFileSystem`](#OsFileSystem) for `FileSystem` in a native program. Co
 ## Details
 [`OsFileSystem.make`](#OsFileSystem.impl.make) takes a root directory of the host. The path `/` of the provider is that
 root, not the root of the host. A path cannot leave the root: `..` is not valid in a `Path`, and
-the provider does not follow symbolic links below the root.
+the native provider resolves a symbolic link below the root inside the root. An absolute link
+target starts again at the root, and `..` in a target never goes above it.
 
 The write operations are different:
 - `writeFile` creates or truncates the file, then writes. If it fails, a partial file can stay.
@@ -22,6 +23,8 @@ file, so the permissions, owner, extended attributes, and hard links of the old 
 kept. A synchronized atomic write calls `fsync` on the file before the rename, and on the
 directory after it. `syncDirectory` also uses `fsync`. These do not use `F_FULLFSYNC`, and do
 not promise that data survives a power loss.
+
+On WASI, roots name preopened guest directories. The host controls rights, file permissions, and synchronization support.
 
 Directory listings are sorted by the bytes of the paths. A native error becomes a `FileError`
 with a portable reason and the native code.
@@ -38,7 +41,7 @@ with a portable reason and the native code.
   that renames those directories, changes mounts, or changes the temporary files.
 - After `writeFileAtomic` fails with a published error, the new contents are visible. Do not
   write again without a check.
-- The provider exists only on Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
+- The provider exists on WASI, Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
 
 ## Examples
 ### Write and read a file in a temporary directory
@@ -78,7 +81,7 @@ effect fn failed<E>(error: E) -> i32 {
 effect fn withFiles() -> i32
   ! FileError | OutOfMemoryError
   ? &mut Allocator {
-  let mut files = run OsFileSystem.make(b"/tmp")
+  let mut files = run OsFileSystem.make("/tmp")
   return run program() |> Effect.provideMut<FileSystem>(&mut files)
 }
 
@@ -105,9 +108,11 @@ The native `FileSystem` provider. It owns the bytes of its root directory.
 ### Details
 Each `Path` is resolved below the root. The root is never shown as a `Path`. An operation that
 would leave the root fails. The path `/` of the provider is the root, not the root of the
-host. The provider does not follow symbolic links below the root. New files get mode 0666,
-filtered by the umask of the process. Directory listings are sorted by the bytes of the
-paths. A native error becomes a `FileError` with a portable reason and the native code.
+host. The native provider resolves symbolic links below the root inside the root. New files
+get mode 0666, filtered by the umask of the process. Directory listings are sorted by the
+bytes of the paths. A native error becomes a `FileError` with a portable reason and the native code.
+
+On WASI, the root names a preopened guest directory. The host controls rights, permissions, and synchronization support.
 
 ### Gotchas
 - Trust the root and its parent directories. The confinement does not protect against a
@@ -117,7 +122,7 @@ paths. A native error becomes a `FileError` with a portable reason and the nativ
   `writeFileAtomic` when a reader must see the old file or the complete new file.
 - Synchronized writes use `fsync`, not `F_FULLFSYNC`, and do not promise that data survives a
   power loss.
-- The provider exists only on Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
+- The provider exists on WASI, Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64.
 
 ::Anchor{id="OsFileSystem.impl"}
 
@@ -140,11 +145,32 @@ impl OsFileSystem
 ### Associated function `make`
 
 ```silk
-pub effect fn make(root: &[u8]) -> OsFileSystem ! OutOfMemoryError ? &mut Allocator
+pub effect fn make(root: string) -> OsFileSystem ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns a provider with a copy of the text `root` as its root directory, such as `"/"` or
+`"/tmp"`. It does not open the directory.
+
+#### Errors
+`OutOfMemoryError` if the copy cannot be allocated.
+
+#### Gotchas
+`root` must be an absolute host path, not empty, with no NUL. Other values trap.
+
+::Anchor{id="OsFileSystem.impl.makeBytes"}
+
+### Associated function `makeBytes`
+
+```silk
+pub effect fn makeBytes(root: &[u8]) -> OsFileSystem ! OutOfMemoryError ? &mut Allocator
 ```
 
 Returns a provider with a copy of `root` as its root directory. It does not open the
-directory.
+directory. The bytes do not have to be valid UTF-8.
+
+#### When to use
+Use it for a root that you got from the host as bytes, such as the working directory from
+`HostInput.workingDirectory`.
 
 #### Errors
 `OutOfMemoryError` if the copy cannot be allocated.
@@ -250,4 +276,4 @@ createTemporaryDirectory: OsFileSystem.createTemporaryDirectory
 
 Category: Native platform.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -316,6 +316,24 @@ The byte offset of the coding, or the bad byte, in the field value.
 impl Copy for CodingPosition
 ```
 
+::Anchor{id="CodingPosition.impl.Debug"}
+
+## Implementation `Debug for CodingPosition`
+
+```silk
+impl Debug for CodingPosition
+```
+
+::Anchor{id="CodingPosition.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `CodingPosition { wireIndex: ..., fieldIndex: ..., ... }`.
+
 ::Anchor{id="Limits"}
 
 ## `Limits`
@@ -475,6 +493,24 @@ DecodedBytes
 ```
 
 `maxDecoded`.
+
+::Anchor{id="ContentLimitKind.impl.Debug"}
+
+## Implementation `Debug for ContentLimitKind`
+
+```silk
+impl Debug for ContentLimitKind
+```
+
+::Anchor{id="ContentLimitKind.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `CodingDepth`.
 
 ::Anchor{id="ContentReason"}
 
@@ -777,6 +813,24 @@ InvalidState
 
 The reader had already failed or stopped.
 
+::Anchor{id="ContentReason.impl.Debug"}
+
+## Implementation `Debug for ContentReason<'head>`
+
+```silk
+impl<'head> Debug for ContentReason<'head>
+```
+
+::Anchor{id="ContentReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidLimit { ... }`.
+
 ::Anchor{id="ContentError"}
 
 ## `ContentError`
@@ -837,6 +891,24 @@ pub totalDecoded: u64
 ```
 
 The total decoded bytes written.
+
+::Anchor{id="ContentError.impl.Debug"}
+
+## Implementation `Debug for ContentError<'head>`
+
+```silk
+impl<'head> Debug for ContentError<'head>
+```
+
+::Anchor{id="ContentError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ContentError { reason: ..., written: ..., ... }`.
 
 ::Anchor{id="ContentProgressState"}
 
@@ -1741,4 +1813,4 @@ still fail.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -84,6 +84,24 @@ pub maximum: usize
 
 The maximum output length: 8160 for SHA-256 and 12240 for SHA-384.
 
+::Anchor{id="OutputTooLongError.impl.Debug"}
+
+## Implementation `Debug for OutputTooLongError`
+
+```silk
+impl Debug for OutputTooLongError
+```
+
+::Anchor{id="OutputTooLongError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `OutputTooLongError { requested: ..., maximum: ... }`.
+
 ::Anchor{id="HkdfSha256"}
 
 ## `HkdfSha256`
@@ -224,4 +242,4 @@ same bytes, and a shorter output is a prefix of a longer one.
 
 Category: Cryptography.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

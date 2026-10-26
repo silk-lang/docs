@@ -65,6 +65,24 @@ The failure when an allocator cannot supply the requested storage.
 A failed request never returns part of an allocation. Each operation that makes owned storage,
 such as `List.push` or `Box.make`, can fail with this error.
 
+::Anchor{id="OutOfMemoryError.impl.Debug"}
+
+## Implementation `Debug for OutOfMemoryError`
+
+```silk
+impl Debug for OutOfMemoryError
+```
+
+::Anchor{id="OutOfMemoryError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `OutOfMemoryError`.
+
 ::Anchor{id="Allocator"}
 
 ## `Allocator`
@@ -175,4 +193,4 @@ allocate: SystemAllocator.systemAllocate
 
 Category: Memory.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

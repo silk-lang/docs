@@ -61,7 +61,7 @@ fn status(code: u16) -> Status {
   return match Status.fromCode(code) {
     Result<Status, ValueError>.Success { value } => value
     Result<Status, ValueError>.Failure { error: _ } => {
-      let invalid = 1 / 0
+      Intrinsic.trap("unexpected failure")
       return status(code)
     }
   }
@@ -71,14 +71,14 @@ fn origin(text: string<'static>) -> Origin {
   let uri = match Uri.parse(text) {
     Result<Uri, ParseError>.Success { value } => value
     Result<Uri, ParseError>.Failure { error: _ } => {
-      let invalid = 1 / 0
+      Intrinsic.trap("unexpected failure")
       return origin(text)
     }
   }
   return match Origin.fromUri(&uri) {
     Result<Origin, OriginError>.Success { value } => value
     Result<Origin, OriginError>.Failure { error: _ } => {
-      let invalid = 1 / 0
+      Intrinsic.trap("unexpected failure")
       return origin(text)
     }
   }
@@ -516,6 +516,24 @@ Body
 
 The request body.
 
+::Anchor{id="RedirectComponent.impl.Debug"}
+
+## Implementation `Debug for RedirectComponent`
+
+```silk
+impl Debug for RedirectComponent
+```
+
+::Anchor{id="RedirectComponent.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Policy`.
+
 ::Anchor{id="RedirectLimit"}
 
 ## `RedirectLimit`
@@ -585,6 +603,24 @@ HistoryBytes
 ```
 
 `maxHistoryBytes`.
+
+::Anchor{id="RedirectLimit.impl.Debug"}
+
+## Implementation `Debug for RedirectLimit`
+
+```silk
+impl Debug for RedirectLimit
+```
+
+::Anchor{id="RedirectLimit.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `PolicyNames`.
 
 ::Anchor{id="RedirectReason"}
 
@@ -774,6 +810,24 @@ A body producer sent another length or framing than its `mode` said.
 impl Copy for RedirectReason
 ```
 
+::Anchor{id="RedirectReason.impl.Debug"}
+
+## Implementation `Debug for RedirectReason`
+
+```silk
+impl Debug for RedirectReason
+```
+
+::Anchor{id="RedirectReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidPolicy`.
+
 ::Anchor{id="RedirectContext"}
 
 ## `RedirectContext`
@@ -824,6 +878,24 @@ pub nextUri: Option<OwnedUri>
 
 A copy of the next URI, when it is known.
 
+::Anchor{id="RedirectContext.impl.Debug"}
+
+## Implementation `Debug for RedirectContext`
+
+```silk
+impl Debug for RedirectContext
+```
+
+::Anchor{id="RedirectContext.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `RedirectContext { hop: ..., status: ..., ... }`.
+
 ::Anchor{id="RedirectError"}
 
 ## `RedirectError`
@@ -867,6 +939,24 @@ pub context: RedirectContext
 ```
 
 The URIs and the status.
+
+::Anchor{id="RedirectError.impl.Debug"}
+
+## Implementation `Debug for RedirectError`
+
+```silk
+impl Debug for RedirectError
+```
+
+::Anchor{id="RedirectError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `RedirectError { component: ..., reason: ..., ... }`.
 
 ::Anchor{id="Request"}
 
@@ -2612,4 +2702,4 @@ again for the next request. A bad `Connection` value fails with its `ValueError`
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

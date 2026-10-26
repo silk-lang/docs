@@ -94,6 +94,24 @@ Close
 
 A close of the whole transport.
 
+::Anchor{id="ByteIoOperation.impl.Debug"}
+
+## Implementation `Debug for ByteIoOperation`
+
+```silk
+impl Debug for ByteIoOperation
+```
+
+::Anchor{id="ByteIoOperation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Read`.
+
 ::Anchor{id="ByteIoError"}
 
 ## `ByteIoError`
@@ -226,6 +244,24 @@ pub code: i32
 ```
 
 A code that the provider defines, such as an `errno` value.
+
+::Anchor{id="ByteIoError.impl.Debug"}
+
+## Implementation `Debug for ByteIoError`
+
+```silk
+impl Debug for ByteIoError
+```
+
+::Anchor{id="ByteIoError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `Timeout { ... }`.
 
 ::Anchor{id="ReadTransfer"}
 
@@ -591,4 +627,4 @@ Returns `ByteIoError.Provider` for `operation` with a provider-defined `code`.
 
 Category: Input and output.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

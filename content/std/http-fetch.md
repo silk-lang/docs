@@ -200,6 +200,24 @@ Finish
 
 Completing the response and deciding if the connection can be used again.
 
+::Anchor{id="FetchPhase.impl.Debug"}
+
+## Implementation `Debug for FetchPhase`
+
+```silk
+impl Debug for FetchPhase
+```
+
+::Anchor{id="FetchPhase.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Uri`.
+
 ::Anchor{id="FetchLimit"}
 
 ## `FetchLimit`
@@ -269,6 +287,24 @@ DiscardBytes
 ```
 
 The `maxDiscardBytes` of a `discard*` function.
+
+::Anchor{id="FetchLimit.impl.Debug"}
+
+## Implementation `Debug for FetchLimit`
+
+```silk
+impl Debug for FetchLimit
+```
+
+::Anchor{id="FetchLimit.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `EncodedBodyBytes`.
 
 ::Anchor{id="FetchContentReason"}
 
@@ -571,6 +607,24 @@ InvalidState
 
 The content reader had already failed or stopped.
 
+::Anchor{id="FetchContentReason.impl.Debug"}
+
+## Implementation `Debug for FetchContentReason`
+
+```silk
+impl Debug for FetchContentReason
+```
+
+::Anchor{id="FetchContentReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidLimit { ... }`.
+
 ::Anchor{id="FetchContentError"}
 
 ## `FetchContentError`
@@ -630,6 +684,24 @@ pub totalDecoded: u64
 ```
 
 The total decoded bytes.
+
+::Anchor{id="FetchContentError.impl.Debug"}
+
+## Implementation `Debug for FetchContentError`
+
+```silk
+impl Debug for FetchContentError
+```
+
+::Anchor{id="FetchContentError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `FetchContentError { reason: ..., written: ..., ... }`.
 
 ::Anchor{id="FetchReason"}
 
@@ -832,6 +904,24 @@ pub status: Status
 
 The status of the response.
 
+::Anchor{id="FetchReason.impl.Debug"}
+
+## Implementation `Debug for FetchReason`
+
+```silk
+impl Debug for FetchReason
+```
+
+::Anchor{id="FetchReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `InvalidOptions`.
+
 ::Anchor{id="FetchError"}
 
 ## `FetchError`
@@ -907,6 +997,24 @@ pub offeredBodyBytes: usize
 
 The length of the chunk that the destination rejected, or 0.
 
+::Anchor{id="FetchError.impl.Debug"}
+
+## Implementation `Debug for FetchError`
+
+```silk
+impl Debug for FetchError
+```
+
+::Anchor{id="FetchError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `FetchError { phase: ..., reason: ..., ... }`.
+
 ::Anchor{id="DestinationFailure"}
 
 ## `DestinationFailure`
@@ -936,6 +1044,24 @@ pub context: FetchError
 ```
 
 The context: the phase, the status, the URI, and the bytes delivered before the error.
+
+::Anchor{id="DestinationFailure.impl.Debug"}
+
+## Implementation `Debug for DestinationFailure<E>`
+
+```silk
+impl<E: Debug> Debug for DestinationFailure<E>
+```
+
+::Anchor{id="DestinationFailure.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `DestinationFailure { error: ..., context: ... }`.
 
 ::Anchor{id="RepresentationMetadata"}
 
@@ -2125,4 +2251,4 @@ and checks the body of the final response without keeping it. More than `maxDisc
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -135,6 +135,24 @@ OutputTooSmall
 
 The output buffer is too small. Nothing was written.
 
+::Anchor{id="OriginError.impl.Debug"}
+
+## Implementation `Debug for OriginError`
+
+```silk
+impl Debug for OriginError
+```
+
+::Anchor{id="OriginError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidScheme`.
+
 ::Anchor{id="Origin"}
 
 ## `Origin`
@@ -266,4 +284,4 @@ compared without case, and equal IP addresses match in any spelling.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -279,6 +279,24 @@ TokenTooLarge
 
 A token does not fit in the buffer that the caller gave for it.
 
+::Anchor{id="JsonReason.impl.Debug"}
+
+## Implementation `Debug for JsonReason`
+
+```silk
+impl Debug for JsonReason
+```
+
+::Anchor{id="JsonReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `UnexpectedByte`.
+
 ::Anchor{id="JsonError"}
 
 ## `JsonError`
@@ -331,6 +349,24 @@ pub available: Option<usize>
 ```
 
 For `TokenTooLarge`, the buffer size that was available.
+
+::Anchor{id="JsonError.impl.Debug"}
+
+## Implementation `Debug for JsonError`
+
+```silk
+impl Debug for JsonError
+```
+
+::Anchor{id="JsonError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `JsonError { reason: ..., offset: ..., ... }`.
 
 ::Anchor{id="JsonError.impl"}
 
@@ -778,4 +814,4 @@ Returns the source bytes of `span`, such as the text of a string or number token
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -1,0 +1,13 @@
+Descriptor reads and writes through WASI.
+
+## Details
+These operations borrow descriptors. They never close them.
+They retry interrupted calls and report WASI errno values on failure.
+
+Public declarations: 0.
+
+This module declares no public items.
+
+Category: Native platform.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.

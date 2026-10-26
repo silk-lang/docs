@@ -282,6 +282,24 @@ DepthExceeded
 
 More than [`MAX_DEPTH`](#MAX_DEPTH) arrays or inline tables are nested.
 
+::Anchor{id="TomlReason.impl.Debug"}
+
+## Implementation `Debug for TomlReason`
+
+```silk
+impl Debug for TomlReason
+```
+
+::Anchor{id="TomlReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `UnexpectedByte`.
+
 ::Anchor{id="TomlError"}
 
 ## `TomlError`
@@ -312,6 +330,24 @@ pub offset: usize
 
 The byte position of the problem in the input. Errors that are not tied to a source position,
 such as codec errors, use 0.
+
+::Anchor{id="TomlError.impl.Debug"}
+
+## Implementation `Debug for TomlError`
+
+```silk
+impl Debug for TomlError
+```
+
+::Anchor{id="TomlError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `TomlError { reason: ..., offset: ... }`.
 
 ::Anchor{id="TomlScalarKind"}
 
@@ -673,4 +709,4 @@ Returns the byte position where the next call to [`TomlScanner.next`](#TomlScann
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

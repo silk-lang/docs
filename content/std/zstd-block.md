@@ -68,6 +68,24 @@ Output
 
 The decoded block exceeds the supplied output storage.
 
+::Anchor{id="BlockReason.impl.Debug"}
+
+## Implementation `Debug for BlockReason`
+
+```silk
+impl Debug for BlockReason
+```
+
+::Anchor{id="BlockReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `None`.
+
 ::Anchor{id="BlockError"}
 
 ## `BlockError`
@@ -97,6 +115,24 @@ pub offset: usize
 ```
 
 The local compressed byte position.
+
+::Anchor{id="BlockError.impl.Debug"}
+
+## Implementation `Debug for BlockError`
+
+```silk
+impl Debug for BlockError
+```
+
+::Anchor{id="BlockError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `BlockError { reason: ..., offset: ... }`.
 
 ::Anchor{id="BlockState"}
 
@@ -182,4 +218,4 @@ Failure can change tables and scratch bytes. Discard the frame state after failu
 
 Category: Compiler support.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

@@ -175,6 +175,24 @@ ResourceLimit
 
 Input, traversal, or descriptor storage exceeds a budget.
 
+::Anchor{id="SanDecodeClass.impl.Debug"}
+
+## Implementation `Debug for SanDecodeClass`
+
+```silk
+impl Debug for SanDecodeClass
+```
+
+::Anchor{id="SanDecodeClass.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Malformed`.
+
 ::Anchor{id="SanDecodeReason"}
 
 ## `SanDecodeReason`
@@ -275,6 +293,24 @@ Depth
 
 DER depth exceeds its budget or the hard ceiling of 32.
 
+::Anchor{id="SanDecodeReason.impl.Debug"}
+
+## Implementation `Debug for SanDecodeReason`
+
+```silk
+impl Debug for SanDecodeReason
+```
+
+::Anchor{id="SanDecodeReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidDer`.
+
 ::Anchor{id="SanDecodeError"}
 
 ## `SanDecodeError`
@@ -314,6 +350,24 @@ pub offset: usize
 ```
 
 The failed DER offset. Extension-list failures use zero.
+
+::Anchor{id="SanDecodeError.impl.Debug"}
+
+## Implementation `Debug for SanDecodeError`
+
+```silk
+impl Debug for SanDecodeError
+```
+
+::Anchor{id="SanDecodeError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `SanDecodeError { kind: ..., reason: ..., ... }`.
 
 ::Anchor{id="SanDecodeSummary"}
 
@@ -464,4 +518,4 @@ encoding only. `HttpsIdentity.verify` checks DNS syntax and IP lengths.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

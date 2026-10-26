@@ -394,6 +394,24 @@ pub struct Cancelled
 
 A Fiber outcome that reports structured task cancellation.
 
+::Anchor{id="Cancelled.impl.Debug"}
+
+## Implementation `Debug for Cancelled`
+
+```silk
+impl Debug for Cancelled
+```
+
+::Anchor{id="Cancelled.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes `Cancelled`.
+
 ::Anchor{id="PreparedFiber"}
 
 ## `PreparedFiber`
@@ -486,4 +504,4 @@ child. The scheduler cancels unfinished children when the root finishes.
 
 Category: Concurrency.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

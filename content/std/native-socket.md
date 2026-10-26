@@ -339,6 +339,24 @@ Close
 
 `close`.
 
+::Anchor{id="NativeSocketOperation.impl.Debug"}
+
+## Implementation `Debug for NativeSocketOperation`
+
+```silk
+impl Debug for NativeSocketOperation
+```
+
+::Anchor{id="NativeSocketOperation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Socket`.
+
 ::Anchor{id="ListenerPhase"}
 
 ## `ListenerPhase`
@@ -399,6 +417,24 @@ PollInterval
 
 The poll interval is not 1 nanosecond through 1 second.
 
+::Anchor{id="ListenOptionsReason.impl.Debug"}
+
+## Implementation `Debug for ListenOptionsReason`
+
+```silk
+impl Debug for ListenOptionsReason
+```
+
+::Anchor{id="ListenOptionsReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `KernelBacklog`.
+
 ::Anchor{id="ListenOptionsError"}
 
 ## `ListenOptionsError`
@@ -428,6 +464,24 @@ pub value: u64
 ```
 
 The value that you gave.
+
+::Anchor{id="ListenOptionsError.impl.Debug"}
+
+## Implementation `Debug for ListenOptionsError`
+
+```silk
+impl Debug for ListenOptionsError
+```
+
+::Anchor{id="ListenOptionsError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ListenOptionsError { reason: ..., value: ... }`.
 
 ::Anchor{id="InvalidBindReason"}
 
@@ -479,6 +533,24 @@ AbstractPath
 
 The path is an abstract socket address, which is not supported.
 
+::Anchor{id="InvalidBindReason.impl.Debug"}
+
+## Implementation `Debug for InvalidBindReason`
+
+```silk
+impl Debug for InvalidBindReason
+```
+
+::Anchor{id="InvalidBindReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `EmptyPath`.
+
 ::Anchor{id="ConnectOptionsReason"}
 
 ## `ConnectOptionsReason`
@@ -509,6 +581,24 @@ MaxAttempts
 
 The attempt limit is not 1 through 1024.
 
+::Anchor{id="ConnectOptionsReason.impl.Debug"}
+
+## Implementation `Debug for ConnectOptionsReason`
+
+```silk
+impl Debug for ConnectOptionsReason
+```
+
+::Anchor{id="ConnectOptionsReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `PollInterval`.
+
 ::Anchor{id="ConnectOptionsError"}
 
 ## `ConnectOptionsError`
@@ -538,6 +628,24 @@ pub value: u64
 ```
 
 The value that you gave.
+
+::Anchor{id="ConnectOptionsError.impl.Debug"}
+
+## Implementation `Debug for ConnectOptionsError`
+
+```silk
+impl Debug for ConnectOptionsError
+```
+
+::Anchor{id="ConnectOptionsError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `ConnectOptionsError { reason: ..., value: ... }`.
 
 ::Anchor{id="InvalidEndpointReason"}
 
@@ -619,6 +727,24 @@ AbstractPath
 
 The path is an abstract socket address, which is not supported.
 
+::Anchor{id="InvalidEndpointReason.impl.Debug"}
+
+## Implementation `Debug for InvalidEndpointReason`
+
+```silk
+impl Debug for InvalidEndpointReason
+```
+
+::Anchor{id="InvalidEndpointReason.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `EmptyEndpoints`.
+
 ::Anchor{id="AttemptFailure"}
 
 ## `AttemptFailure`
@@ -688,6 +814,24 @@ pub errno: i32
 ```
 
 The `errno` value.
+
+::Anchor{id="AttemptFailure.impl.Debug"}
+
+## Implementation `Debug for AttemptFailure`
+
+```silk
+impl Debug for AttemptFailure
+```
+
+::Anchor{id="AttemptFailure.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `ConnectionRefused`.
 
 ::Anchor{id="NativeSocketError"}
 
@@ -1068,6 +1212,24 @@ pub errno: i32
 ```
 
 The `errno` value.
+
+::Anchor{id="NativeSocketError.impl.Debug"}
+
+## Implementation `Debug for NativeSocketError`
+
+```silk
+impl Debug for NativeSocketError
+```
+
+::Anchor{id="NativeSocketError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant and its fields, such as `AttemptsExhausted { ... }`.
 
 ::Anchor{id="NativeSocket"}
 
@@ -1929,4 +2091,4 @@ closeRaw: Connection.closeByteConnection
 
 Category: Networking.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
