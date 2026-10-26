@@ -353,7 +353,16 @@ Nothing is saved yet, so `add` and `done` change a board that disappears when th
 A failure can travel all the way out of `main`. Try it:
 
 ```silk
-pub struct NoSuchTask { id: u32 }
+import silk.format { Debug, Format, Formatter }
+import silk.writer { Writer, WriterError }
+
+pub struct NoSuchTask { pub id: u32 }
+
+impl Debug for NoSuchTask {
+  effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer {
+    return run Format.debugFields(self, "NoSuchTask", &mut formatter)
+  }
+}
 
 effect fn complete(id: u32) -> () ! NoSuchTask {
   if id > 3 {
@@ -373,11 +382,14 @@ silk run
 
 ```
 unhandled error: main.NoSuchTask
-  at main.complete (main:5:5)
-  at main.main (main:11:3)
+  at main.complete (main:14:5)
+  at main.main (main:20:3)
+unhandled value: NoSuchTask { id: 9 }
 ```
 
-The program exits with status 1 and prints where the failure started. That is useful while developing, but users deserve better. Notice the `pub` on the struct: `main` is `pub`, and a public signature can only name public failure types. Without it, SEM0019 reports a public declaration whose signature mentions a private type.
+The program exits with status 1, prints where the failure started, and shows the failure value. That is useful while developing, but users deserve better.
+
+Two things make this compile. The runtime prints the value through `Debug`, so every failure that `main` can raise must implement it. `Format.debugFields` writes a struct's `pub` fields in one line, which is why `id` is `pub` here. And `main` is `pub`, and a public signature can only name public failure types, so the struct is `pub` too. Without it, SEM0019 reports a public declaration whose signature mentions a private type.
 
 ## Handling failures
 
