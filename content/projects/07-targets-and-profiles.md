@@ -352,7 +352,7 @@ Without the composition, `libc = "none"` finds no runtime in the std lib catalog
 
 ## WebAssembly
 
-`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. Clang 18 builds it. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name. The program `silk init` writes does not build for wasm32 as it is, because it imports `silk.os_logger`, which needs an operating system to write to; a wasm32 program starts from a `main` like this one:
+`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name. The program `silk init` writes does not build for wasm32 as it is, because it imports `silk.os_logger`, which needs an operating system to write to; a wasm32 program starts from a `main` like this one:
 
 ```silk
 export "C" fn add(left: i32, right: i32) -> i32 {
@@ -389,7 +389,7 @@ threading = "multi"
 max-memory = "256MiB"
 ```
 
-The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `max-memory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.max-memory = "100KiB"`. A threaded module needs Clang 19 or newer, because Clang 18 crashes on it or writes a module the host rejects; `silk build` refuses an older Clang and names it.
+The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `max-memory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.max-memory = "100KiB"`.
 
 The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32 and runs it in Node.
 

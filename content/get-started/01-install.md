@@ -1,6 +1,6 @@
 # Install
 
-Silk installs with one shell script. It downloads a release of Silk, the `silkc` compiler and its standard library, into `~/.silk`, as one version among any others you install later, and installs `silk`, the command you type. `silk` runs each project with the Silk version it pins. You also need Clang 18 or newer, because Silk builds programs through Clang.
+Silk installs with one shell script. It downloads a release of Silk, the `silkc` compiler and its standard library, into `~/.silk`, as one version among any others you install later, and installs `silk`, the command you type. `silk` runs each project with the Silk version it pins. You also need Clang 22 or newer, because Silk builds programs through Clang.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | sh
@@ -82,29 +82,29 @@ curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | SI
 
 ## Install Clang
 
-Silk compiles your code to LLVM IR and hands it to Clang to make the executable. Clang 18 or newer builds ordinary programs. Programs for Linux without libc need Clang 22 or newer, because the inline assembly in their runtime uses LLVM 22 syntax. Clang 17 and older are untested. Install LLVM from your package manager or from llvm.org. The Clang that ships with Xcode ("Apple clang") does not qualify, and the installer warns about it; install LLVM's own Clang on macOS too.
+Silk compiles your code to LLVM 22 bitcode and hands it to Clang to make the executable, so it needs Clang 22 or newer. An older Clang misreads that bitcode, and `silk build` refuses it before compiling. Install LLVM from your package manager or from llvm.org. The Clang that ships with Xcode ("Apple clang") does not qualify, and the installer warns about it; install LLVM's own Clang on macOS too.
 
 The compiler uses the Clang named by `--clang <path>` on `silk build`, `silk run` or `silk test`, else the one named by the `SILK_CLANG` environment variable, else the first `clang` on your `PATH`.
 
 The archiver comes from `SILK_LLVM_AR`, or else the `llvm-ar` in the same folder as that Clang.
 
-If your default `clang` is older than 18, or you build for Linux without libc, point `SILK_CLANG` at a newer one:
+If your default `clang` is older than 22, point `SILK_CLANG` at a newer one:
 
 ```sh
 export SILK_CLANG=/usr/lib/llvm-22/bin/clang
 ```
 
-The installer checks the Clang it would use. Clang 18 to 21 gets a note:
+The installer checks the Clang it would use. An older Clang, or Apple clang, gets a warning:
 
 ```
-clang is Clang 18: it builds ordinary programs, but no-libc targets need Clang 22 or newer.
+Silk needs Clang 22 or newer, but clang is: Ubuntu clang version 18.1.3
+Put LLVM 22 or newer on PATH, or set SILK_CLANG to its clang.
 ```
 
-An older Clang, or Apple clang, gets a warning:
+A build with an older Clang stops before compiling and names the Clang it found:
 
 ```
-Silk needs Clang 18 or newer, but clang is: Ubuntu clang version 17.0.6
-Put LLVM 18 or newer (22 for no-libc targets) on PATH, or set SILK_CLANG to its clang.
+silk: Silk builds need Clang 22 or newer, but /usr/bin/clang-18 (from SILK_CLANG) is Clang 18; set SILK_CLANG or pass --clang the path of a newer Clang
 ```
 
 With no Clang at all, `silk build` and `silk run` stop at the link step:
