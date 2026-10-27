@@ -160,13 +160,14 @@ Why all this, when `priorityLabel` could just write `match priority`? Because a 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  check    failed: 2 modules, 2 errors       0.11s
 [x86_64-unknown-linux-gnu]
-src/main.silk:34:10: error[OWN0003] A non-Copy value consumed without the explicit `move` its position requires
+src/main.silk:34:16: error[OWN0003] `match status.*` moves `status.*`; write `match move status.*` to take it apart, or `match &status.*` to look at it
+src/main.silk:34:16: error[OWN0012] A non-Copy value cannot be moved out through a borrowed-view place
 Failed tasks in 0.17s
 ```
 
-OWN codes come from the ownership checker. `Copy` is the name for types that copy freely, like numbers and enums, and `Status` is not one of them. So a plain `match` would use up the status itself, and Silk wants you to write `move` when you mean that. But `statusMark` only borrowed the status, and it has no business using it up. For a `match`, the answer is almost always `&`: look at the value where it is. Chapter 4 is all about ownership and explains the other options.
+OWN codes come from the ownership checker. `Copy` is the name for types that copy freely, like numbers and enums, and `Status` is not one of them. So a plain `match` would use up the status itself, and Silk wants you to write `move` when you mean that. But `statusMark` only borrowed the status, and it has no business using it up, which is what OWN0012 adds: nothing can be moved out through a borrow. For a `match`, the answer is almost always `&`: look at the value where it is. Chapter 4 is all about ownership and explains the other options.
 
 Remember the shape `match &x.*` for references, and `match &x` for a local value you only want to read.
 

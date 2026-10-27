@@ -32,7 +32,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.04s
   check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-src/main.silk:2:27: error[SEM0135] Operator + does not accept (string<'static>, string<'static>)
+src/main.silk:2:27: error[SEM0135] Operator + does not join strings; build an owned `String` with `String.copy` and `String.append`, or write the text with a `Format.format` template
 Failed scratch in 0.14s
 ```
 

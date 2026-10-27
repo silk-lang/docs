@@ -122,7 +122,7 @@ From weakest to strongest:
 - `()` is the unit value. `(a, b)` is a tuple. `(a,)` is a one-element tuple. `(e)` is grouping.
 - `[a, b, c]` is an array literal. `Name { field: e }` is a struct literal. `.{ field: e }` takes its type from context. See Structs, tuples and arrays.
 - In `if` and `while` conditions and `match` subjects, a struct literal must be parenthesized: `(P { x: 1 }).x`.
-- `if` is a statement, not an expression. `match` is an expression. See Patterns and match.
+- `match` is an expression. `if` is a statement, and also an expression when its `else` chain ends in a final `else`. See Patterns and match, and Control flow.
 - `fn (x: T) -> R { … }` is an anonymous function. See Closures and callable types.
 - `move e` transfers ownership of a place. See Ownership and moves.
 - `&e` and `&mut e` borrow a place. See Borrowing.

@@ -114,7 +114,7 @@ time 0.303s
 
 Same answer, half the time. Here is what each piece does:
 
-- `Fiber<A, E>.forkChild(effect)` starts the effect as a child task and gives you a `Fiber<A, E>` handle. `A` is its success type and `E` its failure type. Write both type arguments; the compiler does not infer them here.
+- `Fiber<A, E>.forkChild(effect)` starts the effect as a child task and gives you a `Fiber<A, E>` handle. `A` is its success type and `E` its failure type. The compiler infers both from the effect, so `Fiber.forkChild(estimate(25, 300))` also works. This chapter writes them out so that each fiber's types are visible where it starts.
 - The child does not start at the fork. The parent keeps going until it parks, here at the first `join`. Only then do both children run, and both go to sleep at almost the same moment.
 - `join` consumes the handle (note the `move`), waits if the child is not done, and returns its value. Its failure row is the child's `E` plus `Cancelled`.
 - `forkChild` itself can fail with `OutOfMemoryError` or `TaskIdExhaustedError`, and it needs `? &mut Scheduler`.

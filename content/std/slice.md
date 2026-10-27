@@ -2,7 +2,8 @@ Borrowed subranges of slices, with no copy and no allocation.
 
 ## When to use
 Use [`Slice.view`](#Slice.impl.view) to give a part of a slice to a function that takes `&[T]`, such as the
-remaining input of a parser.
+remaining input of a parser. Use [`Slice.viewMut`](#Slice.impl.viewMut) to give a part of a slice to a function that
+takes `&mut [T]`, such as one row of a scratch buffer.
 
 ## Details
 A view borrows the input. It has the same lifetime as the input and does not copy elements.
@@ -70,6 +71,62 @@ Returns a shared borrow of the `length` elements of `values` that start at index
 
 The view does not copy elements and does not allocate. It cannot live longer than `values`.
 `view(values, values.length, 0)` is a valid empty view.
+
+#### Gotchas
+
+If `offset` is more than `values.length`, or `offset + length` is more than `values.length`,
+the program traps.
+
+::Anchor{id="Slice.impl.copyInto"}
+
+### Associated function `copyInto`
+
+```silk
+pub fn copyInto<T: Copy>(destination: &mut [T], offset: usize, source: &[T]) -> ()
+```
+
+Copies every element of `source` into `destination`, starting at index `offset`.
+
+#### Details
+
+The range is checked once, and the copy compiles to a bulk memory copy. A fixed array works as
+the destination through `&mut array`. Elements of `destination` outside the range keep their
+values.
+
+#### Gotchas
+
+If `offset` is more than `destination.length`, or `source.length` is more than
+`destination.length - offset`, the program traps.
+
+#### Examples
+```silk
+import silk.slice { Slice }
+
+pub fn main() -> i32 {
+  let mut buffer: [u8; 6] = [0; 6]
+  Slice.copyInto<u8>(&mut buffer, 2, b"abc")
+  if buffer[2] != 97 || buffer[4] != 99 || buffer[5] != 0 {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="Slice.impl.viewMut"}
+
+### Associated function `viewMut`
+
+```silk
+pub fn viewMut<'a, T>(values: &'a mut [T], offset: usize, length: usize) -> &'a mut [T]
+```
+
+Returns an exclusive borrow of the `length` elements of `values` that start at index `offset`.
+
+#### Details
+
+The view does not copy elements and does not allocate. Writes through it change `values`.
+While the view lives, `values` cannot be used. `viewMut(values, values.length, 0)` is a valid
+empty view.
 
 #### Gotchas
 

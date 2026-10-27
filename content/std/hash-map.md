@@ -158,7 +158,7 @@ The seed and the sequence of operations decide the bucket order.
 pub fn length(self: &Self) -> usize
 ```
 
-Returns the number of entrys in the map.
+Returns the number of entries in the map.
 
 ::Anchor{id="HashMap.impl.bucketCount"}
 

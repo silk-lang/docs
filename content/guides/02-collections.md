@@ -188,11 +188,11 @@ Checking wordfreq (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
-src/main.silk:177:7: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
+src/main.silk:177:7: error[SEM0121] `main.Count<'_>: silk.order.Order` cannot be proved: no implementation of `silk.order.Order` exists for `main.Count<'_>`
 Failed wordfreq in 0.21s
 ```
 
-The "conditional requirement" is `Count: Order`, which `sort` declares as `sort<T: Order>`. The location is the `run rows.sort()` line.
+The requirement it cannot prove is `Count: Order`, which `sort` declares as `sort<T: Order>`. The location is the `run rows.sort()` line.
 
 `Equal` from `silk/equal` works the same way for `==` and `!=`. Strings and numbers already have both operators.
 

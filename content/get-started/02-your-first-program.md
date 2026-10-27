@@ -60,7 +60,7 @@ pub effect fn main() -> ()
   ! LogError {
   let mut logger = StdoutLogger.make()
 
-  run Effect.log("Hello, world!", &()) |> Effect.provideMut(&mut logger)
+  run Effect.log("Hello, world!\n", &()) |> Effect.provideMut(&mut logger)
 }
 ```
 
@@ -85,8 +85,6 @@ Hello, world!
 ```
 
 `silk run` builds the package and starts the program. The first lines are the build's progress: one row per compiler phase, then the path of the program it built. They go to standard error, and the program's own output follows on standard output, so `silk run > out.txt` captures only `Hello, world!`. In a terminal the rows are redrawn in place while they run. `silk run --quiet` keeps only the `Finished` line. From here on, the output shown after `silk run` is the program's alone.
-
-The log message has no `\n` at the end, so your prompt shows up right after `Hello, world!`.
 
 ## Read an argument and choose the exit status
 

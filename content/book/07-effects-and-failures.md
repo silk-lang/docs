@@ -490,11 +490,11 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-src/main.silk:390:17: error[SEM0052] A generic call whose type arguments its values do not determine
+src/main.silk:390:50: error[SEM0052] This call needs an Effect that cannot fail, but the one passed here can fail with silk.logger.LogError; wrap it in `Effect.result(...)` and handle the Result it returns
 Failed tasks in 0.24s
 ```
 
-SEM0052 says the compiler found no type arguments for `ensuring` that fit the values you passed. The value that doesn't fit is the finalizer: `ensuring` wants one whose failure row is `never`. A finalizer must not fail. If it could, which failure would win, the command's or the cleanup's? `Effect.log` can fail with `LogError`, so it isn't allowed as is. Handle its failure first, inside the finalizer:
+SEM0052 points at the finalizer: `ensuring` wants one whose failure row is `never`. A finalizer must not fail. If it could, which failure would win, the command's or the cleanup's? `Effect.log` can fail with `LogError`, so it isn't allowed as is. Handle its failure first, inside the finalizer:
 
 ```silk
 // A finalizer runs whether the command succeeded or failed. It must not fail itself.

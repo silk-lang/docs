@@ -32,7 +32,7 @@ test fn withParam(x: i32) {
 ```
 
 ```
-src/main.silk:1:19: error[SEM0218] A `test` qualifier marks a function outside the finite executable test contract
+src/main.silk:1:19: error[SEM0218] Invalid test declaration: a test takes no parameters; the test runner calls it with none
 ```
 
 `pub test fn` is allowed. Outside `silk test`, a test is checked like any other function, so `silk check` reports its errors too.

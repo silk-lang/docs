@@ -104,7 +104,7 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 | `StaticText.concat(left, right)` | the joined `string<'static>` |
 | `StaticText.slice(text, start, end)` | bytes `start..end` as `string<'static>`; a boundary inside a scalar is SEM0176 |
 
-- A `static fn` returning `string` needs an explicit `string<'static>` result. An unannotated `string` result is SEM0210.
+- A `static fn` that returns `string` and takes no borrowed parameter needs an explicit `string<'static>` result; an unannotated `string` result there is SEM0210. With a borrowed parameter, such as `static fn shout(text: string<'static>) -> string`, the result borrows from that parameter as in any function.
 
 ## Static sequences
 

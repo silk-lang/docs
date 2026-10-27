@@ -61,7 +61,7 @@ fn dateFromDays(days: i64) -> Date {
 }
 ```
 
-`if` is a statement in Silk, not an expression, so the corrections are written as `let mut` plus an `if`.
+One `if` adjusts both the month and the year, so the two are `let mut` bindings that it corrects.
 
 ## Reading the wall clock
 
