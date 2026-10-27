@@ -1,6 +1,6 @@
 # Your first program
 
-This page takes you from an empty folder to a program that reads an argument, prints a greeting and sets its exit status. You need `silk` on your `PATH` and Clang 18 or newer; see Install.
+This page takes you from an empty folder to a program that reads an argument, prints a greeting and sets its exit status. You need `silk` on your `PATH` and Clang 22 or newer; see Install.
 
 ## Create a package
 

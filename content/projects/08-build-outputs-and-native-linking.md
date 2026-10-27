@@ -69,7 +69,7 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 | `SILK_CLANG` | Every build without `--clang`, when set. |
 | `clang` on `PATH` | Otherwise. |
 
-- Use Clang 18 or newer. Linux without libc needs Clang 22 or newer, because the inline assembly in its runtime uses LLVM 22 syntax. Clang 17 and older are untested.
+- Use Clang 22 or newer. Silk hands Clang LLVM 22 bitcode, and a build refuses an older Clang before compiling.
 - Static archives use `SILK_LLVM_AR` when set, else the `llvm-ar` in Clang's directory.
 - Clang runs with only `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL` and `LC_CTYPE` from your environment. `CFLAGS`, `LDFLAGS` and similar are not passed.
 - An executable link adds `-lc -lm` after everything else.
