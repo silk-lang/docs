@@ -1,6 +1,6 @@
 # Control flow
 
-Control flow in Silk is statement-based: `if`, `if let` and `while` are statements, not expressions. This page covers conditionals, loops, `break`, `continue`, `return`, the `never` type and short-circuit evaluation.
+`if`, `if let` and `while` are statements. An `if` or `if let` whose `else` chain ends in a final `else` may also be used as a value. This page covers conditionals, `if` values and value blocks, loops, `break`, `continue`, `return`, the `never` type and short-circuit evaluation.
 
 ## Syntax
 
@@ -11,6 +11,8 @@ WhileStatement   = 'while' Condition Block
 BreakStatement   = 'break'
 ContinueStatement = 'continue'
 ReturnStatement  = 'return' Expression?
+IfExpression     = ( 'if' Condition | 'if' 'let' Pattern '=' Condition ) Block
+                   ( 'else' ( 'if' Condition | 'if' 'let' Pattern '=' Condition ) Block )* 'else' Block
 StaticIf         = 'static' 'if' Condition Block ( 'else' Block )?
 Condition        = Expression
 Block            = '{' Statement* '}'
@@ -22,7 +24,7 @@ Block            = '{' Statement* '}'
 
 ## Conditionals
 
-- `if` is a statement. It produces no value, so `let y = if c { 1 } else { 2 }` is a parse error (PAR0001). Use `match` when a value is needed (see Patterns and match).
+- In statement position `if` is a statement: its branches produce no value. See `if` as a value below for the expression form.
 - The condition must have type `bool` (SEM0011). Integers are not truthy.
 - `else if` chains to any depth. `else` may start on the line after the closing brace.
 - An `if` whose `then` block and `else` branch both end with `return` (or a call returning `never`) ends the path. The function needs no further `return`.
@@ -36,6 +38,40 @@ Block            = '{' Statement* '}'
 - Matching `&expr` or `&mut expr` borrows instead. Bindings are then shared or exclusive views of the parts.
 - A value of reference type cannot be matched directly (SEM0226). Match its referent: `if let Status.Bad { code } = &status.* { }`.
 - `if let` and plain `if` may be mixed in one `else if` chain.
+
+## `if` as a value
+
+- An `if` or `if let` whose `else` chain ends in a plain `else { ... }` may appear wherever an expression is expected: a binding initializer, a `return` operand, an argument, an array element, a match arm, or an operand of another expression.
+
+  ```silk
+  let sign = if n > 0 { 1 } else if n < 0 { -1 } else { 0 }
+  return if let Option<i32>.Some { value } = move input { value } else { 0 }
+  ```
+
+- The `if` produces the value of the branch that runs. Only that branch runs.
+- An `if` without a final `else` is not a value, because the path where every condition is false produces nothing. Using one as a value is PAR0009, which suggests adding `else { ... }`.
+- Branch results join like match arms: equal types keep that type, distinct nominal types form a union, and a branch of type `never` adds nothing. Types that cannot join are SEM0049.
+- An expected type, such as a binding annotation or a parameter type, reaches every branch, so `let small: u8 = if flag { 1 } else { 2 }` types both literals as `u8`.
+- An `if` in statement position stays a statement, even with a final `else`. A branch that ends in a non-unit expression there is an ignored result (SEM0087).
+- Static bodies do not evaluate `if` values.
+
+## Value blocks
+
+- A block whose value is used, which is a branch of an `if` used as a value or an arm block of a `match` used as a value, runs its statements and then produces its last expression. The last expression counts when its type is neither `()` nor `never`.
+
+  ```silk
+  return match n {
+    0 => 0
+    _ => {
+      let doubled = n * 2
+      doubled + 1
+    }
+  }
+  ```
+
+- A block without such a last expression produces `()`, or `never` when every path leaves it with `return`, `break`, `continue` or `fail`.
+- The value is computed before the block's locals are cleaned up, so it may move a local out but may not borrow one.
+- Blocks in statement position do not produce values.
 
 ## Loops
 

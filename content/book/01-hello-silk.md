@@ -72,7 +72,7 @@ pub effect fn main() -> ()
   ! LogError {
   let mut logger = StdoutLogger.make()
 
-  run Effect.log("Hello, world!", &()) |> Effect.provideMut(&mut logger)
+  run Effect.log("Hello, world!\n", &()) |> Effect.provideMut(&mut logger)
 }
 ```
 
@@ -97,7 +97,7 @@ Hello, world!
 
 `silk run` compiles the package and then starts the program. The lines before `Hello, world!` are the compiler reporting its progress, one row per phase, on standard error. "Check before you run", below, explains the rows. Everything after the `Finished` line is your program's output. From now on, the book shows only the program's output after `silk run`.
 
-Look closely at your terminal. Your shell prompt probably appears right after `Hello, world!` on the same line. That is because the program never printed a line break. Silk prints exactly the bytes you give it, and adds nothing. You fix that below.
+The `\n` at the end of the message is a line break. Silk prints exactly the bytes you give it and adds nothing, so without it your shell prompt would appear right after `Hello, world!` on the same line.
 
 ## Reading main
 
@@ -127,12 +127,12 @@ The word `effect` is the important part. In Silk, a function that talks to the o
 This creates a logger that writes to standard output, and binds it to the name `logger`. `let` makes a binding. `mut` lets you change it, or lend it out for changing, which is what happens next.
 
 ```silk
-  run Effect.log("Hello, world!", &()) |> Effect.provideMut(&mut logger)
+  run Effect.log("Hello, world!\n", &()) |> Effect.provideMut(&mut logger)
 ```
 
 This line does three things.
 
-- `Effect.log("Hello, world!", &())` describes a log message. It does not print anything yet. It builds a value that says "log this message" and needs a `Logger` to do it.
+- `Effect.log("Hello, world!\n", &())` describes a log message. It does not print anything yet. It builds a value that says "log this message" and needs a `Logger` to do it.
 - `|> Effect.provideMut(&mut logger)` passes that description to `provideMut`, which hands it your logger. The `|>` operator takes the value on its left and passes it as the first argument of the call on its right. `&mut logger` lends the logger out for changing while the message is written.
 - `run` actually performs the effect. Without `run`, nothing happens.
 
@@ -140,7 +140,7 @@ This split between describing work and running it is central to Silk. Code that 
 
 ## Make it say something useful
 
-Change the message so it is about tasks, and end it with a line break. `\n` inside a string literal is a newline:
+Change the message so it is about tasks. Keep the `\n` at the end:
 
 ```silk
   run Effect.log("tasks: nothing to track yet\n", &()) |> Effect.provideMut(&mut logger)
@@ -153,8 +153,6 @@ silk run
 ```
 tasks: nothing to track yet
 ```
-
-The prompt is back on its own line.
 
 ## Templates and arguments
 

@@ -145,7 +145,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
-src/main.silk:9:15: error[SEM0157] Direct ordering of scalar enum values
+src/main.silk:9:15: error[SEM0157] Enum Priority has no order, so >= does not apply; compare backing values with `Priority.value(...)` instead
 Failed scratch in 0.18s
 ```
 

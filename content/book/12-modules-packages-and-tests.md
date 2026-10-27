@@ -47,18 +47,14 @@ silk init --workspace tasks-workspace
 
 ```
 Initialized Silk workspace at /home/you/tasks-workspace
+Initialized Silk project app at /home/you/tasks-workspace/app
+Run it with `silk run` from the workspace root
 ```
 
-It writes a `.gitignore` for `build/` and a manifest with no members yet:
-
-```
-[workspace]
-members = []
-```
-
-Move `tasks` in, then add it to `members` in `tasks-workspace/silk.toml`. `silk init` will not touch a package that already exists, so this one edit is by hand:
+It writes a `.gitignore` for `build/`, a manifest, and a starter program in `app` so that `silk run` works at once. You already have a program, so remove the starter, move `tasks` in, and replace `app` with `tasks` in the `members` of `tasks-workspace/silk.toml`. `silk init` will not touch a package that already exists, so this one edit is by hand:
 
 ```sh
+rm -r tasks-workspace/app
 mv tasks tasks-workspace/
 ```
 
@@ -225,13 +221,13 @@ Checking taskcore (x86_64-unknown-linux-gnu)
   load     47 modules, 5 in package          0.06s
   check    failed: 5 modules, 2 errors       0.19s
 [x86_64-unknown-linux-gnu]
-taskcore/src/Board.silk:52:23: error[SEM0021] Constructing a struct at a site where its raw constructor is not available
-taskcore/src/Store.silk:119:21: error[SEM0028] A field projection naming a private field of another module's struct
+taskcore/src/Board.silk:52:23: error[SEM0021] Cannot construct Task.Status.Done here because it has fields private to its module; call a function that module provides to build one
+taskcore/src/Store.silk:119:21: error[SEM0028] Pattern names private field `at` of variant `Done`; skip it with `..`, or mark it `pub at` to use it outside its module
 Failed taskcore in 0.25s
 Failed 1 of 1 package in 0.26s
 ```
 
-The messages talk about structs, because a union variant with fields is built and read like one. SEM0021, in `Board.silk`, is about building a value: `Status.Done { at: at }` needs every field to be visible, and `at` is not. SEM0028, in `Store.silk`, is about reading: the pattern `Status.Done { at } => at` binds a private field. Put the `pub` back and both go away.
+SEM0021, in `Board.silk`, is about building a value: `Status.Done { at: at }` needs every field to be visible, and `at` is not. SEM0028, in `Store.silk`, is about reading: the pattern `Status.Done { at } => at` binds a private field. Put the `pub` back and both go away.
 
 Private is still useful. In `Remind.silk`, the struct `Reminder { id: TaskId delay: u64 }` keeps its fields private. Only `Remind` makes reminders, so no other module needs to see inside one. See **Structs, tuples and arrays** and **Enums and unions** in the reference for the full visibility rules.
 
@@ -371,7 +367,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     78 modules, 7 in package          0.09s
   check    failed: 8 modules, 1 error        1.67s
 [x86_64-unknown-linux-gnu]
-tasks/src/main.silk:19:38: error[SEM0015] `fileText` is private to Store; mark it `pub` there to use it here
+tasks/src/main.silk:19:38: error[SEM0015] `fileText` is private to taskcore.Store; mark it `pub` there to use it here
 Failed tasks in 1.76s
 ```
 

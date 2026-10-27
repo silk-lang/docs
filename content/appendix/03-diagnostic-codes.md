@@ -41,7 +41,7 @@ pub fn main() -> i32 {
 
 ```text
 src/main.silk:2:15: error[LEX0001] Unsupported byte sequence
-src/main.silk:2:16: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
+src/main.silk:2:16: error[SEM0087] Expression statement produces i32, but only () or never may be ignored; write `drop` before it to discard the value
 ```
 
 The parser then reads the `5` as an expression statement and also reports SEM0087.
@@ -450,6 +450,67 @@ The error is reported once, at the `?`, wherever a type is expected: a `let`, a 
 
 Fix: Write `Option<i32>`. See Enums and unions.
 
+### PAR0008
+
+An anonymous tuple type written `(A, B)` in a type position.
+
+```silk
+pub fn main() -> i32 {
+  let pair: (i32, i32) = (1, 2)
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:2:13: error[PAR0008] Silk has no anonymous tuple types; declare one with a name, as in `tuple Pair(i32, i32)`, and write `Pair`
+```
+
+Fix: Declare `tuple Pair(i32, i32)` and write `Pair` in the type position. See Structs, tuples and arrays.
+
+### PAR0009
+
+An `if` used as a value without a final `else`, so some path produces no value.
+
+```silk
+pub fn main() -> i32 {
+  let flag = true
+  let n = if flag { 1 }
+  return n
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:3:11: error[PAR0009] An `if` used as a value needs a final `else` branch, so that every path produces a value; add `else { ... }`, or write the `if` as a statement
+```
+
+Fix: Add a final `else { ... }`, or write the `if` as a statement. See Control flow.
+
+### PAR0010
+
+A spelling from another language that Silk writes differently: `+=`, `++`, `for ... in`, `var`, `c ? a : b`, `=> return x`, a prefix `*n` or a bare `{ ... }` block.
+
+```silk
+pub fn main() -> i32 {
+  let mut n = 0
+  n += 1
+  return n
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:3:5: error[PAR0010] Silk has no compound assignment; write `x = x + 1` instead of `x += 1`
+```
+
+The message names the Silk form of each spelling, such as a `while` loop with a counter for `for ... in`, `let mut` for `var`, and `n.*` for `*n`. For `c ? a : b`, write an `if` with a final `else` as a value: `if c { a } else { b }`.
+
+Fix: Write the Silk form the message names. See Bindings and statements.
+
 ## MOD: modules and packages
 
 ### MOD0001
@@ -716,10 +777,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:3: error[OWN0005] A loop whose body leaves owner liveness different from what its next iteration expects
+src/main.silk:6:3: error[OWN0005] `t` is moved inside this loop, so the next iteration would use it after the move; create it inside the loop, or leave the loop right after moving it
 ```
-
-Message template, not filled by this compiler: `Loop {loop} repeats with incompatible owner liveness`.
 
 Fix: Give the moved owner a new value before the next iteration, or move it once outside the loop. See Ownership and moves, Control flow.
 
@@ -958,11 +1017,9 @@ pub fn main() -> i32 {
 `silk build` prints:
 
 ```text
-src/main.silk:7:3: error[OWN0016] An access-scoped local-shared borrow escaping or crossing suspension
+src/main.silk:7:3: error[OWN0016] `Fiber<(), ()>.yieldNow()` runs an Effect while a local-shared access such as `Shared.withMut` holds its exclusive borrow; take what you need out of the value, return it, and run the Effect after the access returns
   note: src/main.silk:15:10: related location
 ```
-
-Message template, not filled by this compiler: `Local-shared access cannot invoke an external readiness callback while its exclusive borrow is live` / `Local-shared access cannot suspend while its exclusive borrow is live`.
 
 Fix: Do the suspending work outside the `withMut` callback. A callback that holds the access must not `run` anything that can park. See Allocation and shared ownership, Suspension and cancellation.
 
@@ -984,11 +1041,9 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:4:5: error[OWN0018] Returning a callable or Effect that borrows storage owned by the returning function
+src/main.silk:4:5: error[OWN0018] The returned callable borrows `cell`, a local of this function; move it into the callable instead, which makes the result a `once fn<'static>`
   note: src/main.silk:3:10: related location
 ```
-
-Message template, not filled by this compiler: `{executable} cannot escape with a {access} borrow of local {spelling}`.
 
 Fix: Move an owned value into the literal (`let owned = move cell`) and return a `once fn<'static>`. See Closures and callable types, Effects and run.
 
@@ -1623,10 +1678,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:26: error[SEM0030] An array literal element whose type mismatches the element type
+src/main.silk:2:26: error[SEM0030] This element is bool, but the array holds i32
 ```
-
-Message template, not filled by this compiler: `Array element {index} expects {expected} but received {actual}`.
 
 Fix: Make every element the declared element type. See Structs, tuples and arrays.
 
@@ -1826,10 +1879,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:48: error[SEM0040] A union conversion whose source has members its target lacks
+src/main.silk:1:48: error[SEM0040] The value can be bool, which the target type does not hold; match on it to handle that case first
 ```
-
-Message template, not filled by this compiler: `{source} cannot widen to {target}; missing {missing}`.
 
 Fix: Widen only to a union that has every source member: `i32 | bool | char`. See Enums and unions.
 
@@ -1943,10 +1994,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:7: error[SEM0046] A struct pattern that omits a field without a trailing `..`
+src/main.silk:4:7: error[SEM0046] This pattern leaves out field `y`; name it, or end the fields with `..` to skip the rest
 ```
-
-Message template, not filled by this compiler: `Pattern for {type} is missing field {field}; add it or use ..`.
 
 Fix: Name every field or end the pattern with `..`: `Point { x, .. }`. See Patterns and match.
 
@@ -2056,10 +2105,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:10: error[SEM0051] An application with the wrong number of type arguments
+src/main.silk:3:10: error[SEM0051] `Option` takes 1 type argument, but 2 were written
 ```
-
-Message template, not filled by this compiler: `{target} expects {expected} type argument{expectedWord}, received {actual}`.
 
 Fix: Pass the declared number of type arguments: `Option<i32>`. See Generics.
 
@@ -2551,10 +2598,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:10: error[SEM0082] A raw storage operation outside lexical unsafe authority
+src/main.silk:3:10: error[SEM0082] `danger(...)` is unsafe; write `unsafe danger(...)`, or put it in an `unsafe { }` block
 ```
-
-Message template, not filled by this compiler: `{operation} requires unsafe acknowledgement`.
 
 Fix: Call the unsafe function inside `unsafe { ... }`. See Unsafe code and C interop.
 
@@ -2624,10 +2669,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:14: error[SEM0085] Malformed escapes, invalid UTF-8, or non-byte literal values
+src/main.silk:2:14: error[SEM0085] Invalid static literal: `\q` is not an escape; the escapes are `\n`, `\r`, `\t`, `\0`, `\\`, `\"`, `\'`, `\xNN`, and `\u{...}`
 ```
-
-Message template, not filled by this compiler: `Invalid static literal: {detail}`.
 
 Fix: Use a supported escape: `\n` `\r` `\t` `\0` `\\` `\"`, `\'` in a character literal, `\xHH` or `\u{H...}`.
 
@@ -2663,7 +2706,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:3: error[SEM0087] Expression statement produces i32, but only () or never may be ignored
+src/main.silk:3:3: error[SEM0087] Expression statement produces i32, but only () or never may be ignored; write `drop` before it to discard the value
 ```
 
 An Effect that is built and never run gets its own message. Here `compute` is an `effect fn`:
@@ -3095,7 +3138,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:9:14: error[SEM0123] The provider matches no compatible requirement
+src/main.silk:9:14: error[SEM0123] main.Fixed implements none of the services the Effect requires: &main.Clock
 ```
 
 Fix: Provide a value whose type implements the required service. See Services and providers.
@@ -3329,11 +3372,9 @@ pub fn main() -> i32 {
 `silk build` prints:
 
 ```text
-src/main.silk:6:14: error[SEM0139] A concrete executable that fails one sealed static-property obligation
+src/main.silk:6:14: error[SEM0139] `cleanup` must not park, because this call needs an `Intrinsic.NonParking` value, but running it can park; move work that can suspend, such as `Effect.sleep`, out of it
 src/main.silk:5:8: error[SEM0225] Entry point `main` may park, but the selected runtime starts it without a scheduler, so it must not park
 ```
-
-Message template, not filled by this compiler: `{property} is unsatisfied: {causes}`.
 
 Fix: Give `Effect.ensuringNonParking` a cleanup that never parks. See Suspension and cancellation.
 
@@ -3370,10 +3411,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:1: error[SEM0146] A scalar enum with no declared members
+src/main.silk:1:1: error[SEM0146] Enum Color must declare at least one member
 ```
-
-Message template, not filled by this compiler: `Enum {enumName} must declare at least one member`.
 
 Fix: Declare at least one member. See Enums and unions.
 
@@ -3389,10 +3428,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:6: error[SEM0147] A scalar enum representation outside the fixed-width integer set
+src/main.silk:1:6: error[SEM0147] f32 is not a scalar enum representation; write one of u8, u16, u32, u64, i8, i16, i32 or i64
 ```
-
-Message template, not filled by this compiler: `{spelling} is not a scalar enum representation`.
 
 Fix: Use a fixed-width integer representation such as `u8` or `i32`. See Enums and unions.
 
@@ -3426,11 +3463,9 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:31: error[SEM0149] A scalar enum discriminant repeated after its first declaration
+src/main.silk:1:31: error[SEM0149] Enum Color gives Green the discriminant 1, which Red already has
   note: src/main.silk:1:20: related location
 ```
-
-Message template, not filled by this compiler: `Duplicate enum discriminant {value}`.
 
 Fix: Give each member its own discriminant. See Enums and unions.
 
@@ -3446,10 +3481,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:24: error[SEM0150] An explicit scalar enum discriminant outside its representation range
+src/main.silk:1:24: error[SEM0150] Discriminant 300 of Color.Red does not fit in u8 (0 to 255)
 ```
-
-Message template, not filled by this compiler: `Enum discriminant {value} is outside {representation}`.
 
 Fix: Use a discriminant inside the representation range, or a wider representation. See Enums and unions.
 
@@ -3465,10 +3498,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:29: error[SEM0151] An implicit scalar enum successor outside its representation range
+src/main.silk:1:29: error[SEM0151] Color.Green follows Red = 255, so its implicit discriminant does not fit in u8 (0 to 255); give it an explicit discriminant
 ```
-
-Message template, not filled by this compiler: `Implicit enum discriminant after {predecessor} exceeds {representation}`.
 
 Fix: Give the next member an explicit value in range, or widen the representation. See Enums and unions.
 
@@ -3484,10 +3515,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:24: error[SEM0152] A negative discriminant under an unsigned scalar enum representation
+src/main.silk:1:24: error[SEM0152] Discriminant -1 of Color.Red is negative, and unsigned u8 (0 to 255) cannot hold it
 ```
-
-Message template, not filled by this compiler: `Unsigned enum representation {representation} cannot hold {value}`.
 
 Fix: Use a signed representation for negative discriminants. See Enums and unions.
 
@@ -3506,10 +3535,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0153] A member missing from a resolved scalar enum
+src/main.silk:3:11: error[SEM0153] Enum Color has no member Blue
 ```
-
-Message template, not filled by this compiler: `Enum {enumName} has no member {member}`.
 
 Fix: Name a declared member. See Enums and unions.
 
@@ -3529,10 +3556,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:18: error[SEM0154] A canonical member used through or required by another enum
+src/main.silk:4:18: error[SEM0154] Expected main.Color but received a member of main.Light; enums do not convert into each other
 ```
-
-Message template, not filled by this compiler: `Enum member of {actual} cannot be used as {expected}`.
 
 Fix: Use the member of the expected enum: `Color.Red`. See Enums and unions.
 
@@ -3551,10 +3576,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:18: error[SEM0155] Implicit mixing between a scalar enum and an integer
+src/main.silk:3:18: error[SEM0155] Expected Color but received i32; an integer does not convert into an enum, so write one of the members of Color instead
 ```
-
-Message template, not filled by this compiler: `{enumName} does not implicitly convert to {integer}` / `{integer} does not implicitly construct {enumName}`.
 
 Fix: Use a member (`Color.Green`), or convert explicitly. See Enums and unions.
 
@@ -3574,10 +3597,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:16: error[SEM0156] Equality between distinct canonical scalar enums
+src/main.silk:4:16: error[SEM0156] Cannot compare main.Color with main.Light; equality needs both sides to be the same enum
 ```
-
-Message template, not filled by this compiler: `Equality requires one enum type, not {left} and {right}`.
 
 Fix: Compare values of the same enum. See Enums and unions.
 
@@ -3596,10 +3617,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:16: error[SEM0157] Direct ordering of scalar enum values
+src/main.silk:3:16: error[SEM0157] Enum Color has no order, so < does not apply; compare backing values with `Color.value(...)` instead
 ```
-
-Message template, not filled by this compiler: `Enum {enumName} does not support {operator}; compare backing values explicitly`.
 
 Fix: Compare the discriminants, not the enum values. See Enums and unions.
 
@@ -3645,11 +3664,9 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:5: error[SEM0159] A repeated unguarded scalar enum member arm
+src/main.silk:6:5: error[SEM0159] Color.Red is already matched by an earlier arm
   note: src/main.silk:5:5: related location
 ```
-
-Message template, not filled by this compiler: `Duplicate enum match arm {member}`.
 
 Fix: Remove the repeated arm. See Patterns and match.
 
@@ -3695,10 +3712,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:5: error[SEM0161] A scalar enum pattern naming a member of another enum
+src/main.silk:6:5: error[SEM0161] Pattern main.Light.On cannot match a value of main.Color
 ```
-
-Message template, not filled by this compiler: `Enum pattern from {actual} cannot match {expected}`.
 
 Fix: Use members of the subject's enum. See Patterns and match.
 
@@ -3720,10 +3735,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:5:5: error[SEM0162] An integer literal pattern used against a scalar enum
+src/main.silk:5:5: error[SEM0162] Integer pattern 0 cannot match enum Color; match its members, or match on `Color.value(...)` instead
 ```
-
-Message template, not filled by this compiler: `Integer pattern {value} cannot match enum {enum_}`.
 
 Fix: Match members, not integers. See Patterns and match.
 
@@ -4014,11 +4027,9 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:24: error[SEM0179] Exhausting the static evaluator's deterministic step budget
+src/main.silk:3:24: error[SEM0179] Static evaluation exceeded its limit of 100000 steps; make the static loop or recursion shorter, or do this work at runtime
   note: src/main.silk:7:18: related location
 ```
-
-Message template, not filled by this compiler: `Static evaluation exceeded its step limit of {limit} for {target}`.
 
 Fix: Let the static loop end within the step budget. See Static evaluation.
 
@@ -4040,11 +4051,9 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:10: error[SEM0180] Exhausting the static evaluator's logical call-depth budget
+src/main.silk:3:10: error[SEM0180] Static evaluation exceeded its limit of 64 nested calls; make the static recursion shallower, or do this work at runtime
   note: src/main.silk:6:18: related location
 ```
-
-Message template, not filled by this compiler: `Static evaluation exceeded its call-depth limit of {limit} for {target}`.
 
 Fix: Reduce static recursion depth. See Static evaluation.
 
@@ -4063,11 +4072,9 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:1:46: error[SEM0181] Exhausting the static evaluator's retained-value budget
+src/main.silk:1:46: error[SEM0181] Static evaluation exceeded its limit of 1048576 bytes of retained values; keep fewer or smaller values alive at once, or do this work at runtime
   note: src/main.silk:3:22: related location
 ```
-
-Message template, not filled by this compiler: `Static evaluation exceeded its retained-value limit of {limit} bytes for {target}`.
 
 Fix: Build smaller static values. See Static evaluation.
 
@@ -4732,8 +4739,7 @@ pub fn main() -> i32 { return A }
 `silk check` prints:
 
 ```text
-src/main.silk:1:16: error[SEM0223] Cannot resolve a non-alias dependency cycle
-src/main.silk:2:16: error[SEM0223] Cannot resolve a non-alias dependency cycle
+src/main.silk:1:16: error[SEM0223] `A` and `B` depend on each other in a cycle, so none of them can be resolved
 ```
 
 Fix: Break the cycle: give one constant a value that does not depend on the other. See Static evaluation.
@@ -4756,10 +4762,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:4:5: error[SEM0224] A unit nominal-union variant is written with a braced payload pattern (PATT-021)
+src/main.silk:4:5: error[SEM0224] Status.Open has no fields, so its pattern takes no braces; write `Status.Open`
 ```
-
-Message template, not filled by this compiler: `Unit variant {variant} does not accept a payload pattern`.
 
 Fix: Write a unit variant pattern without braces: `Status.Open`. See Patterns and match.
 
@@ -4888,7 +4892,7 @@ pub fn main() -> i32 { return naked() }
 `silk check` prints:
 
 ```text
-src/main.silk:1:19: error[SEM0236] This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` only to other runtime functions
+src/main.silk:1:19: error[SEM0236] This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)`, `Intrinsic.inline()`, `Intrinsic.inlineAlways()` and `Intrinsic.inlineNever()` only to other runtime functions
 ```
 
 The same code covers `Intrinsic.machine(features:)` on an `extern "C"`, `export "C"` or `static` function, a `features:` clause with another field beside it, and either property on an interface or service operation.

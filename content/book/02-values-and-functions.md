@@ -191,9 +191,9 @@ Integer division drops the remainder, so `percent(1, 3)` is 33. Dividing by zero
 
 `noun` returns text. A text literal such as `"task"` has the type `string<'static>`. `string` is a view of some text stored elsewhere, and `'static` says that text lives as long as the program does. Literals are built into the program, so they qualify. Chapter 5 explains the part in angle brackets properly.
 
-## if is a statement
+## if as a value
 
-You might want to write `noun` with a value-producing `if`:
+`noun` can also choose its word with an `if` that produces a value:
 
 ```silk
 fn noun(count: i32) -> string<'static> {
@@ -202,28 +202,23 @@ fn noun(count: i32) -> string<'static> {
 }
 ```
 
-```
-Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    failed: 2 modules, 2 errors       0.12s
-[x86_64-unknown-linux-gnu]
-src/main.silk:16:14: error[PAR0001] Expected identifier
-src/main.silk:16:30: error[SEM0087] Expression statement produces string<'static>, but only () or never may be ignored
-Failed tasks in 0.18s
-```
+An `if` with a final `else` is a value: each branch is a block whose last expression is its result, and the `if` produces the result of the branch that runs. Both branches must produce the same type.
 
-The real message is the first line: the parser did not expect `if` after `=`. In Silk, `if` is a statement. It runs one block or another, but it has no value of its own. The SEM0087 that follows is a knock-on error: once the parser lost its place, it read `{ "task" }` as a statement on its own. That statement produces a value, and Silk does not let a value be thrown away unnoticed.
-
-There are two good ways to choose a value. Return from inside the `if`, as the version above `report` does. Or start with one value and change it:
+The final `else` is required. Without it, the path where the condition is false would produce nothing:
 
 ```silk
-  let mut label = "tasks"
-  if open == 1 {
-    label = "task"
-  }
+  let word = if count == 1 { "task" }
 ```
 
-The `match` expression in chapter 3 does produce a value, and it covers many of the places where you would reach for an if-expression.
+```sh
+silk check
+```
+
+```
+src/main.silk:2:14: error[PAR0009] An `if` used as a value needs a final `else` branch, so that every path produces a value; add `else { ... }`, or write the `if` as a statement
+```
+
+When you only want to do something in one case, write the `if` as a statement, as `percent` does. The `match` expression in chapter 3 produces a value in the same way and chooses among more than two cases.
 
 ## Constants
 

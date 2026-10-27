@@ -78,7 +78,7 @@ Creates a package in `path`, or in the current directory. The package name comes
 | --- | --- |
 | `silk init app` | An executable: `silk.toml`, `src/main.silk`, `.gitignore` |
 | `silk init --lib util` | A library: `src/lib.silk`, `kind = "library"`, `exports = ["lib"]` |
-| `silk init --workspace ws` | A workspace root: `[workspace] members = []` and `.gitignore` |
+| `silk init --workspace ws` | A workspace root with `.gitignore` and one starter executable member, `app`: `[workspace] members = ["app"]`. `--name` names the member |
 
 Inside a workspace, `silk init` also appends the new package to the root's `members`:
 
@@ -87,7 +87,7 @@ Initialized Silk project util at /home/you/ws/util
 Added util to the workspace members in /home/you/ws/silk.toml
 ```
 
-`--workspace` takes no `--name`. `init` refuses to overwrite an existing `silk.toml` and refuses a directory name that is not a valid package name; both exit 2:
+`init` refuses to overwrite an existing `silk.toml` and refuses a directory name that is not a valid package name; both exit 2:
 
 ```
 Refusing to overwrite existing project file /home/you/hello/silk.toml

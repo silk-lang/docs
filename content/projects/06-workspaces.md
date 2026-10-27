@@ -5,25 +5,24 @@ A workspace is a folder whose `silk.toml` lists member packages. From its root, 
 ## Creating one
 
 ```sh
-silk init --workspace shop
+silk init --workspace --name store shop
 cd shop
 silk init --lib pricing
-silk init store
 ```
 
 ```
 Initialized Silk workspace at /home/you/shop
+Initialized Silk project store at /home/you/shop/store
+Run it with `silk run` from the workspace root
 Initialized Silk project pricing at /home/you/shop/pricing
 Added pricing to the workspace members in /home/you/shop/silk.toml
-Initialized Silk project store at /home/you/shop/store
-Added store to the workspace members in /home/you/shop/silk.toml
 ```
 
-`silk init --workspace` writes a `.gitignore` for `/build/` and this manifest. Each `silk init` inside the workspace appends the new package to `members`, and gives it no `.gitignore` of its own:
+`silk init --workspace` writes a `.gitignore` for `/build/`, the workspace manifest and one starter executable member, so `silk run` works at once. `--name` names that member; without it the member is `app`. Each `silk init` inside the workspace appends the new package to `members`, and gives it no `.gitignore` of its own:
 
 ```toml
 [workspace]
-members = ["pricing", "store"]
+members = ["store", "pricing"]
 ```
 
 To bring in a package that already exists, move it into the folder and add it to `members` by hand.

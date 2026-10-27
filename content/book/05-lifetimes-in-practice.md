@@ -326,7 +326,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 2 errors       0.14s
 [x86_64-unknown-linux-gnu]
-src/main.silk:199:3: error[OWN0011] An owner access that conflicts with an active borrowed-view loan
+src/main.silk:199:3: error[OWN0011] Dropping `board` while a borrow of it is still in use; use that borrow for the last time before this
   note: src/main.silk:198:17: the borrow starts here
 src/main.silk:200:57: error[OWN0019] `longest` is used after `board`, which it borrows, ended or was replaced
   note: src/main.silk:198:17: the borrow starts here
