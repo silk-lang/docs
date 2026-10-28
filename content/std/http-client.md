@@ -2,8 +2,8 @@ A simple HTTP client: send a request, and get the whole response in memory.
 
 ## When to use
 Use [`Http`](#Http) to call web APIs. Code that sends requests requires `? &mut Http`. The program
-gives a provider one time, near `main`: `NativeHttp` from `silk.http_client_native` for real
-requests, or a fake in tests. Use `silk.http_exchange` to stream bodies or to control the
+gives a provider one time, near `main`: `NativeHttp` from `silk.http.client_native` for real
+requests, or a fake in tests. Use `silk.http.exchange` to stream bodies or to control the
 connection.
 
 ## Details
@@ -25,10 +25,10 @@ module. Fields that are private to another module are not written.
 ## Examples
 ### Test code that uses Http with a fake provider
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.http_client { Http, HttpError, Request, Response }
-import silk.string { String }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.http.client { Http, HttpError, Request, Response }
+import silk.text.string { String }
 
 struct FakeHttp {
   calls: i32,
@@ -73,7 +73,7 @@ pub effect fn main() -> i32
 }
 ```
 
-Import as `HttpClient` with `import silk.http_client as HttpClient`.
+Import as `HttpClient` with `import silk.http.client as HttpClient`.
 
 Public declarations: 11.
 
@@ -1282,7 +1282,7 @@ pub service Http
 The service that sends HTTP requests.
 
 ### Details
-The provider decides how requests travel. `NativeHttp` in `silk.http_client_native` uses sockets
+The provider decides how requests travel. `NativeHttp` in `silk.http.client_native` uses sockets
 and TLS, and a test provider can return fixed responses. A provider can also wrap another
 provider, for example to add headers, logs, or retries, and forward with
 `Effect.provideMut<Http>`.
@@ -1290,8 +1290,8 @@ provider, for example to add headers, logs, or retries, and forward with
 ### When to use
 
 Use it to call web APIs. Code that sends requests requires `? &mut Http`. The program gives a
-provider one time, near `main`: `NativeHttp` from `silk.http_client_native` for real requests,
-or a fake in tests. Use `silk.http_exchange` to stream bodies or to control the connection.
+provider one time, near `main`: `NativeHttp` from `silk.http.client_native` for real requests,
+or a fake in tests. Use `silk.http.exchange` to stream bodies or to control the connection.
 
 ::Anchor{id="Http.send"}
 

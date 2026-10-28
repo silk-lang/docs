@@ -8,7 +8,7 @@ A fiber is a small task that can pause and let other fibers run. Silk runs all t
 
 That sounds limiting, but most waiting is not computing. A reminder that fires in 200 ms spends all 200 ms doing nothing. While it waits, other fibers can run, and the waits overlap.
 
-Fibers add no new syntax. They are library operations from `silk/fiber`, `silk/scheduler` and `silk/local_scheduler`, called with `run` like any other effect. You already know the hard part: effects, requirement rows and providers.
+Fibers add no new syntax. They are library operations from `silk/concurrency/fiber`, `silk/concurrency/scheduler` and `silk/concurrency/local_scheduler`, called with `run` like any other effect. You already know the hard part: effects, requirement rows and providers.
 
 ## Two waits that overlap
 
@@ -26,15 +26,15 @@ The copy keeps the name `tasks` in its `silk.toml`, so `silk check` there prints
 Replace `src/main.silk` with this. Each `estimate` pretends to need a slow 300 ms lookup:
 
 ```silk
-import silk.effect { Effect }
-import silk.fiber { Fiber, Cancelled }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.logger { Logger, LogError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_logger { StdoutLogger }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.allocator { OutOfMemoryError }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.io.logger { Logger, LogError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.io.logger_native { StdoutLogger }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.mem.allocator { OutOfMemoryError }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
 
 const MILLISECOND: u64 = 1000000
 
@@ -126,15 +126,15 @@ Something has to provide that `Scheduler`. `LocalScheduler.make()` creates the s
 `join` passes a child's failure straight up. Sometimes you would rather look at the result as data. `await` does that: it never fails, and it returns an `Outcome` whose `value` is a `Success`, a `Failure` or `Cancelled`. Put this in the scratch project:
 
 ```silk
-import silk.effect { Effect }
-import silk.fiber { Fiber, Cancelled, Failure, Outcome, Success }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.logger { Logger, LogError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_logger { StdoutLogger }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.allocator { OutOfMemoryError }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled, Failure, Outcome, Success }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.io.logger { Logger, LogError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.io.logger_native { StdoutLogger }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.mem.allocator { OutOfMemoryError }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
 
 struct NoSuchTask {
   id: u32,
@@ -197,12 +197,12 @@ A forked child can outlive the line that forked it. That is the whole point: you
 Here is a reminder that wants to log by itself, in the scratch project:
 
 ```silk
-import silk.effect { Effect }
-import silk.fiber { Fiber }
-import silk.logger { Logger, LogError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.allocator { OutOfMemoryError }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber }
+import silk.io.logger { Logger, LogError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.mem.allocator { OutOfMemoryError }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
 
 effect fn shout() -> () ! LogError ? &mut Logger {
   run Effect.log("reminder!\n", &())
@@ -244,7 +244,7 @@ effect fn root<'text>(title: string<'text>) -> () ! OutOfMemoryError | TaskIdExh
 }
 ```
 
-(This version imports `silk.string { String }` instead of the logger.) It fails on the same line, but with a lifetime error:
+(This version imports `silk.text.string { String }` instead of the logger.) It fails on the same line, but with a lifetime error:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
@@ -259,7 +259,7 @@ Column 15 is the `run` of the fork. SEM0212 means one lifetime has to outlive an
 
 So a failed `forkChild` comes in two kinds. SEM0076 means the child needs a service other than the two allowed. SEM0212 means it borrows something. The fix is always the same shape: give the child owned values, and do the logging or the borrowing in the parent.
 
-That leaves a puzzle. How do fibers report back if they cannot borrow? With `Shared<T>` from `silk/shared`. A `Shared` is an owned, counted handle to one value on the heap. Each fiber gets its own clone of the handle, and they all point at the same value. `Shared.withMut(&handle, callback)` lends the value to a callback for a moment. The callback must be an ordinary `fn` that runs no effects, so nobody can park while holding the value. See **Allocation and shared ownership** in the reference.
+That leaves a puzzle. How do fibers report back if they cannot borrow? With `Shared<T>` from `silk/mem/shared`. A `Shared` is an owned, counted handle to one value on the heap. Each fiber gets its own clone of the handle, and they all point at the same value. `Shared.withMut(&handle, callback)` lends the value to a callback for a moment. The callback must be an ordinary `fn` that runs no effects, so nobody can park while holding the value. See **Allocation and shared ownership** in the reference.
 
 ## Planning the reminders
 
@@ -279,13 +279,13 @@ Here is the plan for `tasks remind`:
 Start with the imports. Add these next to the others:
 
 ```silk
-import silk.fiber { Fiber, Cancelled }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
-import silk.shared { Shared }
-import silk.u32
+import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.mem.shared { Shared }
+import silk.num.u32
 ```
 
 Then a new section near the end of the program, before `execute`. First the delays and what a fiber carries:
@@ -416,11 +416,11 @@ effect fn runReminders(board: &Board, budget: u64) -> Fired
 Notice the requirement row: `MonotonicClock` and `Allocator`, but no `Scheduler`. `LocalScheduler.execute` provides `Scheduler` to the fibers inside it, the same way `provideMut` does for other services. What happens if you forget it? Try this in the scratch project:
 
 ```silk
-import silk.effect { Effect }
-import silk.fiber { Fiber, Cancelled }
-import silk.monotonic_clock { MonotonicClock }
-import silk.allocator { OutOfMemoryError }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.mem.allocator { OutOfMemoryError }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
 
 effect fn work() -> i32 ? &mut Scheduler | &mut MonotonicClock { return 1 }
 
@@ -503,14 +503,14 @@ effect fn parseMilliseconds(word: string) -> u64 ! UsageError {
 }
 ```
 
-`u32.toU64` lives in the `silk/u32` module, which is why the import list gained `import silk.u32`. Leave that import out and the compiler says so:
+`u32.toU64` lives in the `silk/num/u32` module, which is why the import list gained `import silk.num.u32`. Leave that import out and the compiler says so:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
   load     67 modules, 1 in package          0.09s
   check    failed: 2 modules, 1 error        4.36s
 [x86_64-unknown-linux-gnu]
-src/main.silk:470:33: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
+src/main.silk:470:33: error[SEM0009] Unknown name u32; is `import silk.num.u32` missing?
 Failed tasks in 4.46s
 ```
 

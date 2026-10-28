@@ -9,7 +9,7 @@ cd notes
 
 ## The service and the provider
 
-All file access goes through the `FileSystem` service from `silk/filesystem`. Code that touches files says `? &mut FileSystem` and works with `Path` values. The native provider, `OsFileSystem` from `silk/os_filesystem`, is made with a root directory:
+All file access goes through the `FileSystem` service from `silk/system/filesystem`. Code that touches files says `? &mut FileSystem` and works with `Path` values. The native provider, `OsFileSystem` from `silk/system/filesystem_native`, is made with a root directory:
 
 ```silk
   let here = run HostInput.workingDirectory() |> Effect.provideMut<Allocator>(&mut allocator)
@@ -272,7 +272,7 @@ Checking notes (x86_64-unknown-linux-gnu)
   load     57 modules, 1 in package          0.09s
   check    failed: 2 modules, 1 error        0.74s
 [x86_64-unknown-linux-gnu]
-src/main.silk:190:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk.filesystem.AtomicWriteError | silk.filesystem.FileError | silk.allocator.OutOfMemoryError` does not accept `silk.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
+src/main.silk:190:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk.system.filesystem.AtomicWriteError | silk.system.filesystem.FileError | silk.mem.allocator.OutOfMemoryError` does not accept `silk.io.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
 Failed notes in 0.84s
 ```
 
@@ -281,19 +281,19 @@ Column 58 is `explain`, and the message names the failure its parameter is missi
 The imports:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.filesystem { AtomicWriteError, DirectoryInfo, FileError, FileInfo, FileOperation, FileReason, FileSystem, Path, TemporaryDirectory }
-import silk.host_input { HostInput, HostInputError }
-import silk.list { List }
-import silk.logger { Logger, LogError }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.system.filesystem { AtomicWriteError, DirectoryInfo, FileError, FileInfo, FileOperation, FileReason, FileSystem, Path, TemporaryDirectory }
+import silk.system.host_input { HostInput, HostInputError }
+import silk.collections.list { List }
+import silk.io.logger { Logger, LogError }
 import silk.option { Option }
-import silk.os_filesystem { OsFileSystem }
-import silk.os_logger { StdoutLogger }
-import silk.result { Result }
-import silk.string { String }
-import silk.testing { AssertionError, Testing }
+import silk.system.filesystem_native { OsFileSystem }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.result { Result }
+import silk.text.string { String }
+import silk.testing.testing { AssertionError, Testing }
 ```
 
 ## Run it
@@ -438,10 +438,10 @@ Time   4 ms
 
 ## API reference
 
-- `silk/filesystem`: `FileSystem`, `Path`, `FileError`, `FileReason`, `FileOperation`, `AtomicWriteError`, `PublicationPolicy`, `Durability`, `FileInfo`, `DirectoryInfo`, `DirectoryEntry`, `TemporaryDirectory`
-- `silk/os_filesystem`: `OsFileSystem`
-- `silk/host_input`: `HostInput`
-- `silk/effect`: `Effect` (`catchAll`, `result`, `ensuring`)
-- `silk/bytes`: `Bytes`
-- `silk/string`: `String`
-- `silk/testing`: `Testing`, `AssertionError`
+- `silk/system/filesystem`: `FileSystem`, `Path`, `FileError`, `FileReason`, `FileOperation`, `AtomicWriteError`, `PublicationPolicy`, `Durability`, `FileInfo`, `DirectoryInfo`, `DirectoryEntry`, `TemporaryDirectory`
+- `silk/system/filesystem_native`: `OsFileSystem`
+- `silk/system/host_input`: `HostInput`
+- `silk/core/effect`: `Effect` (`catchAll`, `result`, `ensuring`)
+- `silk/collections/bytes`: `Bytes`
+- `silk/text/string`: `String`
+- `silk/testing/testing`: `Testing`, `AssertionError`

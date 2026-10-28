@@ -10,9 +10,9 @@ You already use one. `Effect.log` needs a `Logger`, and every function that logs
 
 This chapter adds three more services from the standard library:
 
-- `FileSystem` from `silk/filesystem`, to read and write `tasks.txt`.
-- `SystemClock` from `silk/system_clock`, to learn the time of day.
-- `Allocator` from `silk/allocator`, because reading a file creates a new `Bytes` value, and that needs memory.
+- `FileSystem` from `silk/system/filesystem`, to read and write `tasks.txt`.
+- `SystemClock` from `silk/system/system_clock`, to learn the time of day.
+- `Allocator` from `silk/mem/allocator`, because reading a file creates a new `Bytes` value, and that needs memory.
 
 Here is where the program ends up. `execute` is the whole program in one effect, and its signature says exactly what it touches:
 
@@ -243,23 +243,23 @@ pub effect fn main() -> i32
 
 Read the last statement from the inside out. `Effect.catchAll(execute(&words), explain)` is an effect that still needs four services. Each `Effect.provideMut<S>(&mut p)` lends one provider exclusively and removes `S` from the row. After four of them the row is empty, and `run` can perform the whole thing. The order of the `provideMut` steps does not matter.
 
-`OsFileSystem` from `silk/os_filesystem` is confined to a root directory. Here the root is the working directory, which `HostInput` reports. Inside the provider, `/` means that root, so `/tasks.txt` is `tasks.txt` in the directory you run the program from. The provider refuses paths that try to escape it.
+`OsFileSystem` from `silk/system/filesystem_native` is confined to a root directory. Here the root is the working directory, which `HostInput` reports. Inside the provider, `/` means that root, so `/tasks.txt` is `tasks.txt` in the directory you run the program from. The provider refuses paths that try to escape it.
 
-`OsSystemClock` from `silk/os_system_clock` asks the operating system for the time. The new imports at the top of the file are:
+`OsSystemClock` from `silk/system/system_clock_native` asks the operating system for the time. The new imports at the top of the file are:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError, SystemAllocator }
-import silk.filesystem { DirectoryEntry, DirectoryInfo, FileError, FileInfo, FileSystem, Path, AtomicWriteError, Durability, PublicationPolicy }
-import silk.i64
-import silk.list { List }
-import silk.os_filesystem { OsFileSystem }
-import silk.os_system_clock { OsSystemClock }
-import silk.system_clock { Instant, SystemClock }
-import silk.testing { AssertionError, Testing }
-import silk.u8
+import silk.mem.allocator { Allocator, OutOfMemoryError, SystemAllocator }
+import silk.system.filesystem { DirectoryEntry, DirectoryInfo, FileError, FileInfo, FileSystem, Path, AtomicWriteError, Durability, PublicationPolicy }
+import silk.num.i64
+import silk.collections.list { List }
+import silk.system.filesystem_native { OsFileSystem }
+import silk.system.system_clock_native { OsSystemClock }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.testing.testing { AssertionError, Testing }
+import silk.num.u8
 ```
 
-Most of the `silk/filesystem` names, and `List`, are for the test fake later in the chapter.
+Most of the `silk/system/filesystem` names, and `List`, are for the test fake later in the chapter.
 
 ## Run it
 
@@ -362,8 +362,8 @@ SEM0071 means "this `run` leaves a requirement that nobody provides." The locati
 The same error appears in a smaller setting. Put this in your scratch project. Here a plain `pub fn main` runs an effect that needs a clock:
 
 ```silk
-import silk.effect { Effect }
-import silk.system_clock { SystemClock }
+import silk.core.effect { Effect }
+import silk.system.system_clock { SystemClock }
 
 effect fn stamp() -> i64 ? &mut SystemClock {
   let now = run SystemClock.now()
@@ -392,7 +392,7 @@ A plain `fn` cannot declare a `?` row, so every effect it runs must be fully pro
 **`main` gets exactly one service.** When the program starts, the runtime provides `&mut HostInput` (arguments, environment, working directory) and nothing else. You might try to ask for a clock directly:
 
 ```silk
-import silk.system_clock { SystemClock }
+import silk.system.system_clock { SystemClock }
 
 pub effect fn main() -> i32 ? &mut SystemClock {
   let now = run SystemClock.now()
@@ -418,9 +418,9 @@ SEM0225 points at `main` and lists what the runtime can start. An effectful `mai
 **Shared and exclusive access are different.** A requirement written `&mut S` needs a provider lent with `provideMut`. Lending one with `Effect.provide`, which only shares it, is not enough:
 
 ```silk
-import silk.effect { Effect }
-import silk.os_system_clock { OsSystemClock }
-import silk.system_clock { SystemClock }
+import silk.core.effect { Effect }
+import silk.system.system_clock_native { OsSystemClock }
+import silk.system.system_clock { SystemClock }
 
 effect fn stamp() -> i64 ? &mut SystemClock {
   let now = run SystemClock.now()
@@ -450,9 +450,9 @@ SEM0131 says you lent the right service, but with too little access. Write `let 
 The standard services are not special. You can declare one with `service`. Try this in your scratch project: a `Notifier` that sends reminders, with one provider that prints and one that only counts.
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
 
 // A service is a set of operations. Code that needs it says `? &mut Notifier`.
 service Notifier {
@@ -586,9 +586,9 @@ impl FileSystem for MemoryFiles {
 
 Look closely at `writeFile`. Its signature, fixed by the service, has no `Allocator` in its row, yet copying the bytes needs memory. So `MemoryFiles` owns its own `SystemAllocator` and provides it inside the operation. It also has to turn `OutOfMemoryError` into a `FileError`, because that is the only failure `writeFile` may report. `noSpace` does that through `Effect.catchAll`. A provider is just code: it can create providers of its own.
 
-`Logger.inMemoryProvider()` from `silk/logger` is the last fake. It collects lines instead of printing them, and `Logger.length` counts them.
+`Logger.inMemoryProvider()` from `silk/io/logger` is the last fake. It collects lines instead of printing them, and `Logger.length` counts them.
 
-Now the test. A `test effect fn` is an effect that the test runner performs. It fails if it fails, and `Testing.expect` from `silk/testing` fails with an `AssertionError` when its condition is false:
+Now the test. A `test effect fn` is an effect that the test runner performs. It fails if it fails, and `Testing.expect` from `silk/testing/testing` fails with an `AssertionError` when its condition is false:
 
 ```silk
 test effect fn finishingRecordsTheClockTime() ! AssertionError<'static> | LogError | OutOfMemoryError {

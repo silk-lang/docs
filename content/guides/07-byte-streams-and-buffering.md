@@ -1,6 +1,6 @@
 # Byte streams and buffering
 
-Every byte-oriented connection in the standard library, whether a TCP socket, a TLS session or an in-memory stand-in, is used through one interface: `ByteDuplex`, from `silk/byte_duplex`. Protocol code written against it runs over any of them. This guide covers that interface, the deadlines every operation takes, the buffered layer that most protocol code wants on top (`silk/buffered_duplex`, `silk/buffered_input`, `silk/buffered_output`), copying from one stream to another (`silk/buffered_transfer`), and testing it all without a network (`silk/memory_byte_duplex`).
+Every byte-oriented connection in the standard library, whether a TCP socket, a TLS session or an in-memory stand-in, is used through one interface: `ByteDuplex`, from `silk/io/byte_duplex`. Protocol code written against it runs over any of them. This guide covers that interface, the deadlines every operation takes, the buffered layer that most protocol code wants on top (`silk/io/buffered_duplex`, `silk/io/buffered_input`, `silk/io/buffered_output`), copying from one stream to another (`silk/io/buffered_transfer`), and testing it all without a network (`silk/io/memory_byte_duplex`).
 
 The program is `numbered`, a small line server. It reads lines from a TCP client and answers each one with its number. It can also run as a relay that passes a connection on to another server, which is the copying example.
 
@@ -49,7 +49,7 @@ let deadline = MonotonicClock.deadlineAfter(&now, 10000000000)  // ten seconds
 
 ## Buffered sessions
 
-Reading a line straight from `ByteDuplex` is awkward. One read can return half a line, or a line and a half, and the bytes after the newline belong to the next line. Writing an answer in three small pieces costs three transport writes. `withBufferedCapacity` from `silk/buffered_duplex` solves both. It allocates an input buffer and an output buffer of the sizes you give, lends a `BufferedDuplex` session to a callback, and closes the transport when the callback finishes, however it finishes. `withBuffered` does the same with 8192 bytes each way.
+Reading a line straight from `ByteDuplex` is awkward. One read can return half a line, or a line and a half, and the bytes after the newline belong to the next line. Writing an answer in three small pieces costs three transport writes. `withBufferedCapacity` from `silk/io/buffered_duplex` solves both. It allocates an input buffer and an output buffer of the sizes you give, lends a `BufferedDuplex` session to a callback, and closes the transport when the callback finishes, however it finishes. `withBuffered` does the same with 8192 bytes each way.
 
 On the input side:
 
@@ -62,39 +62,39 @@ On the output side, `writeAll`, `writeSome` and `writeVecAll` copy bytes into th
 
 The scope never flushes for you. When the callback returns or fails, anything still in the output buffer is dropped and the transport is closed. A protocol must flush, or call `shutdownWrite`, before it finishes, and also before it waits for the peer to say something more; otherwise the peer may be waiting for an answer that is still sitting in the buffer.
 
-Failures from these operations are `BufferError` from `silk/buffered_input`. The transport's own failures arrive wrapped, with how far the operation got: `ReadFailed { progress, error }` and `WriteFailed { accepted, drained, error }`, where `error` is the `ByteIoError`. After such a failure the session is terminal, and further operations fail with `BufferError.Terminal`.
+Failures from these operations are `BufferError` from `silk/io/buffered_input`. The transport's own failures arrive wrapped, with how far the operation got: `ReadFailed { progress, error }` and `WriteFailed { accepted, drained, error }`, where `error` is the `ByteIoError`. After such a failure the session is terminal, and further operations fail with `BufferError.Terminal`.
 
 ## The protocol
 
 `numberLines` is the server's work, written against a session over any provider `P`:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.buffered_duplex { BufferedDuplex, withBufferedCapacity, withBufferedPairCapacity }
-import silk.buffered_input { BufferError, FillOutcome }
-import silk.buffered_transfer { BufferedTransfer }
-import silk.byte_duplex { ByteDuplex, ByteIoError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.buffered_duplex { BufferedDuplex, withBufferedCapacity, withBufferedPairCapacity }
+import silk.io.buffered_input { BufferError, FillOutcome }
+import silk.io.buffered_transfer { BufferedTransfer }
+import silk.io.byte_duplex { ByteDuplex, ByteIoError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.host_input { HostInput, HostInputError }
-import silk.list { List }
-import silk.memory_byte_duplex { MemoryByteDuplex, MemoryReadEvent, MemoryWriteAction, MemoryWriteEvent }
-import silk.monotonic_clock { MonotonicClock }
-import silk.native_socket { AcceptedView, ConnectOptions, Connection, ListenOptions, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted }
-import silk.network_address { Endpoint, IpAddress, Ipv4Address, Port }
+import silk.system.host_input { HostInput, HostInputError }
+import silk.collections.list { List }
+import silk.io.memory_byte_duplex { MemoryByteDuplex, MemoryReadEvent, MemoryWriteAction, MemoryWriteEvent }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.net.socket_native { AcceptedView, ConnectOptions, Connection, ListenOptions, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted }
+import silk.net.address { Endpoint, IpAddress, Ipv4Address, Port }
 import silk.option { Option }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.os_writer { StderrWriter }
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.system_clock { Instant, SystemClock }
-import silk.testing { AssertionError, Testing }
-import silk.u32
-import silk.u64
-import silk.u8
-import silk.usize
-import silk.writer { Writer, WriterError }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.io.writer_native { StderrWriter }
+import silk.core.result { Result }
+import silk.collections.slice { Slice }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.testing.testing { AssertionError, Testing }
+import silk.num.u32
+import silk.num.u64
+import silk.num.u8
+import silk.num.usize
+import silk.io.writer { Writer, WriterError }
 
 // ---------------------------------------------------------------------------
 // The protocol: read lines, answer each one as "N: line".
@@ -259,7 +259,7 @@ fn same(left: &[u8], right: &[u8]) -> bool {
 
 ## In-memory streams for tests
 
-`MemoryByteDuplex` from `silk/memory_byte_duplex` is a `ByteDuplex` provider that plays a script. You give it:
+`MemoryByteDuplex` from `silk/io/memory_byte_duplex` is a `ByteDuplex` provider that plays a script. You give it:
 
 - read events, in order: `MemoryReadEvent.Data { readyAt, bytes }`, `End { readyAt }`, or `Failure { readyAt, code }`. Each becomes readable at its `readyAt` time on the `MonotonicClock`, and a `Data` event is handed out in as many pieces as the reader's buffer requires.
 - write events, one per transport write: `MemoryWriteEvent { readyAt, action }`, where the action is `MemoryWriteAction.Accept { count }` (take at most `count` bytes) or `Failure { code }`.
@@ -553,10 +553,10 @@ A client that sends one line and then goes quiet gets its answer at once, becaus
 
 ## API reference
 
-- `silk/byte_duplex`: `ByteDuplex`, `ReadTransfer`, `ByteIoError`, `ByteIoOperation`
-- `silk/buffered_duplex`: `BufferedDuplex`, `withBuffered`, `withBufferedCapacity`, `withBufferedPairCapacity`, `DEFAULT_CAPACITY`
-- `silk/buffered_input`: `BufferedInput`, `BufferError`, `FillOutcome`
-- `silk/buffered_output`: `BufferedOutput`
-- `silk/buffered_transfer`: `BufferedTransfer`, `TransferOutcome`
-- `silk/memory_byte_duplex`: `MemoryByteDuplex`, `MemoryReadEvent`, `MemoryWriteEvent`, `MemoryWriteAction`
-- `silk/monotonic_clock`: `MonotonicClock`
+- `silk/io/byte_duplex`: `ByteDuplex`, `ReadTransfer`, `ByteIoError`, `ByteIoOperation`
+- `silk/io/buffered_duplex`: `BufferedDuplex`, `withBuffered`, `withBufferedCapacity`, `withBufferedPairCapacity`, `DEFAULT_CAPACITY`
+- `silk/io/buffered_input`: `BufferedInput`, `BufferError`, `FillOutcome`
+- `silk/io/buffered_output`: `BufferedOutput`
+- `silk/io/buffered_transfer`: `BufferedTransfer`, `TransferOutcome`
+- `silk/io/memory_byte_duplex`: `MemoryByteDuplex`, `MemoryReadEvent`, `MemoryWriteEvent`, `MemoryWriteAction`
+- `silk/system/monotonic_clock`: `MonotonicClock`

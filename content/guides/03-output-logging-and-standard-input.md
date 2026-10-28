@@ -11,9 +11,9 @@ cd numberlines
 
 | Service | Module | Native provider | Operation | Failure |
 | --- | --- | --- | --- | --- |
-| `Writer` | `silk/writer` | `StdoutWriter`, `StderrWriter` in `silk/os_writer` | `writeAll(bytes)`, `flush()` | `WriterError` |
-| `Logger` | `silk/logger` | `StderrLogger`, `StdoutLogger` in `silk/os_logger` | `log(level, template, args)` | `LogError` |
-| `StandardInput` | `silk/standard_input` | `OsStandardInput` in `silk/os_standard_input` | `read(buffer)` | `StreamReadError` |
+| `Writer` | `silk/io/writer` | `StdoutWriter`, `StderrWriter` in `silk/io/writer_native` | `writeAll(bytes)`, `flush()` | `WriterError` |
+| `Logger` | `silk/io/logger` | `StderrLogger`, `StdoutLogger` in `silk/io/logger_native` | `log(level, template, args)` | `LogError` |
+| `StandardInput` | `silk/io/standard_input` | `OsStandardInput` in `silk/io/standard_input_native` | `read(buffer)` | `StreamReadError` |
 
 A `Writer` moves bytes. A `Logger` receives whole events, each with a level. Use a writer for the program's output and a logger for messages about the run. Code that needs one says so with `? &mut Writer`, `? &mut Logger` or `? &mut StandardInput`, and never names a provider. `main` picks the real ones.
 
@@ -46,9 +46,9 @@ effect fn emit(number: u32, line: &[u8]) -> () ! WriterError | LogError ? &mut W
 
 ## Logging
 
-`Effect.logWarning` from `silk/effect` sends one event at level `Warning` to the ambient `Logger`. There is one helper per level of `LogLevel`: `logTrace`, `logDebug`, `logInfo`, `logWarning` and `logError`. `Effect.log` is `logInfo`, and `Effect.logAt(level, ...)` takes the level as a value. The template rules are the same as for `Format.format`.
+`Effect.logWarning` from `silk/core/effect` sends one event at level `Warning` to the ambient `Logger`. There is one helper per level of `LogLevel`: `logTrace`, `logDebug`, `logInfo`, `logWarning` and `logError`. `Effect.log` is `logInfo`, and `Effect.logAt(level, ...)` takes the level as a value. The template rules are the same as for `Format.format`.
 
-What a message looks like is the provider's choice. `silk/os_logger` has two:
+What a message looks like is the provider's choice. `silk/io/logger_native` has two:
 
 | Provider | Writes to | Each message becomes |
 | --- | --- | --- |
@@ -129,19 +129,19 @@ pub effect fn main() -> i32 ! StreamReadError | WriterError | LogError | OutOfMe
 The program keeps standard output clean for the numbered lines, so the logger is `StderrLogger`. Making the providers does no I/O. `OsStandardInput.make()` reads nothing until the first `receive`. The imports for the program and its tests:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError, SystemAllocator }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError, SystemAllocator }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.logger { Logger, LogError, LogLevel }
-import silk.os_logger { StderrLogger }
-import silk.os_standard_input { OsStandardInput }
-import silk.os_writer { StdoutWriter }
-import silk.result { Result }
-import silk.standard_input { ReadOutcome, StandardInput, StreamReadError }
-import silk.string { String }
-import silk.testing { AssertionError, Testing }
-import silk.writer { Writer, WriterError }
+import silk.io.logger { Logger, LogError, LogLevel }
+import silk.io.logger_native { StderrLogger }
+import silk.io.standard_input_native { OsStandardInput }
+import silk.io.writer_native { StdoutWriter }
+import silk.core.result { Result }
+import silk.io.standard_input { ReadOutcome, StandardInput, StreamReadError }
+import silk.text.string { String }
+import silk.testing.testing { AssertionError, Testing }
+import silk.io.writer { Writer, WriterError }
 ```
 
 ## Run it
@@ -190,7 +190,7 @@ info: 0 lines, 0 bytes
 
 ## A quick message on standard error
 
-While you look for a bug, you often want to see one value without threading a logger through the code. `StderrWriter.print` from `silk/os_writer` formats a template and writes it to standard error. It is a plain function, so it needs no service and no `run`. Add one line to the read loop of `numberLines`, and import `StderrWriter`:
+While you look for a bug, you often want to see one value without threading a logger through the code. `StderrWriter.print` from `silk/io/writer_native` formats a template and writes it to standard error. It is a plain function, so it needs no service and no `run`. Add one line to the read loop of `numberLines`, and import `StderrWriter`:
 
 ```silk
     total = total + count
@@ -288,7 +288,7 @@ impl Writer for CapturingWriter {
 }
 ```
 
-**Logs.** `Logger.inMemoryProvider()` from `silk/logger` keeps the events. `Logger.length` counts them, `Logger.levelAt` gives an event's level, and `messageLengthAt` and `messageByteAt` read its text. It holds at most eight events and 64 message bytes in total. A log past either limit fails with `LogError` and is not kept. `Logger.inMemoryProviderFailAt(n)` makes the n-th call fail, for testing how your code handles a broken logger.
+**Logs.** `Logger.inMemoryProvider()` from `silk/io/logger` keeps the events. `Logger.length` counts them, `Logger.levelAt` gives an event's level, and `messageLengthAt` and `messageByteAt` read its text. It holds at most eight events and 64 message bytes in total. A log past either limit fails with `LogError` and is not kept. `Logger.inMemoryProviderFailAt(n)` makes the n-th call fail, for testing how your code handles a broken logger.
 
 Now the tests. `sameBytes` is a small loop that compares two byte slices:
 
@@ -362,13 +362,13 @@ The guide "Testing with providers" goes further with fakes, and chapter 8 of the
 
 ## API reference
 
-- `silk/writer`: `Writer`, `WriterError`
-- `silk/os_writer`: `StdoutWriter`, `StderrWriter` (`print`, `lock`), `LockedStderr`
-- `silk/logger`: `Logger`, `LogLevel`, `LogError`, `InMemoryLogger`
-- `silk/os_logger`: `StderrLogger`, `StdoutLogger`
-- `silk/standard_input`: `StandardInput`, `ReadOutcome`, `StreamReadError`
-- `silk/os_standard_input`: `OsStandardInput`
-- `silk/effect`: `Effect` (`log`, `logInfo`, `logWarning`, `provideMut`, `catchAll`)
+- `silk/io/writer`: `Writer`, `WriterError`
+- `silk/io/writer_native`: `StdoutWriter`, `StderrWriter` (`print`, `lock`), `LockedStderr`
+- `silk/io/logger`: `Logger`, `LogLevel`, `LogError`, `InMemoryLogger`
+- `silk/io/logger_native`: `StderrLogger`, `StdoutLogger`
+- `silk/io/standard_input`: `StandardInput`, `ReadOutcome`, `StreamReadError`
+- `silk/io/standard_input_native`: `OsStandardInput`
+- `silk/core/effect`: `Effect` (`log`, `logInfo`, `logWarning`, `provideMut`, `catchAll`)
 - `silk/format`: `Format`
-- `silk/testing`: `Testing`, `AssertionError`
-- `silk/bytes`: `Bytes`
+- `silk/testing/testing`: `Testing`, `AssertionError`
+- `silk/collections/bytes`: `Bytes`

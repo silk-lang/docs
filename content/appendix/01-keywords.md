@@ -6,7 +6,7 @@ Silk reserves 38 keywords. A keyword cannot name a declaration, binding, paramet
 
 | Keyword | Meaning | Reference page |
 | --- | --- | --- |
-| `as` | Renames an import (`import silk.list as L`) or gives a C symbol name (`as "c_name"`). Not a cast. | Lexical structure, Unsafe code and C interop |
+| `as` | Renames an import (`import silk.collections.list as L`) or gives a C symbol name (`as "c_name"`). Not a cast. | Lexical structure, Unsafe code and C interop |
 | `break` | Leaves the innermost `while` loop. | Control flow |
 | `compileError` | `compileError("text")` stops the build when a static branch selects it (SEM0177). | Static control flow and reflection |
 | `const` | Declares a module-level constant; also `*const T` pointers. | Static evaluation, Unsafe code and C interop |
@@ -78,17 +78,17 @@ These words are identifiers except in the position shown. `let where = 1` and `f
 
 ## Keywords in import paths
 
-An import path segment may be spelled like a keyword: `import silk.effect {Effect}`. When the last segment is a keyword and the import has neither an alias nor a member list, the import cannot bind that name:
+An import path segment may be spelled like a keyword: `import silk.core.effect {Effect}`. When the last segment is a keyword and the import has neither an alias nor a member list, the import cannot bind that name:
 
 ```silk
-import silk.effect
+import silk.core.effect
 ```
 
 ```
 src/main.silk:1:13: error[PAR0004] An import whose reserved final path segment cannot form an implicit binding
 ```
 
-Add an alias (`import silk.effect as effects`) or a member list.
+Add an alias (`import silk.core.effect as effects`) or a member list.
 
 ## See also
 

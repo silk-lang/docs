@@ -380,7 +380,7 @@ Fix: Do not start an expression with `<`. Templates are not implemented. See Lex
 An import whose reserved final path segment cannot form an implicit binding.
 
 ```silk
-import silk.effect
+import silk.core.effect
 pub fn main() -> i32 { return 0 }
 ```
 
@@ -392,7 +392,7 @@ src/main.silk:1:13: error[PAR0004] An import whose reserved final path segment c
 
 Message template, not filled by this compiler: `Reserved module segment {spelling} requires an explicit alias or selected-member list`.
 
-Fix: Import members instead, as in `import silk.effect { Effect }`, or add `as name`. See Modules and imports.
+Fix: Import members instead, as in `import silk.core.effect { Effect }`, or add `as name`. See Modules and imports.
 
 ### PAR0005
 
@@ -694,7 +694,7 @@ Fix: Stop using the binding after the move, or copy out what you need first: `le
 A partial move out of a place whose boundary keeps the owner whole.
 
 ```silk
-import silk.ownership { Drop }
+import silk.core.ownership { Drop }
 struct Token { value: i32 }
 impl Drop for Token { fn drop(self: &mut Token) -> () { return () } }
 struct Pair { kept: Token,  lost: Token }
@@ -969,7 +969,7 @@ Fix: Take the holder by `&mut` (`stepper: &mut Stepper<'env, F>`) for a `mut fn`
 Running a stored Effect through too weak an aggregate receiver access.
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 struct Running<'env, F: mut Effect<'env; i32>> { operation: F }
 fn runShared<'env, F: mut Effect<'env; i32>>(value: &Running<'env, F>) -> i32 {
   return run value.operation
@@ -992,10 +992,10 @@ Fix: Take the holder by `&mut` for a `mut Effect`, or by value for a `once Effec
 An access-scoped local-shared borrow escaping or crossing suspension.
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.fiber { Fiber }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber }
+import silk.mem.shared { Shared }
 struct Counter { value: i32 }
 fn bump(c: &mut Counter) -> i32 {
   run Fiber<(), ()>.yieldNow()
@@ -1089,7 +1089,7 @@ pub fn main() -> i32 { return 0 }
 src/main.silk:1:14: error[SEM0001] Unknown type Size
 ```
 
-A commonly used standard-library type also names its import. `fn sizes() -> List<i32>` without the import prints ``Unknown type List; is `import silk.list { List }` missing?``, and SEM0009 does the same for a call such as `List<i32>.make()`.
+A commonly used standard-library type also names its import. `fn sizes() -> List<i32>` without the import prints ``Unknown type List; is `import silk.collections.list { List }` missing?``, and SEM0009 does the same for a call such as `List<i32>.make()`.
 
 Fix: Declare the type, import it, or fix its spelling. See Values and primitive types.
 
@@ -1182,7 +1182,7 @@ pub fn main() -> i32 {
 src/main.silk:2:10: error[SEM0006] Unknown value count
 ```
 
-Fix: Declare the binding before its use, or import the constant (`import silk.u32` for `u32.MAX`). See Bindings and statements.
+Fix: Declare the binding before its use, or import the constant (`import silk.num.u32` for `u32.MAX`). See Bindings and statements.
 
 ### SEM0007
 
@@ -1238,10 +1238,10 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:10: error[SEM0009] Unknown name u32; is `import silk.u32` missing?
+src/main.silk:2:10: error[SEM0009] Unknown name u32; is `import silk.num.u32` missing?
 ```
 
-Fix: Add the import the message names: `import silk.u32`. See Values and primitive types.
+Fix: Add the import the message names: `import silk.num.u32`. See Values and primitive types.
 
 ### SEM0010
 
@@ -1264,7 +1264,7 @@ pub fn main() -> i32 {
 src/main.silk:6:17: error[SEM0010] main.Point has no associated function `build`
 ```
 
-A call on a value names the method instead, such as ``silk.list.List<i32> has no method `push` ``.
+A call on a value names the method instead, such as ``silk.collections.list.List<i32> has no method `push` ``.
 
 Fix: Call a function or method the type declares, here `Point.make()`. See Functions and methods.
 
@@ -1309,21 +1309,21 @@ src/main.silk:4:13: error[SEM0012] Expected i64 but received i32
 
 When the types differ only in a lifetime, the message names both, as in `Expected string<'static> but received string` for a borrowed `string` passed to a `string<'static>` parameter. A lifetime the compiler has not named prints as `'_`, as in `Expected main.Draft<'static> but received main.Draft<'_>`.
 
-Fix: Pass the parameter type. Integers do not widen implicitly: use `i32.toI64(small)` after `import silk.i32`. See Functions and methods.
+Fix: Pass the parameter type. Integers do not widen implicitly: use `i32.toI64(small)` after `import silk.num.i32`. See Functions and methods.
 
 ### SEM0014
 
 An import or qualified reference naming a member its module does not declare.
 
 ```silk
-import silk.list {Stack}
+import silk.collections.list {Stack}
 pub fn main() -> i32 { return 0 }
 ```
 
 `silk check` prints:
 
 ```text
-src/main.silk:1:19: error[SEM0014] Module silk.list has no member Stack
+src/main.silk:1:19: error[SEM0014] Module silk.collections.list has no member Stack
 ```
 
 Fix: Import a member the module declares, here `List`. See Modules and imports.
@@ -1351,7 +1351,7 @@ fn secret() -> i32 { return 0 }
 src/main.silk:1:16: error[SEM0015] `secret` is private to helper; mark it `pub` there to use it here
 ```
 
-A name that the module only imports is not its member either. Importing it through that module names the module that declares it, as in ``error[SEM0015] `ParseError` is not declared in silk.i64, which only imports it; import it from silk.format``.
+A name that the module only imports is not its member either. Importing it through that module names the module that declares it, as in ``error[SEM0015] `ParseError` is not declared in silk.num.i64, which only imports it; import it from silk.format``.
 
 Fix: Mark the member `pub` in its module, or import the name from the module that declares it. See Modules and imports.
 
@@ -1360,7 +1360,7 @@ Fix: Mark the member `pub` in its module, or import the name from the module tha
 Two bindings in one scope claiming the same spelling.
 
 ```silk
-import silk.list {List}
+import silk.collections.list {List}
 struct List { size: i32 }
 pub fn main() -> i32 { return 0 }
 ```
@@ -1376,7 +1376,7 @@ The error is at the second binding, here the struct, with a note on the first. T
 
 ```silk
 import silk.format { Format }
-import silk.inflate { Format }
+import silk.compress.inflate { Format }
 pub fn main() -> i32 { return 0 }
 ```
 
@@ -2345,7 +2345,7 @@ Fix: Declare the failure on the caller (`! Oops`), or handle it with `Effect.cat
 An `Effect.catch` handler that does not fit the failures it handles.
 
 ```silk
-import silk.effect {Effect}
+import silk.core.effect {Effect}
 struct Missing {}
 struct Other {}
 effect fn load() -> i32 ! Missing { fail Missing {} }
@@ -2364,9 +2364,9 @@ src/main.silk:7:14: error[SEM0067] Invalid Effect.catch handler: `main.Other` is
 The same code covers an `Effect.catchAll` handler whose parameter does not accept every failure of the handled Effect. When the parameter is a single type, the message names the missing failure:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
 
 struct Oops {}
 
@@ -2389,7 +2389,7 @@ pub effect fn main() -> i32 ! LogError {
 `silk check` prints:
 
 ```text
-src/main.silk:18:41: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
+src/main.silk:18:41: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk.io.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
 ```
 
 The message names the missing failures the same way when the parameter is a union that lacks a member, when the handled Effect has a single failure, and in the pipeline form, `work() |> Effect.catchAll(explain)`. With several missing it says ``does not accept `main.B`, `main.C`, failures of the handled Effect; add them to the parameter's union``.
@@ -2397,7 +2397,7 @@ The message names the missing failures the same way when the parameter is a unio
 A handler that is a plain `fn` is the same code. A handler returns an Effect, so it must be an `effect fn`:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 struct Problem {}
 effect fn load() -> i32 ! Problem { fail Problem {} }
 fn recover(error: Problem) -> i32 { return 0 }
@@ -2639,7 +2639,7 @@ Fix: Implement every interface member, with the interface's signature, and nothi
 A Drop implementation outside the compiler-sealed hook contract.
 
 ```silk
-import silk.ownership {Drop}
+import silk.core.ownership {Drop}
 struct File { fd: i32 }
 impl Drop for File {
   fn drop(self: File) -> () {}
@@ -3101,7 +3101,7 @@ Fix: Write conformance requirements that get smaller toward a base case. See Int
 A concrete specialization whose conditional requirements cannot be proved.
 
 ```silk
-import silk.ownership {Copy}
+import silk.core.ownership {Copy}
 fn twin<T: Copy>(v: T) -> T { return v }
 struct Token { n: i32 }
 pub fn main() -> i32 {
@@ -3123,7 +3123,7 @@ Fix: Pass a type that implements the bound, or implement it. See Generics, Inter
 A provider that matches no member of its concrete source requirement row.
 
 ```silk
-import silk.effect {Effect}
+import silk.core.effect {Effect}
 service Clock { effect fn now() -> i32 ? &Clock }
 service Dice { effect fn roll() -> i32 ? &Dice }
 struct Fixed { n: i32 }
@@ -3148,7 +3148,7 @@ Fix: Provide a value whose type implements the required service. See Services an
 Provider selection that retains more than one common requirement member.
 
 ```silk
-import silk.effect {Effect}
+import silk.core.effect {Effect}
 role Audit
 service Journal { effect fn read() -> i32 ? &Journal }
 struct Book { n: i32 }
@@ -3174,7 +3174,7 @@ Fix: Select the requirement explicitly with `Effect.provide<Journal at Audit>(..
 An explicitly or independently selected row that is not exactly one member.
 
 ```silk
-import silk.effect {Effect}
+import silk.core.effect {Effect}
 service Clock { effect fn now() -> i32 ? &Clock }
 service Dice { effect fn roll() -> i32 ? &Dice }
 struct Fixed { n: i32 }
@@ -3240,7 +3240,7 @@ Fix: End every path with `return`. See Functions and methods.
 A provider whose key matches but whose access cannot satisfy the requirement.
 
 ```silk
-import silk.effect {Effect}
+import silk.core.effect {Effect}
 service Counter { effect fn next() -> i32 ? &mut Counter }
 struct Count { n: i32 }
 impl Counter for Count {
@@ -3360,8 +3360,8 @@ Fix: Put `unsafe` on the unsafe call itself, not on a wider expression. See Unsa
 A concrete executable that fails one sealed static-property obligation.
 
 ```silk
-import silk.effect {Effect}
-import silk.fiber {Fiber}
+import silk.core.effect {Effect}
+import silk.concurrency.fiber {Fiber}
 effect fn work() -> i32 { return 1 }
 effect fn cleanup() -> () { run Fiber.yieldNow() }
 pub fn main() -> i32 {
@@ -3962,9 +3962,9 @@ src/main.silk:3:5: error[SEM0177] a bar needs a width
 The std lib's format templates use the same code. A template error is reported at your `Effect.log` or `Format.format` call, and its span covers the whole pipeline:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 pub effect fn main() -> () ! LogError {
   let mut logger = StdoutLogger.make()
@@ -4437,7 +4437,7 @@ Fix: Call through one interface: `Named.name(value)`. See Interfaces and impls.
 An `export "C"` function whose body may suspend.
 
 ```silk
-import silk.fiber { Fiber }
+import silk.concurrency.fiber { Fiber }
 export "C" fn waits() -> i32 {
   run Fiber<(), ()>.yieldNow()
   return 0
@@ -4666,8 +4666,8 @@ src/main.silk:1:15: error[SEM0218] Invalid test declaration: a test takes no par
 A test with a requirement row is refused with the filled message, at the row:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.string { String }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.text.string { String }
 test effect fn copies() -> () ! OutOfMemoryError ? &mut Allocator {
   let text = run String.copy("hi")
 }
@@ -4685,7 +4685,7 @@ Fix: Declare tests as `test fn name() -> ()` or a `test effect fn` with no param
 A sealed Drop or Copy head names `'static`, repeats one region, or bounds a region.
 
 ```silk
-import silk.ownership { Drop }
+import silk.core.ownership { Drop }
 struct View<'a> { left: &'a i32 }
 impl Drop for View<'static> { fn drop(self: &mut Self) -> () { return () } }
 pub fn main() -> i32 { return 0 }
@@ -4781,7 +4781,7 @@ pub fn main() -> u64 { return 0 }
 src/main.silk:1:8: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` and whose errors all implement `Debug`
 ```
 
-The message describes the runtime that was selected. For a wasm32 build with `silk/wasm_start`, `pub effect fn main() -> i32` gives ``Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements``.
+The message describes the runtime that was selected. For a wasm32 build with `silk/platform/wasm/start`, `pub effect fn main() -> i32` gives ``Entry point `main` has a result the selected runtime `silk/platform/wasm/start` cannot start; it accepts i32, (), or an Effect producing () with no requirements``.
 
 Fix: Return `i32` or `()` from `main`, or an Effect that produces one of them. Implement `Debug` for each failure type `main` can raise, for example with `Format.debugFields`. See Program entry and termination.
 
@@ -4835,7 +4835,7 @@ Fix: Name the service once, with the strongest access: `? &mut Counter`. See Ser
 A call that does not prove a `?S in R` requirement-row premise of its callee.
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 service Clock {}
 service Logger {}
@@ -4918,14 +4918,14 @@ src/main.silk:2:51: error[SEM0237] This atomic operation does not admit this mem
 
 The column points at the memory order. A store takes `"relaxed"`, `"release"` or `"sequentiallyConsistent"`, not `"acquire"`. The same code covers an arithmetic operation on a float, such as `Intrinsic.atomicFetchAdd<f64>`, a compare-exchange whose failure order is `"release"`, and a misspelled order such as `"seqCst"`.
 
-Fix: Use an order the operation admits: `"release"` here. Most code should use `silk/atomic` instead of the intrinsics. See Intrinsics.
+Fix: Use an order the operation admits: `"release"` here. Most code should use `silk/concurrency/atomic` instead of the intrinsics. See Intrinsics.
 
 ### SEM0238
 
 A type named through a module import in a value position.
 
 ```silk
-import silk.inflate
+import silk.compress.inflate
 pub fn main() -> i32 {
   let format = inflate.Format.Gzip
   return 0
@@ -4935,12 +4935,12 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:16: error[SEM0238] Format is a type of module silk.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.inflate { Format }`
+src/main.silk:3:16: error[SEM0238] Format is a type of module silk.compress.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.compress.inflate { Format }`
 ```
 
 A module import lets you name the module's types in type positions, such as `inflate.Format` in a signature, but not reach their members as values.
 
-Fix: Import the type by name and use it directly: `import silk.inflate { Format }`, then `Format.Gzip`. See Modules and imports.
+Fix: Import the type by name and use it directly: `import silk.compress.inflate { Format }`, then `Format.Gzip`. See Modules and imports.
 
 ### SEM0239
 
@@ -4970,11 +4970,11 @@ An `Intrinsic.simd*` member whose type arguments break one of its rules gets the
 - ``Intrinsic.simdConvert needs simd<u8, 16> and simd<f32, 4> to have the same lane count, but they have 16 and 4``.
 - ``Intrinsic.simdBitcast needs simd<u32, 4> and simd<u32, 8> to have the same width in bits, but they have 128 and 256``.
 - ``Intrinsic.simdShuffle needs simd<u32, 4> and simd<i32, 4> to have the same lane type, but they have u32 and i32``.
-- ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices. A `shuffle` from a `silk/simd` module prints this too, at your call to it.
+- ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices. A `shuffle` from a `silk/simd/simd` module prints this too, at your call to it.
 
 An architecture member given a shape it does not take gets the same code, with the shapes it takes: ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. Intrinsics lists the shapes each one takes.
 
-Fix: For a shape, use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. For a member, give it the lanes it names, or vectors that agree in the measure it names. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
+Fix: For a shape, use a numeric lane type and a lane count the message admits, such as `simd<i32, 4>`, or `mask<4>` for four boolean lanes. The `silk/simd/simd` modules, such as `silk.simd.i32x4`, name the supported shapes and offer only the operations each lane type takes. For a member, give it the lanes it names, or vectors that agree in the measure it names. See [SIMD vectors and masks](/docs/reference/values-and-primitive-types#simd-vectors-and-masks) in Values and primitive types.
 
 ### SEM0240
 
@@ -5026,7 +5026,7 @@ src/main.silk:3:16: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with s
 
 The default x86-64 profile has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
 
-Fix: Call the `silk/arch` wrapper, here `x86.shuffleBytes` from `silk.arch.x86`, which falls back to portable code. Or select the feature in the profile (`cpu.model = "x86-64-v2"`) and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` with `with Intrinsic.machine(features: ("ssse3",))`. See Intrinsics and Targets and profiles.
+Fix: Call the architecture wrapper, here `x86.shuffleBytes` from `silk.simd.x86`, which falls back to portable code. Or select the feature in the profile (`cpu.model = "x86-64-v2"`) and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` with `with Intrinsic.machine(features: ("ssse3",))`. See Intrinsics and Targets and profiles.
 
 ### SEM0242
 
@@ -5074,7 +5074,7 @@ src/main.silk:1:1: error[SEM0243] fast enables CPU features, so it must be decla
 
 Running AVX2 code on a machine without AVX2 is undefined, so each call must be `unsafe`.
 
-Fix: Declare it `unsafe fn fast(...)`, and call it inside `unsafe` after `CpuFeatures.detect()` from `silk/cpu` reports the features. See Intrinsics.
+Fix: Declare it `unsafe fn fast(...)`, and call it inside `unsafe` after `CpuFeatures.detect()` from `silk/simd/cpu` reports the features. See Intrinsics.
 
 ### SEM0244
 
@@ -5105,7 +5105,7 @@ Fix: Select the feature in the profile, as in `[profiles.fast.cpu] features = ["
 An anonymous function or `effect {}` block that the native compiler cannot specialize yet: one run from a function with `static` parameters, or one in a `static for` body.
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 effect fn again<'env, A, E, ?R>(mut action: mut Effect<'env; A ! E ? R>) -> A ! E ? R {
   return run action
@@ -5180,4 +5180,4 @@ These SEM codes are in the catalog, but no path in this compiler reports them, o
 | SEM0216 | A diagnostic observer callback lacks a complete direct-execution proof. | `Diagnostic observer callback requires direct execution: {detail}` |  | Not tried. |
 | SEM0217 | Terminal observation is provably outside a selected failure handler. | `Terminal diagnostic observation requires a selected failure context` |  | Not tried. |
 | SEM0219 | Emitted code references a function instance whose valid body native lowering does not support yet. | `Native lowering does not support this function body yet` |  | Not tried. |
-| SEM0222 | A namespace-qualified type named where a value is required (NAME-005). | `{member} in {module} is a type, not a value; select it with an import and write {member}.<member> for its members` | `let format = inflate.Format.Gzip` after `import silk.inflate` | SEM0238. |
+| SEM0222 | A namespace-qualified type named where a value is required (NAME-005). | `{member} in {module} is a type, not a value; select it with an import and write {member}.<member> for its members` | `let format = inflate.Format.Gzip` after `import silk.compress.inflate` | SEM0238. |

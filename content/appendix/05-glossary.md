@@ -18,7 +18,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Suspension | A running Effect stopping at a `run` and resuming later. A suspension point is a `run` whose Effect can suspend; parking an `Execution` is the only external suspension. | Suspension and cancellation |
 | Trap | A fatal runtime error, such as arithmetic overflow, division by zero or an out-of-bounds index. It does not unwind and runs no cleanup, finalizers or `Drop` hooks. | Program entry and termination |
 | Profile | A named build configuration, `[profiles.<name>]` in `silk.toml`. It builds for the host unless it sets `target`, and may set `optimization`, `safety`, `debug` and other fields, plus parameter values under `config`. Selected with `--profile` or `[build].profile`. | Package parameters |
-| Target | The machine a build compiles for, given as a triple such as `x86_64-unknown-linux-gnu` by `--target` or a profile. `silk/target` exposes its architecture, operating system and other facts to static code. | Static control flow and reflection |
+| Target | The machine a build compiles for, given as a triple such as `x86_64-unknown-linux-gnu` by `--target` or a profile. `silk/core/target` exposes its architecture, operating system and other facts to static code. | Static control flow and reflection |
 
 ## Other terms
 
@@ -40,7 +40,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Effect | A lazy computation value of type `Effect<'env; A ! E ? R>`. Calling an `effect fn` or writing `effect { ... }` builds one; nothing runs until `run`. | Effects and run |
 | Environment | The lifetime a callable's or Effect's captured state lives for, written `fn<'env>` or `Effect<'env; ...>`. | Closures and callable types, Effects and run |
 | Exclusive access | `&mut`: the only access to a place or service while it lasts. | Borrowing, Services and providers |
-| Execution | An owner of a suspendable computation from `silk/execution`. It parks and is woken by a `Wake`. | Suspension and cancellation |
+| Execution | An owner of a suspendable computation from `silk/concurrency/execution`. It parks and is woken by a `Wake`. | Suspension and cancellation |
 | Failure | A value an effect raises with `fail` instead of succeeding. Its type appears in the failure row. | Typed failures |
 | Fiber | A cooperative task on one thread, created with `Fiber.forkChild` and observed through a `Fiber<A, E>` handle. | Fibers and scheduling |
 | Finalizer | Code that `Effect.ensuring` and related operations run after an Effect finishes. | Typed failures, Suspension and cancellation |
@@ -49,7 +49,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Intrinsic | A compiler-provided operation, type or property in the `Intrinsic` namespace. | Intrinsics |
 | Invocation mode | How often a callable can be called: shared (`fn`), mutable (`mut fn`) or once (`once fn`). | Closures and callable types |
 | Manifest | The `silk.toml` file that describes a package. | The manifest |
-| Module | One `.silk` source file, imported by its path, as in `import silk.list`. | Modules and imports |
+| Module | One `.silk` source file, imported by its path, as in `import silk.collections.list`. | Modules and imports |
 | `never` | The empty type: an expression of type `never` does not produce a value. | Values and primitive types |
 | NonParking | `Intrinsic.NonParking`: a sealed property of an executable whose call graph cannot reach external parking. | Suspension and cancellation |
 | Nominal union | A `union` declaration whose variants may carry named fields. | Enums and unions |

@@ -8,9 +8,9 @@ Silk has two kinds of text, and you have used both.
 
 A `string<'text>` is a *view*. It points at UTF-8 bytes that live somewhere else, and its lifetime says how long that somewhere lasts. String literals are views of `'static` data. The titles on the board are views of the loaded file or of the command-line words. Making a view never copies anything and never allocates.
 
-`Bytes`, from `silk/bytes`, is *owned*. It holds its own buffer, can grow, and frees the buffer when it is dropped. `HostInput.argument` and `FileSystem.readFile` return `Bytes`, because they create new data. Growing a `Bytes` needs memory, so `append` needs an allocator.
+`Bytes`, from `silk/collections/bytes`, is *owned*. It holds its own buffer, can grow, and frees the buffer when it is dropped. `HostInput.argument` and `FileSystem.readFile` return `Bytes`, because they create new data. Growing a `Bytes` needs memory, so `append` needs an allocator.
 
-Because views are cheap, you can cut them freely. Users type stray spaces, so `"  Water the plants  "` should mean the same task as `"Water the plants"`. `String.trim` from `silk/string` drops the whitespace at both ends:
+Because views are cheap, you can cut them freely. Users type stray spaces, so `"  Water the plants  "` should mean the same task as `"Water the plants"`. `String.trim` from `silk/text/string` drops the whitespace at both ends:
 
 ```silk
 let title = String.trim("  Water the plants  ")
@@ -40,7 +40,7 @@ The message says it plainly: `+` belongs to an operator interface, and no impl o
 
 ## A board that grows
 
-`List<T>` from `silk/list` is a growable sequence that owns its elements. The import is already there, from chapter 8's test fake. Swap the list in for the array, and drop `count`, since the list knows its own length:
+`List<T>` from `silk/collections/list` is a growable sequence that owns its elements. The import is already there, from chapter 8's test fake. Swap the list in for the array, and drop `count`, since the list knows its own length:
 
 ```silk
 // The board grows as needed. It also indexes tasks by title to refuse duplicates.
@@ -108,10 +108,10 @@ To look at the tasks, borrow them as a slice. `asSlice` gives `&[Task]` and `asM
 There is also `get`, which looks more direct. Try it in a scratch file:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
 import silk.option { Option }
-import silk.list { List }
+import silk.collections.list { List }
 
 struct Task { title: string<'static> }
 
@@ -193,21 +193,21 @@ Adding to a list may need a bigger buffer. In Silk that is never hidden. `append
 
 And the requirement climbs, exactly like the clock in chapter 8. `parseLine` and `parseBoard` call `add`, so they now say `? &mut Allocator` and list `OutOfMemoryError`. So does `addTask`. `execute` already had the allocator in its row, because `load` needed it, so `main` does not change at all.
 
-This is the payoff of treating memory as a service. You can see, from a signature alone, which functions may allocate. `String.trim`, `part`, `count` and `complete` cannot. And the allocator a test provides could be one that fails on purpose, to check what happens when memory runs out. A program can also provide a different allocator to one part of itself, such as an `Arena` from `silk/arena`, which hands out memory from large chunks and gives a phase's memory back all at once. See **Allocation and shared ownership** in the reference for `List`, `Box` and `Shared`.
+This is the payoff of treating memory as a service. You can see, from a signature alone, which functions may allocate. `String.trim`, `part`, `count` and `complete` cannot. And the allocator a test provides could be one that fails on purpose, to check what happens when memory runs out. A program can also provide a different allocator to one part of itself, such as an `Arena` from `silk/mem/arena`, which hands out memory from large chunks and gives a phase's memory back all at once. See **Allocation and shared ownership** in the reference for `List`, `Box` and `Shared`.
 
 `BoardFull` is gone. The board only fills when memory does, and that is `OutOfMemoryError`, which `explain` already passes on.
 
 ## Refusing duplicates with a HashMap
 
-Adding `Buy milk` twice should not make two tasks. You could scan the list each time, but a hash map answers "have I seen this title?" directly. `HashMap<K, V>` from `silk/hash_map` maps keys to values. Here the key is a title and the value is the task's id.
+Adding `Buy milk` twice should not make two tasks. You could scan the list each time, but a hash map answers "have I seen this title?" directly. `HashMap<K, V>` from `silk/collections/hash_map` maps keys to values. Here the key is a title and the value is the task's id.
 
-A key type must implement `HashKey` from `silk/hash`. A plain `string` does not, so you wrap it. First, see what happens without the impl:
+A key type must implement `HashKey` from `silk/collections/hash`. A plain `string` does not, so you wrap it. First, see what happens without the impl:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.hash { Hash }
-import silk.hash_map { HashMap }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.collections.hash { Hash }
+import silk.collections.hash_map { HashMap }
 
 struct Title { text: string<'static> }
 
@@ -227,7 +227,7 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-src/main.silk:10:12: error[SEM0121] `main.Title: silk.hash.HashKey` cannot be proved: no implementation of `silk.hash.HashKey` exists for `main.Title`
+src/main.silk:10:12: error[SEM0121] `main.Title: silk.collections.hash.HashKey` cannot be proved: no implementation of `silk.collections.hash.HashKey` exists for `main.Title`
 Failed scratch in 0.19s
 ```
 
@@ -261,11 +261,11 @@ impl<'text> HashKey for Title<'text> { equals: sameTitle hash: hashTitle }
 
 `Hash.mix` starts from the seed and the length. `Hash.combine` folds in each byte. Equal bytes give an equal hash, so the rule holds. The map was made with `Hash.seed(2026)`. The seed is part of the map, and every key is hashed with it.
 
-`Title` is `Copy` because it is only a view. Copying it copies a pointer and a length, never the text. That matters twice: `add` uses the same key for `get` and `insert`, and `HashMap.get` only works when keys and values are `Copy`. You will need `import silk.u64` and `import silk.usize` for the conversions, plus these:
+`Title` is `Copy` because it is only a view. Copying it copies a pointer and a length, never the text. That matters twice: `add` uses the same key for `get` and `insert`, and `HashMap.get` only works when keys and values are `Copy`. You will need `import silk.num.u64` and `import silk.num.usize` for the conversions, plus these:
 
 ```silk
-import silk.hash { Hash, HashKey, HashSeed }
-import silk.hash_map { HashMap }
+import silk.collections.hash { Hash, HashKey, HashSeed }
+import silk.collections.hash_map { HashMap }
 ```
 
 Now `add` can check before it appends:
@@ -373,7 +373,7 @@ In `execute`, the `List` arm now passes `&mut board`. See **Borrowing** in the r
 
 ## Writing the file with templates
 
-In chapter 8, `render` built each line by hand and even had its own digit-printing loop. But you already have a tool that turns numbers and text into bytes: the template in `Effect.log`. Templates are not tied to the logger. `Format.format` from `silk/format` writes a template to any `Writer`, and `Writer` from `silk/writer` is a service. So you need a provider that collects bytes in memory.
+In chapter 8, `render` built each line by hand and even had its own digit-printing loop. But you already have a tool that turns numbers and text into bytes: the template in `Effect.log`. Templates are not tied to the logger. `Format.format` from `silk/format` writes a template to any `Writer`, and `Writer` from `silk/io/writer` is a service. So you need a provider that collects bytes in memory.
 
 ```silk
 // A Writer that collects bytes in memory. It owns its allocator because a Writer
@@ -444,7 +444,7 @@ effect fn render(board: &Board) -> Bytes ! WriterError {
 }
 ```
 
-`priorityCode` now returns `"l"`, `"n"` or `"h"` as a `string<'static>`, so it can go straight into the template. `appendNumber` is deleted, along with its `import silk.i64`: `{at}` prints the `i64` for you.
+`priorityCode` now returns `"l"`, `"n"` or `"h"` as a `string<'static>`, so it can go straight into the template. `appendNumber` is deleted, along with its `import silk.num.i64`: `{at}` prints the `i64` for you.
 
 `render` provides the `Writer` itself, so it needs no services at all. Its only failure is `WriterError`. That ripples outward in a pleasant way. `save` no longer needs the allocator:
 

@@ -1,4 +1,4 @@
-The native provider for the `Http` service of `silk.http_client`.
+The native provider for the `Http` service of `silk.http.client`.
 
 ## When to use
 Give [`NativeHttp`](#NativeHttp) one time, near `main`, with `Effect.provideMut<Http>(&mut http)`. All code
@@ -28,11 +28,11 @@ environment variables, so it never uses a proxy. Only `http://` proxies are supp
 The request in this example fails before it connects, because `ftp` is not supported.
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.http_client { Http, HttpError, HttpErrorKind, Request, Response }
-import silk.http_client_native { NativeHttp }
-import silk.result { Result }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.http.client { Http, HttpError, HttpErrorKind, Request, Response }
+import silk.http.client_native { NativeHttp }
+import silk.core.result { Result }
 
 effect fn check() -> i32
   ! OutOfMemoryError
@@ -67,7 +67,7 @@ pub effect fn main() -> i32
 }
 ```
 
-Import as `HttpClientNative` with `import silk.http_client_native as HttpClientNative`.
+Import as `HttpClientNative` with `import silk.http.client_native as HttpClientNative`.
 
 Public declarations: 5.
 

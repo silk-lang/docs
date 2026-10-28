@@ -13,10 +13,10 @@ cd wordfreq
 | --- | --- | --- | --- |
 | `[T; n]` | built in | A fixed number of values known at compile time | Never grows |
 | `&[T]`, `&mut [T]` | built in | Borrowing a run of values from any of the others | Never grows |
-| `Bytes` | `silk/bytes` | Raw octets: file contents, buffers | `append` |
-| `List<T>` | `silk/list` | An ordered sequence of any element type | `append`, `insert` |
-| `HashSet<T>` | `silk/hash_set` | Unique values and fast membership | `insert` |
-| `HashMap<K, V>` | `silk/hash_map` | Looking a value up by key | `insert` |
+| `Bytes` | `silk/collections/bytes` | Raw octets: file contents, buffers | `append` |
+| `List<T>` | `silk/collections/list` | An ordered sequence of any element type | `append`, `insert` |
+| `HashSet<T>` | `silk/collections/hash_set` | Unique values and fast membership | `insert` |
+| `HashMap<K, V>` | `silk/collections/hash_map` | Looking a value up by key | `insert` |
 
 Every operation that may grow a collection is an `effect fn` that needs `? &mut Allocator` and can fail with `OutOfMemoryError`. `make()` never allocates, so an empty collection costs nothing. A failed growth leaves the collection as it was. You can see from a signature alone which code may allocate.
 
@@ -92,7 +92,7 @@ An index out of range traps with `index out of bounds`. `length()` is a method o
 
 ## A key type of your own
 
-`HashMap` and `HashSet` need a key type that implements `HashKey` from `silk/hash`. No std lib type but `Word` (one `u64`) has one, not even `string`. So wrap the word in a small struct:
+`HashMap` and `HashSet` need a key type that implements `HashKey` from `silk/collections/hash`. No std lib type but `Word` (one `u64`) has one, not even `string`. So wrap the word in a small struct:
 
 ```silk
 // A word used as a key. It borrows its text, so it is cheap to copy.
@@ -120,7 +120,7 @@ impl<'text> HashKey for Term<'text> { equals: sameTerm hash: hashTerm }
 
 `HashKey` has two members. `equals` says when two keys are the same entry. `hash` turns a key into a number under the collection's seed: start with `Hash.mix(seed, first)` and fold in every further value with `Hash.combine`. The rule the collection cannot check for you: keys that are equal must hash the same. Here both depend on exactly the same bytes, so the rule holds.
 
-`Copy` comes from `silk/ownership`. `Term` is `Copy` because copying it copies a view, not the text. That matters because lookups consume the key you pass, and `HashMap.get` returns copies of stored keys and values, so it needs both to be `Copy`.
+`Copy` comes from `silk/core/ownership`. `Term` is `Copy` because copying it copies a view, not the text. That matters because lookups consume the key you pass, and `HashMap.get` returns copies of stored keys and values, so it needs both to be `Copy`.
 
 ## Counting with a HashSet and a HashMap
 
@@ -257,24 +257,24 @@ The stop set is written `HashSet<Term>`, with no lifetime. The compiler picks on
 The imports:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.hash { Hash, HashKey, HashSeed }
-import silk.hash_map { HashMap }
-import silk.hash_set { HashSet }
-import silk.list { List }
+import silk.collections.hash { Hash, HashKey, HashSeed }
+import silk.collections.hash_map { HashMap }
+import silk.collections.hash_set { HashSet }
+import silk.collections.list { List }
 import silk.option { Option }
 import silk.order { Order, Ordering }
-import silk.os_writer { StdoutWriter }
-import silk.ownership { Copy }
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.string { String }
-import silk.u8
-import silk.usize
-import silk.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
+import silk.core.ownership { Copy }
+import silk.core.result { Result }
+import silk.collections.slice { Slice }
+import silk.text.string { String }
+import silk.num.u8
+import silk.num.usize
+import silk.io.writer { Writer, WriterError }
 ```
 
 ## Run it
@@ -300,13 +300,13 @@ There are 16 words. After "the", "and" and "on" are dropped, 6 remain. "cat" and
 
 ## API reference
 
-- `silk/list`: `List`
-- `silk/bytes`: `Bytes`
-- `silk/slice`: `Slice`
-- `silk/hash_map`: `HashMap`
-- `silk/hash_set`: `HashSet`
-- `silk/hash`: `Hash`, `HashKey`, `HashSeed`, `Word`
+- `silk/collections/list`: `List`
+- `silk/collections/bytes`: `Bytes`
+- `silk/collections/slice`: `Slice`
+- `silk/collections/hash_map`: `HashMap`
+- `silk/collections/hash_set`: `HashSet`
+- `silk/collections/hash`: `Hash`, `HashKey`, `HashSeed`, `Word`
 - `silk/order`: `Order`, `Ordering`
 - `silk/equal`: `Equal`
-- `silk/ownership`: `Copy`
-- `silk/allocator`: `Allocator`, `OutOfMemoryError`
+- `silk/core/ownership`: `Copy`
+- `silk/mem/allocator`: `Allocator`, `OutOfMemoryError`

@@ -2,9 +2,9 @@ Send one HTTP request, follow redirects, decode the content, and deliver the bod
 destination that you choose.
 
 ## When to use
-Use this module when you need more control than `silk.http_client`: a sink for a large body, a
+Use this module when you need more control than `silk.http.client`: a sink for a large body, a
 body that you stream, content decoding, a proxy, or a connection pool. Make a [`Fetch`](#Fetch) around a
-[`FetchClient`](#FetchClient), such as the `Context` of `silk.http_fetch_native`. Then call one function for
+[`FetchClient`](#FetchClient), such as the `Context` of `silk.http.fetch_native`. Then call one function for
 each request.
 
 ## Details
@@ -22,8 +22,8 @@ The suffix tells what the request body is:
 - `Replay`: a factory that makes a new producer for each attempt.
 
 [`FetchOptions`](#FetchOptions) sets redirects, content decoding, the pool, the proxy, one deadline for the
-whole operation, and all limits. `silk.http_redirect` applies the redirect rules, and
-`silk.http_content` decodes the content.
+whole operation, and all limits. `silk.http.redirect` applies the redirect rules, and
+`silk.http.content` decodes the content.
 
 ## Errors
 - [`FetchError`](#FetchError) tells the phase and the reason, with the status and the URI when they are
@@ -36,7 +36,7 @@ whole operation, and all limits. `silk.http_redirect` applies the redirect rules
 The deadline is not renewed between redirects or phases. The default [`FetchOptions`](#FetchOptions) do not
 follow redirects and do not decode content. Set `redirect` and `content` to change that.
 
-Import as `Fetch` with `import silk.http_fetch { Fetch }`.
+Import as `Fetch` with `import silk.http.fetch { Fetch }`.
 
 Public declarations: 30.
 
@@ -314,7 +314,7 @@ Writes the name of the variant, such as `EncodedBodyBytes`.
 pub union FetchContentReason
 ```
 
-The reason that content decoding failed. It is a copy of the `silk.http_content` error that does
+The reason that content decoding failed. It is a copy of the `silk.http.content` error that does
 not borrow the response.
 
 ::Anchor{id="FetchContentReason.InvalidLimit"}
@@ -455,7 +455,7 @@ The body framing failed.
 pub error: BodyError
 ```
 
-The error from `silk.http_body`.
+The error from `silk.http.body`.
 
 ::Anchor{id="FetchContentReason.Buffer"}
 
@@ -515,7 +515,7 @@ The position of the coding in `Content-Encoding`, from 0.
 pub error: DecodeError
 ```
 
-The error from `silk.inflate`.
+The error from `silk.compress.inflate`.
 
 ::Anchor{id="FetchContentReason.Zstandard"}
 
@@ -555,7 +555,7 @@ The position of the coding in `Content-Encoding`, from 0.
 pub error: ZstdError
 ```
 
-The error from `silk.zstd`.
+The error from `silk.compress.zstd`.
 
 ::Anchor{id="FetchContentReason.TrailingEncodedData"}
 
@@ -761,7 +761,7 @@ Copying an HTTP value failed.
 pub error: ValueError
 ```
 
-The error from `silk.http`.
+The error from `silk.http.message`.
 
 ::Anchor{id="FetchReason.HttpBody"}
 
@@ -781,7 +781,7 @@ The body or the trailers of the final response are not valid.
 pub error: BodyError
 ```
 
-The error from `silk.http_body`.
+The error from `silk.http.body`.
 
 ::Anchor{id="FetchReason.HttpClient"}
 
@@ -801,7 +801,7 @@ The exchange failed while the body of the final response was read.
 pub error: ExchangeError
 ```
 
-The error from `silk.http_exchange`.
+The error from `silk.http.exchange`.
 
 ::Anchor{id="FetchReason.SizeOverflow"}
 
@@ -1292,7 +1292,7 @@ pub fn make(
 ```
 
 Returns a request. `continuePolicy` selects `Expect: 100-continue`. The limits apply to the
-head that is sent. See `prepare` in `silk.http_request`.
+head that is sent. See `prepare` in `silk.http.request`.
 
 ::Anchor{id="FetchRequest.impl.get"}
 
@@ -1329,7 +1329,7 @@ and do not decode content. Set `redirect` and `content` to change that.
 pub redirect: RedirectPolicy
 ```
 
-Whether and how to follow redirects. See `silk.http_redirect`.
+Whether and how to follow redirects. See `silk.http.redirect`.
 
 ::Anchor{id="FetchOptions.content"}
 
@@ -1339,7 +1339,7 @@ Whether and how to follow redirects. See `silk.http_redirect`.
 pub content: ContentMode
 ```
 
-Whether to give the body raw or decoded. See `silk.http_content`.
+Whether to give the body raw or decoded. See `silk.http.content`.
 
 ::Anchor{id="FetchOptions.pool"}
 
@@ -1474,9 +1474,9 @@ functions.
 
 ### When to use
 
-Use it when you need more control than `silk.http_client`: a sink for a large body, a body that
+Use it when you need more control than `silk.http.client`: a sink for a large body, a body that
 you stream, content decoding, a proxy, or a connection pool. Use the `Context` of
-`silk.http_fetch_native` as the client.
+`silk.http.fetch_native` as the client.
 
 ### Details
 

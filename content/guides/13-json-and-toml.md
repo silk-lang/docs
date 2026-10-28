@@ -6,11 +6,11 @@ This guide builds `stock`, a program that reads a TOML config and a JSON order, 
 
 | Approach | Module | Allocates | Use it when |
 | --- | --- | --- | --- |
-| Value tree | `silk/json_value` (`Json`), `silk/toml_value` (`Toml`) | yes | You want a few fields from a document that fits in memory |
-| Token scanner | `silk/json_scanner` (`JsonScanner`), `silk/json_reader` (`JsonReader`) | no | You want to skim or validate without building anything |
-| Typed codec | `silk/json_codec`, `silk/toml_codec` | depends on the type | You want a Silk value of a known type, or you want to write one |
+| Value tree | `silk/json/value` (`Json`), `silk/toml/value` (`Toml`) | yes | You want a few fields from a document that fits in memory |
+| Token scanner | `silk/json/scanner` (`JsonScanner`), `silk/json/reader` (`JsonReader`) | no | You want to skim or validate without building anything |
+| Typed codec | `silk/json/codec`, `silk/toml/codec` | depends on the type | You want a Silk value of a known type, or you want to write one |
 
-TOML has the value tree and the codecs. JSON has all three, plus `JsonReflect` in `silk/json_reflect`, which writes any struct as a JSON object.
+TOML has the value tree and the codecs. JSON has all three, plus `JsonReflect` in `silk/json/reflect`, which writes any struct as a JSON object.
 
 ## Set up
 
@@ -22,23 +22,23 @@ cd stock
 As in the other guides, the code blocks below, in order, make up the whole of `src/main.silk`. First the imports and the two input documents:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.json_codec { JsonCodec, Serialize }
-import silk.json_output { JsonOptions }
-import silk.json_reflect { JsonReflect }
-import silk.json_scanner { JsonError, JsonReason, JsonScanner, JsonToken }
-import silk.json_value { Json }
-import silk.list { List }
+import silk.json.codec { JsonCodec, Serialize }
+import silk.json.output { JsonOptions }
+import silk.json.reflect { JsonReflect }
+import silk.json.scanner { JsonError, JsonReason, JsonScanner, JsonToken }
+import silk.json.value { Json }
+import silk.collections.list { List }
 import silk.option { Option }
-import silk.os_writer { StdoutWriter }
-import silk.result { Result }
-import silk.toml_codec { TomlCodec }
-import silk.toml_output { TomlOutput }
-import silk.toml_scanner { TomlError }
-import silk.toml_value { Toml }
-import silk.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
+import silk.core.result { Result }
+import silk.toml.codec { TomlCodec }
+import silk.toml.output { TomlOutput }
+import silk.toml.scanner { TomlError }
+import silk.toml.value { Toml }
+import silk.io.writer { Writer, WriterError }
 
 fn configText() -> &'static [u8] {
   return b"title = \"Spring stock\"\nlimit = 3\n\n[owner]\nname = \"Julia\"\n"
@@ -69,7 +69,7 @@ effect fn readConfig() -> () ! TomlError | OutOfMemoryError | WriterError ? &mut
 }
 ```
 
-`Toml.parse` checks the whole document and builds an owned tree. It needs an `Allocator` and fails with `TomlError` (from `silk/toml_scanner`) on bad syntax.
+`Toml.parse` checks the whole document and builds an owned tree. It needs an `Allocator` and fails with `TomlError` (from `silk/toml/scanner`) on bad syntax.
 
 Lookups return `Option` so they chain without checks at each step. `Toml.field(&config, "owner")` gives an `Option<&Value>`, `Toml.fieldAt("name")` looks inside it, and `Toml.asString` borrows the text. If any step misses, the result is `None` and `unwrapOr` supplies the default. The borrowed strings live as long as `config`.
 
@@ -132,11 +132,11 @@ effect fn countNumbers() -> () ! JsonError | WriterError ? &mut Writer {
 
 `JsonScanner.make(bytes)` borrows a complete input and hands out one `JsonToken` per `next()` call: `ObjectBegin`, `String { span, escaped }`, `Number { span }`, `EndOfInput` and so on. It validates as it goes, allocates nothing, and has no `Allocator` or other requirement, so `countNumbers` needs only the `Writer` it prints to. A `span` is an offset and length into the input; `JsonScanner.slice` borrows its raw bytes.
 
-When the document arrives in pieces, for example from a socket, use `JsonReader` from `silk/json_reader`. It reads tokens from a `BufferedInput` into scratch space you provide. The Byte streams and buffering guide covers `BufferedInput`.
+When the document arrives in pieces, for example from a socket, use `JsonReader` from `silk/json/reader`. It reads tokens from a `BufferedInput` into scratch space you provide. The Byte streams and buffering guide covers `BufferedInput`.
 
 ## Handle a parse error
 
-Every JSON failure is a `JsonError` from `silk/json_scanner` with a `reason` (a `JsonReason` such as `UnexpectedByte`, `MissingField` or `DepthExceeded`) and an `offset` into the input:
+Every JSON failure is a `JsonError` from `silk/json/scanner` with a `reason` (a `JsonReason` such as `UnexpectedByte`, `MissingField` or `DepthExceeded`) and an `offset` into the input:
 
 ```silk
 effect fn checkInput(text: &[u8]) -> () ! OutOfMemoryError | WriterError ? &mut Allocator | &mut Writer {
@@ -159,7 +159,7 @@ effect fn checkInput(text: &[u8]) -> () ! OutOfMemoryError | WriterError ? &mut 
 
 `Effect.result` turns the parse into a `Result` whose error is the union `JsonError | OutOfMemoryError`. The inner `match` takes the union apart by type. Here the trailing comma at offset 12 is the unexpected byte. See **Typed failures** in the reference for `Effect.result` and **Patterns and match** for matching a union by type.
 
-Without the handler, a `JsonError` that escapes `main` ends the program with status 1 and a trace on standard error, starting `unhandled error: silk/json_scanner.JsonError`.
+Without the handler, a `JsonError` that escapes `main` ends the program with status 1 and a trace on standard error, starting `unhandled error: silk/json/scanner.JsonError`.
 
 ## Write JSON from a struct
 
@@ -189,11 +189,11 @@ effect fn writeStock() -> () ! JsonError | OutOfMemoryError | WriterError ? &mut
 }
 ```
 
-`JsonReflect.write<Item>` walks the struct's fields at compile time and writes them in declaration order. It only sees fields visible to `silk/json_reflect`, which means `pub` fields: `note` is private, so it never appears in the output. That is a handy way to keep internal state out of what you publish.
+`JsonReflect.write<Item>` walks the struct's fields at compile time and writes them in declaration order. It only sees fields visible to `silk/json/reflect`, which means `pub` fields: `note` is private, so it never appears in the output. That is a handy way to keep internal state out of what you publish.
 
 Calling `JsonReflect.write` from a one-line `Serialize` witness makes `Item` a full citizen of the codec. Now `List<Item>` is `Serialize` too, because the std lib's list witness writes any list whose element type is. `JsonCodec.writeOne(&stock, options)` picks the witness and writes the array.
 
-`JsonOptions.compact()` writes everything on one line. `JsonOptions.indented(2)` indents nested containers by two spaces. All JSON and TOML output goes through the `Writer` service from `silk/writer`, so the same code can write to standard output, a file or a test buffer.
+`JsonOptions.compact()` writes everything on one line. `JsonOptions.indented(2)` indents nested containers by two spaces. All JSON and TOML output goes through the `Writer` service from `silk/io/writer`, so the same code can write to standard output, a file or a test buffer.
 
 ## Write TOML
 
@@ -271,21 +271,21 @@ title = "Spring stock"
 ## Limits to know
 
 - Both parsers are strict. `Json.parse` rejects trailing commas, comments and duplicate keys. `Toml.parse` rejects duplicate keys and redefined tables.
-- JSON nesting is limited to 64 open arrays and objects (`MAX_DEPTH` in `silk/json_scanner`); deeper input fails with `DepthExceeded`.
+- JSON nesting is limited to 64 open arrays and objects (`MAX_DEPTH` in `silk/json/scanner`); deeper input fails with `DepthExceeded`.
 - Writing can fail halfway if the `Writer` fails, leaving a partial document. Nothing is flushed for you.
 - Floats that are infinite or NaN cannot be written and fail with `JsonError` before any bytes go out.
 
 ## API reference
 
-- `silk/json_value`: `Json`, `Value`
-- `silk/json_scanner`: `JsonScanner`, `JsonToken`, `JsonError`, `JsonReason`
-- `silk/json_reader`: `JsonReader`
-- `silk/json_codec`: `JsonCodec`, `Serialize`, `Decode`, `Deserialize`
-- `silk/json_reflect`: `JsonReflect`
-- `silk/json_output`: `JsonOptions`, `JsonOutput`
-- `silk/json_object`, `silk/json_array`: `JsonObject`, `JsonArray` (hand-written object and array writers)
-- `silk/toml_value`: `Toml`, `Value`
-- `silk/toml_scanner`: `TomlError`
-- `silk/toml_codec`: `TomlCodec`, `Serialize`, `Decode`, `Deserialize`
-- `silk/toml_output`: `TomlOutput`
-- `silk/writer`: `Writer`; `silk/os_writer`: `StdoutWriter`; `silk/allocator`: `Allocator`
+- `silk/json/value`: `Json`, `Value`
+- `silk/json/scanner`: `JsonScanner`, `JsonToken`, `JsonError`, `JsonReason`
+- `silk/json/reader`: `JsonReader`
+- `silk/json/codec`: `JsonCodec`, `Serialize`, `Decode`, `Deserialize`
+- `silk/json/reflect`: `JsonReflect`
+- `silk/json/output`: `JsonOptions`, `JsonOutput`
+- `silk/json/object`, `silk/json/array`: `JsonObject`, `JsonArray` (hand-written object and array writers)
+- `silk/toml/value`: `Toml`, `Value`
+- `silk/toml/scanner`: `TomlError`
+- `silk/toml/codec`: `TomlCodec`, `Serialize`, `Decode`, `Deserialize`
+- `silk/toml/output`: `TomlOutput`
+- `silk/io/writer`: `Writer`; `silk/io/writer_native`: `StdoutWriter`; `silk/mem/allocator`: `Allocator`

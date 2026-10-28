@@ -32,7 +32,7 @@ CompileError     = 'compileError' '(' Expression ')'
 - Local `let` and `let mut` bindings, assignment to a whole binding, `if`, `while` and `return`.
 - Calls to other `static fn`, including generic ones and inherent members such as `Units.kilo()`.
 - Construction and field reads of structs without a `Drop` hook, fixed arrays and indexing, scalar enum values and `==` on them, and string values with `==`.
-- `silk/static_text`, `silk/static_sequence` and reflection operations.
+- `silk/core/static_text`, `silk/core/static_sequence` and reflection operations.
 
 The following are SEM0176 during static evaluation:
 
@@ -95,7 +95,7 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 
 ## Static text
 
-`silk/static_text` provides `StaticText`, whose operations work only in the static phase. Text is UTF-8 bytes.
+`silk/core/static_text` provides `StaticText`, whose operations work only in the static phase. Text is UTF-8 bytes.
 
 | Operation | Result |
 | --- | --- |
@@ -108,18 +108,18 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 
 ## Static sequences
 
-`silk/static_sequence` provides `StaticSequence` over the type `Intrinsic.StaticSequence<Element>`, an immutable sequence that exists only in the static phase.
+`silk/core/static_sequence` provides `StaticSequence` over the type `Intrinsic.StaticSequence<Element>`, an immutable sequence that exists only in the static phase.
 
 - `StaticSequence.empty<T>()` makes an empty sequence. `StaticSequence.append<T>(move s, value)` returns a new sequence with one more element.
 - Sequences are passed and reassigned with `move`.
 - A `static for` loop walks a sequence. See Static control flow and reflection.
-- `StaticSequence.concat`, `StaticSequence.length` and `StaticSequence.at` are declared but refused as not supported. The refusal is reported at the user's call that reached them, like other static errors in another module. Its related location points into `silk/static_sequence.silk`.
+- `StaticSequence.concat`, `StaticSequence.length` and `StaticSequence.at` are declared but refused as not supported. The refusal is reported at the user's call that reached them, like other static errors in another module. Its related location points into `silk/core/static_sequence.silk`.
 
 ## Static error reporting
 
 - A static failure is reported at the failing operation, which is usually inside the `static fn`, not at the demanding site.
 - A runtime argument is reported at the argument.
-- When the failing operation is in another module, such as `silk/static_text` or `silk/reflect`, the error is reported at the outermost call in the evaluated module that reached it. `static if StaticText.byteAt("abc", 7) == 0` reports SEM0176 at the `StaticText.byteAt` call. `const B: u8 = pick()`, where the user's `static fn pick` calls `StaticText.byteAt("abc", 7)`, reports it at `pick()`. In both cases a `note: ... related location` line follows at the same position.
+- When the failing operation is in another module, such as `silk/core/static_text` or `silk/core/reflect`, the error is reported at the outermost call in the evaluated module that reached it. `static if StaticText.byteAt("abc", 7) == 0` reports SEM0176 at the `StaticText.byteAt` call. `const B: u8 = pick()`, where the user's `static fn pick` calls `StaticText.byteAt("abc", 7)`, reports it at `pick()`. In both cases a `note: ... related location` line follows at the same position.
 - `compileError(message)` fails the evaluation that reaches it with SEM0177. The diagnostic's message is the `message` text. `message` must be static text, such as a literal or a `string` constant.
 - The SEM0177 is reported at the `compileError`. When a call selected it through a static argument, a note points at that call. In the second example below, changing `scaled(3, 1)` on line 24 to `scaled(-1, 1)` reports:
 
@@ -173,8 +173,8 @@ pub fn main() -> i32 {
 Static parameters, one instance per value, and a static assertion:
 
 ```silk
-import silk.static_text { StaticText }
-import silk.usize
+import silk.core.static_text { StaticText }
+import silk.num.usize
 
 struct Config {
   base: i32,
@@ -214,8 +214,8 @@ pub fn main() -> i32 {
 Static text inspection and a static sequence walked by `static for`:
 
 ```silk
-import silk.static_text { StaticText }
-import silk.static_sequence { StaticSequence }
+import silk.core.static_text { StaticText }
+import silk.core.static_sequence { StaticSequence }
 
 static fn countByte(text: string, wanted: u8) -> i32 {
   let mut count = 0
@@ -316,7 +316,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Static control flow and reflection · Package parameters · Functions and methods · Bindings and statements · Values and primitive types · Structs, tuples and arrays · Generics · `silk/static_text` · `silk/static_sequence`
+Static control flow and reflection · Package parameters · Functions and methods · Bindings and statements · Values and primitive types · Structs, tuples and arrays · Generics · `silk/core/static_text` · `silk/core/static_sequence`
 
 ## Open questions
 

@@ -55,8 +55,8 @@ The `link` row is the Clang step whatever the stage; for `assembly` it runs `cla
 Each output has a `.symbols` file beside it. Each line is a native symbol, its kind and the Silk declaration it comes from, separated by tabs:
 
 ```
-main	export	hello@0.1.0:silk/native_start.silk::_._.enter
-silk_5d3308971cc4722980f0a2011e60fca5	function	hello@0.1.0:silk/native_start.silk::_._.enter
+main	export	hello@0.1.0:silk/platform/native/start.silk::_._.enter
+silk_5d3308971cc4722980f0a2011e60fca5	function	hello@0.1.0:silk/platform/native/start.silk::_._.enter
 ```
 
 Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled src/main.silk -> hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)`, with both paths relative to the current directory, or in full when a file is outside it. Its symbol count is the number of lines in this file.
@@ -186,9 +186,9 @@ An executable starts in a runtime module that sets up the process and calls `mai
 
 | Targets | libc | Runtime |
 | --- | --- | --- |
-| `aarch64-apple-darwin` | `system` | `silk/native_start` (hosted) |
-| Linux x86-64 and arm64 | `gnu` | `silk/native_start` (hosted) |
-| `wasm32-unknown-unknown` | `none` | `silk/wasm_start` (standalone) |
+| `aarch64-apple-darwin` | `system` | `silk/platform/native/start` (hosted) |
+| Linux x86-64 and arm64 | `gnu` | `silk/platform/native/start` (hosted) |
+| `wasm32-unknown-unknown` | `none` | `silk/platform/wasm/start` (standalone) |
 
 `[unstable].composition` replaces the catalog for one package. Its keys:
 
@@ -205,8 +205,8 @@ Any other key is refused at its line, as in `Invalid Silk project manifest /home
 ```toml
 [unstable]
 composition = { runtimes = [
-  { name = "synchronous", module = "silk/native_start_sync" },
-  { name = "hosted", modul = "silk/native_start" },
+  { name = "synchronous", module = "silk/platform/native/start_sync" },
+  { name = "hosted", modul = "silk/platform/native/start" },
 ], defaults = ["synchronous"] }
 ```
 
@@ -216,16 +216,16 @@ Invalid Silk project manifest /home/you/hello/silk.toml:9: unstable.composition.
 
 Line 9 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`unstable.composition.retention.decl is not a supported field`), and in a component's `bindings` entry as `unstable.composition.components.bindings.<key>`.
 
-For example, `silk/native_start_sync` is a smaller hosted runtime for a `main` that returns `i32` and needs only `HostInput`:
+For example, `silk/platform/native/start_sync` is a smaller hosted runtime for a `main` that returns `i32` and needs only `HostInput`:
 
 ```toml
 [unstable]
-composition = { runtimes = [{ name = "synchronous", module = "silk/native_start_sync" }], defaults = ["synchronous"] }
+composition = { runtimes = [{ name = "synchronous", module = "silk/platform/native/start_sync" }], defaults = ["synchronous"] }
 ```
 
 ```silk
-import silk.host_input { HostInput, HostInputError }
-import silk.usize
+import silk.system.host_input { HostInput, HostInputError }
+import silk.num.usize
 
 pub effect fn main() -> i32 ! HostInputError ? &mut HostInput {
   let count = run HostInput.argumentCount()
@@ -252,11 +252,11 @@ Compiling tiny (x86_64-unknown-linux-gnu, debug)
   check    1 module                          0.00s
   codegen  failed: 89 functions, 1 error     0.09s
 [x86_64-unknown-linux-gnu]
-src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/native_start_sync` cannot start
+src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/platform/native/start_sync` cannot start
 Failed tiny in 0.26s
 ```
 
-A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/raw_start` case.
+A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/platform/linux/start` case.
 
 ## Building without a runtime
 

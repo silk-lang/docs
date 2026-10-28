@@ -1,6 +1,6 @@
 # Suspension and cancellation
 
-A running Effect can suspend at a `run` and be resumed later, or be cancelled while it is suspended. This page covers suspension points, what a suspended frame keeps alive, local-shared access across suspension, cancellation and the cleanup it performs, the `NonParking` and `Detached` properties, and the `Execution` park and wake protocol from `silk/execution`.
+A running Effect can suspend at a `run` and be resumed later, or be cancelled while it is suspended. This page covers suspension points, what a suspended frame keeps alive, local-shared access across suspension, cancellation and the cleanup it performs, the `NonParking` and `Detached` properties, and the `Execution` park and wake protocol from `silk/concurrency/execution`.
 
 ## Syntax
 
@@ -33,7 +33,7 @@ NonParkingMarker  = 'with' 'Intrinsic' '.' 'nonParking' '(' ')'
 
 - `Shared.with` and `Shared.withMut` lend the stored value to an ordinary `once fn` callback. The borrow ends when the callback returns.
 - Nothing the callback reaches may `run` an Effect. This includes an Effect that never suspends. The violation is OWN0016.
-- Nothing the callback reaches may notify an execution, such as `Execution.wake`. That is also OWN0016, reported at the notification site, which may be inside `silk/execution`.
+- Nothing the callback reaches may notify an execution, such as `Execution.wake`. That is also OWN0016, reported at the notification site, which may be inside `silk/concurrency/execution`.
 - The check follows calls from the callback transitively.
 - Fix: take what you need out of the value inside the callback, return it, then `run` or wake after the access call returns.
 - Nesting access to the same allocation through any alias traps at runtime before the inner callback starts.
@@ -69,7 +69,7 @@ NonParkingMarker  = 'with' 'Intrinsic' '.' 'nonParking' '(' ')'
 
 ## Execution, park and wake
 
-`silk/execution` exposes one owner per independently resumable computation.
+`silk/concurrency/execution` exposes one owner per independently resumable computation.
 
 - `Execution.make(body, readyState, onReady)` allocates one package and moves the body in. The body does not start. It needs `? &mut Allocator` and can fail with `OutOfMemoryError`. The result `Intrinsic.Execution<A>` is affine.
 - `onReady: fn<'static>(&O) -> ()` is the fixed readiness endpoint. It must be `Detached` and `NonParking`. It runs with `readyState`.
@@ -87,10 +87,10 @@ NonParkingMarker  = 'with' 'Intrinsic' '.' 'nonParking' '(' ')'
 Park, wake and resume one execution:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.execution { Execution, Wake }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.execution { Execution, Wake }
+import silk.mem.shared { Shared }
 
 struct Empty {}
 
@@ -202,11 +202,11 @@ pub fn main() -> i32 {
 Cancel a parked execution. The local `Token` drops first (digit 1), then the nonparking finalizer runs (digit 2). With `Effect.ensuring` in place of `Effect.ensuringNonParking`, the log is `1`.
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.execution { Execution, Wake }
-import silk.ownership { Drop }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.execution { Execution, Wake }
+import silk.core.ownership { Drop }
+import silk.mem.shared { Shared }
 
 struct Log {
   value: i32,
@@ -296,15 +296,15 @@ pub fn main() -> i32 {
 A child is cancelled when its parent task finishes. The grandchild `leaf` sleeps for an hour; `middle` returns first, so `leaf` is cancelled, its `Token` drops, and awaiting its `Fiber` reports `Cancelled`:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.fiber { Fiber, Cancelled, Failure, Outcome, Success }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.ownership { Drop }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled, Failure, Outcome, Success }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.core.ownership { Drop }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.mem.shared { Shared }
 
 struct Log {
   drops: i32,
@@ -430,9 +430,9 @@ pub fn main() -> i32 {
 OWN0016, running an Effect inside a `Shared.withMut` callback:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.mem.shared { Shared }
 
 struct Counter { value: i32 }
 effect fn five() -> i32 { return 5 }
@@ -454,9 +454,9 @@ pub fn main() -> i32 { return run Effect.catchAll(program(), recover) }
 Run the Effect first and pass its result into the callback:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.mem.shared { Shared }
 
 struct Counter {
   value: i32,
@@ -503,11 +503,11 @@ SEM0139, a parking finalizer passed to `Effect.ensuringNonParking`. In the cance
 
 ## See also
 
-Effects and run · Fibers and scheduling · Typed failures · Allocation and shared ownership · Ownership and moves · Borrowing · Lifetimes · Closures and callable types · Program entry and termination · `silk/execution` · `silk/fiber` · `silk/shared` · `silk/effect` · `silk/local_scheduler`
+Effects and run · Fibers and scheduling · Typed failures · Allocation and shared ownership · Ownership and moves · Borrowing · Lifetimes · Closures and callable types · Program entry and termination · `silk/concurrency/execution` · `silk/concurrency/fiber` · `silk/mem/shared` · `silk/core/effect` · `silk/concurrency/local_scheduler`
 
 ## Open questions
 
 - SEM0139, and SEM0225 for a parking `main`, are reported only by a build. `silk check` accepts a program that violates `Intrinsic.NonParking`.
-- SEM0139 for a parking provider of a `with Intrinsic.nonParking()` operation can point into `silk/effect`, for example when `main` runs the operation directly. The user site is not named.
-- OWN0016 for a wake inside a callback is reported at `silk/execution.silk`, not at the user's call.
+- SEM0139 for a parking provider of a `with Intrinsic.nonParking()` operation can point into `silk/core/effect`, for example when `main` runs the operation directly. The user site is not named.
+- OWN0016 for a wake inside a callback is reported at `silk/concurrency/execution.silk`, not at the user's call.
 - SEM0201, an `export "C"` function that may park, is also reported only by `silk build`.

@@ -50,7 +50,7 @@ ExactType         = 'typeof' '(' Path ')'
 - `T: Interface` requires a conformance of `T` to the interface. Bounds combine with `+`: `T: Add<T, T> + Order`.
 - `T: 'a` requires `T` to stay valid for `'a`. `T: 'static` means `T` holds no borrows.
 - `F: fn(i32) -> i32` bounds a parameter by a callable contract. See Closures and callable types.
-- `T: Copy` uses the sealed property from `silk/ownership`. `Drop` is not usable as a bound.
+- `T: Copy` uses the sealed property from `silk/core/ownership`. `Drop` is not usable as a bound.
 - A generic body is checked once, against its bounds only. Using an operation the bounds don't provide is an error even before any call (SEM0135 for an operator).
 - At each use, the compiler proves the bounds for the concrete arguments. A missing conformance is SEM0121.
 - Bounds on a generic struct are checked wherever the struct type is named with arguments (SEM0121).
@@ -245,7 +245,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Interfaces and impls · Closures and callable types · Functions and methods · Lifetimes · Structs, tuples and arrays · Enums and unions · Static evaluation · Effects and run · Typed failures · Services and providers · `silk/ops`, `silk/order`, `silk/ownership`
+Interfaces and impls · Closures and callable types · Functions and methods · Lifetimes · Structs, tuples and arrays · Enums and unions · Static evaluation · Effects and run · Typed failures · Services and providers · `silk/ops`, `silk/order`, `silk/core/ownership`
 
 ## Open questions
 

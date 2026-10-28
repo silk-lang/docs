@@ -144,8 +144,8 @@ The std lib comes from the installation unless you pass `--stdlib-root <director
 `--check` compares instead of writing, and reports each difference:
 
 ```
-/home/you/silk/reference/stdlib/bool.md is missing
-/home/you/silk/reference/stdlib/box.md is stale
+/home/you/silk/reference/stdlib/core-bool.md is missing
+/home/you/silk/reference/stdlib/mem-box.md is stale
 /home/you/silk/reference/stdlib/old.md is extra or renamed
 ```
 

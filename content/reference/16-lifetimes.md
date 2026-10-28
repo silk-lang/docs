@@ -279,7 +279,7 @@ pub fn main() -> i32 {
 SEM0220, a `Drop` head that selects by lifetime:
 
 ```silk
-import silk.ownership { Drop }
+import silk.core.ownership { Drop }
 struct Handle<'a> { item: &'a i32 }
 impl Drop for Handle<'static> {
   fn drop(self: &mut Handle<'static>) -> () { return () }
@@ -290,7 +290,7 @@ pub fn main() -> i32 { return 0 }
 Implement it for every lifetime:
 
 ```silk
-import silk.ownership { Drop }
+import silk.core.ownership { Drop }
 
 struct Handle<'a> {
   item: &'a i32,

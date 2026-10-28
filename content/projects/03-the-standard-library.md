@@ -4,19 +4,19 @@ The standard library is the package `silk`. Every package can import its modules
 
 ## Importing
 
-- Std lib modules are named `silk.<module>`: `import silk.list { List }`, `import silk.http_client as HttpClient`.
-- Module names use underscores between words: `silk.http_client`, `silk.os_logger`, `silk.hash_map`. The file is `silk/http_client.silk` in the std lib directory.
-- Each module page in the Std lib API reference ends its overview with the recommended import line, for example: Import as `HttpClient` with `import silk.http_client as HttpClient`. That page's title is the module's path, `silk/http_client`.
-- Primitive modules hold the operations of a primitive type. `import silk.usize` binds the module `usize`, so `usize.ZERO` and `usize.add(...)` work.
+- Std lib modules are named `silk.<module>`: `import silk.collections.list { List }`, `import silk.http.client as HttpClient`.
+- Module names use underscores between words: `silk.http.client`, `silk.io.logger_native`, `silk.collections.hash_map`. The file is `silk/http/client.silk` in the std lib directory.
+- Each module page in the Std lib API reference ends its overview with the recommended import line, for example: Import as `HttpClient` with `import silk.http.client as HttpClient`. That page's title is the module's path, `silk/http/client`.
+- Primitive modules hold the operations of a primitive type. `import silk.num.usize` binds the module `usize`, so `usize.ZERO` and `usize.add(...)` work.
 - The import forms and rules are the same as for your own modules. See **Modules and imports**.
 
 | You want | Import |
 | --- | --- |
-| A growable list | `import silk.list { List }` |
-| Effects and `run` helpers | `import silk.effect { Effect }` |
-| Logging to standard output | `import silk.logger { LogError }`, `import silk.os_logger { StdoutLogger }` |
-| Test assertions | `import silk.testing { AssertionError, Testing }` |
-| Build facts (target, profile) | `import silk.target { Target }`, `import silk.compilation { Compilation }` |
+| A growable list | `import silk.collections.list { List }` |
+| Effects and `run` helpers | `import silk.core.effect { Effect }` |
+| Logging to standard output | `import silk.io.logger { LogError }`, `import silk.io.logger_native { StdoutLogger }` |
+| Test assertions | `import silk.testing.testing { AssertionError, Testing }` |
+| Build facts (target, profile) | `import silk.core.target { Target }`, `import silk.core.compilation { Compilation }` |
 
 ## Where it is found
 
@@ -59,8 +59,8 @@ Write `Intrinsic.replace(...)` with no import instead. The one importable module
 
 A module can offer different declarations on different targets. The Std lib API reference documents six profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`, the two Linux targets without libc (`-no-libc`), and `wasm32-unknown-unknown`. A module with more than one surface has one page per surface, such as `os-logger` and `os-logger.profile-2`. Each page lists its profiles.
 
-- Most hosted providers, such as `silk.os_logger`, `silk.os_filesystem`, `silk.native_filesystem` and `silk.native_report`, have no public declarations on the no-libc and wasm profiles. The Profiles column of the API reference index shows each module's surfaces.
-- `silk.raw_linux`, `silk.raw_process_inputs` and `silk.raw_start` exist only on the no-libc Linux profiles.
+- Most hosted providers, such as `silk.io.logger_native`, `silk.system.filesystem_native`, `silk.platform.native.filesystem` and `silk.platform.native.report`, have no public declarations on the no-libc and wasm profiles. The Profiles column of the API reference index shows each module's surfaces.
+- `silk.platform.linux.syscall`, `silk.platform.linux.process_inputs` and `silk.platform.linux.start` exist only on the no-libc Linux profiles.
 
 The program from `silk init` checks on every hosted target, and fails on wasm because `StdoutLogger` does not exist there:
 
@@ -73,7 +73,7 @@ Checking hello (wasm32-unknown-unknown)
   load     50 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.05s
 [wasm32-unknown-unknown]
-src/main.silk:3:25: error[SEM0014] Module silk.os_logger has no member StdoutLogger
+src/main.silk:3:25: error[SEM0014] Module silk.io.logger_native has no member StdoutLogger
 Failed hello in 0.11s
 ```
 

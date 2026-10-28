@@ -67,7 +67,7 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 - Negating members exist only for signed integers and floats. Wrapping, saturating and checked members exist only for integers.
 - Plain `To<Type>` conversions trap when the value does not fit: `Intrinsic.i32ToU8(300)` traps with "arithmetic overflow".
 - A checked member takes the result type `R` as its one type argument. After the operands it takes two functions that build `R` on success and on failure: `Intrinsic.i32CheckedAdd<Option<i32>>(a, b, Option.some, Option.none)`.
-- Each integer module (`silk/i32`, `silk/u64`, ...) wraps these as ordinary functions such as `i32.checkedAdd` and `i32.toU8`.
+- Each integer module (`silk/num/i32`, `silk/num/u64`, ...) wraps these as ordinary functions such as `i32.checkedAdd` and `i32.toU8`.
 
 ## SIMD members
 
@@ -84,7 +84,7 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 | `simdShuffle` to another lane type | ``Intrinsic.simdShuffle needs simd<u32, 4> and simd<i32, 4> to have the same lane type, but they have u32 and i32`` |
 | `simdShuffle` index out of range | ``Intrinsic.simdShuffle needs 4 static lane indices, one per result lane, each below 8``, at the indices |
 
-- The `silk/simd` modules wrap these for the 128-bit and 256-bit shapes. Other admitted shapes, such as `simd<u8, 64>` or `simd<u32, 2>`, are reachable only here. The types, operators and modules are in Values and primitive types, under SIMD vectors and masks.
+- The `silk/simd/simd` modules wrap these for the 128-bit and 256-bit shapes. Other admitted shapes, such as `simd<u8, 64>` or `simd<u32, 2>`, are reachable only here. The types, operators and modules are in Values and primitive types, under SIMD vectors and masks.
 
 ## Architecture members
 
@@ -126,7 +126,7 @@ Each architecture member stands for one instruction of one target that the porta
 - Otherwise the call is SEM0241. With the default x86-64 profile, which has SSE2 but not SSSE3, `Intrinsic.x86ShuffleBytes<simd<u8, 16>>(a, a)` prints "Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`". An AArch64 member on x86-64 prints "needs aarch64 with neon".
 - Code for several targets puts each call under a `static if` on `Target.arch()` and `Target.hasCpuFeature`, or in a function that lists the feature.
 - A shape the member does not take is SEM0239 at the call, and the message lists the shapes it takes: `x86ShuffleBytes<simd<u16, 8>>` prints ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. The shape is checked before the target and features, so this is reported on any target.
-- `silk/arch/x86`, `silk/arch/aarch64` and `silk/arch/wasm` wrap each member in a function that compiles to the instruction where the profile enables it and to portable code everywhere else. See Values and primitive types, under SIMD vectors and masks.
+- `silk/simd/x86`, `silk/simd/aarch64` and `silk/simd/wasm` wrap each member in a function that compiles to the instruction where the profile enables it and to portable code everywhere else. See Values and primitive types, under SIMD vectors and masks.
 
 ## Type and property members
 
@@ -140,7 +140,7 @@ Each architecture member stands for one instruction of one target that the porta
 | Property clauses | `with Intrinsic.foreign(...)`, `with Intrinsic.nonParking()`, `with Intrinsic.machine(...)` |
 | Module | `application`, imported by entry modules as `import Intrinsic.application` |
 
-- `impl Intrinsic.Copy for T {}` and `impl Copy for T {}` (with `Copy` from `silk/ownership`) are the same conformance. The same holds for `Drop`.
+- `impl Intrinsic.Copy for T {}` and `impl Copy for T {}` (with `Copy` from `silk/core/ownership`) are the same conformance. The same holds for `Drop`.
 - `with Intrinsic.foreign(...)` describes foreign functions; see Unsafe code and C interop.
 - `with Intrinsic.machine(naked: true, noReturn: true)` appears only on startup entry points in the standard library.
 - `with Intrinsic.nonParking()` takes no fields. It is accepted on an ordinary function or service operation.
@@ -159,10 +159,10 @@ unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> wit
 ```
 
 - The value is a tuple of text literals, `("ssse3", "avx2")`, or one literal, `"avx2"`. A name outside the target's feature catalog is SEM0242: `features: ("neon",)` on x86-64 prints "neon is not a CPU feature of x86_64-unknown-linux-gnu; `features` lists text literals from the target's catalog". A constant or any other non-literal entry is also SEM0242, with "a non-literal entry" in place of the name. An empty list, `features: ()`, is SEM0242 too: "`features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the clause". Level names such as `"x86-64-v3"` are models, not features.
-- The function must be declared `unsafe fn`; otherwise SEM0243 at the declaration: "safe enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them". Each call is an unsafe operation (SEM0082 outside `unsafe`). Running it on a machine without the features is undefined; check first with `CpuFeatures.detect()` from `silk/cpu`.
+- The function must be declared `unsafe fn`; otherwise SEM0243 at the declaration: "safe enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them". Each call is an unsafe operation (SEM0082 outside `unsafe`). Running it on a machine without the features is undefined; check first with `CpuFeatures.detect()` from `silk/simd/cpu`.
 - Free functions, methods, generic functions and effect functions take the clause. `with Intrinsic.nonParking()` may sit beside it. A closure does not take a `with` clause.
 - The function is compiled with the listed features, the features they imply and the profile's features. Architecture members that need them are admitted in its body (SEM0241 otherwise). Functions it calls are compiled for the profile, unless the optimizer inlines them into it.
-- `Target.hasCpuFeature` and the other static queries still read the profile inside the function. A `silk/arch` wrapper called from it takes its portable path unless the profile enables the feature; call the `Intrinsic` member directly instead.
+- `Target.hasCpuFeature` and the other static queries still read the profile inside the function. A `silk/simd/x86` or `silk/simd/aarch64` wrapper called from it takes its portable path unless the profile enables the feature; call the `Intrinsic` member directly instead.
 - A `static if` on `Intrinsic.targetArchitecture()` keeps the function out of builds for other targets, where its features would be SEM0242.
 
 ## Unsafe members
@@ -172,7 +172,7 @@ unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> wit
 - So are these storage members: `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `sharedFromAllocation`, `stringFromUtf8Unchecked`, `executionFromAllocation`.
 - Call them inside `unsafe { }` or as `unsafe Intrinsic.member(...)`. Otherwise SEM0082.
 - No other member is unsafe. Scalar operations, the other SIMD members, architecture members, target queries and reflection are safe. A function compiled for extra CPU features is unsafe to call; see Functions compiled for CPU features above.
-- `allocationAdopt(base: *mut u8, layout: Layout, reclaim: extern "C" fn(?*mut u8) -> (), context: ?*mut u8)` returns an `Allocation` over storage that the caller manages. Dropping it calls `reclaim(context)` instead of returning memory to the system. `Arena` in `silk/arena` uses it for each allocation it hands out.
+- `allocationAdopt(base: *mut u8, layout: Layout, reclaim: extern "C" fn(?*mut u8) -> (), context: ?*mut u8)` returns an `Allocation` over storage that the caller manages. Dropping it calls `reclaim(context)` instead of returning memory to the system. `Arena` in `silk/mem/arena` uses it for each allocation it hands out.
 
 ## Static-only members
 
@@ -191,24 +191,24 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 
 | Intrinsic area | Wrapper |
 | --- | --- |
-| Scalar operations | `silk/i8` ... `silk/usize`, `silk/f32`, `silk/f64`, `silk/bool`, `silk/char` |
-| `Copy`, `Drop` | `silk/ownership` |
+| Scalar operations | `silk/num/i8` ... `silk/num/usize`, `silk/num/f32`, `silk/num/f64`, `silk/core/bool`, `silk/text/char` |
+| `Copy`, `Drop` | `silk/core/ownership` |
 | Operator interfaces | `silk/ops`, `silk/equal`, `silk/order` |
-| Pointers | `silk/pointer` |
-| Atomics | `silk/atomic` |
-| SIMD vectors | `silk/simd` and one module per shape, such as `silk/simd/u8x16` and `silk/simd/mask16` |
-| Architecture operations | `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm` |
-| Allocation, raw storage | `silk/allocator`, `silk/arena`, `silk/layout`, `silk/raw_buffer`, `silk/slot`, `silk/box`, `silk/list` |
-| Shared ownership | `silk/shared` |
-| Execution | `silk/execution` |
-| Effect composition | `silk/effect` (`provide`, `provideMut`, `catch`, `catchAll`, finalizers) |
-| Target queries | `silk/target` (`Target.arch()`, `Target.operatingSystem()`, `Target.hasCpuFeature(...)`, `pointerBits`) |
-| CPU features of the running machine | `silk/cpu` (`CpuFeatures.detect()`, `has`) |
-| Profile queries | `silk/compilation` (`Compilation.libc()`, `debug`, ...) |
-| Reflection | `silk/reflect` (`Reflect.typeOf`, `Reflect.fields`, `Reflect.typeKind`, ...) |
-| Static text and sequences | `silk/static_text`, `silk/static_sequence` |
-| `sliceView` | `silk/slice` |
-| Tests | `silk/test_runner` |
+| Pointers | `silk/mem/pointer` |
+| Atomics | `silk/concurrency/atomic` |
+| SIMD vectors | `silk/simd/simd` and one module per shape, such as `silk/simd/u8x16` and `silk/simd/mask16` |
+| Architecture operations | `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm` |
+| Allocation, raw storage | `silk/mem/allocator`, `silk/mem/arena`, `silk/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/box`, `silk/collections/list` |
+| Shared ownership | `silk/mem/shared` |
+| Execution | `silk/concurrency/execution` |
+| Effect composition | `silk/core/effect` (`provide`, `provideMut`, `catch`, `catchAll`, finalizers) |
+| Target queries | `silk/core/target` (`Target.arch()`, `Target.operatingSystem()`, `Target.hasCpuFeature(...)`, `pointerBits`) |
+| CPU features of the running machine | `silk/simd/cpu` (`CpuFeatures.detect()`, `has`) |
+| Profile queries | `silk/core/compilation` (`Compilation.libc()`, `debug`, ...) |
+| Reflection | `silk/core/reflect` (`Reflect.typeOf`, `Reflect.fields`, `Reflect.typeKind`, ...) |
+| Static text and sequences | `silk/core/static_text`, `silk/core/static_sequence` |
+| `sliceView` | `silk/collections/slice` |
+| Tests | `silk/testing/runner` |
 
 ## Examples
 
@@ -301,7 +301,7 @@ pub fn main() -> i32 {
 }
 ```
 
-SIMD members on shapes that have no `silk/simd` module, a 64-lane byte vector and a two-lane result:
+SIMD members on shapes that have no `silk/simd/simd` module, a 64-lane byte vector and a two-lane result:
 
 ```silk
 pub fn main() -> i32 {
@@ -326,7 +326,7 @@ pub fn main() -> i32 {
 A function compiled for AVX2, called only after the running machine reports AVX2. The program builds for every target and exits with 0 on any x86-64 machine:
 
 ```silk
-import silk.cpu { CpuFeatures }
+import silk.simd.cpu { CpuFeatures }
 
 static if Intrinsic.targetArchitecture() == "x86_64" {
   // Compiled for AVX2, so the 32-byte pshufb is admitted. AVX2 implies SSSE3, so the
@@ -399,11 +399,11 @@ pub fn main() -> i32 {
 }
 ```
 
-Two SHA-256 rounds with `sha256rnds2`, checked against the `silk/arch/x86` wrapper, which takes its portable path under the default profile. The program exits with 0 with or without SHA, and also builds for AArch64:
+Two SHA-256 rounds with `sha256rnds2`, checked against the `silk/simd/x86` wrapper, which takes its portable path under the default profile. The program exits with 0 with or without SHA, and also builds for AArch64:
 
 ```silk
-import silk.arch.x86
-import silk.cpu { CpuFeatures }
+import silk.simd.x86
+import silk.simd.cpu { CpuFeatures }
 import silk.simd.u32x4
 
 static if Intrinsic.targetArchitecture() == "x86_64" {
@@ -458,7 +458,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Values and primitive types · Interfaces and impls · Ownership and moves · Unsafe code and C interop · Allocation and shared ownership · Static evaluation · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/ownership`, `silk/pointer`, `silk/simd`, `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`, `silk/cpu`, `silk/reflect`, `silk/target`, `silk/compilation`, `silk/effect`
+Values and primitive types · Interfaces and impls · Ownership and moves · Unsafe code and C interop · Allocation and shared ownership · Static evaluation · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/core/ownership`, `silk/mem/pointer`, `silk/simd/simd`, `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm`, `silk/simd/cpu`, `silk/core/reflect`, `silk/core/target`, `silk/core/compilation`, `silk/core/effect`
 
 ## Open questions
 

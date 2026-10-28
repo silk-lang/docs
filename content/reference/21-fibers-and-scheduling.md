@@ -1,11 +1,11 @@
 # Fibers and scheduling
 
-Silk runs concurrent work as cooperative fibers on one thread. This page covers forking and observing fibers, yielding, the `Scheduler` service, the `LocalScheduler` provider, timers, and the setup a program needs before any fiber can run. Fibers add no syntax: they are library operations from `silk/fiber`, `silk/scheduler` and `silk/local_scheduler`, used with `run` and requirement rows.
+Silk runs concurrent work as cooperative fibers on one thread. This page covers forking and observing fibers, yielding, the `Scheduler` service, the `LocalScheduler` provider, timers, and the setup a program needs before any fiber can run. Fibers add no syntax: they are library operations from `silk/concurrency/fiber`, `silk/concurrency/scheduler` and `silk/concurrency/local_scheduler`, used with `run` and requirement rows.
 
 ## Execution model
 
 - All fibers of one scheduler run on one host thread. There is no parallelism and no preemption.
-- Native threads are separate from fibers. `NativeThread.spawn` in `silk/native_thread` runs a `Transferable` closure on its own operating-system thread, and `JoinHandle.join` waits for its result. `silk/atomic`, `silk/sync` and `silk/thread` hold the matching atomics, locks and thread properties. `silk/work_queue` has queues that move owned values between threads, and `silk/thread_pool` runs `Transferable` lazy tasks on a work-stealing pool of native threads. This page does not cover them.
+- Native threads are separate from fibers. `NativeThread.spawn` in `silk/concurrency/thread_native` runs a `Transferable` closure on its own operating-system thread, and `JoinHandle.join` waits for its result. `silk/concurrency/atomic`, `silk/concurrency/sync` and `silk/concurrency/thread` hold the matching atomics, locks and thread properties. `silk/concurrency/work_queue` has queues that move owned values between threads, and `silk/concurrency/thread_pool` runs `Transferable` lazy tasks on a work-stealing pool of native threads. This page does not cover them.
 - A task runs until it parks. It parks when it waits on an unfinished fiber, yields, waits on a timer, or forks a child.
 - When a task parks, the scheduler resumes another ready task. `LocalScheduler` keeps ready tasks in FIFO order.
 - A task that never parks keeps the thread until it finishes.
@@ -13,7 +13,7 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 
 ## Fiber handles
 
-- `Fiber<A, E>` from `silk/fiber` is an affine handle to one task's result. `A` is the success type, `E` the failure type.
+- `Fiber<A, E>` from `silk/concurrency/fiber` is an affine handle to one task's result. `A` is the success type, `E` the failure type.
 - Observing a fiber consumes it. Using a handle after `join` or `await` is OWN0001.
 - A fiber has at most one observer.
 - Dropping a fiber stops observation. It does not cancel the task.
@@ -52,14 +52,14 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 
 ## The Scheduler service
 
-- `Scheduler` in `silk/scheduler` is a service with one operation, `prepare`. It prepares a child task without publishing it.
+- `Scheduler` in `silk/concurrency/scheduler` is a service with one operation, `prepare`. It prepares a child task without publishing it.
 - `Fiber.forkChild` calls `Scheduler.prepare` and then publishes the child. Application code uses `forkChild`, not `prepare`.
 - A custom scheduler implements `Scheduler` and drives the published tasks itself.
 - `TaskId` values are unique within one scheduler run and are not reused.
 
 ## LocalScheduler
 
-- `LocalScheduler` in `silk/local_scheduler` is the standard deterministic single-thread provider. `LocalScheduler.make()` creates one.
+- `LocalScheduler` in `silk/concurrency/local_scheduler` is the standard deterministic single-thread provider. `LocalScheduler.make()` creates one.
 - `LocalScheduler.execute(&mut scheduler, program)` runs `program` as the root task (task zero) and returns its result.
 - `program` has the same type as a forked child: `once Effect<'static; A ! E ? &mut Scheduler | &mut MonotonicClock>`.
 - `execute` returns `A ! E | OutOfMemoryError | StalledError ? &mut MonotonicClock`. The `MonotonicClock` requirement is the parent clock, used for timer waits.
@@ -68,19 +68,19 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 
 ## StalledError
 
-- `StalledError` from `silk/local_scheduler` is raised when the root is unfinished, no task is ready, and no timer is pending.
+- `StalledError` from `silk/concurrency/local_scheduler` is raised when the root is unfinished, no task is ready, and no timer is pending.
 - This happens when a task parks and the `Wake` that would resume it is lost.
 - `execute` cancels and releases the whole task tree before it raises `StalledError`.
 
 ## Sleeping and timers
 
-- `Effect.sleep(duration)` in `silk/effect` waits `duration` nanoseconds. It requires `? &mut MonotonicClock`. Duration literals such as `2ms` fit.
+- `Effect.sleep(duration)` in `silk/core/effect` waits `duration` nanoseconds. It requires `? &mut MonotonicClock`. Duration literals such as `2ms` fit.
 - `MonotonicClock.waitFor(duration)` and `MonotonicClock.waitUntil(deadline)` are the underlying operations. `MonotonicClock.now()` reads the clock.
 - Inside a `LocalScheduler` task, a wait parks only that task. Other tasks keep running.
 - Waiting tasks resume in deadline order, then in registration order.
 - When no task is ready, the driver waits on the parent clock until the earliest deadline.
 - Clock reads inside a task return one cached mark per driver turn.
-- The parent clock decides what a wait means. `OsMonotonicClock.make()` from `silk/os_monotonic_clock` blocks the host thread. A provider whose `waitUntil` only records the deadline gives virtual time.
+- The parent clock decides what a wait means. `OsMonotonicClock.make()` from `silk/system/monotonic_clock_native` blocks the host thread. A provider whose `waitUntil` only records the deadline gives virtual time.
 - Outside any scheduler, `Effect.sleep` with `OsMonotonicClock` blocks the whole program.
 
 ## Runtime setup in main
@@ -95,13 +95,13 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 Fork two children, yield inside them, and join both from an effect `main`:
 
 ```silk
-import silk.allocator { OutOfMemoryError }
-import silk.effect { Effect }
-import silk.fiber { Fiber, Cancelled }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.mem.allocator { OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
 
 effect fn square(n: i32) -> i32 {
   run Fiber.yieldNow()
@@ -131,13 +131,13 @@ pub effect fn main() -> i32
 Timers, a typed child failure, and `await` with `Outcome`:
 
 ```silk
-import silk.effect { Effect }
-import silk.fiber { Fiber, Cancelled, Outcome, Success, Failure }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.allocator { OutOfMemoryError }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled, Outcome, Success, Failure }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.mem.allocator { OutOfMemoryError }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
 
 struct Refused {
   code: i32,
@@ -202,14 +202,14 @@ pub fn main() -> i32 {
 Fork order, dropped fibers, and cancellation when the root finishes. The child runs only after the parent yields. The sleeping child is cancelled when the root returns, so it never writes:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.fiber { Fiber, Cancelled }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.mem.shared { Shared }
 
 struct Log {
   value: i32,
@@ -295,7 +295,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Suspension and cancellation · Effects and run · Services and providers · Typed failures · Allocation and shared ownership · Ownership and moves · Program entry and termination · `silk/fiber` · `silk/scheduler` · `silk/local_scheduler` · `silk/monotonic_clock` · `silk/os_monotonic_clock` · `silk/execution`
+Suspension and cancellation · Effects and run · Services and providers · Typed failures · Allocation and shared ownership · Ownership and moves · Program entry and termination · `silk/concurrency/fiber` · `silk/concurrency/scheduler` · `silk/concurrency/local_scheduler` · `silk/system/monotonic_clock` · `silk/system/monotonic_clock_native` · `silk/concurrency/execution`
 
 ## Open questions
 

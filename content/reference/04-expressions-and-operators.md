@@ -96,7 +96,7 @@ From weakest to strongest:
 - No import activates an operator. The use site needs neither `silk/ops` nor the module holding the conformance.
 - With no matching conformance the operator is SEM0135. With two matching conformances it is SEM0136.
 - Concrete primitive operands always use the built-in operator.
-- Generic code applies an operator to `T` through a bound such as `T: Add<T, T>`. See Interfaces and impls and `silk/numeric`.
+- Generic code applies an operator to `T` through a bound such as `T: Add<T, T>`. See Interfaces and impls and `silk/num/numeric`.
 
 ## Postfix forms
 
@@ -261,7 +261,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Lexical structure · Values and primitive types · Bindings and statements · Control flow · Structs, tuples and arrays · Patterns and match · Functions and methods · Closures and callable types · Generics · Interfaces and impls · Ownership and moves · Borrowing · Unsafe code and C interop · Effects and run · Typed failures · Services and providers · Static evaluation · `silk/ops`, `silk/equal`, `silk/order`, `silk/numeric`, `silk/bool`
+Lexical structure · Values and primitive types · Bindings and statements · Control flow · Structs, tuples and arrays · Patterns and match · Functions and methods · Closures and callable types · Generics · Interfaces and impls · Ownership and moves · Borrowing · Unsafe code and C interop · Effects and run · Typed failures · Services and providers · Static evaluation · `silk/ops`, `silk/equal`, `silk/order`, `silk/num/numeric`, `silk/core/bool`
 
 ## Open questions
 

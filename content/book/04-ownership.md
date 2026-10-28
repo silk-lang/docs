@@ -9,10 +9,10 @@ These rules are the part of Silk that surprises people most. Take this chapter s
 Here is where the chapter ends up. Replace `src/main.silk` with it, then the sections below take it apart and break it on purpose. The line numbers in the error messages refer to this file.
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
-import silk.ownership { Copy }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.ownership { Copy }
 
 enum Priority {
   Low,
@@ -289,7 +289,7 @@ The line numbers are two lower than before because you removed two lines. Withou
 
 You could write `move` and juggle copies by hand, but that is silly for a wrapper around a `u32`. Put the line back. `impl Copy for T {}` is allowed when every field is itself `Copy`, which is why it is fine for `TaskId` and would be rejected for a type that owned something. If a type that owns a resource could copy itself, you would be back to two owners.
 
-`Copy` comes from `silk/ownership`, which is why the file now imports it.
+`Copy` comes from `silk/core/ownership`, which is why the file now imports it.
 
 ## Borrowing: looking without taking
 

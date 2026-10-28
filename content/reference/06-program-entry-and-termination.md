@@ -15,9 +15,9 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 ## Entry point
 
 - The entry point is the function named `main` in the root module of the package. It must be `pub` and take no parameters.
-- The default hosted runtime is the std lib module `silk/native_start`. It calls `main` and turns its result into the process status.
-- A package can name other runtimes in `silk.toml`, as `[unstable]` `composition = { runtimes = [{ name = "synchronous", module = "silk/native_start_sync" }], defaults = [] }`. A profile picks one with `runtime = { kind = "named", name = "synchronous" }` beside its `target`, and `silk build --profile <name>` uses it. A name listed in `defaults` is used by a plain `silk build`. `silk/native_start_sync` starts only an `effect fn main() -> i32 ? &HostInput`. It also accepts `? &mut HostInput` and a failure row. A typed failure drops its payload and exits with 1, with no report.
-- Under `silk/native_start_sync`, any other `main`, such as `pub fn main() -> i32` or `pub effect fn main() -> i32` with no requirement, is SEM0225 at `main` in both `silk check` and `silk build`: "Entry point `main` has a result or requirement the selected runtime `silk/native_start_sync` cannot start".
+- The default hosted runtime is the std lib module `silk/platform/native/start`. It calls `main` and turns its result into the process status.
+- A package can name other runtimes in `silk.toml`, as `[unstable]` `composition = { runtimes = [{ name = "synchronous", module = "silk/platform/native/start_sync" }], defaults = [] }`. A profile picks one with `runtime = { kind = "named", name = "synchronous" }` beside its `target`, and `silk build --profile <name>` uses it. A name listed in `defaults` is used by a plain `silk build`. `silk/platform/native/start_sync` starts only an `effect fn main() -> i32 ? &HostInput`. It also accepts `? &mut HostInput` and a failure row. A typed failure drops its payload and exits with 1, with no report.
+- Under `silk/platform/native/start_sync`, any other `main`, such as `pub fn main() -> i32` or `pub effect fn main() -> i32` with no requirement, is SEM0225 at `main` in both `silk check` and `silk build`: "Entry point `main` has a result or requirement the selected runtime `silk/platform/native/start_sync` cannot start".
 - Both `silk check` and `silk build` check the entry against the runtime, except for parking: a `main` that may park passes `silk check` and fails only `silk build`. A `main` the runtime cannot start is SEM0225, reported at the name `main`, or at line 1, column 1 when there is none:
 
 | Problem | Message |
@@ -26,7 +26,7 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 | `main` is not `pub` | Entry point `main` must be `pub` |
 | `main` declares a parameter | Entry point `main` must take no parameters |
 | Unsupported result type or requirement | Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` |
-| A `main` shape a std lib runtime such as `silk/native_start_sync` does not adapt | Entry point `main` has a result or requirement the selected runtime `<module>` cannot start |
+| A `main` shape a std lib runtime such as `silk/platform/native/start_sync` does not adapt | Entry point `main` has a result or requirement the selected runtime `<module>` cannot start |
 | `main` may park | Entry point `main` may park, but the selected runtime starts it without a scheduler, so it must not park |
 
 - The parking check runs only in `silk build`. See Fibers and scheduling.
@@ -41,7 +41,7 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 | `pub effect fn main() ! E` | 0, or 1 on an uncaught failure |
 
 - The failure row `! E` is optional and may list several types: `! A | B`. Each type must implement `Debug`, which the report uses to show the value. Otherwise `main` is rejected (SEM0225).
-- The only requirement the runtime provides is `? &mut HostInput` from `silk/host_input`. It holds an owned copy of the arguments and environment.
+- The only requirement the runtime provides is `? &mut HostInput` from `silk/system/host_input`. It holds an owned copy of the arguments and environment.
 - Any other requirement, such as `? &mut Allocator`, is rejected (SEM0225). Supply other services inside `main`, for example `Allocator.systemAllocatorProvider()`. See Services and providers.
 - Other result types, such as `u8` or `bool`, are rejected (SEM0225).
 - A plain `pub fn main` can still `run` an effect whose failures are all handled, for example through `Effect.catchAll`.
@@ -64,15 +64,15 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 - A trap is a fatal runtime error. It does not unwind and runs no cleanup.
 - The runtime writes `fatal trap: <reason>` to standard error, followed by the frame where it happened. The process then stops with an illegal-instruction signal (the shell shows status 132).
 - Reasons include `arithmetic overflow`, `division by zero`, `index out of bounds` and `slice range out of bounds`.
-- Arithmetic overflow traps for every integer width, including `u8`. Use the `checked*`, `wrapping*` or `saturating*` functions in `silk/i32` and the other integer modules to avoid it.
+- Arithmetic overflow traps for every integer width, including `u8`. Use the `checked*`, `wrapping*` or `saturating*` functions in `silk/num/i32` and the other integer modules to avoid it.
 - Indexes that are known at compile time to be out of range are rejected before the program runs (SEM0034).
 
 ## Arguments and standard input
 
 - Declare `? &mut HostInput` on `main` to read process arguments, environment variables and the working directory. `HostInput.argumentCount()` includes the program name at index 0.
 - `HostInput.argument(index)` returns `Option<Bytes>` and needs an `Allocator`. Arguments are raw bytes and need not be UTF-8.
-- Standard input is not provided automatically. Construct `OsStandardInput.make()` from `silk/os_standard_input` and provide it for the `StandardInput` requirement.
-- Standard output is written through `StdoutWriter.make()` from `silk/os_writer` and the `Writer` service.
+- Standard input is not provided automatically. Construct `OsStandardInput.make()` from `silk/io/standard_input_native` and provide it for the `StandardInput` requirement.
+- Standard output is written through `StdoutWriter.make()` from `silk/io/writer_native` and the `Writer` service.
 
 ## Termination
 
@@ -95,7 +95,7 @@ An uncaught failure:
 
 ```silk
 import silk.format { Debug, Format, Formatter }
-import silk.writer { Writer, WriterError }
+import silk.io.writer { Writer, WriterError }
 
 pub struct NotFound { pub code: i32 }
 
@@ -128,16 +128,16 @@ unhandled value: NotFound { code: 4 }
 Echo the first argument, then return the number of bytes read from standard input:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.host_input { HostInput, HostInputError }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.system.host_input { HostInput, HostInputError }
 import silk.option { Option }
-import silk.os_standard_input { OsStandardInput }
-import silk.os_writer { StdoutWriter }
-import silk.standard_input { StandardInput, StreamReadError }
-import silk.writer { Writer, WriterError }
-import silk.usize
+import silk.io.standard_input_native { OsStandardInput }
+import silk.io.writer_native { StdoutWriter }
+import silk.io.standard_input { StandardInput, StreamReadError }
+import silk.io.writer { Writer, WriterError }
+import silk.num.usize
 
 pub effect fn main() -> i32
 ! HostInputError | OutOfMemoryError | WriterError | StreamReadError
@@ -179,7 +179,7 @@ fatal trap: index out of bounds
 
 ## See also
 
-Control flow · Functions and methods · Structs, tuples and arrays · Values and primitive types · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/native_start`, `silk/host_input`, `silk/standard_input`, `silk/os_standard_input`, `silk/os_writer`, `silk/writer`
+Control flow · Functions and methods · Structs, tuples and arrays · Values and primitive types · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/platform/native/start`, `silk/system/host_input`, `silk/io/standard_input`, `silk/io/standard_input_native`, `silk/io/writer_native`, `silk/io/writer`
 
 ## Open questions
 

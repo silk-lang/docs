@@ -1,0 +1,181 @@
+The `MonotonicClock` effect: time that never goes back, for durations, timeouts, and waits.
+
+## When to use
+Require `&mut MonotonicClock` to measure how long something takes, to compute a deadline, or to
+wait. Use `silk.system.system_clock` when you need the date and time of day.
+
+## Details
+[`MonotonicClock.now`](#MonotonicClock.now) returns an [`Instant`](/docs/std/system-system-clock#Instant) from an origin that is not specified, such as the
+start of the computer. Each read is equal to or later than the read before it. A mark or a
+deadline has a meaning only for the clock that made it.
+
+Durations are `u64` nanoseconds. A duration literal such as `300ms` has this type.
+[`MonotonicClock.deadlineAfter`](#MonotonicClock.impl.deadlineAfter) adds a duration to a mark.
+
+## Gotchas
+`Instant` is also the type of system time. The compiler cannot stop you from mixing marks of
+different clocks, or a mark with system time. The native provider blocks the thread when it
+waits. A task scheduler provides a clock whose waits pause only one task. A test clock can move
+its time forward without sleeping. If a provider returns a value that is not valid, the program
+traps, because this effect has no error type.
+
+## Examples
+### Use a test clock that moves forward without sleeping
+```silk
+import silk.core.effect { Effect }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.system_clock { Instant, SystemClock }
+
+struct VirtualClock {
+  mark: Instant,
+}
+
+impl MonotonicClock for VirtualClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return SystemClock.make(SystemClock.seconds(&self.mark), SystemClock.nanoseconds(&self.mark))
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return 1
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    self.mark = move when
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    self.mark = MonotonicClock.deadlineAfter(&self.mark, howLong)
+    return ()
+  }
+}
+
+pub fn main() -> i32 {
+  let mut clock = VirtualClock { mark: SystemClock.make(0, 900000000) }
+  run MonotonicClock.waitFor(300ms) |> Effect.provideMut<MonotonicClock>(&mut clock)
+  if SystemClock.seconds(&clock.mark) != 1 || SystemClock.nanoseconds(&clock.mark) != 200000000 {
+    return 1
+  }
+  return 0
+}
+```
+
+Import as `MonotonicClock` with `import silk.system.monotonic_clock { MonotonicClock }`.
+
+Public declarations: 1.
+
+::Anchor{id="MonotonicClock"}
+
+## `MonotonicClock`
+
+```silk
+pub service MonotonicClock
+```
+
+The effect for a clock that never goes back, for durations, timeouts, and waits.
+
+### When to use
+
+Require `&mut MonotonicClock` to measure how long something takes, to compute a deadline, or to
+wait. Use `silk.system.system_clock` when you need the date and time of day.
+
+### Details
+
+[`MonotonicClock.now`](#MonotonicClock.now) returns an `Instant` from an origin that is not specified, such as the
+start of the computer. Durations are `u64` nanoseconds. A duration literal such as `300ms` has
+this type. /// A provider implements all four operations on one timeline. Exclusive access lets
+a test provider move its own time forward and record waits.
+
+### Gotchas
+
+A mark or a deadline has a meaning only for the clock that made it. `Instant` is also the type
+of system time, and the compiler cannot stop you from mixing marks of different clocks, or a
+mark with system time. The native provider blocks the thread when it waits. A task scheduler
+provides a clock whose waits pause only one task. If a provider returns a value that is not
+valid, the program traps, because this effect has no error type.
+
+::Anchor{id="MonotonicClock.now"}
+
+### Operation `now`
+
+```silk
+effect fn now() -> Instant ? &mut MonotonicClock
+```
+
+Returns the current mark. It is equal to or later than each earlier mark of the same clock.
+
+::Anchor{id="MonotonicClock.getResolution"}
+
+### Operation `getResolution`
+
+```silk
+effect fn getResolution() -> u64 ? &mut MonotonicClock
+```
+
+Returns the tick of the clock in nanoseconds. It is at least 1. The real precision can be
+lower.
+
+::Anchor{id="MonotonicClock.waitUntil"}
+
+### Operation `waitUntil`
+
+```silk
+effect fn waitUntil(when: Instant) -> () ? &mut MonotonicClock
+```
+
+Returns when the clock reaches `when`. If `when` is in the past, it returns at once.
+
+#### Gotchas
+
+`when` must be a mark of the same clock. The native provider blocks the calling thread.
+
+::Anchor{id="MonotonicClock.waitFor"}
+
+### Operation `waitFor`
+
+```silk
+effect fn waitFor(howLong: u64) -> () ? &mut MonotonicClock
+```
+
+Returns when at least `howLong` nanoseconds have passed on the clock.
+
+#### Gotchas
+
+A duration of 0 can return at once. If the deadline does not fit in an `Instant`, the provider
+traps.
+
+::Anchor{id="MonotonicClock.impl"}
+
+## Implementation `MonotonicClock`
+
+```silk
+impl MonotonicClock
+```
+
+::Anchor{id="MonotonicClock.impl.deadlineAfter"}
+
+### Associated function `deadlineAfter`
+
+```silk
+pub fn deadlineAfter(start: &Instant, howLong: u64) -> Instant
+```
+
+Returns the mark that is `howLong` nanoseconds after `start`.
+
+#### When to use
+
+Use it to compute a deadline for operations that take one, such as
+`silk.io.byte_duplex.ByteDuplex.readSome`: `MonotonicClock.deadlineAfter(&now, 5000ms)`.
+
+#### Details
+
+Every `u64` duration works when the result fits in an `Instant`.
+
+#### Gotchas
+
+It traps if the seconds of the result do not fit in `i64`. Use `start` from the same clock
+that will use the deadline.
+
+Category: System.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

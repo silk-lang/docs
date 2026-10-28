@@ -2,8 +2,8 @@ Check and write the head of an HTTP request before it is sent.
 
 ## When to use
 Use [`fromUri`](#fromUri) or [`prepare`](#prepare) to make a [`PreparedRequest`](#PreparedRequest) for a direct connection to an
-origin. `silk.http_exchange` sends it. Use [`prepareForward`](#prepareForward) and [`prepareConnect`](#prepareConnect) for a route
-from `silk.http_proxy`. Most programs use `silk.http_client` or `silk.http_fetch`, which call
+origin. `silk.http.exchange` sends it. Use [`prepareForward`](#prepareForward) and [`prepareConnect`](#prepareConnect) for a route
+from `silk.http.proxy`. Most programs use `silk.http.client` or `silk.http.fetch`, which call
 this module.
 
 ## Details
@@ -23,15 +23,15 @@ By default, Basic credentials fail over plain HTTP with `InsecureBasic`. Set `ba
 ## Examples
 ### Prepare a GET request
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.http { Header, Method, ValueError, Version }
-import silk.http_headers { Headers, Limits }
-import silk.http_request { BodyMode, HeaderPolicy, PreparedRequest, RequestError, fromUri }
-import silk.result { Result }
-import silk.uri { Uri }
-import silk.uri_reference { ParseError }
-import silk.usize
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.http.message { Header, Method, ValueError, Version }
+import silk.http.headers { Headers, Limits }
+import silk.http.request { BodyMode, HeaderPolicy, PreparedRequest, RequestError, fromUri }
+import silk.core.result { Result }
+import silk.uri.uri { Uri }
+import silk.uri.reference { ParseError }
+import silk.num.usize
 
 fn limits() -> Limits {
   return Limits {
@@ -107,7 +107,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `HttpRequest` with `import silk.http_request as HttpRequest`.
+Import as `HttpRequest` with `import silk.http.request as HttpRequest`.
 
 Public declarations: 11.
 
@@ -278,7 +278,7 @@ The whole field value.
 Basic
 ```
 
-Send HTTP Basic credentials. See `silk.http_basic`.
+Send HTTP Basic credentials. See `silk.http.basic`.
 
 ::Anchor{id="Authorization.Basic.username"}
 
@@ -470,7 +470,7 @@ A method, target, or field is not valid.
 pub error: ValueError
 ```
 
-The error from `silk.http`.
+The error from `silk.http.message`.
 
 ::Anchor{id="RequestError.Origin"}
 
@@ -490,7 +490,7 @@ The origin is not valid, or its authority does not fit.
 pub error: OriginError
 ```
 
-The error from `silk.http_origin`.
+The error from `silk.http.origin`.
 
 ::Anchor{id="RequestError.Basic"}
 
@@ -510,7 +510,7 @@ The Basic credentials are not valid.
 pub error: BasicError
 ```
 
-The error from `silk.http_basic`. It does not hold the credentials.
+The error from `silk.http.basic`. It does not hold the credentials.
 
 ::Anchor{id="RequestError.ConflictingHeader"}
 
@@ -645,8 +645,8 @@ A checked request head, written as bytes and ready to send. It owns its memory.
 ### When to use
 
 Make one with [`fromUri`](#fromUri) or [`prepare`](#prepare) for a direct connection to an origin, or with
-[`prepareForward`](#prepareForward) and [`prepareConnect`](#prepareConnect) for a route from `silk.http_proxy`. Send it with
-`silk.http_exchange`.
+[`prepareForward`](#prepareForward) and [`prepareConnect`](#prepareConnect) for a route from `silk.http.proxy`. Send it with
+`silk.http.exchange`.
 
 ::Anchor{id="PreparedRequest.impl"}
 

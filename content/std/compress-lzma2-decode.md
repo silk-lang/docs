@@ -1,0 +1,45 @@
+LZMA2 chunk framing shared by raw LZMA2 and XZ decoders.
+
+Import as `Lzma2Stream` with `import silk.compress.lzma2_decode { Lzma2Stream }`.
+
+Public declarations: 1.
+
+::Anchor{id="Lzma2Stream"}
+
+## `Lzma2Stream`
+
+```silk
+pub struct Lzma2Stream
+```
+
+Internal LZMA2 stream driver; state owns probability models and progress counters.
+
+::Anchor{id="Lzma2Stream.impl"}
+
+## Implementation `Lzma2Stream`
+
+```silk
+impl Lzma2Stream
+```
+
+::Anchor{id="Lzma2Stream.impl.decode"}
+
+### Associated function `decode`
+
+```silk
+pub effect fn decode(
+    state: &mut LzmaState,
+    input: &[u8],
+    output: &mut [u8],
+    workspace: usize
+  ) -> ()
+    ! OutOfMemoryError
+    ? &mut Allocator
+```
+
+Decodes through the LZMA2 end control byte, preserving any following container bytes.
+Requires a validated dictionary size and slice bounds in `state`.
+
+Category: Data formats.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.

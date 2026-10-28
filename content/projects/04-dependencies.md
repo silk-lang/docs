@@ -40,9 +40,9 @@ You can also write the entry by hand. See **The manifest** for the keys.
 The first segment of the import path is the dependency name. The rest is a module the dependency exports.
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 import text_utils.lib { countSpaces }
 
 pub effect fn main() -> ()

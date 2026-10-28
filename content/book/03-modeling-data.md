@@ -7,12 +7,12 @@ At the end of chapter 2, a task was a position shared by two arrays: an estimate
 The report from chapter 2 has served its purpose. Replace `src/main.silk` with the version built in this chapter. Keep the imports and `main`. Everything between them is new, including the body of `report`.
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
 ```
 
-You no longer need `silk.usize`, so that import goes.
+You no longer need `silk.num.usize`, so that import goes.
 
 ## Enums: a fixed set of names
 
@@ -300,9 +300,9 @@ The urgent arm won, because the guard saw `Priority.High`.
 ## The whole file
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
 
 enum Priority {
   Low,

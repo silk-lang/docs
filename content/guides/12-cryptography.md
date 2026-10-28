@@ -8,15 +8,15 @@ The crypto modules are portable and allocate nothing. They work on byte slices (
 
 | Need | Module | Type |
 | --- | --- | --- |
-| Digest | `silk/sha2`, `silk/sha3`, `silk/blake2b`, `silk/sha1` | `Sha256`, `Sha384`, `Sha512`, `Sha3_256`, `Blake2b512`, `Sha1`, ... |
-| Keyed tag | `silk/hmac` | `HmacSha256`, `HmacSha384` |
-| Key derivation | `silk/hkdf` | `HkdfSha256`, `HkdfSha384` |
-| Authenticated encryption | `silk/chacha20_poly1305`, `silk/aes_gcm` | `ChaCha20Poly1305`, `AesGcm` |
-| Key agreement | `silk/x25519`, `silk/p256` | `X25519`, `P256` |
-| Signature verification | `silk/ed25519`, `silk/p256`, `silk/p384`, `silk/rsa` | `Ed25519PublicKey`, `EcdsaP256Sha256`, `EcdsaP384Sha384`, `RsaPublicKey` |
-| Secure random bytes | `silk/random`, `silk/os_random` | `Random`, `OsRandom` |
+| Digest | `silk/crypto/sha2`, `silk/crypto/sha3`, `silk/crypto/blake2b`, `silk/crypto/sha1` | `Sha256`, `Sha384`, `Sha512`, `Sha3_256`, `Blake2b512`, `Sha1`, ... |
+| Keyed tag | `silk/crypto/hmac` | `HmacSha256`, `HmacSha384` |
+| Key derivation | `silk/crypto/hkdf` | `HkdfSha256`, `HkdfSha384` |
+| Authenticated encryption | `silk/crypto/chacha20_poly1305`, `silk/crypto/aes_gcm` | `ChaCha20Poly1305`, `AesGcm` |
+| Key agreement | `silk/crypto/x25519`, `silk/crypto/p256` | `X25519`, `P256` |
+| Signature verification | `silk/crypto/ed25519`, `silk/crypto/p256`, `silk/crypto/p384`, `silk/crypto/rsa` | `Ed25519PublicKey`, `EcdsaP256Sha256`, `EcdsaP384Sha384`, `RsaPublicKey` |
+| Secure random bytes | `silk/system/random`, `silk/system/random_native` | `Random`, `OsRandom` |
 
-There is no signing and no general-purpose public-key encryption. The signature modules verify only: they exist so that TLS and your own code can check signatures made elsewhere. `silk/hash` is a different thing. It hashes collection keys for `HashMap` and is not cryptographic.
+There is no signing and no general-purpose public-key encryption. The signature modules verify only: they exist so that TLS and your own code can check signatures made elsewhere. `silk/collections/hash` is a different thing. It hashes collection keys for `HashMap` and is not cryptographic.
 
 ## Set up the project
 
@@ -28,27 +28,27 @@ cd sealnote
 Replace `src/main.silk` piece by piece as you read. The pieces below, in order, make up the whole file. Start with the imports and two helpers:
 
 ```silk
-import silk.base64 { Base64 }
-import silk.blake2b { Blake2b512 }
-import silk.chacha20_poly1305 { AeadError, ChaCha20Poly1305 }
-import silk.ed25519 { Ed25519PublicKey }
-import silk.effect { Effect }
+import silk.encoding.base64 { Base64 }
+import silk.crypto.blake2b { Blake2b512 }
+import silk.crypto.chacha20_poly1305 { AeadError, ChaCha20Poly1305 }
+import silk.crypto.ed25519 { Ed25519PublicKey }
+import silk.core.effect { Effect }
 import silk.format { Debug, Format, Formatter }
-import silk.hkdf { HkdfSha256 }
-import silk.hmac { HmacSha256 }
-import silk.logger { LogError, Logger }
-import silk.os_logger { StdoutLogger }
-import silk.os_random { OsRandom }
-import silk.p256 { EcdsaP256Sha256 }
-import silk.random { Random }
-import silk.result { Result }
-import silk.sha2 { Sha256 }
-import silk.sha3 { Sha3_256 }
-import silk.slice { Slice }
-import silk.string { String }
-import silk.u8
-import silk.writer { Writer, WriterError }
-import silk.x25519 { X25519 }
+import silk.crypto.hkdf { HkdfSha256 }
+import silk.crypto.hmac { HmacSha256 }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_native { StdoutLogger }
+import silk.system.random_native { OsRandom }
+import silk.crypto.p256 { EcdsaP256Sha256 }
+import silk.system.random { Random }
+import silk.core.result { Result }
+import silk.crypto.sha2 { Sha256 }
+import silk.crypto.sha3 { Sha3_256 }
+import silk.collections.slice { Slice }
+import silk.text.string { String }
+import silk.num.u8
+import silk.io.writer { Writer, WriterError }
+import silk.crypto.x25519 { X25519 }
 
 pub struct Broken { pub step: string<'static> }
 
@@ -73,7 +73,7 @@ fn hex<'a>(bytes: &[u8], out: &'a mut [u8]) -> string<'a> {
 
 `Broken` is the program's one failure type. Each step that can go wrong fails with it and names itself. `main` can fail with it, so it implements `Debug`: when a step fails, the runtime prints the value, as `Broken { step: "seal" }`. `Format.debugFields` writes the struct's `pub` fields, which is why `step` is `pub`.
 
-`hex` writes two hex digits per byte into a buffer you lend it and returns the filled part as text. The std lib has no hex formatter, and templates cannot print a byte array, so you write this once. `Slice.view` from `silk/slice` borrows the first `bytes.length * 2` bytes. `String.fromUtf8Unchecked` is `unsafe` because it skips validation; the digits are ASCII, so that is safe here. Use the checked `String.fromUtf8` when you do not know the bytes.
+`hex` writes two hex digits per byte into a buffer you lend it and returns the filled part as text. The std lib has no hex formatter, and templates cannot print a byte array, so you write this once. `Slice.view` from `silk/collections/slice` borrows the first `bytes.length * 2` bytes. `String.fromUtf8Unchecked` is `unsafe` because it skips validation; the digits are ASCII, so that is safe here. Use the checked `String.fromUtf8` when you do not know the bytes.
 
 ## Hash some bytes
 
@@ -98,7 +98,7 @@ Each digest type has the same three entry points. `hash` takes the whole message
 
 The result is a fixed array: `[u8; 32]` for SHA-256 and SHA3-256, `[u8; 48]` for SHA-384, `[u8; 64]` for SHA-512 and BLAKE2b. `b"abc"` is a byte string literal, a `&[u8]`.
 
-Pick SHA-256 unless a protocol says otherwise. SHA-3 exists for protocols that require it. `Blake2b512` from `silk/blake2b` is unkeyed BLAKE2b with a 64-byte digest (RFC 7693), for formats that name it, such as minisign's prehashed signatures. It has no key, salt, personalization or shorter digest lengths. `silk/sha1` is there for old protocols such as WebSocket handshakes and should not be used for anything new.
+Pick SHA-256 unless a protocol says otherwise. SHA-3 exists for protocols that require it. `Blake2b512` from `silk/crypto/blake2b` is unkeyed BLAKE2b with a 64-byte digest (RFC 7693), for formats that name it, such as minisign's prehashed signatures. It has no key, salt, personalization or shorter digest lengths. `silk/crypto/sha1` is there for old protocols such as WebSocket handshakes and should not be used for anything new.
 
 ## Check a keyed tag with HMAC
 
@@ -134,7 +134,7 @@ fn sameBytes(left: &[u8], right: &[u8]) -> bool {
 
 `HmacSha256.authenticate(key, message)` returns the 32-byte tag in one call. The incremental form gives the same tag however you split the message. The result of `sameBytes` is a `bool`, and a template prints it as `true` or `false`.
 
-The HMAC types compute tags. They do not compare them. Comparing with an early-exit loop leaks, through timing, how many leading bytes matched. `sameBytes` instead ORs together the XOR of every byte pair, so it always looks at the whole tag. `u8.bitOr` and `u8.bitXor` come from `silk/u8`.
+The HMAC types compute tags. They do not compare them. Comparing with an early-exit loop leaks, through timing, how many leading bytes matched. `sameBytes` instead ORs together the XOR of every byte pair, so it always looks at the whole tag. `u8.bitOr` and `u8.bitXor` come from `silk/num/u8`.
 
 ## Verify a signature
 
@@ -168,11 +168,11 @@ effect fn checkRelease() -> () ! LogError | Broken ? &mut Logger {
 }
 ```
 
-`EcdsaP256Sha256.verify(publicKey, message, signature)` hashes the message with SHA-256 and returns `Result<(), P256SignatureError>`. The public key is the 65-byte uncompressed point (it starts with byte 4). The signature is DER, so its length varies; here it is 71 bytes, and `Slice.view` passes exactly those. `Base64.decodeInto` from `silk/base64` returns how many bytes it wrote. The Encodings and compression guide covers it.
+`EcdsaP256Sha256.verify(publicKey, message, signature)` hashes the message with SHA-256 and returns `Result<(), P256SignatureError>`. The public key is the 65-byte uncompressed point (it starts with byte 4). The signature is DER, so its length varies; here it is 71 bytes, and `Slice.view` passes exactly those. `Base64.decodeInto` from `silk/encoding/base64` returns how many bytes it wrote. The Encodings and compression guide covers it.
 
 The error tells you why a check failed (`InvalidKey`, `InvalidEncoding`, and so on), but a wrong signature over a well-formed message is simply a failure. Treat every `Failure` as "not valid".
 
-For P-384 use `EcdsaP384Sha384.verify` from `silk/p384`, with a 97-byte key. For RSA, `RsaPublicKey.fromComponents(modulus, exponent)` from `silk/rsa` admits a 2048 to 4096-bit key with exponent 65537, and `verifyPss` checks a SHA-256 PSS signature. Each of these modules also has a `verifyCertificate` that the certificate code in `silk/certificate_profile` uses.
+For P-384 use `EcdsaP384Sha384.verify` from `silk/crypto/p384`, with a 97-byte key. For RSA, `RsaPublicKey.fromComponents(modulus, exponent)` from `silk/crypto/rsa` admits a 2048 to 4096-bit key with exponent 65537, and `verifyPss` checks a SHA-256 PSS signature. Each of these modules also has a `verifyCertificate` that the certificate code in `silk/tls/certificate_profile` uses.
 
 ## Verify an Ed25519 signature
 
@@ -202,9 +202,9 @@ effect fn checkMirror() -> () ! LogError | Broken ? &mut Logger {
 }
 ```
 
-`Ed25519PublicKey.fromBytes(bytes)` from `silk/ed25519` decodes and checks the key once, and fails with `Ed25519Error.InvalidKeyLength` or `InvalidKey`. `verify(message, signature)` then returns `Result<(), Ed25519Error>`, failing with `InvalidSignatureLength` or `InvalidSignature`. Unlike ECDSA there is no separate hash to pick: Ed25519 hashes the message itself with SHA-512. For a prehashed format, such as minisign's `ED` algorithm, pass the BLAKE2b digest as the message.
+`Ed25519PublicKey.fromBytes(bytes)` from `silk/crypto/ed25519` decodes and checks the key once, and fails with `Ed25519Error.InvalidKeyLength` or `InvalidKey`. `verify(message, signature)` then returns `Result<(), Ed25519Error>`, failing with `InvalidSignatureLength` or `InvalidSignature`. Unlike ECDSA there is no separate hash to pick: Ed25519 hashes the message itself with SHA-512. For a prehashed format, such as minisign's `ED` algorithm, pass the BLAKE2b digest as the message.
 
-Verification works on public data and does not try to run in constant time. Like the other signature modules, `silk/ed25519` cannot sign.
+Verification works on public data and does not try to run in constant time. Like the other signature modules, `silk/crypto/ed25519` cannot sign.
 
 ## Agree on a key
 
@@ -237,9 +237,9 @@ effect fn agreeKey() -> [u8; 32] ! Broken ? &mut Random {
 }
 ```
 
-`X25519.generate()` is an effect that requires `&mut Random` from `silk/random`. It draws 32 fresh secure bytes and derives the public key. Code that needs randomness says so in its signature, and whoever runs it decides where the bytes come from. To use known bytes, for example a test vector, call `X25519.fromSecret(bytes)` instead.
+`X25519.generate()` is an effect that requires `&mut Random` from `silk/system/random`. It draws 32 fresh secure bytes and derives the public key. Code that needs randomness says so in its signature, and whoever runs it decides where the bytes come from. To use known bytes, for example a test vector, call `X25519.fromSecret(bytes)` instead.
 
-`publicKey()` returns the 32 bytes to send to the peer. `agree(peer)` consumes the key: the type is not `Copy` and `agree` takes `self` by value, so one ephemeral key can only be used for one agreement. It fails with `X25519Error.AllZeroSharedSecret` for a malicious peer value. `P256` in `silk/p256` has the same shape with a 65-byte public key, for protocols that require NIST curves.
+`publicKey()` returns the 32 bytes to send to the peer. `agree(peer)` consumes the key: the type is not `Copy` and `agree` takes `self` by value, so one ephemeral key can only be used for one agreement. It fails with `X25519Error.AllZeroSharedSecret` for a malicious peer value. `P256` in `silk/crypto/p256` has the same shape with a 65-byte public key, for protocols that require NIST curves.
 
 A shared secret is not a key yet. `HkdfSha256.extract(salt, secret)` turns it into a 32-byte pseudorandom key, and `expand(prk, info, output)` fills `output` with key material bound to the `info` label. Use a different `info` for each key you derive, such as one per direction. `expand` fails only when you ask for more than 255 hash blocks (8160 bytes for SHA-256).
 
@@ -289,7 +289,7 @@ An AEAD cipher encrypts and authenticates in one step. `seal` takes the key, a 1
 - The associated data (`header` here) is authenticated but not encrypted. Put things the receiver must trust but can read, such as a message id or a version.
 - Flipping one bit of the ciphertext makes `open` fail with `AeadError.AuthenticationFailed`, which the last step shows.
 
-`AesGcm` in `silk/aes_gcm` takes exactly the same arguments. It accepts a 16 or 32-byte key and fails with the union `AesGcmError`. To switch, change the import and the three calls; because `AesGcmError` is a union rather than an enum, the inner match becomes `match move error`.
+`AesGcm` in `silk/crypto/aes_gcm` takes exactly the same arguments. It accepts a 16 or 32-byte key and fails with the union `AesGcmError`. To switch, change the import and the three calls; because `AesGcmError` is a union rather than an enum, the inner match becomes `match move error`.
 
 |  | `ChaCha20Poly1305` | `AesGcm` |
 | --- | --- | --- |
@@ -316,7 +316,7 @@ pub effect fn main() -> () ! LogError | Broken {
 }
 ```
 
-`OsRandom` from `silk/os_random` reads the operating system's secure random source. Nothing in the program reaches for it on its own: `X25519.generate` and `Random.fillBytes` only say they need a `Random`, and `main` decides which. In a test you can provide your own `Random` that hands out fixed bytes and get the same keys every run. The Testing with providers guide shows how to write such a provider.
+`OsRandom` from `silk/system/random_native` reads the operating system's secure random source. Nothing in the program reaches for it on its own: `X25519.generate` and `Random.fillBytes` only say they need a `Random`, and `main` decides which. In a test you can provide your own `Random` that hands out fixed bytes and get the same keys every run. The Testing with providers guide shows how to write such a provider.
 
 Run it:
 
@@ -363,22 +363,22 @@ Failed sealnote in 0.27s
 - Secret state is not guaranteed to be erased from memory when a key or hash state is dropped.
 - Comparing tags is your job; use a constant-time loop like `sameBytes`.
 - Long inputs past a hash's length limit (2^64 bits for SHA-256) trap rather than fail.
-- Use `Random` for every key, nonce and token. `silk/insecure_random` is for simulations and shuffles only. The Time and randomness guide explains the difference.
+- Use `Random` for every key, nonce and token. `silk/system/insecure_random` is for simulations and shuffles only. The Time and randomness guide explains the difference.
 
 ## API reference
 
-- `silk/sha2`: `Sha256`, `Sha224`, `Sha384`, `Sha512`, `Sha512_224`, `Sha512_256`
-- `silk/sha3`: `Sha3_224`, `Sha3_256`, `Sha3_384`, `Sha3_512`
-- `silk/blake2b`: `Blake2b512`
-- `silk/sha1`: `Sha1`
-- `silk/hmac`: `HmacSha256`, `HmacSha384`
-- `silk/hkdf`: `HkdfSha256`, `HkdfSha384`, `OutputTooLongError`
-- `silk/chacha20_poly1305`: `ChaCha20Poly1305`, `AeadError`
-- `silk/aes_gcm`: `AesGcm`, `AesGcmError`
-- `silk/x25519`: `X25519`, `X25519Error`
-- `silk/ed25519`: `Ed25519PublicKey`, `Ed25519Error`
-- `silk/p256`: `P256`, `P256Error`, `EcdsaP256Sha256`, `P256SignatureError`
-- `silk/p384`: `EcdsaP384Sha384`, `P384SignatureError`
-- `silk/rsa`: `RsaPublicKey`, `RsaError`
-- `silk/random`: `Random`; `silk/os_random`: `OsRandom`
-- `silk/base64`: `Base64`; `silk/slice`: `Slice`; `silk/u8`
+- `silk/crypto/sha2`: `Sha256`, `Sha224`, `Sha384`, `Sha512`, `Sha512_224`, `Sha512_256`
+- `silk/crypto/sha3`: `Sha3_224`, `Sha3_256`, `Sha3_384`, `Sha3_512`
+- `silk/crypto/blake2b`: `Blake2b512`
+- `silk/crypto/sha1`: `Sha1`
+- `silk/crypto/hmac`: `HmacSha256`, `HmacSha384`
+- `silk/crypto/hkdf`: `HkdfSha256`, `HkdfSha384`, `OutputTooLongError`
+- `silk/crypto/chacha20_poly1305`: `ChaCha20Poly1305`, `AeadError`
+- `silk/crypto/aes_gcm`: `AesGcm`, `AesGcmError`
+- `silk/crypto/x25519`: `X25519`, `X25519Error`
+- `silk/crypto/ed25519`: `Ed25519PublicKey`, `Ed25519Error`
+- `silk/crypto/p256`: `P256`, `P256Error`, `EcdsaP256Sha256`, `P256SignatureError`
+- `silk/crypto/p384`: `EcdsaP384Sha384`, `P384SignatureError`
+- `silk/crypto/rsa`: `RsaPublicKey`, `RsaError`
+- `silk/system/random`: `Random`; `silk/system/random_native`: `OsRandom`
+- `silk/encoding/base64`: `Base64`; `silk/collections/slice`: `Slice`; `silk/num/u8`

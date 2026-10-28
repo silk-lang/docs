@@ -109,7 +109,7 @@ UnitType       = '(' ')'
 - Borrow an array to get a slice: `&a` or `&mut a`, passed where `&[T]` or `&mut [T]` is expected. Passing `a` itself is a type error (SEM0012).
 - `&[T; N]` is a reference to a whole fixed array, keeping its length in the type.
 - Slices support `.length`, indexing and element assignment (for `&mut [T]`).
-- There is no range or slicing syntax such as `a[1..3]`. Use `Slice.view(values, offset, length)` from `silk/slice` for a shared subrange. An invalid range traps with `slice range out of bounds`.
+- There is no range or slicing syntax such as `a[1..3]`. Use `Slice.view(values, offset, length)` from `silk/collections/slice` for a shared subrange. An invalid range traps with `slice range out of bounds`.
 - See Borrowing and Lifetimes for how long a slice may live.
 
 ## Examples
@@ -182,7 +182,7 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.slice { Slice }
+import silk.collections.slice { Slice }
 
 fn total(values: &[i32]) -> i32 {
   let mut sum = 0
@@ -251,7 +251,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Values and primitive types · Bindings and statements · Enums and unions · Patterns and match · Generics · Ownership and moves · Borrowing · Lifetimes · Unsafe code and C interop · Program entry and termination · `silk/slice`, `silk/vector`
+Values and primitive types · Bindings and statements · Enums and unions · Patterns and match · Generics · Ownership and moves · Borrowing · Lifetimes · Unsafe code and C interop · Program entry and termination · `silk/collections/slice`, `silk/vector`
 
 ## Open questions
 

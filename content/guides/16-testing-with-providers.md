@@ -19,24 +19,24 @@ beacon/
 `src/main.silk` starts with its imports and three small helpers:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.byte_duplex { ByteDuplex, ByteIoError }
-import silk.effect { Effect }
-import silk.filesystem { FileError, FileSystem, Path }
-import silk.logger { LogError, Logger }
-import silk.monotonic_clock { MonotonicClock }
-import silk.native_socket { ConnectOptions, NativeSocketError, connectResolvedOwned }
-import silk.network_address { Endpoint, IpAddress, Ipv4Address, Port }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.byte_duplex { ByteDuplex, ByteIoError }
+import silk.core.effect { Effect }
+import silk.system.filesystem { FileError, FileSystem, Path }
+import silk.io.logger { LogError, Logger }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.net.socket_native { ConnectOptions, NativeSocketError, connectResolvedOwned }
+import silk.net.address { Endpoint, IpAddress, Ipv4Address, Port }
 import silk.option { Option }
-import silk.os_filesystem { OsFileSystem }
-import silk.os_logger { StdoutLogger }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.os_random { OsRandom }
-import silk.random { Random }
-import silk.slice { Slice }
-import silk.string { String }
-import silk.system_clock { Instant, SystemClock }
-import silk.u8
+import silk.system.filesystem_native { OsFileSystem }
+import silk.io.logger_native { StdoutLogger }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.system.random_native { OsRandom }
+import silk.system.random { Random }
+import silk.collections.slice { Slice }
+import silk.text.string { String }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.num.u8
 
 // Only for `silk test`: the tests module imports this one back.
 import tests
@@ -166,25 +166,25 @@ disk 81%
 load 0.42
 ```
 
-The id changes on every run, and the time depends on your machine. With no listener, `connectResolvedOwned` fails and `main` ends with `unhandled error: silk/native_socket.NativeSocketError`. None of that is something a test should depend on.
+The id changes on every run, and the time depends on your machine. With no listener, `connectResolvedOwned` fails and `main` ends with `unhandled error: silk/net/socket_native.NativeSocketError`. None of that is something a test should depend on.
 
 ## The fakes
 
 The fakes live in `src/tests/Fakes.silk`, so every test module can share them. A fake is an ordinary provider: a struct and an `impl` of the service. Two helpers come first:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.filesystem { AtomicWriteError, DirectoryEntry, DirectoryInfo, Durability }
-import silk.filesystem { FileError, FileInfo, FileSystem, Path, PublicationPolicy }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.system.filesystem { AtomicWriteError, DirectoryEntry, DirectoryInfo, Durability }
+import silk.system.filesystem { FileError, FileInfo, FileSystem, Path, PublicationPolicy }
 import silk.layout { Layout }
-import silk.list { List }
-import silk.logger { InMemoryLogger, Logger }
-import silk.monotonic_clock { MonotonicClock }
+import silk.collections.list { List }
+import silk.io.logger { InMemoryLogger, Logger }
+import silk.system.monotonic_clock { MonotonicClock }
 import silk.option { Option }
-import silk.random { Random }
-import silk.system_clock { Instant, SystemClock }
+import silk.system.random { Random }
+import silk.system.system_clock { Instant, SystemClock }
 
 pub fn sameBytes(left: &[u8], right: &[u8]) -> bool {
   if left.length != right.length { return false }
@@ -209,7 +209,7 @@ pub fn logged(logger: &InMemoryLogger, index: usize, expected: &[u8]) -> bool {
 }
 ```
 
-`sameBytes` compares two byte slices. `logged` checks one event of an `InMemoryLogger`, the test logger from `silk/logger`. `Logger.length`, `Logger.messageLengthAt` and `Logger.messageByteAt` read back what it holds.
+`sameBytes` compares two byte slices. `logged` checks one event of an `InMemoryLogger`, the test logger from `silk/io/logger`. `Logger.length`, `Logger.messageLengthAt` and `Logger.messageByteAt` read back what it holds.
 
 ### A scripted Random
 
@@ -231,7 +231,7 @@ impl Random for ScriptedRandom {
 
 `Random` has one operation, `fillBytes`. This fake fills the buffer with counting bytes from `next`, so a test knows the id in advance: starting at 160 (`0xa0`) the id is `a0a1a2a3`. The helpers `Random.nextU64`, `Random.below` and `Random.nextBool` all go through `fillBytes`, so they work with this provider too. Use a fake like this only in tests. Code that needs a real secret must get its bytes from `OsRandom` or another real source.
 
-If you want random-looking but repeatable numbers that are not secrets, such as shuffled test data, `silk/insecure_random` has a seeded generator, `InsecureRandom.seeded(seed)`. It provides the separate `InsecureRandom` service, not `Random`.
+If you want random-looking but repeatable numbers that are not secrets, such as shuffled test data, `silk/system/insecure_random` has a seeded generator, `InsecureRandom.seeded(seed)`. It provides the separate `InsecureRandom` service, not `Random`.
 
 ### A virtual clock
 
@@ -390,11 +390,11 @@ You do not have to write every fake yourself:
 
 | Provider | Module | Service | Use in tests |
 | --- | --- | --- | --- |
-| `Logger.inMemoryProvider()` | `silk/logger` | `Logger` | Keeps up to 8 events and 64 message bytes; read them with `Logger.length`, `levelAt`, `messageLengthAt`, `messageByteAt` |
-| `Logger.inMemoryProviderFailAt(n)` | `silk/logger` | `Logger` | Same, but call number `n` (from 0) fails with `LogError`; `Logger.attempts` counts calls |
-| `MemoryByteDuplex.make(...)` | `silk/memory_byte_duplex` | `ByteDuplex` | Scripted reads and writes on the `MonotonicClock` timeline; `outbound()`, `audit()`, `phase()`, `closeAttempts()` show what happened |
-| `InsecureRandom.seeded(seed)` | `silk/insecure_random` | `InsecureRandom` | A fixed pseudorandom sequence, for code that does not need secrets |
-| `MemoryTrustSource.make(snapshot)` | `silk/memory_trust_source` | `TrustSource` | A trust store you fill yourself, for TLS code |
+| `Logger.inMemoryProvider()` | `silk/io/logger` | `Logger` | Keeps up to 8 events and 64 message bytes; read them with `Logger.length`, `levelAt`, `messageLengthAt`, `messageByteAt` |
+| `Logger.inMemoryProviderFailAt(n)` | `silk/io/logger` | `Logger` | Same, but call number `n` (from 0) fails with `LogError`; `Logger.attempts` counts calls |
+| `MemoryByteDuplex.make(...)` | `silk/io/memory_byte_duplex` | `ByteDuplex` | Scripted reads and writes on the `MonotonicClock` timeline; `outbound()`, `audit()`, `phase()`, `closeAttempts()` show what happened |
+| `InsecureRandom.seeded(seed)` | `silk/system/insecure_random` | `InsecureRandom` | A fixed pseudorandom sequence, for code that does not need secrets |
+| `MemoryTrustSource.make(snapshot)` | `silk/tls/trust_source_memory` | `TrustSource` | A trust store you fill yourself, for TLS code |
 
 The in-memory logger fails with `LogError` once it is full, so keep each test's logging small.
 
@@ -403,19 +403,19 @@ The in-memory logger fails with `LogError` once it is full, so keep each test's 
 `sendReport` needs six providers in every test. `src/tests.silk` gathers them in one struct and builds a fresh one per test:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.byte_duplex { ByteDuplex, ByteIoError, ByteIoOperation }
-import silk.effect { Effect }
-import silk.filesystem { FileError, FileSystem, Path }
-import silk.list { List }
-import silk.logger { InMemoryLogger, LogError, Logger }
-import silk.memory_byte_duplex { MemoryByteDuplex, MemoryReadEvent, MemoryWriteAction, MemoryWriteEvent }
-import silk.monotonic_clock { MonotonicClock }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.byte_duplex { ByteDuplex, ByteIoError, ByteIoOperation }
+import silk.core.effect { Effect }
+import silk.system.filesystem { FileError, FileSystem, Path }
+import silk.collections.list { List }
+import silk.io.logger { InMemoryLogger, LogError, Logger }
+import silk.io.memory_byte_duplex { MemoryByteDuplex, MemoryReadEvent, MemoryWriteAction, MemoryWriteEvent }
+import silk.system.monotonic_clock { MonotonicClock }
 import silk.option { Option }
-import silk.random { Random }
-import silk.result { Result }
-import silk.system_clock { SystemClock }
-import silk.testing { AssertionError, Testing }
+import silk.system.random { Random }
+import silk.core.result { Result }
+import silk.system.system_clock { SystemClock }
+import silk.testing.testing { AssertionError, Testing }
 import main { sendReport }
 import tests.Fakes { CountingAllocator, MemoryFiles, ScriptedRandom, VirtualClock, logged, sameBytes }
 
@@ -653,14 +653,14 @@ Provide every service inside the test or in a helper it calls, as `send` does. T
 
 ## API reference
 
-- `silk/testing`: `Testing.expect`, `AssertionError`
-- `silk/effect`: `Effect.provideMut`, `Effect.result`
-- `silk/result`: `Result`
-- `silk/logger`: `Logger`, `InMemoryLogger`, `Logger.inMemoryProvider`, `Logger.inMemoryProviderFailAt`, `LogError`
-- `silk/memory_byte_duplex`: `MemoryByteDuplex`, `MemoryWriteEvent`, `MemoryWriteAction`, `MemoryReadEvent`
-- `silk/byte_duplex`: `ByteDuplex`, `ByteIoError`, `ByteIoOperation`
-- `silk/monotonic_clock`: `MonotonicClock`; `silk/system_clock`: `SystemClock`, `Instant`
-- `silk/random`: `Random`; `silk/insecure_random`: `InsecureRandom`
-- `silk/allocator`: `Allocator`, `OutOfMemoryError`; `silk/layout`: `Layout`
-- `silk/filesystem`: `FileSystem`, `Path`, `FileError`
-- `silk/memory_trust_source`: `MemoryTrustSource`
+- `silk/testing/testing`: `Testing.expect`, `AssertionError`
+- `silk/core/effect`: `Effect.provideMut`, `Effect.result`
+- `silk/core/result`: `Result`
+- `silk/io/logger`: `Logger`, `InMemoryLogger`, `Logger.inMemoryProvider`, `Logger.inMemoryProviderFailAt`, `LogError`
+- `silk/io/memory_byte_duplex`: `MemoryByteDuplex`, `MemoryWriteEvent`, `MemoryWriteAction`, `MemoryReadEvent`
+- `silk/io/byte_duplex`: `ByteDuplex`, `ByteIoError`, `ByteIoOperation`
+- `silk/system/monotonic_clock`: `MonotonicClock`; `silk/system/system_clock`: `SystemClock`, `Instant`
+- `silk/system/random`: `Random`; `silk/system/insecure_random`: `InsecureRandom`
+- `silk/mem/allocator`: `Allocator`, `OutOfMemoryError`; `silk/layout`: `Layout`
+- `silk/system/filesystem`: `FileSystem`, `Path`, `FileError`
+- `silk/tls/trust_source_memory`: `MemoryTrustSource`

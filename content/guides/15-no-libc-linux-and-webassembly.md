@@ -8,12 +8,12 @@ On a hosted target, the providers you create in `main` talk to the C library: `S
 
 | Kind of module | Hosted | Linux, no libc | wasm32 |
 | --- | --- | --- | --- |
-| Portable logic (`silk/list`, `silk/json_value`, `silk/sha2`, ...) | yes | yes | yes |
-| Services (`silk/writer`, `silk/logger`, `silk/filesystem`, `silk/random`, ...) | yes | yes | yes |
+| Portable logic (`silk/collections/list`, `silk/json/value`, `silk/crypto/sha2`, ...) | yes | yes | yes |
+| Services (`silk/io/writer`, `silk/io/logger`, `silk/system/filesystem`, `silk/system/random`, ...) | yes | yes | yes |
 | `Allocator.systemAllocatorProvider()` | yes | yes | yes |
-| OS providers (`silk/os_writer`, `silk/os_logger`, `silk/os_filesystem`, `silk/os_child_process`, ...) | yes | empty module | empty module |
+| OS providers (`silk/io/writer_native`, `silk/io/logger_native`, `silk/system/filesystem_native`, `silk/system/child_process_native`, ...) | yes | empty module | empty module |
 | `OsRandom`, `OsMonotonicClock`, native sockets, native HTTP | yes | compile error | compile error |
-| Raw kernel calls (`silk/raw_linux`, `silk/raw_mapping`, `silk/raw_process_inputs`) | empty module | yes | empty module |
+| Raw kernel calls (`silk/platform/linux/syscall`, `silk/platform/linux/mapping`, `silk/platform/linux/process_inputs`) | empty module | yes | empty module |
 
 So on these targets your code keeps asking for services, and you supply providers you write yourself. That is the same move you make in tests, which the Testing with providers guide covers.
 
@@ -33,9 +33,9 @@ silk-version = "0.1.0"
 
 [unstable.composition]
 runtimes = [
-  { name = "hosted", module = "silk/native_start" },
-  { name = "raw", module = "silk/raw_start" },
-  { name = "standalone", module = "silk/wasm_start" },
+  { name = "hosted", module = "silk/platform/native/start" },
+  { name = "raw", module = "silk/platform/linux/start" },
+  { name = "standalone", module = "silk/platform/wasm/start" },
 ]
 defaults = ["hosted"]
 
@@ -49,22 +49,22 @@ target = "wasm32-unknown-unknown"
 runtime = { kind = "named", name = "standalone" }
 ```
 
-A target alone does not say how a program starts. The runtime module does that, and the std lib's catalog only knows two: `silk/native_start` for hosted targets and `silk/wasm_start` for wasm32. For Linux without libc there is no default, so you list the runtimes yourself in `[unstable.composition]` and pick one per profile:
+A target alone does not say how a program starts. The runtime module does that, and the std lib's catalog only knows two: `silk/platform/native/start` for hosted targets and `silk/platform/wasm/start` for wasm32. For Linux without libc there is no default, so you list the runtimes yourself in `[unstable.composition]` and pick one per profile:
 
-- `hosted` (`silk/native_start`) is the default, used by `silk run` and by any profile that names no runtime.
-- `raw` (`silk/raw_start`) enters at `_start` straight from the kernel. It calls `pub fn main(inputs: &ProcessInputs) -> i32` and turns the result into the exit status.
-- `standalone` (`silk/wasm_start`) exports `main` from the WebAssembly module. The host calls it with no arguments and receives an `i32`: an `i32` result passes through, a unit result is 0, and a typed failure is 1. It gives the program no host services.
+- `hosted` (`silk/platform/native/start`) is the default, used by `silk run` and by any profile that names no runtime.
+- `raw` (`silk/platform/linux/start`) enters at `_start` straight from the kernel. It calls `pub fn main(inputs: &ProcessInputs) -> i32` and turns the result into the exit status.
+- `standalone` (`silk/platform/wasm/start`) exports `main` from the WebAssembly module. The host calls it with no arguments and receives an `i32`: an `i32` result passes through, a unit result is 0, and a typed failure is 1. It gives the program no host services.
 
 The `bare` profile selects Linux with `libc = "none"`; `web` selects wasm32. **Targets and profiles** in the Projects section lists every profile key. Without the composition, `silk check --profile bare` stops with `silk: the build selects no single runtime (ARTIFACT-001)`.
 
 ## The program
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.writer { Writer, WriterError }
-import silk.compilation { Compilation, Libc }
-import silk.target { Arch, Target }
+import silk.io.writer { Writer, WriterError }
+import silk.core.compilation { Compilation, Libc }
+import silk.core.target { Arch, Target }
 
 fn sumOfSquares(limit: i32) -> i32 {
   let mut total = 0
@@ -88,10 +88,10 @@ static if Target.arch() == Arch.Wasm32 {
     return sumOfSquares(10)
   }
 } else static if Compilation.libc() == Libc.None {
-  import silk.raw_linux { RawLinux }
-  import silk.raw_process_inputs { ProcessInputs }
-  import silk.result { Result }
-  import silk.slice { Slice }
+  import silk.platform.linux.syscall { RawLinux }
+  import silk.platform.linux.process_inputs { ProcessInputs }
+  import silk.core.result { Result }
+  import silk.collections.slice { Slice }
 
   struct RawStdout {}
 
@@ -124,7 +124,7 @@ static if Target.arch() == Arch.Wasm32 {
     }
   }
 } else {
-  import silk.os_writer { StdoutWriter }
+  import silk.io.writer_native { StdoutWriter }
 
   pub effect fn main() -> ()
     ! WriterError {
@@ -136,13 +136,13 @@ static if Target.arch() == Arch.Wasm32 {
 
 `sumOfSquares` and `report` are the portable part. `report` needs a `Writer` and does not care which one.
 
-The rest is three versions of `main`, chosen by a module-level `static if`. `Target.arch()` from `silk/target` and `Compilation.libc()` from `silk/compilation` are static functions: the compiler knows their answers before it type-checks, so only the selected arm exists in the build. That is why each arm can import modules the others cannot use. See **Static control flow and reflection** in the reference.
+The rest is three versions of `main`, chosen by a module-level `static if`. `Target.arch()` from `silk/core/target` and `Compilation.libc()` from `silk/core/compilation` are static functions: the compiler knows their answers before it type-checks, so only the selected arm exists in the build. That is why each arm can import modules the others cannot use. See **Static control flow and reflection** in the reference.
 
-- On wasm32, `main` returns the number. The host reads it as the call's result. `silk/wasm_start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225: "Entry point `main` has a result the selected runtime `silk/wasm_start` cannot start; it accepts i32, (), or an Effect producing () with no requirements".
+- On wasm32, `main` returns the number. The host reads it as the call's result. `silk/platform/wasm/start` accepts a `main` that returns `i32` or `()`, or an `effect fn` that returns `()` and may fail. An `effect fn main() -> i32` is refused there with SEM0225: "Entry point `main` has a result the selected runtime `silk/platform/wasm/start` cannot start; it accepts i32, (), or an Effect producing () with no requirements".
 - On Linux without libc, `RawStdout` implements the `Writer` service with `RawLinux.write` on descriptor 1. `RawLinux.write` returns the kernel's raw result; `RawLinux.error` turns it into zero or an error number. `writeVectored`, which writes several slices as one, has no faster way here, so it is left out and its default body calls `writeAll` for each slice. With that provider, the same `report` runs unchanged.
-- Everywhere else, `StdoutWriter` from `silk/os_writer` does the job.
+- Everywhere else, `StdoutWriter` from `silk/io/writer_native` does the job.
 
-`silk/target` also has `operatingSystem()`, `abi()`, `endianness()`, `pointerBits` and `hasCpuFeature("...")`. `silk/compilation` reports the rest of the build request, such as `artifact()`, `safety()` and `threading()`.
+`silk/core/target` also has `operatingSystem()`, `abi()`, `endianness()`, `pointerBits` and `hasCpuFeature("...")`. `silk/core/compilation` reports the rest of the build request, such as `artifact()`, `safety()` and `threading()`.
 
 ## Check every target
 
@@ -197,11 +197,11 @@ Checking squares (wasm32-unknown-unknown)
   load     51 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.07s
 [wasm32-unknown-unknown]
-src/main.silk:23:27: error[SEM0014] Module silk.os_writer has no member StdoutWriter
+src/main.silk:23:27: error[SEM0014] Module silk.io.writer_native has no member StdoutWriter
 Failed squares in 0.13s
 ```
 
-`silk/os_writer` exists on wasm32, but its wasm32 page declares nothing. Now try a provider that is declared everywhere but refuses wasm32. Put `let random = OsRandom.make()` in the wasm32 `main`, with `import silk.os_random { OsRandom }`:
+`silk/io/writer_native` exists on wasm32, but its wasm32 page declares nothing. Now try a provider that is declared everywhere but refuses wasm32. Put `let random = OsRandom.make()` in the wasm32 `main`, with `import silk.system.random_native { OsRandom }`:
 
 ```
 Checking squares (wasm32-unknown-unknown)
@@ -263,7 +263,7 @@ echo $?
 
 An `export "C" fn` in the program is exported from the module under its name, next to `main`, so the host can call it with numbers. Only scalar and pointer arguments cross that boundary on wasm32; C statics, variadic functions and callbacks are refused.
 
-A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory and the wasi-threads `thread-spawn` function, and `silk/native_thread` runs each thread as a Worker under `wasm-runner.mjs`. `max-memory` in the profile caps the memory, for example `max-memory = "256MiB"`; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit.
+A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory and the wasi-threads `thread-spawn` function, and `silk/concurrency/thread_native` runs each thread as a Worker under `wasm-runner.mjs`. `max-memory` in the profile caps the memory, for example `max-memory = "256MiB"`; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit.
 
 ## Building without libc
 
@@ -279,7 +279,7 @@ Compiling squares (x86_64-unknown-linux-gnu, bare)
   check    1 module                          0.40s
   codegen  failed: 77 functions, 1 error     0.01s
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/raw_start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
+<silk>/lib/silk/stdlib/silk/platform/linux/start.silk:27:5: unsupported[foreign-contract] not supported by the native compiler yet
 Failed squares in 0.51s
 ```
 
@@ -289,13 +289,13 @@ The compiler cannot generate the raw runtime's entry point yet. Until it can, us
 
 ## API reference
 
-- `silk/target`: `Target`, `Arch`, `OperatingSystem`, `Abi`, `Endianness`, `pointerBits`
-- `silk/compilation`: `Compilation`, `Libc`, `Artifact`
-- `silk/raw_linux`: `RawLinux` (no-libc Linux only)
-- `silk/raw_process_inputs`: `ProcessInputs` (no-libc Linux only)
-- `silk/raw_mapping`: `Mapping` (no-libc Linux only)
-- `silk/raw_start`, `silk/wasm_start`, `silk/native_start`: runtime modules, no public items
-- `silk/native_thread`: `NativeThread` (hosted targets, and wasm32 with `threading = "multi"`)
+- `silk/core/target`: `Target`, `Arch`, `OperatingSystem`, `Abi`, `Endianness`, `pointerBits`
+- `silk/core/compilation`: `Compilation`, `Libc`, `Artifact`
+- `silk/platform/linux/syscall`: `RawLinux` (no-libc Linux only)
+- `silk/platform/linux/process_inputs`: `ProcessInputs` (no-libc Linux only)
+- `silk/platform/linux/mapping`: `Mapping` (no-libc Linux only)
+- `silk/platform/linux/start`, `silk/platform/wasm/start`, `silk/platform/native/start`: runtime modules, no public items
+- `silk/concurrency/thread_native`: `NativeThread` (hosted targets, and wasm32 with `threading = "multi"`)
 - `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`: runs a wasm32 module in Node or a browser
-- `silk/writer`: `Writer`, `WriterError`; `silk/os_writer`: `StdoutWriter` (hosted only)
-- `silk/format`: `Format`; `silk/slice`: `Slice`
+- `silk/io/writer`: `Writer`, `WriterError`; `silk/io/writer_native`: `StdoutWriter` (hosted only)
+- `silk/format`: `Format`; `silk/collections/slice`: `Slice`

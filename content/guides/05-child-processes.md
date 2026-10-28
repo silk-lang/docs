@@ -9,7 +9,7 @@ cd runcheck
 
 ## How a child runs
 
-The `ChildProcess` service from `silk/child_process` has one operation: run a `ProcessRequest` to the end and return a `ProcessOutcome`. The native provider is `OsChildProcess` from `silk/os_child_process`. The model is deliberately simple:
+The `ChildProcess` service from `silk/system/child_process` has one operation: run a `ProcessRequest` to the end and return a `ProcessOutcome`. The native provider is `OsChildProcess` from `silk/system/child_process_native`. The model is deliberately simple:
 
 - **No shell.** The request names an executable and a list of arguments. Spaces, quotes, `$` and `*` in an argument are data, never syntax.
 - **No inherited environment.** A request starts with an empty environment. The child sees only the variables you set.
@@ -21,7 +21,7 @@ There is no streaming in either direction. You cannot write to the child's stand
 
 ## Building a request
 
-`ChildProcess.request(&path)` makes a request for one program. The path is a `Path` from `silk/filesystem`, and here it is the real path on the host. There is no search through `PATH`, so name the program in full: `/bin/echo`, not `echo`. `Path.make("echo")` fails with "invalid path", because a `Path` is always absolute.
+`ChildProcess.request(&path)` makes a request for one program. The path is a `Path` from `silk/system/filesystem`, and here it is the real path on the host. There is no search through `PATH`, so name the program in full: `/bin/echo`, not `echo`. `Path.make("echo")` fails with "invalid path", because a `Path` is always absolute.
 
 ```silk
 // A request for `program` with the given arguments, in order.
@@ -202,15 +202,15 @@ When you need a shell feature such as a pipe or a redirect, run `/bin/sh` with `
 The imports:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.child_process { ChildProcess, Exited, ProcessError, ProcessOutcome, ProcessReason, ProcessRequest, Signaled }
-import silk.effect { Effect }
-import silk.filesystem { FileError, Path }
-import silk.logger { Logger, LogError }
-import silk.os_child_process { OsChildProcess }
-import silk.os_logger { StdoutLogger }
-import silk.result { Result }
-import silk.string { String }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.system.child_process { ChildProcess, Exited, ProcessError, ProcessOutcome, ProcessReason, ProcessRequest, Signaled }
+import silk.core.effect { Effect }
+import silk.system.filesystem { FileError, Path }
+import silk.io.logger { Logger, LogError }
+import silk.system.child_process_native { OsChildProcess }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.result { Result }
+import silk.text.string { String }
 ```
 
 ## Run it
@@ -258,10 +258,10 @@ Read it from the top:
 
 ## API reference
 
-- `silk/child_process`: `ChildProcess`, `ProcessRequest`, `ProcessOutcome`, `Exited`, `Signaled`, `ProcessError`, `ProcessReason`, `ProcessOperation`
-- `silk/os_child_process`: `OsChildProcess`
-- `silk/filesystem`: `Path`, `FileError`
-- `silk/host_input`: `HostInput` (`variable`)
-- `silk/effect`: `Effect` (`result`)
-- `silk/string`: `String`
-- `silk/bytes`: `Bytes`
+- `silk/system/child_process`: `ChildProcess`, `ProcessRequest`, `ProcessOutcome`, `Exited`, `Signaled`, `ProcessError`, `ProcessReason`, `ProcessOperation`
+- `silk/system/child_process_native`: `OsChildProcess`
+- `silk/system/filesystem`: `Path`, `FileError`
+- `silk/system/host_input`: `HostInput` (`variable`)
+- `silk/core/effect`: `Effect` (`result`)
+- `silk/text/string`: `String`
+- `silk/collections/bytes`: `Bytes`

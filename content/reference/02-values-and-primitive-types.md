@@ -34,7 +34,7 @@ MaskType      = 'mask' '<' Expression '>'
 - `usize` and `isize` follow the target. They are 64 bits on `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` and `aarch64-apple-darwin`, and 32 bits on `wasm32-unknown-unknown`.
 - A literal that fits a 64-bit `usize` can be out of range on `wasm32` (SEM0002 there).
 - Array indexes and lengths are `usize`.
-- Each integer module (`silk/i32`, `silk/usize`, …) exports `MIN`, `MAX` and `BITS`. `silk/usize` also exports `ZERO` and `ONE`.
+- Each integer module (`silk/num/i32`, `silk/num/usize`, …) exports `MIN`, `MAX` and `BITS`. `silk/num/usize` also exports `ZERO` and `ONE`.
 
 ## Integer literal typing
 
@@ -56,7 +56,7 @@ MaskType      = 'mask' '<' Expression '>'
 - Division by zero and overflow produce infinities or NaN. They never trap.
 - `==` and ordering return `false` when either operand is NaN.
 - `%` works on floats.
-- `silk/f64` and `silk/f32` provide `isNaN`, `isInfinite`, `toBits`, `fromBits`, `sqrt`, `floor`, `round`, `totalOrder` and more.
+- `silk/num/f64` and `silk/num/f32` provide `isNaN`, `isInfinite`, `toBits`, `fromBits`, `sqrt`, `floor`, `round`, `totalOrder` and more.
 
 ## bool, char, string
 
@@ -66,7 +66,7 @@ MaskType      = 'mask' '<' Expression '>'
 - `string<'a>` is a borrowed view of valid UTF-8 bytes that lives for `'a`. Writing `string` alone lets the compiler pick or elide the lifetime.
 - A text literal has type `string<'static>`. A byte-string literal `b"…"` has type `&[u8]`.
 - `string` values are copied, not moved. On 64-bit targets a `string` is 16 bytes.
-- Owned, growable text is `String` from `silk/string`. `String.byteLength` measures a `string` in bytes.
+- Owned, growable text is `String` from `silk/text/string`. `String.byteLength` measures a `string` in bytes.
 
 ## Unit and never
 
@@ -82,7 +82,7 @@ MaskType      = 'mask' '<' Expression '>'
 - There are no implicit numeric conversions. `i32` and `i64` operands don't mix (SEM0135), and an `i32` value can't initialize an `i64` binding (SEM0037).
 - There is no cast operator. `as` is a keyword, but `x as i64` is not an expression.
 - Convert with std lib functions named after the target type: `i32.toI64(x)`, `u8.toI32(b)`, `usize.toI32(n)`.
-- Each such module must be imported, as in `import silk.i32`. Without the import, a call such as `u32.toU64(x)` is SEM0009: "Unknown name u32; is `import silk.u32` missing?". A value such as `u32.MAX`, or a bare `u32`, is SEM0006: "Unknown value u32; is `import silk.u32` missing?".
+- Each such module must be imported, as in `import silk.num.i32`. Without the import, a call such as `u32.toU64(x)` is SEM0009: "Unknown name u32; is `import silk.num.u32` missing?". A value such as `u32.MAX`, or a bare `u32`, is SEM0006: "Unknown value u32; is `import silk.num.u32` missing?".
 - The hint is left out when the module has syntax errors. The message is then plain, as in "Unknown value i32".
 - Every integer module has `toU8`, `toU16`, `toU32`, `toU64`, `toUsize`, `toI8`, `toI16`, `toI32`, `toI64`, `toIsize`, `toF32` and `toF64`.
 - `toX` traps when the value doesn't fit. `checkedToX` returns `Option<X>` with `None` instead.
@@ -105,7 +105,7 @@ MaskType      = 'mask' '<' Expression '>'
 
 ## SIMD vectors and masks
 
-`simd<T, N>` holds `N` lanes of the numeric type `T` and works on all of them at once. `mask<N>` holds `N` lanes that are each set or clear; lane comparisons return one. Use them through the `silk/simd` modules, one per shape: `silk.simd.u8x16` for `simd<u8, 16>`, `silk.simd.f32x4` for `simd<f32, 4>`, `silk.simd.mask16` for `mask<16>`, and so on.
+`simd<T, N>` holds `N` lanes of the numeric type `T` and works on all of them at once. `mask<N>` holds `N` lanes that are each set or clear; lane comparisons return one. Use them through the `silk/simd/simd` modules, one per shape: `silk.simd.u8x16` for `simd<u8, 16>`, `silk.simd.f32x4` for `simd<f32, 4>`, `silk.simd.mask16` for `mask<16>`, and so on.
 
 - `T` is any integer or float type, including `isize` and `usize`. `bool` and `char` are refused; a vector of booleans is spelled `mask<N>`.
 - `N` is a static expression, such as `16` or `2 * N` for a constant `N`. It is a power of two from 2 to 64.
@@ -130,7 +130,7 @@ MaskType      = 'mask' '<' Expression '>'
 - `<`, `<=`, `>` and `>=` don't apply to vectors (SEM0135). Compare lanes with `lanesLess`, `lanesGreater` and the rest, which return a mask.
 - There are no shift operators, as for scalars. Use `shiftLeft`, `shiftRight`, `rotateLeft` and `rotateRight`.
 
-### The silk/simd modules
+### The silk/simd/simd modules
 
 There is a module for each 128-bit and 256-bit shape, and for the masks they compare into:
 
@@ -168,7 +168,7 @@ Other admitted shapes, such as `simd<u8, 64>`, `simd<u32, 2>` or `simd<usize, 2>
 
 ### Choosing a width for the target
 
-`silk.simd` itself answers two static questions about the target CPU of the build. Both read the profile's CPU model and features, not the machine the compiler runs on, and cost nothing at run time.
+`silk.simd.simd` itself answers two static questions about the target CPU of the build. Both read the profile's CPU model and features, not the machine the compiler runs on, and cost nothing at run time.
 
 | Function | Result |
 | --- | --- |
@@ -181,20 +181,20 @@ The features come from the profile's `cpu` table; see Targets and profiles. With
 
 ### Architecture instructions
 
-Some instructions do in one step what takes several portable operations: byte table lookups, multiply-add steps, saturating packs, sums of absolute differences, AES rounds, carry-less multiplication and SHA-256 rounds. The `silk/arch` modules give them as ordinary functions, named after what they compute:
+Some instructions do in one step what takes several portable operations: byte table lookups, multiply-add steps, saturating packs, sums of absolute differences, AES rounds, carry-less multiplication and SHA-256 rounds. The `silk/simd/x86` and `silk/simd/aarch64` modules give them as ordinary functions, named after what they compute:
 
 | Module | Functions, with the instruction and the CPU feature it needs |
 | --- | --- |
-| `silk.arch.x86` | `shuffleBytes` (`pshufb`, ssse3), `shuffleBytes256` (avx2), `multiplyAddBytes` (`pmaddubsw`, ssse3), `multiplyAddBytes256` (avx2), `multiplyAddWords` (`pmaddwd`, sse2), `multiplyAddWords256` (avx2), `packUnsigned16` (`packuswb`, sse2), `packUnsigned16x256` (avx2), `packUnsigned32` (`packusdw`, sse4.1), `packSigned16` (`packsswb`, sse2), `packSigned32` (`packssdw`, sse2), `sumAbsoluteDifferences` (`psadbw`, sse2), `sumAbsoluteDifferences256` (avx2), `aesEncrypt`, `aesEncryptLast`, `aesDecrypt`, `aesDecryptLast`, `aesInverseMixColumns` (`aesenc`, `aesenclast`, `aesdec`, `aesdeclast`, `aesimc`, aes), `carrylessMultiply` (`pclmulqdq`, pclmul), `sha256Rounds2`, `sha256Message1`, `sha256Message2` (`sha256rnds2`, `sha256msg1`, `sha256msg2`, sha) |
-| `silk.arch.aarch64` | `tableLookup` (`tbl`, neon), `dotProduct` (`udot`, dotprod), `dotProductSigned` (`sdot`, dotprod), `pairwiseAdd8`, `pairwiseAdd16`, `pairwiseAdd32` (`addp`, neon), `aesEncrypt`, `aesDecrypt`, `aesMixColumns`, `aesInverseMixColumns` (`aese`, `aesd`, `aesmc`, `aesimc`, aes), `sha256Hash`, `sha256Hash2`, `sha256ScheduleUpdate0`, `sha256ScheduleUpdate1` (`sha256h`, `sha256h2`, `sha256su0`, `sha256su1`, sha2) |
-| `silk.arch.wasm` | `swizzle` (`i8x16.swizzle`, simd128), `relaxedSwizzle` (`i8x16.relaxed_swizzle`, relaxed-simd), `dot` (`i32x4.dot_i16x8_s`, simd128), `narrowUnsigned`, `narrowSigned` (`i8x16.narrow_i16x8_u` and `_s`, simd128) |
+| `silk.simd.x86` | `shuffleBytes` (`pshufb`, ssse3), `shuffleBytes256` (avx2), `multiplyAddBytes` (`pmaddubsw`, ssse3), `multiplyAddBytes256` (avx2), `multiplyAddWords` (`pmaddwd`, sse2), `multiplyAddWords256` (avx2), `packUnsigned16` (`packuswb`, sse2), `packUnsigned16x256` (avx2), `packUnsigned32` (`packusdw`, sse4.1), `packSigned16` (`packsswb`, sse2), `packSigned32` (`packssdw`, sse2), `sumAbsoluteDifferences` (`psadbw`, sse2), `sumAbsoluteDifferences256` (avx2), `aesEncrypt`, `aesEncryptLast`, `aesDecrypt`, `aesDecryptLast`, `aesInverseMixColumns` (`aesenc`, `aesenclast`, `aesdec`, `aesdeclast`, `aesimc`, aes), `carrylessMultiply` (`pclmulqdq`, pclmul), `sha256Rounds2`, `sha256Message1`, `sha256Message2` (`sha256rnds2`, `sha256msg1`, `sha256msg2`, sha) |
+| `silk.simd.aarch64` | `tableLookup` (`tbl`, neon), `dotProduct` (`udot`, dotprod), `dotProductSigned` (`sdot`, dotprod), `pairwiseAdd8`, `pairwiseAdd16`, `pairwiseAdd32` (`addp`, neon), `aesEncrypt`, `aesDecrypt`, `aesMixColumns`, `aesInverseMixColumns` (`aese`, `aesd`, `aesmc`, `aesimc`, aes), `sha256Hash`, `sha256Hash2`, `sha256ScheduleUpdate0`, `sha256ScheduleUpdate1` (`sha256h`, `sha256h2`, `sha256su0`, `sha256su1`, sha2) |
+| `silk.simd.wasm` | `swizzle` (`i8x16.swizzle`, simd128), `relaxedSwizzle` (`i8x16.relaxed_swizzle`, relaxed-simd), `dot` (`i32x4.dot_i16x8_s`, simd128), `narrowUnsigned`, `narrowSigned` (`i8x16.narrow_i16x8_u` and `_s`, simd128) |
 
 - Every function compiles on every target. Where the build targets the module's architecture with the feature enabled, it is the one instruction. Elsewhere it computes the same lanes with portable code, which is correct but slower.
 - The choice is made at compile time from the profile, like `simd.preferredBytes()`. With the default x86-64 profile, `x86.shuffleBytes` takes the portable path; with `cpu.model = "x86-64-v2"` (SSSE3 and SSE4.1) it is `pshufb`, and `x86-64-v3` adds the AVX2 forms.
-- Code that only pays off with the instruction tests `Target.hasCpuFeature` from `silk/target` in a `static if` and keeps a plain loop otherwise.
+- Code that only pays off with the instruction tests `Target.hasCpuFeature` from `silk/core/target` in a `static if` and keeps a plain loop otherwise.
 - The 256-bit x86 forms work on each 16-byte half separately: a `shuffleBytes256` index picks only within its own half, and `packUnsigned16x256` interleaves the halves of its operands.
-- The AES and SHA-256 functions follow their instructions, so the two modules split the work differently. An x86 AES round is `x86.aesEncrypt(state, key)`; on AArch64 it is `aarch64.aesMixColumns(aarch64.aesEncrypt(state, key))`, because `aese` adds the key first. `silk.arch.aes` has the portable steps (`subBytes`, `shiftRows`, `mixColumns` and their inverses) for checking either. To encrypt data, use `silk/aes_gcm`.
-- `x86.sha256Rounds2` does two rounds on the state split as A, B, E, F and C, D, G, H, highest lane first. `aarch64.sha256Hash` and `sha256Hash2` do four rounds on A to D and E to H in lane order. The message schedule takes one extra add on x86 (see the example below). The std lib digests in `silk/sha2` do not call these functions.
+- The AES and SHA-256 functions follow their instructions, so the two modules split the work differently. An x86 AES round is `x86.aesEncrypt(state, key)`; on AArch64 it is `aarch64.aesMixColumns(aarch64.aesEncrypt(state, key))`, because `aese` adds the key first. `silk.crypto.aes_round` has the portable steps (`subBytes`, `shiftRows`, `mixColumns` and their inverses) for checking either. To encrypt data, use `silk/crypto/aes_gcm`.
+- `x86.sha256Rounds2` does two rounds on the state split as A, B, E, F and C, D, G, H, highest lane first. `aarch64.sha256Hash` and `sha256Hash2` do four rounds on A to D and E to H in lane order. The message schedule takes one extra add on x86 (see the example below). The std lib digests in `silk/crypto/sha2` do not call these functions.
 - Index rules differ. `x86.shuffleBytes` uses the low four bits of an index and gives `0` when bit 7 is set; `aarch64.tableLookup` and `wasm.swizzle` give `0` for any index of 16 or more. `wasm.relaxedSwizzle` leaves those lanes unspecified, and they may differ between engines.
 
 To run a faster path on machines that have a feature the build does not select, see Targets and profiles, under CPU features at run time. The underlying members are in Intrinsics, under Architecture members.
@@ -202,10 +202,10 @@ To run a faster path on machines that have a feature the build does not select, 
 ## Examples
 
 ```silk
-import silk.i32
-import silk.i64
+import silk.num.i32
+import silk.num.i64
 import silk.option { Option }
-import silk.u8
+import silk.num.u8
 
 fn widen(value: i64) -> i64 {
   return value * 2
@@ -231,9 +231,9 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.i32
+import silk.num.i32
 import silk.option { Option }
-import silk.u8
+import silk.num.u8
 
 pub fn main() -> i32 {
   let top: u8 = 250
@@ -253,9 +253,9 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.char
-import silk.string { String }
-import silk.usize
+import silk.text.char
+import silk.text.string { String }
+import silk.num.usize
 
 pub fn main() -> i32 {
   let letter = 'é'
@@ -320,7 +320,7 @@ pub fn main() -> i32 {
 A sum that uses eight lanes when the profile prefers 32-byte vectors, then masks, `select` and `shuffle`. It exits with 0 under the default profile, with `cpu.model = "x86-64-v3"`, and on wasm32:
 
 ```silk
-import silk.simd
+import silk.simd.simd
 import silk.simd.i32x4
 import silk.simd.i32x8
 import silk.simd.mask4
@@ -380,7 +380,7 @@ pub fn main() -> i32 {
 Sixteen nibbles to hex digits with one table lookup. It exits with 0 under the default profile, which runs the portable path, and under `cpu.model = "x86-64-v2"`, which compiles `shuffleBytes` to `pshufb`:
 
 ```silk
-import silk.arch.x86
+import silk.simd.x86
 import silk.simd.u8x16
 
 // Sixteen nibbles to sixteen lowercase hex digits with one table lookup.
@@ -408,10 +408,10 @@ pub fn main() -> i32 {
 The next four SHA-256 message words, computed with each module. It exits with 0 under the default profile, where both take their portable paths, and under `cpu.features = ["sha"]`, which compiles the x86 functions to `sha256msg1` and `sha256msg2`. On arm64 with `sha2`, the AArch64 functions are `sha256su0` and `sha256su1`:
 
 ```silk
-import silk.arch.aarch64
-import silk.arch.x86
+import silk.simd.aarch64
+import silk.simd.x86
 import silk.simd.u32x4
-import silk.u32
+import silk.num.u32
 
 fn sigma1(x: u32) -> u32 {
   return u32.rotateRight(x, 17) ^ u32.rotateRight(x, 19) ^ u32.shiftRight(x, 10)
@@ -481,7 +481,7 @@ fatal trap: arithmetic overflow
 | Code | Meaning |
 | --- | --- |
 | SEM0002 | Integer literal outside the range of its selected type |
-| SEM0006 | Unknown value, such as `u32.MAX` without `import silk.u32` |
+| SEM0006 | Unknown value, such as `u32.MAX` without `import silk.num.u32` |
 | SEM0009 | Unknown name, such as an integer module function called without its `import` |
 | SEM0012 | Argument type does not match the parameter, e.g. `f64 + 1` |
 | SEM0034 | Constant array index outside the array length |
@@ -494,7 +494,7 @@ fatal trap: arithmetic overflow
 
 ## See also
 
-Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · Unsafe code and C interop · `silk/i8`, `silk/i16`, `silk/i32`, `silk/i64`, `silk/isize`, `silk/u8`, `silk/u16`, `silk/u32`, `silk/u64`, `silk/usize`, `silk/f32`, `silk/f64`, `silk/numeric`, `silk/bool`, `silk/char`, `silk/string`, `silk/layout`, `silk/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...), `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`
+Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · Unsafe code and C interop · `silk/num/i8`, `silk/num/i16`, `silk/num/i32`, `silk/num/i64`, `silk/num/isize`, `silk/num/u8`, `silk/num/u16`, `silk/num/u32`, `silk/num/u64`, `silk/num/usize`, `silk/num/f32`, `silk/num/f64`, `silk/num/numeric`, `silk/core/bool`, `silk/text/char`, `silk/text/string`, `silk/layout`, `silk/simd/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...), `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm`
 
 ## Open questions
 

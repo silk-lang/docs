@@ -7,12 +7,12 @@ This page reads one small program from top to bottom. It models a shopping baske
 Make a package with `silk init tour` and put this in `src/main.silk`:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.list { List }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
-import silk.result { Result }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.collections.list { List }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.result { Result }
 
 struct Item {
   name: string,
@@ -117,11 +117,11 @@ total 1150 cents, cash paid 1150 cents
 ## Imports
 
 ```silk
-import silk.list { List }
-import silk.logger { Logger, LogError }
+import silk.collections.list { List }
+import silk.io.logger { Logger, LogError }
 ```
 
-Nothing from the standard library is in scope until you import it. `silk.list` is the module `silk/list`, and `{ List }` brings its `List` type into this file. The program uses six modules: memory allocation (`silk/allocator`), effects (`silk/effect`), growable lists (`silk/list`), logging (`silk/logger` and `silk/os_logger`) and results (`silk/result`). Each has a page in the Std lib API reference, under the same name.
+Nothing from the standard library is in scope until you import it. `silk.collections.list` is the module `silk/collections/list`, and `{ List }` brings its `List` type into this file. The program uses six modules: memory allocation (`silk/mem/allocator`), effects (`silk/core/effect`), growable lists (`silk/collections/list`), logging (`silk/io/logger` and `silk/io/logger_native`) and results (`silk/core/result`). Each has a page in the Std lib API reference, under the same name.
 
 ## Structs and unions
 
@@ -256,9 +256,9 @@ The Silk book teaches all of this in order, by growing one program from a few li
 
 ## API reference
 
-- `silk/allocator`: `Allocator`, `OutOfMemoryError`
-- `silk/effect`: `Effect` (`Effect.log`, `Effect.result`, `Effect.provideMut`)
-- `silk/list`: `List`
-- `silk/logger`: `Logger`, `LogError`
-- `silk/os_logger`: `StdoutLogger`
-- `silk/result`: `Result`
+- `silk/mem/allocator`: `Allocator`, `OutOfMemoryError`
+- `silk/core/effect`: `Effect` (`Effect.log`, `Effect.result`, `Effect.provideMut`)
+- `silk/collections/list`: `List`
+- `silk/io/logger`: `Logger`, `LogError`
+- `silk/io/logger_native`: `StdoutLogger`
+- `silk/core/result`: `Result`

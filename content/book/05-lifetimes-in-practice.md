@@ -121,7 +121,7 @@ const SEED: string = "x|n|Buy milk\n |h|Write the Silk book\n |l|Water the plant
 An `x` in the status column means done. The priority is `l`, `n` or `h`. Here are the helpers, plus a new import at the top of the file:
 
 ```silk
-import silk.string { String }
+import silk.text.string { String }
 ```
 
 ```silk
@@ -182,7 +182,7 @@ The signature says it all: give me text valid for `'text`, and I give you a boar
 
 ## When you may leave lifetimes out
 
-You might wonder why the stdlib functions you just called have no lifetimes in sight. Their signatures in `silk/string` look like this:
+You might wonder why the stdlib functions you just called have no lifetimes in sight. Their signatures in `silk/text/string` look like this:
 
 ```silk
   pub fn utf8Bytes(value: string) -> &[u8] {
@@ -206,7 +206,7 @@ That compiles and runs just the same. The book keeps the names in `part` and `pa
 The fourth rule covers a function with two borrowed inputs. Put this in the `src/main.silk` of the scratch project from chapter 2:
 
 ```silk
-import silk.string { String }
+import silk.text.string { String }
 
 fn longer(left: string, right: string) -> string {
   if String.byteLength(left) >= String.byteLength(right) {
@@ -356,8 +356,8 @@ Rule of thumb: when a method returns something it found inside `self`, ask wheth
 So far the compiler has refused safe code because the signature said too little. Here it catches the real bug. Put this in the scratch project:
 
 ```silk
-import silk.result { Result }
-import silk.string { String, InvalidUtf8 }
+import silk.core.result { Result }
+import silk.text.string { String, InvalidUtf8 }
 
 struct Board<'text> {
   first: string<'text>,
@@ -422,11 +422,11 @@ See **Lifetimes** in the reference for the full elision rules, outlives bounds s
 Here is `src/main.silk` at the end of the chapter. The line numbers in the errors above refer to this file.
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
-import silk.ownership { Copy }
-import silk.string { String }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.ownership { Copy }
+import silk.text.string { String }
 
 enum Priority {
   Low,

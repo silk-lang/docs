@@ -4,7 +4,7 @@ fields.
 ## When to use
 Use [`RequestParser`](#RequestParser) or [`ResponseParser`](#ResponseParser) to parse a head as its bytes arrive from a
 transport. Use [`parseRequest`](#parseRequest) or [`parseResponse`](#parseResponse) when you have all the bytes. Use
-[`writeRequestInto`](#writeRequestInto) and [`writeResponseInto`](#writeResponseInto) to write a head from `silk.http`.
+[`writeRequestInto`](#writeRequestInto) and [`writeResponseInto`](#writeResponseInto) to write a head from `silk.http.message`.
 
 ## Details
 A parser allocates all its memory in `make`. After that, `feed`, `head`, `reset`, and the write
@@ -30,10 +30,10 @@ A status line with no reason phrase may leave out the space after the code: `HTT
 ## Examples
 ### Parse a response head
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.http { Status }
-import silk.http_head {
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.http.message { Status }
+import silk.http.head {
   Limits,
   ParseError,
   ParsedResponse,
@@ -42,8 +42,8 @@ import silk.http_head {
   ResponseParser,
   parseResponse
 }
-import silk.http_headers { Limits as ValueLimits }
-import silk.result { Result }
+import silk.http.headers { Limits as ValueLimits }
+import silk.core.result { Result }
 
 fn limits() -> Limits {
   return Limits {
@@ -101,7 +101,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `RequestParser` with `import silk.http_head { RequestParser }`.
+Import as `RequestParser` with `import silk.http.head { RequestParser }`.
 
 Public declarations: 22.
 
@@ -1292,7 +1292,7 @@ pub effect fn copy(
   ) -> Result<OwnedRequestHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies the head into new memory, as an owned head from `silk.http`.
+Copies the head into new memory, as an owned head from `silk.http.message`.
 
 #### Errors
 - `ValueError` if the head exceeds `limits`.
@@ -1367,7 +1367,7 @@ pub effect fn copy(
   ) -> Result<OwnedResponseHead, ValueError> ! OutOfMemoryError ? &mut Allocator
 ```
 
-Copies the head into new memory, as an owned head from `silk.http`.
+Copies the head into new memory, as an owned head from `silk.http.message`.
 
 #### Errors
 - `ValueError` if the head exceeds `limits`.

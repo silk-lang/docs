@@ -19,8 +19,8 @@ buffer holds the password as plain text. Overwrite it when you are done.
 ## Examples
 ### Encode credentials
 ```silk
-import silk.http_basic { BasicError, encodeInto, encodedLength }
-import silk.result { Result }
+import silk.http.basic { BasicError, encodeInto, encodedLength }
+import silk.core.result { Result }
 
 pub fn main() -> i32 {
   let mut scratch: [u8; 64] = [0; 64]
@@ -56,7 +56,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `HttpBasic` with `import silk.http_basic as HttpBasic`.
+Import as `HttpBasic` with `import silk.http.basic as HttpBasic`.
 
 Public declarations: 3.
 

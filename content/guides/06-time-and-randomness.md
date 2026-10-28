@@ -11,10 +11,10 @@ cd timing
 
 | Service | Module | Native provider | Use it for |
 | --- | --- | --- | --- |
-| `SystemClock` | `silk/system_clock` | `OsSystemClock` in `silk/os_system_clock` | The date and time: timestamps, logs, anything a person reads |
-| `MonotonicClock` | `silk/monotonic_clock` | `OsMonotonicClock` in `silk/os_monotonic_clock` | Measuring elapsed time, timeouts, sleeping |
-| `Random` | `silk/random` | `OsRandom` in `silk/os_random` | Secrets: tokens, keys, nonces, anything that must not be guessed |
-| `InsecureRandom` | `silk/insecure_random` | `Xoshiro256StarStar`, from `InsecureRandom.seeded(seed)` | Reproducible randomness: simulations, games, shuffles, tests |
+| `SystemClock` | `silk/system/system_clock` | `OsSystemClock` in `silk/system/system_clock_native` | The date and time: timestamps, logs, anything a person reads |
+| `MonotonicClock` | `silk/system/monotonic_clock` | `OsMonotonicClock` in `silk/system/monotonic_clock_native` | Measuring elapsed time, timeouts, sleeping |
+| `Random` | `silk/system/random` | `OsRandom` in `silk/system/random_native` | Secrets: tokens, keys, nonces, anything that must not be guessed |
+| `InsecureRandom` | `silk/system/insecure_random` | `Xoshiro256StarStar`, from `InsecureRandom.seeded(seed)` | Reproducible randomness: simulations, games, shuffles, tests |
 
 The wall clock can jump. The operating system may set it back or forward at any time, so never measure a duration with it. The monotonic clock only moves forward, but its starting point means nothing, so never show it to a person.
 
@@ -198,7 +198,7 @@ Failed timing in 1.81s
 
 SEM0123 means the value given to `provideMut<Random>` does not implement `Random`. A seeded generator can't stand in for a secure source by accident.
 
-`silk/insecure_seed` is a third, narrower service: one fixed 128-bit value read at start-up, for hash-flood hardening in a runtime you write. The std lib's hash collections do not use it; they take an explicit `Hash.seed`.
+`silk/system/insecure_seed` is a third, narrower service: one fixed 128-bit value read at start-up, for hash-flood hardening in a runtime you write. The std lib's hash collections do not use it; they take an explicit `Hash.seed`.
 
 ## Run it
 
@@ -232,21 +232,21 @@ pub effect fn main() -> () ! LogError {
 The imports:
 
 ```silk
-import silk.effect { Effect }
-import silk.insecure_random { InsecureRandom }
-import silk.logger { Logger, LogError }
-import silk.monotonic_clock { MonotonicClock }
+import silk.core.effect { Effect }
+import silk.system.insecure_random { InsecureRandom }
+import silk.io.logger { Logger, LogError }
+import silk.system.monotonic_clock { MonotonicClock }
 import silk.option { Option }
-import silk.os_logger { StdoutLogger }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.os_random { OsRandom }
-import silk.os_system_clock { OsSystemClock }
-import silk.random { Random }
-import silk.result { Result }
-import silk.string { String }
-import silk.system_clock { Instant, SystemClock }
-import silk.testing { AssertionError, Testing }
-import silk.u8
+import silk.io.logger_native { StdoutLogger }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.system.random_native { OsRandom }
+import silk.system.system_clock_native { OsSystemClock }
+import silk.system.random { Random }
+import silk.core.result { Result }
+import silk.text.string { String }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.testing.testing { AssertionError, Testing }
+import silk.num.u8
 ```
 
 ```sh
@@ -360,14 +360,14 @@ For code that needs `Random`, a test can provide a scripted `fillBytes` that wri
 
 ## API reference
 
-- `silk/system_clock`: `SystemClock`, `Instant`
-- `silk/os_system_clock`: `OsSystemClock`
-- `silk/monotonic_clock`: `MonotonicClock`
-- `silk/os_monotonic_clock`: `OsMonotonicClock`
-- `silk/random`: `Random`
-- `silk/os_random`: `OsRandom`
-- `silk/insecure_random`: `InsecureRandom`, `Xoshiro256StarStar`
-- `silk/insecure_seed`: `InsecureSeed`
-- `silk/effect`: `Effect` (`sleep`)
-- `silk/logger`: `Logger`
-- `silk/testing`: `Testing`, `AssertionError`
+- `silk/system/system_clock`: `SystemClock`, `Instant`
+- `silk/system/system_clock_native`: `OsSystemClock`
+- `silk/system/monotonic_clock`: `MonotonicClock`
+- `silk/system/monotonic_clock_native`: `OsMonotonicClock`
+- `silk/system/random`: `Random`
+- `silk/system/random_native`: `OsRandom`
+- `silk/system/insecure_random`: `InsecureRandom`, `Xoshiro256StarStar`
+- `silk/system/insecure_seed`: `InsecureSeed`
+- `silk/core/effect`: `Effect` (`sleep`)
+- `silk/io/logger`: `Logger`
+- `silk/testing/testing`: `Testing`, `AssertionError`

@@ -1,6 +1,6 @@
 # Static control flow and reflection
 
-`static if` and `static for` choose and repeat code during compilation. `compileError` stops a build from a selected branch. `silk/reflect`, `silk/target` and `silk/compilation` supply the static facts these forms test: aggregate fields, the target machine, and the build request.
+`static if` and `static for` choose and repeat code during compilation. `compileError` stops a build from a selected branch. `silk/core/reflect`, `silk/core/target` and `silk/core/compilation` supply the static facts these forms test: aggregate fields, the target machine, and the build request.
 
 ## Syntax
 
@@ -47,7 +47,7 @@ ExactType           = 'typeof' '(' Path ')'
 ## `static for`
 
 - `static for name in sequence { ... }` repeats its body once per element, in order, during compilation. No runtime loop remains.
-- The sequence must be a static sequence value: the result of `Reflect.fields<T>()`, or an `Intrinsic.StaticSequence<E>` built with `silk/static_sequence`. Anything else, including a fixed array literal, is SEM0176.
+- The sequence must be a static sequence value: the result of `Reflect.fields<T>()`, or an `Intrinsic.StaticSequence<E>` built with `silk/core/static_sequence`. Anything else, including a fixed array literal, is SEM0176.
 - `name` is bound to the current element as a static value. It may appear in `static if` conditions and static arguments.
 - Each repetition is checked separately with that element's types. A body that suits one field's type but not another's fails for that field (SEM0012).
 - `return` and `fail` inside the body leave the enclosing function.
@@ -66,7 +66,7 @@ ExactType           = 'typeof' '(' Path ')'
 
 ## Reflection
 
-`silk/reflect` exposes aggregate metadata to static code. Descriptors exist only during static evaluation; they have no runtime representation. Import the owner with `import silk.reflect { Reflect }`.
+`silk/core/reflect` exposes aggregate metadata to static code. Descriptors exist only during static evaluation; they have no runtime representation. Import the owner with `import silk.core.reflect { Reflect }`.
 
 | Operation | Result |
 | --- | --- |
@@ -78,12 +78,12 @@ ExactType           = 'typeof' '(' Path ')'
 | `Reflect.fieldOrdinal(field)` | The position of a positional field, as `usize`, counting from 0 |
 | `Reflect.borrowField(owner, field)` | `&V`, a borrow of that field of `owner: &T` |
 
-- Kind constants in `silk/reflect`: `namedKind` (0, a `struct`), `positionalKind` (1, a `tuple` declaration), `anonymousNamedKind` (2, a `.{ ... }` record), `anonymousPositionalKind` (3, a `( ... )` tuple).
+- Kind constants in `silk/core/reflect`: `namedKind` (0, a `struct`), `positionalKind` (1, a `tuple` declaration), `anonymousNamedKind` (2, a `.{ ... }` record), `anonymousPositionalKind` (3, a `( ... )` tuple).
 - Field kind constants: `labeledFieldKind` (0) and `positionalFieldKind` (1).
 - Every operation except `borrowField` is a `static fn`. Calling one where a runtime value is needed, as in `let fields = Reflect.fields<P>()` in an ordinary function, is SEM0176.
 - `borrowField` runs at runtime. Its `field` parameter is `static`, so the descriptor must come from static code, usually a `static for` binding. Type arguments may be written (`borrowField<P, i32>`) or inferred.
 - Comparing labels is static: `static if Reflect.fieldLabel(field) == "count"` selects one field.
-- `Reflect.fields<T>()` lists only `pub` fields, even when called in the module that declares `T`. Visibility is that of `silk/reflect`.
+- `Reflect.fields<T>()` lists only `pub` fields, even when called in the module that declares `T`. Visibility is that of `silk/core/reflect`.
 - `Intrinsic.reflectFields<T>()` uses the calling module's visibility instead, so it also lists private fields of a local type. See Intrinsics.
 - Listing the fields of a nominal `union` with `Reflect.fields<U>()` is not supported. It is SEM0176 at the `Reflect.fields` call in the user's code. `Reflect.typeOf` of a `union` or of a non-aggregate such as `i32`, and `fieldLabel` of a positional field, are reported as unsupported.
 - A fault or unsupported construct reached while statically evaluating another module's function is reported at the outermost call in the user's module. For example, `static if Reflect.typeKind(Reflect.typeOf<i32>()) == 1` reports "unsupported: this construct is not supported by the native compiler yet" at the `Reflect.typeKind` call, followed by a `note:` line at the same position.
@@ -92,7 +92,7 @@ ExactType           = 'typeof' '(' Path ')'
 
 All of these are fixed by the build request (`--target`, `--release`, `--profile`, `--profile-input`) before static evaluation starts. They have no runtime storage. Each query is a `static fn` or `const`, so it can appear in a `static if` condition or in ordinary expressions.
 
-`silk/target`, through `import silk.target { Target, ... }`:
+`silk/core/target`, through `import silk.core.target { Target, ... }`:
 
 | Name | Type |
 | --- | --- |
@@ -106,7 +106,7 @@ All of these are fixed by the build request (`--target`, `--release`, `--profile
 | `pointerBits`, `pointerAlignment` | `u32` constants |
 | `usizeMax`, `isizeMax`, `isizeMin` | target-width constants |
 
-`silk/compilation`, through `import silk.compilation { Compilation, ... }`:
+`silk/core/compilation`, through `import silk.core.compilation { Compilation, ... }`:
 
 | Name | Type |
 | --- | --- |
@@ -142,7 +142,7 @@ All of these are fixed by the build request (`--target`, `--release`, `--profile
 ## Examples
 
 ```silk
-import silk.reflect { Reflect, namedKind }
+import silk.core.reflect { Reflect, namedKind }
 
 struct Point {
   pub x: i32,
@@ -186,8 +186,8 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.target { Target, OperatingSystem, pointerBits }
-import silk.static_sequence { StaticSequence }
+import silk.core.target { Target, OperatingSystem, pointerBits }
+import silk.core.static_sequence { StaticSequence }
 
 static if Target.operatingSystem() == OperatingSystem.Linux {
   fn platform() -> i32 {
@@ -234,7 +234,7 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.reflect { Reflect, positionalKind }
+import silk.core.reflect { Reflect, positionalKind }
 
 struct Named { pub value: i32 }
 tuple Pair(i32, i32)
@@ -298,7 +298,7 @@ src/main.silk:24:5: error[SEM0177] factor must be nonzero
 
 ## See also
 
-Static evaluation · Package parameters · Generics · Intrinsics · Control flow · Structs, tuples and arrays · `silk/reflect`, `silk/target`, `silk/compilation`, `silk/static_sequence`, `silk/static_text`, `silk/json_reflect`
+Static evaluation · Package parameters · Generics · Intrinsics · Control flow · Structs, tuples and arrays · `silk/core/reflect`, `silk/core/target`, `silk/core/compilation`, `silk/core/static_sequence`, `silk/core/static_text`, `silk/json/reflect`
 
 ## Open questions
 

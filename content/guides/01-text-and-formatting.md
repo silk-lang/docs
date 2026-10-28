@@ -16,8 +16,8 @@ Silk keeps three things apart, and every function in this guide picks one of the
 | Type | Module | What it is | Allocates |
 | --- | --- | --- | --- |
 | `string` | built in | A borrowed view of valid UTF-8. Literals are `string<'static>`. | Never |
-| `String` | `silk/string` | Owned, growable, always valid UTF-8. | When it grows |
-| `Bytes` / `&[u8]` | `silk/bytes` | Any octets, no promise about UTF-8. | `Bytes` when it grows |
+| `String` | `silk/text/string` | Owned, growable, always valid UTF-8. | When it grows |
+| `Bytes` / `&[u8]` | `silk/collections/bytes` | Any octets, no promise about UTF-8. | `Bytes` when it grows |
 
 A `string` is what you pass around. `String` is what you build. Bytes are what you get from files, sockets and child processes, and they only become text after you check them. Chapter 9 of the book, "Text, collections and memory", covers views and owned values in more depth.
 
@@ -47,7 +47,7 @@ fn scalarCount(text: string) -> usize {
 
 `String.scalarCursor()` starts before the first scalar. `String.nextScalar` decodes one scalar and returns a `ScalarStep`, or `None` at the end. `String.nextCursor` consumes the step and gives the cursor after it. The cursor and the step are not `Copy`, so each hand-off is an explicit `move`.
 
-A step also knows where it started. `String.scalarValue(&step)` is the `char`, and `String.scalarByteOffset(&step)` is the byte offset. `char.toU32` from `silk/char` turns a `char` into its number. Going the other way, `char.fromU32` returns `None` for surrogates and values above `0x10FFFF`, so you never get an invalid `char`.
+A step also knows where it started. `String.scalarValue(&step)` is the `char`, and `String.scalarByteOffset(&step)` is the byte offset. `char.toU32` from `silk/text/char` turns a `char` into its number. Going the other way, `char.fromU32` returns `None` for surrogates and values above `0x10FFFF`, so you never get an invalid `char`.
 
 A scalar is a code point, not what a reader sees as one character. `e` followed by a combining accent is two scalars. The std lib has no grapheme segmentation.
 
@@ -69,7 +69,7 @@ The second argument is a borrowed record. `{text}` picks the field named `text`.
 
 The template is checked while the program compiles. `{{` and `}}` write literal braces. Each value must implement `Display`, which the std lib provides for every integer type, `f32`, `f64`, `bool`, `char` and `string`. A `bool` prints as `true` or `false`, and a `char` as the character itself. A `{:?}` placeholder uses `Debug` instead, described below.
 
-`describe` needs `? &mut Writer`, and nothing in it says where the bytes go. `main` decides that by providing `StdoutWriter` from `silk/os_writer`. A test could provide a writer that collects bytes instead. The guide "Output, logging and standard input" shows that, and `Effect.log` takes the same templates.
+`describe` needs `? &mut Writer`, and nothing in it says where the bytes go. `main` decides that by providing `StdoutWriter` from `silk/io/writer_native`. A test could provide a writer that collects bytes instead. The guide "Output, logging and standard input" shows that, and `Effect.log` takes the same templates.
 
 Make a typo in a field name and the build stops:
 
@@ -179,7 +179,7 @@ impl Display for CodePoint {
 }
 ```
 
-The `Formatter` carries the options the caller chose. Your impl decides the content width, here `count + 2` scalars, and `writeLeadingPadding` and `writeTrailingPadding` add whatever fill the width and alignment ask for. The `Format.write*` functions take the formatter as `&mut Formatter`, so pass a fresh reborrow, `&mut formatter.*`. `Slice.view` from `silk/slice` borrows the filled end of the buffer; Silk has no `a[i..j]` syntax.
+The `Formatter` carries the options the caller chose. Your impl decides the content width, here `count + 2` scalars, and `writeLeadingPadding` and `writeTrailingPadding` add whatever fill the width and alignment ask for. The `Format.write*` functions take the formatter as `&mut Formatter`, so pass a fresh reborrow, `&mut formatter.*`. `Slice.view` from `silk/collections/slice` borrows the filled end of the buffer; Silk has no `a[i..j]` syntax.
 
 Now print one row per scalar, with the offset right-aligned in 6 columns and the code point left-aligned in 8:
 
@@ -228,7 +228,7 @@ effect fn validate(bytes: &[u8]) -> () ! WriterError ? &mut Writer {
 
 ## Decoding bytes that arrive in pieces
 
-`fromUtf8` needs all the bytes at once. Data from a pipe or a socket comes in chunks, and a two-byte `é` can be split between them. `Utf8Decoder` from `silk/utf8_decoder` takes one byte at a time and keeps the partial scalar between calls:
+`fromUtf8` needs all the bytes at once. Data from a pipe or a socket comes in chunks, and a two-byte `é` can be split between them. `Utf8Decoder` from `silk/text/utf8_decoder` takes one byte at a time and keeps the partial scalar between calls:
 
 ```silk
 // Decodes bytes that arrive in pieces. A scalar may be split between two chunks.
@@ -271,7 +271,7 @@ The pattern names the field `offset: bad` because `offset` is already a local. R
 
 ## Comparing two spellings
 
-`é` can be one scalar, `U+00E9`, or two, `e` plus `U+0301`. They look the same and compare different, because `==` on strings compares bytes. Normalize both sides first with `Unicode.normalizeNfc` from `silk/unicode`:
+`é` can be one scalar, `U+00E9`, or two, `e` plus `U+0301`. They look the same and compare different, because `==` on strings compares bytes. Normalize both sides first with `Unicode.normalizeNfc` from `silk/text/unicode`:
 
 ```silk
 // Two spellings of the same word: a precomposed é, and e plus a combining accent.
@@ -372,19 +372,19 @@ pub effect fn main() -> i32 ! WriterError | OutOfMemoryError {
 The imports at the top of the file:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.char
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.text.char
+import silk.core.effect { Effect }
 import silk.format { Display, Format, Formatter, NotANumber, OutOfRange }
 import silk.option { Option }
-import silk.os_writer { StdoutWriter }
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.string { String }
-import silk.u32
-import silk.unicode { Unicode }
-import silk.utf8_decoder { Utf8Decoder, Utf8Step }
-import silk.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
+import silk.core.result { Result }
+import silk.collections.slice { Slice }
+import silk.text.string { String }
+import silk.num.u32
+import silk.text.unicode { Unicode }
+import silk.text.utf8_decoder { Utf8Decoder, Utf8Step }
+import silk.io.writer { Writer, WriterError }
 ```
 
 ```sh
@@ -422,12 +422,12 @@ Read it against the code. The price column pads `2.50` to 8 columns, `{:.3}` cut
 
 ## API reference
 
-- `silk/string`: `String`, `InvalidUtf8`, `ScalarCursor`, `ScalarStep`
-- `silk/char`: `fromU32`, `toU32`
-- `silk/utf8_decoder`: `Utf8Decoder`, `Utf8Step`
-- `silk/unicode`: `Unicode`
+- `silk/text/string`: `String`, `InvalidUtf8`, `ScalarCursor`, `ScalarStep`
+- `silk/text/char`: `fromU32`, `toU32`
+- `silk/text/utf8_decoder`: `Utf8Decoder`, `Utf8Step`
+- `silk/text/unicode`: `Unicode`
 - `silk/format`: `Format`, `FormatOptions`, `Display`, `Debug`, `Formatter`, `ParseError`
-- `silk/writer`: `Writer`, `WriterError`
-- `silk/os_writer`: `StdoutWriter`
-- `silk/slice`: `Slice`
-- `silk/bytes`: `Bytes`
+- `silk/io/writer`: `Writer`, `WriterError`
+- `silk/io/writer_native`: `StdoutWriter`
+- `silk/collections/slice`: `Slice`
+- `silk/collections/bytes`: `Bytes`

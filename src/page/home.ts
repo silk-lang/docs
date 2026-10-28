@@ -10,9 +10,9 @@ import { docPageRouter, releasesRouter } from '../route'
 
 // CONTENT
 
-const HELLO_CODE = `import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+const HELLO_CODE = `import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 pub effect fn main() -> () ! LogError {
   let mut logger = StdoutLogger.make()
@@ -21,7 +21,7 @@ pub effect fn main() -> () ! LogError {
     |> Effect.provideMut(&mut logger)
 }`
 
-const CLOCK_CODE = `import silk.effect { Effect }
+const CLOCK_CODE = `import silk.core.effect { Effect }
 
 service Clock {
   effect fn value() -> i32 ? &Clock

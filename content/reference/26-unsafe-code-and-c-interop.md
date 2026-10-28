@@ -74,7 +74,7 @@ Forming a pointer is safe: `Pointer.fromRef`, `Pointer.fromMutRef`, `Pointer.fro
 
 ## The Pointer API
 
-`silk/pointer` wraps the pointer intrinsics. Safe operations:
+`silk/mem/pointer` wraps the pointer intrinsics. Safe operations:
 
 - `fromRef`, `fromMutRef`: pointer to a borrowed value. `fromSlice`, `fromMutSlice`: nullable many-element pointer to a slice's elements.
 - `null<T>()`, `isNull`, `isNullMany`, `address`, `addressMany`.
@@ -170,7 +170,7 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 ## Examples
 
 ```silk
-import silk.pointer { Pointer }
+import silk.mem.pointer { Pointer }
 
 unsafe extern "C" fn strlen(text: [*]const u8) -> usize
 
@@ -205,7 +205,7 @@ pub fn main() -> i32 {
 A C callback, sorting with libc `qsort`:
 
 ```silk
-import silk.pointer { Pointer }
+import silk.mem.pointer { Pointer }
 
 unsafe extern "C" fn qsort(
   base: ?[*]mut i32,
@@ -239,7 +239,7 @@ pub fn main() -> i32 {
 A C-layout record and a foreign static:
 
 ```silk
-import silk.pointer { Pointer }
+import silk.mem.pointer { Pointer }
 
 extern "C" struct Timespec {
   seconds: i64,
@@ -379,7 +379,7 @@ The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` wo
 
 ## See also
 
-Values and primitive types (SIMD vectors and masks) · Targets and profiles · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/pointer`, `silk/raw_buffer`, `silk/slot`, `silk/layout`
+Values and primitive types (SIMD vectors and masks) · Targets and profiles · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/mem/pointer`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/layout`
 
 ## Open questions
 

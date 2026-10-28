@@ -64,9 +64,9 @@ The `name` is the package name, and it also names the program you build. `versio
 `src/main.silk` is your program. Open it:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 pub effect fn main() -> ()
   ! LogError {
@@ -104,12 +104,12 @@ The `\n` at the end of the message is a line break. Silk prints exactly the byte
 Now go through the file from the top.
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 ```
 
-Nothing is in scope by default except the language itself. Each `import` names a module of the standard library and the items you want from it. `silk.effect` is the module `silk/effect`, and `{ Effect }` brings its `Effect` type into this file. You will import much more as the program grows. The module pages of the standard library reference are named the same way, so `silk/logger` is where you read about loggers.
+Nothing is in scope by default except the language itself. Each `import` names a module of the standard library and the items you want from it. `silk.core.effect` is the module `silk/core/effect`, and `{ Effect }` brings its `Effect` type into this file. You will import much more as the program grows. The module pages of the standard library reference are named the same way, so `silk/io/logger` is where you read about loggers.
 
 ```silk
 pub effect fn main() -> ()
@@ -161,9 +161,9 @@ The first argument to `Effect.log` is not just a string. It is a template, and i
 Put the version number into the message. Replace the body of `main` so the file reads:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 pub effect fn main() -> ()
   ! LogError {

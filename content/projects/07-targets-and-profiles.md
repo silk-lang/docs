@@ -73,7 +73,7 @@ Finished tiny in 0.10s
 
 Each target is a separate unit with its own rows and its own last line. On a terminal, each finished target collapses to one line.
 
-Code can ask which target and profile it is built for at compile time: `silk/target` (`Target`) and `silk/compilation` (`Compilation`). See **Static control flow and reflection** in the reference.
+Code can ask which target and profile it is built for at compile time: `silk/core/target` (`Target`) and `silk/core/compilation` (`Compilation`). See **Static control flow and reflection** in the reference.
 
 ## Optimization profiles
 
@@ -167,7 +167,7 @@ The manifest page lists every field and its values. The native build applies the
 | arm64 | `aes`, `crc`, `crypto`, `dotprod`, `fp-armv8`, `fullfp16`, `i8mm`, `lse`, `neon`, `rdm`, `sha2`, `sha3` |
 | wasm32 | `atomics`, `bulk-memory`, `mutable-globals`, `relaxed-simd`, `sign-ext`, `simd128` |
 
-A feature also turns on the features it implies, so `avx2` brings `avx` and the SSE levels below it. A level model brings its features: `x86-64-v3` includes `avx2`, `fma` and `bmi2`, and `x86-64-v4` the AVX-512 set. SSE2 on x86-64 and NEON on arm64 are always on. Code can test any of them with `Target.hasCpuFeature`, `silk/simd` uses them to pick a vector width, and `silk/arch` to pick an instruction (see SIMD vectors and masks in Values and primitive types). To test the running machine instead, see CPU features at run time below. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
+A feature also turns on the features it implies, so `avx2` brings `avx` and the SSE levels below it. A level model brings its features: `x86-64-v3` includes `avx2`, `fma` and `bmi2`, and `x86-64-v4` the AVX-512 set. SSE2 on x86-64 and NEON on arm64 are always on. Code can test any of them with `Target.hasCpuFeature`, `silk/simd/simd` uses them to pick a vector width, and `silk/simd/x86` and `silk/simd/aarch64` to pick an instruction (see SIMD vectors and masks in Values and primitive types). To test the running machine instead, see CPU features at run time below. With this profile, `Target.hasCpuFeature("avx2")` is `true`:
 
 ```toml
 [profiles.fast]
@@ -246,22 +246,22 @@ The profile names in these messages are the ones used to produce them; yours sho
 
 A profile's `cpu` features apply to the whole program, and the program needs a machine that has them. To ship one binary that runs everywhere and goes faster where it can, keep the profile at the baseline, compile the hot function for more features, and call it only after the machine reports them.
 
-- `silk/cpu`, `CpuFeatures`: `CpuFeatures.detect()` asks the running machine; `CpuFeatures.selected()` is the set the profile selects. `has(&features, "avx2")` tests one name, spelled as in `cpu.features`; `containsAll(&features, &other)` tests a whole set.
+- `silk/simd/cpu`, `CpuFeatures`: `CpuFeatures.detect()` asks the running machine; `CpuFeatures.selected()` is the set the profile selects. `has(&features, "avx2")` tests one name, spelled as in `cpu.features`; `containsAll(&features, &other)` tests a whole set.
 - `detect()` reads `cpuid` on x86-64 Linux, with or without libc, counting AVX and AVX-512 only when the operating system saves their registers. It reads `getauxval` on arm64 Linux with GNU libc and `sysctlbyname` on arm64 macOS. Elsewhere, such as in a wasm32 module, which cannot ask the engine, it reports the selected set. The result always includes the selected set.
 - Every name in the `cpu.features` table above can be tested, `sha` and `aes` included. The examples in Intrinsics include one that runs `sha256rnds2` only where `detect()` reports `sha`.
 - Detection is not cached. Call `detect()` once at start and keep the value.
 - `with Intrinsic.machine(features: ("avx2",))` on an `unsafe fn` compiles that function with the listed features, the features they imply and the profile's own. Each call is `unsafe`: the caller has checked the machine. The rules are in Intrinsics, under Functions compiled for CPU features.
-- A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `features` list. The `silk/arch` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
+- A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `features` list. The `silk/simd/x86` and `silk/simd/aarch64` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
 
 The same portable loop, compiled twice. In a release build the optimizer inlines `total` into `totalAvx2` and vectorizes it with 32-byte AVX2 registers; the rest of the program stays at the default x86-64 level:
 
 ```silk
-import silk.cpu { CpuFeatures }
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
-import silk.u32
-import silk.usize
+import silk.simd.cpu { CpuFeatures }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.num.u32
+import silk.num.usize
 
 // The portable kernel: every machine can run it.
 fn total(values: &[u32]) -> u32 {
@@ -309,10 +309,10 @@ On a machine without it, the program prints `portable kernel: 499500`. The `feat
 
 ## Linux without libc
 
-A no-libc program uses the `silk.raw_start` runtime and `silk.raw_linux` system calls. Its `main` takes the process inputs:
+A no-libc program uses the `silk.platform.linux.start` runtime and `silk.platform.linux.syscall` system calls. Its `main` takes the process inputs:
 
 ```silk
-import silk.raw_process_inputs { ProcessInputs }
+import silk.platform.linux.process_inputs { ProcessInputs }
 
 pub fn main(inputs: &ProcessInputs) -> i32 {
   return 7
@@ -324,7 +324,7 @@ pub fn main(inputs: &ProcessInputs) -> i32 {
 profile = "bare"
 
 [unstable.composition]
-runtimes = [{ name = "raw", module = "silk/raw_start" }]
+runtimes = [{ name = "raw", module = "silk/platform/linux/start" }]
 defaults = ["raw"]
 
 [profiles.bare]
@@ -342,7 +342,7 @@ Compiling bare (x86_64-unknown-linux-gnu, bare)
   check    1 module                          0.00s
   codegen  failed: 12 functions, 1 error     0.00s
 [x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/raw_start.silk:29:5: unsupported[foreign-contract] not supported by the native compiler yet
+<silk>/lib/silk/stdlib/silk/platform/linux/start.silk:29:5: unsupported[foreign-contract] not supported by the native compiler yet
 Failed bare in 0.10s
 ```
 
@@ -352,7 +352,7 @@ Without the composition, `libc = "none"` finds no runtime in the std lib catalog
 
 ## WebAssembly
 
-`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name. The program `silk init` writes does not build for wasm32 as it is, because it imports `silk.os_logger`, which needs an operating system to write to; a wasm32 program starts from a `main` like this one:
+`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name. The program `silk init` writes does not build for wasm32 as it is, because it imports `silk.io.logger_native`, which needs an operating system to write to; a wasm32 program starts from a `main` like this one:
 
 ```silk
 export "C" fn add(left: i32, right: i32) -> i32 {
@@ -389,10 +389,10 @@ threading = "multi"
 max-memory = "256MiB"
 ```
 
-The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/native_thread` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `max-memory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.max-memory = "100KiB"`.
+The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`) and `wasi.thread-spawn`, so `silk/concurrency/thread_native` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `max-memory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.max-memory = "100KiB"`.
 
 The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32 and runs it in Node.
 
 ## See also
 
-The manifest, The standard library, Build outputs and native linking; **Package parameters**, **Static control flow and reflection** and **Intrinsics** in the reference; chapter 11 of the book; `silk/cpu`, `silk/arch/x86`, `silk/arch/aarch64`, `silk/arch/wasm`.
+The manifest, The standard library, Build outputs and native linking; **Package parameters**, **Static control flow and reflection** and **Intrinsics** in the reference; chapter 11 of the book; `silk/simd/cpu`, `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm`.
