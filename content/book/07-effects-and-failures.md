@@ -23,9 +23,9 @@ The second idea is less familiar. Calling an effect function does not do the wor
 Laziness surprises people the first time, so see it on its own. Put this program in your scratch project. It builds a greeting and forgets to run it:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
 
 effect fn greet() -> () ! LogError ? &mut Logger {
   run Effect.log("hello\n", &())
@@ -217,7 +217,7 @@ struct Words {
 }
 ```
 
-`main` reads them through the `HostInput` service from `silk/host_input`. `HostInput.argument(index)` gives `Option<Bytes>`: the argument, or nothing if there are fewer. Copying an argument into `Bytes` allocates memory, so this effect also needs an `Allocator`. Its requirement row says so:
+`main` reads them through the `HostInput` service from `silk/system/host_input`. `HostInput.argument(index)` gives `Option<Bytes>`: the argument, or nothing if there are fewer. Copying an argument into `Bytes` allocates memory, so this effect also needs an `Allocator`. Its requirement row says so:
 
 ```silk
 effect fn wordAt(index: usize) -> Bytes
@@ -354,7 +354,7 @@ A failure can travel all the way out of `main`. Try it:
 
 ```silk
 import silk.format { Debug, Format, Formatter }
-import silk.writer { Writer, WriterError }
+import silk.io.writer { Writer, WriterError }
 
 pub struct NoSuchTask { pub id: u32 }
 
@@ -433,7 +433,7 @@ The parameter's type is the whole failure row of `execute`. Each arm matches one
 It is natural to write this as a pipeline, like `provideMut`. Here is that idea in a small program:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 struct Unknown<'text> { name: string<'text> }
 
@@ -490,7 +490,7 @@ Checking tasks (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.06s
   check    failed: 2 modules, 1 error        0.18s
 [x86_64-unknown-linux-gnu]
-src/main.silk:390:50: error[SEM0052] This call needs an Effect that cannot fail, but the one passed here can fail with silk.logger.LogError; wrap it in `Effect.result(...)` and handle the Result it returns
+src/main.silk:390:50: error[SEM0052] This call needs an Effect that cannot fail, but the one passed here can fail with silk.io.logger.LogError; wrap it in `Effect.result(...)` and handle the Result it returns
 Failed tasks in 0.24s
 ```
 
@@ -538,20 +538,20 @@ Then come three layers. `execute(&words)` describes the command. `ensuring` adds
 The imports have grown:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
 import silk.equal { Equal }
 import silk.format { Display, Format, Formatter }
-import silk.host_input { HostInput, HostInputError }
-import silk.logger { Logger, LogError }
+import silk.system.host_input { HostInput, HostInputError }
+import silk.io.logger { Logger, LogError }
 import silk.option { Option }
 import silk.order { Order, Ordering }
-import silk.os_logger { StdoutLogger }
-import silk.ownership { Copy }
-import silk.result { Result }
-import silk.string { String, InvalidUtf8 }
-import silk.writer { Writer, WriterError }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.ownership { Copy }
+import silk.core.result { Result }
+import silk.text.string { String, InvalidUtf8 }
+import silk.io.writer { Writer, WriterError }
 ```
 
 ## Run it
@@ -617,10 +617,10 @@ Look at the order of the lines on failure. The reminder comes first, then the me
 A handler decides what a failure means for the whole program. Sometimes you want to decide on the spot instead, right where the effect runs. `Effect.result(e)` runs `e` and never fails. It gives you a `Result` holding either the value or the failure:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
-import silk.result { Result }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.result { Result }
 
 struct NoSuchTask {
   id: u32,

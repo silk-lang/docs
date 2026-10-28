@@ -85,11 +85,11 @@ and recognise it in `parseCommand`:
   }
 ```
 
-`Version` reports the platform, the build mode and both parameters. The first two are facts about the build, and `silk/target` and `silk/compilation` expose them as static functions. Add the imports:
+`Version` reports the platform, the build mode and both parameters. The first two are facts about the build, and `silk/core/target` and `silk/core/compilation` expose them as static functions. Add the imports:
 
 ```silk
-import silk.compilation { Compilation, Optimization }
-import silk.target { Target, OperatingSystem }
+import silk.core.compilation { Compilation, Optimization }
+import silk.core.target { Target, OperatingSystem }
 ```
 
 Now the platform name. Write it as a module-level `static if`, which chooses between whole declarations:
@@ -152,7 +152,7 @@ Inside a function, `else` takes a block only. To chain, nest a second `static if
 `static if` is also a statement, not an expression. In the scratch project, this does not parse:
 
 ```silk
-import silk.target { Target, OperatingSystem }
+import silk.core.target { Target, OperatingSystem }
 
 pub fn main() -> i32 {
   let code = static if Target.operatingSystem() == OperatingSystem.Linux { 1 } else { 2 }
@@ -370,7 +370,7 @@ effect fn bar(static width: usize, done: usize, total: usize) -> () ! LogError ?
 
 `compileError` stops the build, but only when static evaluation selects it. In an unselected branch it does nothing, which makes `static if` plus `compileError` a compile-time assertion. The value of `width` is part of the function's identity: `bar(20, ...)` and `bar(10, ...)` would be two separate compiled functions, each with its own selection.
 
-Call it at the end of `showBoard`. Add `import silk.i32` for the conversion:
+Call it at the end of `showBoard`. Add `import silk.num.i32` for the conversion:
 
 ```silk
   let open = count(&board.*, &OpenTasks {})
@@ -445,9 +445,9 @@ Failed tasks in 0.16s
 Column 13 is `verbose`, which is only known when the program runs. Make the parameter static, and each call compiles its own copy:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
 
 // A static parameter: every call site passes a compile-time value, and each value gets its own copy.
 fn label(static verbose: bool) -> string<'static> {
@@ -488,10 +488,10 @@ struct Row<'text> {
 }
 ```
 
-`silk/reflect` gives static code a view of a type. `Reflect.fields<T>()` is a static sequence of field descriptors, in declaration order. `static for` repeats its body once per element, at compile time, so no loop remains in the program. Import it:
+`silk/core/reflect` gives static code a view of a type. `Reflect.fields<T>()` is a static sequence of field descriptors, in declaration order. `static for` repeats its body once per element, at compile time, so no loop remains in the program. Import it:
 
 ```silk
-import silk.reflect { Reflect, namedKind }
+import silk.core.reflect { Reflect, namedKind }
 ```
 
 The header writes each field's label:

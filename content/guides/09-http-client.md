@@ -19,16 +19,16 @@ Leave it running and open a second terminal. `/status.json` answers 200, any oth
 Create a package with `silk init statuscheck` and replace `src/main.silk` with this:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.http_client { Http, HttpError, HttpErrorKind, Request, Response }
-import silk.http_client_native { NativeHttp }
-import silk.json_value { Json }
+import silk.http.client { Http, HttpError, HttpErrorKind, Request, Response }
+import silk.http.client_native { NativeHttp }
+import silk.json.value { Json }
 import silk.option { Option }
-import silk.os_writer { StdoutWriter }
-import silk.result { Result }
-import silk.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
+import silk.core.result { Result }
+import silk.io.writer { Writer, WriterError }
 
 // Asks the service how many tasks are open. A non-2xx status is a failure here.
 effect fn openTasks(path: string) -> i32
@@ -151,7 +151,7 @@ Three requests, three outcomes. The rest of this guide explains the choices behi
 
 ## The service and its provider
 
-Look at the `?` rows. `openTasks`, `addTask` and `session` require `&mut Http` and know nothing about sockets. Only `main` picks the provider, `NativeHttp` from `silk/http_client_native`, and lends it with `Effect.provideMut<Http>`. This is the same pattern as Logger and FileSystem in the book. See **Services and providers** in the reference.
+Look at the `?` rows. `openTasks`, `addTask` and `session` require `&mut Http` and know nothing about sockets. Only `main` picks the provider, `NativeHttp` from `silk/http/client_native`, and lends it with `Effect.provideMut<Http>`. This is the same pattern as Logger and FileSystem in the book. See **Services and providers** in the reference.
 
 `NativeHttp.make()` reads nothing and cannot fail. Its builder methods set defaults for every request it sends:
 
@@ -234,7 +234,7 @@ The whole body is in memory by the time `send` returns. `Response` offers:
 | `head()` | The full response head, every header included |
 | `body()`, `intoBody()` | The body as `&[u8]`, or moved out as `Bytes` |
 | `text()` | The body as UTF-8 text; fails with `Decode` otherwise |
-| `json()` | The body parsed into a `silk/json_value` `Value` tree |
+| `json()` | The body parsed into a `silk/json/value` `Value` tree |
 | `decode<T>()` | The body decoded as a `T` that implements `Deserialize` |
 | `url()` | The URL that produced the response, after redirects |
 
@@ -302,7 +302,7 @@ The client speaks TLS 1.3 only. The TLS, certificates and trust guide explains t
 
 ## Testing with a fake provider
 
-Code that requires `? &mut Http` runs unchanged on any provider. A fake is a struct that implements `send`. Add this to `src/main.silk`, with `import silk.string { String }` and `import silk.testing { AssertionError, Testing }`:
+Code that requires `? &mut Http` runs unchanged on any provider. A fake is a struct that implements `send`. Add this to `src/main.silk`, with `import silk.text.string { String }` and `import silk.testing.testing { AssertionError, Testing }`:
 
 ```silk
 // A fake Http for tests: answers from a script and counts the calls.
@@ -368,7 +368,7 @@ A provider can also wrap another one, adding a header, logging or retries, and f
 
 ## What this client does not do
 
-`silk/http_client` is new and deliberately small. Know its limits before you rely on it:
+`silk/http/client` is new and deliberately small. Know its limits before you rely on it:
 
 - **No content decoding.** It sends `Accept-Encoding: identity`, and if a server compresses anyway, `body()` holds the compressed bytes.
 - **No connection reuse.** Every request, and every redirect hop, opens a fresh HTTP/1.1 connection.
@@ -383,21 +383,21 @@ The facade is built on lower-level modules that you can use directly. They take 
 
 | You need | Use |
 | --- | --- |
-| Streaming a large body in either direction, custom framing, `Expect: 100-continue`, control over one connection | `silk/http_exchange` with `silk/http_exchange_native` (`withConnection`, `withExchange`, `readSome`, `writeSome`) |
-| gzip, deflate or Zstandard decoding, a proxy, a body delivered to a sink, bounded one-shot delivery with redirects | `silk/http_fetch` with `silk/http_fetch_native`; `FetchOptions` selects `ContentMode.Decode`, `PoolMode` and `ProxyMode` |
-| Keeping connections open across many requests to the same origins | `silk/http_connection_pool` with `silk/http_connection_pool_native` (`withDirectPool`, `withUnixPool`) |
-| HTTP over a Unix socket | `withUnixConnection` in `silk/http_exchange_native` or `withUnixPool` |
-| Your own redirect, proxy or content policy | `silk/http_redirect`, `silk/http_proxy`, `silk/http_content` |
+| Streaming a large body in either direction, custom framing, `Expect: 100-continue`, control over one connection | `silk/http/exchange` with `silk/http/exchange_native` (`withConnection`, `withExchange`, `readSome`, `writeSome`) |
+| gzip, deflate or Zstandard decoding, a proxy, a body delivered to a sink, bounded one-shot delivery with redirects | `silk/http/fetch` with `silk/http/fetch_native`; `FetchOptions` selects `ContentMode.Decode`, `PoolMode` and `ProxyMode` |
+| Keeping connections open across many requests to the same origins | `silk/http/connection_pool` with `silk/http/connection_pool_native` (`withDirectPool`, `withUnixPool`) |
+| HTTP over a Unix socket | `withUnixConnection` in `silk/http/exchange_native` or `withUnixPool` |
+| Your own redirect, proxy or content policy | `silk/http/redirect`, `silk/http/proxy`, `silk/http/content` |
 
 Each of these pages in the std lib API reference starts with a When to use section.
 
 ## API reference
 
-- `silk/http_client`: `Http`, `Request`, `Response`, `HttpError`, `HttpErrorKind`, `HttpCause`
-- `silk/http_client_native`: `NativeHttp`
-- `silk/json_value`: `Json`, `Value`
-- `silk/http_exchange`, `silk/http_exchange_native`
-- `silk/http_fetch`, `silk/http_fetch_native`
-- `silk/http_connection_pool`, `silk/http_connection_pool_native`
-- `silk/http_redirect`, `silk/http_proxy`, `silk/http_content`
-- `silk/testing`: `Testing`, `AssertionError`
+- `silk/http/client`: `Http`, `Request`, `Response`, `HttpError`, `HttpErrorKind`, `HttpCause`
+- `silk/http/client_native`: `NativeHttp`
+- `silk/json/value`: `Json`, `Value`
+- `silk/http/exchange`, `silk/http/exchange_native`
+- `silk/http/fetch`, `silk/http/fetch_native`
+- `silk/http/connection_pool`, `silk/http/connection_pool_native`
+- `silk/http/redirect`, `silk/http/proxy`, `silk/http/content`
+- `silk/testing/testing`: `Testing`, `AssertionError`

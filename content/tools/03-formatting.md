@@ -18,9 +18,9 @@ silk format
 Here is `src/main.silk` before:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 struct Point { x: i32,
   y: i32 }
@@ -40,9 +40,9 @@ pub effect fn main() -> () ! LogError {
 And after:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 struct Point {
   x: i32,

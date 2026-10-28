@@ -140,7 +140,7 @@ Finished hello in 0.11s
 | --- | --- |
 | `--progress <auto\|live\|plain\|never>` | How progress rows are shown. `auto`, the default, redraws them in place in a terminal and prints each finished row once otherwise. `never` prints none |
 | `--quiet`, `-q` | Print only the final line and the diagnostics |
-| `--timings` | List the five slowest modules and function bodies before the final line. Bodies are named as written, such as `silk/list.List<T>.appendBytes`; a body inside a conformance shows it in parentheses, such as `main.(Equal for Point).equals` |
+| `--timings` | List the five slowest modules and function bodies before the final line. Bodies are named as written, such as `silk/collections/list.List<T>.appendBytes`; a body inside a conformance shows it in parentheses, such as `main.(Equal for Point).equals` |
 | `--json` | Write each diagnostic as one JSON object per line, with no progress output |
 | `--replay <script>` | Apply the edits in a TOML script in memory and print the incremental checker's counters for each step, on standard output |
 | `--differential` | With `--replay`, also check each step from scratch and exit 1 if the results differ |

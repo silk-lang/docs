@@ -27,12 +27,12 @@ key or value of a query string.
 ## Examples
 ### Encode a query value and decode it again
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.result { Result }
-import silk.string { String }
-import silk.uri_percent { DecodeError, PercentComponent, UriPercent }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.core.result { Result }
+import silk.text.string { String }
+import silk.uri.percent { DecodeError, PercentComponent, UriPercent }
 
 pub effect fn main() -> i32
   ! OutOfMemoryError {
@@ -57,7 +57,7 @@ pub effect fn main() -> i32
 }
 ```
 
-Import as `UriPercent` with `import silk.uri_percent { UriPercent }`.
+Import as `UriPercent` with `import silk.uri.percent { UriPercent }`.
 
 Public declarations: 4.
 

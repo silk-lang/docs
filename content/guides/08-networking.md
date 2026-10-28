@@ -1,6 +1,6 @@
 # Networking
 
-Silk's networking starts from three ideas. Addresses are plain values (`silk/network_address`). Name lookup is a service (`silk/resolver`), so tests can swap it. A connected socket is a byte stream (`ByteDuplex`, from `silk/byte_duplex`), the same interface every protocol in the standard library reads and writes. This guide builds `ask`, a small TCP tool with three commands: resolve a name, serve one connection, and send a message. It covers addresses, resolving, connecting, listening, and deadlines. The HTTP server and HTTP client guides build on the same pieces.
+Silk's networking starts from three ideas. Addresses are plain values (`silk/net/address`). Name lookup is a service (`silk/net/resolver`), so tests can swap it. A connected socket is a byte stream (`ByteDuplex`, from `silk/io/byte_duplex`), the same interface every protocol in the standard library reads and writes. This guide builds `ask`, a small TCP tool with three commands: resolve a name, serve one connection, and send a message. It covers addresses, resolving, connecting, listening, and deadlines. The HTTP server and HTTP client guides build on the same pieces.
 
 ```
 ask resolve <host>
@@ -12,7 +12,7 @@ ask send <host> <port> <message>
 
 ## Addresses and hosts
 
-`silk/network_address` has one value type for each thing you pass around:
+`silk/net/address` has one value type for each thing you pass around:
 
 | Type | What it holds | Make one with |
 | --- | --- | --- |
@@ -29,26 +29,26 @@ ask send <host> <port> <message>
 `resolveHost` turns text into a `Host`, wraps it in a `ResolveRequest`, and asks the `Resolver` service:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.byte_duplex { ByteDuplex, ByteIoError, ReadTransfer }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.byte_duplex { ByteDuplex, ByteIoError, ReadTransfer }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.host_input { HostInput, HostInputError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.native_resolver { NativeSystemResolver }
-import silk.native_socket { AcceptedView, AttemptFailure, ConnectOptions, ListenOptions, Listener, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted, withListener }
-import silk.network_address { Endpoint, Host, IpAddress, Ipv4Address, Port }
+import silk.system.host_input { HostInput, HostInputError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.net.resolver_native { NativeSystemResolver }
+import silk.net.socket_native { AcceptedView, AttemptFailure, ConnectOptions, ListenOptions, Listener, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted, withListener }
+import silk.net.address { Endpoint, Host, IpAddress, Ipv4Address, Port }
 import silk.option { Option }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.os_writer { StdoutWriter }
-import silk.resolver { FamilySelection, ResolveRequest, ResolvedEndpoints, Resolver, ResolverError }
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.system_clock { Instant }
-import silk.u8
-import silk.u32
-import silk.writer { Writer, WriterError }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.io.writer_native { StdoutWriter }
+import silk.net.resolver { FamilySelection, ResolveRequest, ResolvedEndpoints, Resolver, ResolverError }
+import silk.core.result { Result }
+import silk.collections.slice { Slice }
+import silk.system.system_clock { Instant }
+import silk.num.u8
+import silk.num.u32
+import silk.io.writer { Writer, WriterError }
 
 pub struct UsageError {}
 pub struct BadHost {}
@@ -90,7 +90,7 @@ effect fn printEndpoints(endpoints: &ResolvedEndpoints) -> () ! WriterError ? &m
 
 `ResolveRequest.make(host, port, family, maxResults, deadline)` says what you want: the port to put in every endpoint, `FamilySelection.Any`, `V4` or `V6`, and at most how many results (here 8). A numeric host never reaches the provider; `Resolver.resolve` answers it directly. A domain goes to whichever provider `main` supplies.
 
-`NativeSystemResolver` from `silk/native_resolver` is the native provider. It calls the operating system's `getaddrinfo`, which blocks the thread until it returns and cannot be cancelled. For that reason it refuses a request that carries a deadline, with `ResolverError.DeadlineUnsupported`, before doing any work. Pass `Option<Instant>.none()` as here. Because the call blocks the whole thread, a fiber-based timeout such as the one in the Concurrent I/O patterns guide cannot cut it short either. If lookups must be bounded, supply a different `Resolver` provider.
+`NativeSystemResolver` from `silk/net/resolver_native` is the native provider. It calls the operating system's `getaddrinfo`, which blocks the thread until it returns and cannot be cancelled. For that reason it refuses a request that carries a deadline, with `ResolverError.DeadlineUnsupported`, before doing any work. Pass `Option<Instant>.none()` as here. Because the call blocks the whole thread, a fiber-based timeout such as the one in the Concurrent I/O patterns guide cannot cut it short either. If lookups must be bounded, supply a different `Resolver` provider.
 
 ## Sending
 
@@ -398,9 +398,9 @@ The connection itself succeeded, because the kernel accepts it on the server's b
 
 ## API reference
 
-- `silk/network_address`: `Host`, `IpAddress`, `Ipv4Address`, `Ipv6Address`, `Port`, `Endpoint`
-- `silk/resolver`: `Resolver`, `ResolveRequest`, `ResolvedEndpoints`, `FamilySelection`, `ResolverError`
-- `silk/native_resolver`: `NativeSystemResolver`
-- `silk/native_socket`: `listen`, `accept`, `withListener`, `withAccepted`, `connectResolved`, `connectResolvedOwned`, `ConnectOptions`, `ListenOptions`, `Connection`, `NativeSocketError`
-- `silk/byte_duplex`: `ByteDuplex`, `ReadTransfer`, `ByteIoError`
-- `silk/monotonic_clock`: `MonotonicClock`
+- `silk/net/address`: `Host`, `IpAddress`, `Ipv4Address`, `Ipv6Address`, `Port`, `Endpoint`
+- `silk/net/resolver`: `Resolver`, `ResolveRequest`, `ResolvedEndpoints`, `FamilySelection`, `ResolverError`
+- `silk/net/resolver_native`: `NativeSystemResolver`
+- `silk/net/socket_native`: `listen`, `accept`, `withListener`, `withAccepted`, `connectResolved`, `connectResolvedOwned`, `ConnectOptions`, `ListenOptions`, `Connection`, `NativeSocketError`
+- `silk/io/byte_duplex`: `ByteDuplex`, `ReadTransfer`, `ByteIoError`
+- `silk/system/monotonic_clock`: `MonotonicClock`

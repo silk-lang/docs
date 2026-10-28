@@ -8,7 +8,7 @@ Silk has no implicit global heap. Code that acquires storage states it with an `
 AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?' '&mut' 'Allocator' Block
 ```
 
-- `Allocator` is an ordinary service declared in `silk/allocator`. It has one operation, `allocate(layout: Layout) -> Intrinsic.Allocation ! OutOfMemoryError ? &mut Allocator`.
+- `Allocator` is an ordinary service declared in `silk/mem/allocator`. It has one operation, `allocate(layout: Layout) -> Intrinsic.Allocation ! OutOfMemoryError ? &mut Allocator`.
 - Every standard library operation that acquires storage is an `effect fn` with the requirement `? &mut Allocator`. Examples: `Box.make`, `Shared.make`, `List.append`, `List.insert`, `List.reserve`, `List.sort`.
 - Operations that only read or shrink storage are ordinary functions with no requirement. Examples: `List.make`, `List.length`, `List.asSlice`, `List.pop`, `Box.get`.
 - A requirement stays in the Effect until a caller provides it. Running an Effect with an unprovided requirement is an error (SEM0071).
@@ -18,7 +18,7 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 
 ## Out-of-memory failure
 
-- Allocation failure is the typed failure `OutOfMemoryError`, an empty struct in `silk/allocator`.
+- Allocation failure is the typed failure `OutOfMemoryError`, an empty struct in `silk/mem/allocator`.
 - An allocating operation either succeeds or fails with `OutOfMemoryError`. It never returns partial storage.
 - `OutOfMemoryError` must be handled or declared like any failure. An unhandled failure row is an error (SEM0066).
 - `Effect.catchAll` recovers from it. `Allocator.outOfMemory()` fails with it directly.
@@ -34,7 +34,7 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 
 ## Box
 
-`Box<T>` in `silk/box` owns one heap-allocated `T`.
+`Box<T>` in `silk/mem/box` owns one heap-allocated `T`.
 
 - `Box<T>.make(value)` moves `value` into a new allocation. It is allocating.
 - `Box<T>.get(&box)` returns `&[T]` and `Box<T>.getMut(&mut box)` returns `&mut [T]`. Each is a one-element slice; index it with `[0]`.
@@ -44,7 +44,7 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 
 ## List
 
-`List<T>` in `silk/list` is a growable owned sequence.
+`List<T>` in `silk/collections/list` is a growable owned sequence.
 
 - `List<T>.make()` does not allocate. The first growth reserves four elements; later growth doubles capacity.
 - Allocating operations: `append`, `insert`, `reserve`, `reserveExact`, `sort`, and for `List<u8>` `appendBytes` and `appendRepeated`.
@@ -55,7 +55,7 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 
 ## Shared
 
-`Shared<T>` in `silk/shared` is local, single-threaded shared ownership with callback-scoped access.
+`Shared<T>` in `silk/mem/shared` is local, single-threaded shared ownership with callback-scoped access.
 
 - `Shared<T>.make(value)` allocates one control block. It is the only allocating operation.
 - `Shared<T>.clone(&handle)` adds a strong handle. It does not allocate or touch the value.
@@ -69,7 +69,7 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 
 ## Arena
 
-`Arena<A>` in `silk/arena` is a bump allocator. It implements `Allocator`, so it is provided like any other allocator, and `Box`, `List`, `Bytes` and `Shared` work in it unchanged.
+`Arena<A>` in `silk/mem/arena` is a bump allocator. It implements `Allocator`, so it is provided like any other allocator, and `Box`, `List`, `Bytes` and `Shared` work in it unchanged.
 
 - `Arena.make(child)` creates an arena over another allocator provider, `child`, which it owns. `Arena.withOptions(child, options)` takes chunk sizes as an `ArenaOptions { firstChunkBytes, maximumChunkBytes }`. `ArenaOptions.default()` is a 4 KiB first chunk that doubles up to 1 MiB. Creating an arena allocates nothing.
 - The arena asks its child for chunks and hands out allocations by moving a cursor through the current chunk. It fails with `OutOfMemoryError` only when the child refuses a chunk.
@@ -85,17 +85,17 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 Application code should use `Box`, `List`, `Bytes` and `Shared`. Collection authors can build on lower layers:
 
 - `silk/layout`: `Layout.of<T>()`, `Layout.make(size, alignment)` and `Layout.repeat(layout, count)` describe storage to request.
-- `silk/raw_buffer`: `RawBuffer` operations view an `Intrinsic.Allocation` as typed storage for a counted number of elements.
-- `silk/slot`: `Slot` operations move one element in or out of a raw buffer.
+- `silk/mem/raw_buffer`: `RawBuffer` operations view an `Intrinsic.Allocation` as typed storage for a counted number of elements.
+- `silk/mem/slot`: `Slot` operations move one element in or out of a raw buffer.
 - Most `RawBuffer` and `Slot` operations are `unsafe`. See Unsafe code and C interop and Intrinsics.
 
 ## Examples
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.box { Box }
-import silk.effect { Effect }
-import silk.list { List }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.mem.box { Box }
+import silk.core.effect { Effect }
+import silk.collections.list { List }
 
 effect fn build() -> i32
   ! OutOfMemoryError {
@@ -122,9 +122,9 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.mem.shared { Shared }
 
 struct Counter {
   value: i32,
@@ -169,11 +169,11 @@ pub fn main() -> i32 {
 An arena reused for three phases. Each phase's list is dropped before the reset, so `RetainCapacity` keeps the chunk. The `Box` made last outlives the arena. The program exits with 42:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.arena { Arena, ArenaOptions, ArenaReset }
-import silk.box { Box }
-import silk.effect { Effect }
-import silk.list { List }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.mem.arena { Arena, ArenaOptions, ArenaReset }
+import silk.mem.box { Box }
+import silk.core.effect { Effect }
+import silk.collections.list { List }
 
 effect fn phases() -> i32
   ! OutOfMemoryError {
@@ -217,10 +217,10 @@ pub fn main() -> i32 {
 A provider that refuses every request, to test the failure path:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
 import silk.layout { Layout }
-import silk.list { List }
+import silk.collections.list { List }
 
 struct Refusing {}
 
@@ -265,7 +265,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Ownership and moves · Borrowing · Closures and callable types · Unsafe code and C interop · Intrinsics · Effects and run · Typed failures · Services and providers · Program entry and termination · `silk/allocator`, `silk/arena`, `silk/box`, `silk/list`, `silk/shared`, `silk/bytes`, `silk/layout`, `silk/raw_buffer`, `silk/slot`, `silk/effect`
+Ownership and moves · Borrowing · Closures and callable types · Unsafe code and C interop · Intrinsics · Effects and run · Typed failures · Services and providers · Program entry and termination · `silk/mem/allocator`, `silk/mem/arena`, `silk/mem/box`, `silk/collections/list`, `silk/mem/shared`, `silk/collections/bytes`, `silk/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/core/effect`
 
 ## Open questions
 

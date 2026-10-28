@@ -23,10 +23,10 @@ of a URI, because a fragment is never sent.
 ## Examples
 ### Parse request targets
 ```silk
-import silk.http { Method, ValueError, ValueReason }
-import silk.http_target { HttpAuthority, RequestTarget, effectiveAuthority }
+import silk.http.message { Method, ValueError, ValueReason }
+import silk.http.target { HttpAuthority, RequestTarget, effectiveAuthority }
 import silk.option { Option }
-import silk.result { Result }
+import silk.core.result { Result }
 
 pub fn main() -> i32 {
   let get = Method.get()
@@ -73,7 +73,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `RequestTarget` with `import silk.http_target { RequestTarget }`.
+Import as `RequestTarget` with `import silk.http.target { RequestTarget }`.
 
 Public declarations: 6.
 

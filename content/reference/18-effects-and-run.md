@@ -61,7 +61,7 @@ OpaqueResult     = 'some' '<' Identifier ':' Type '>' Type
 ## The Effect type
 
 - `Effect<'env; A ! E ? R>` is the built-in type of effects: success type `A`, failure row `E`, requirement row `R`.
-- It needs no import. `import silk.effect { Effect }` imports the unrelated struct `Effect` that owns the combinators, such as `Effect.map`.
+- It needs no import. `import silk.core.effect { Effect }` imports the unrelated struct `Effect` that owns the combinators, such as `Effect.map`.
 - `'env` bounds every borrow the Effect holds. `'a & 'b` lists several lifetimes. `'static` means the Effect holds no borrows.
 - The environment may be omitted: `Effect<i32>`. It is then elided like a reference lifetime. See Lifetimes.
 - `! E` and `? R` are optional. Without them the Effect cannot fail or needs nothing.
@@ -116,7 +116,7 @@ effect fn twice<'env, E, ?R>(step: Effect<'env; i32 ! E ? R>) -> i32 ! E ? R
 
 ## Combinators
 
-- The struct `Effect` in `silk/effect` holds the combinators. They are lazy: each returns a new Effect and runs nothing.
+- The struct `Effect` in `silk/core/effect` holds the combinators. They are lazy: each returns a new Effect and runs nothing.
 - Most take the input as `once Effect`, so each composed Effect runs its parts at most once.
 
 | Member | Behavior |
@@ -181,7 +181,7 @@ pub fn main() -> i32 {
 Effect blocks, an anonymous effect function, an opaque result and a stored Effect:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 struct Token {
   value: i32,
@@ -232,7 +232,7 @@ pub fn main() -> i32 {
 A generic effect function over failure and requirement rows:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 struct Problem {
   code: i32,
@@ -290,7 +290,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Typed failures · Services and providers · Closures and callable types · Functions and methods · Lifetimes · Generics · Ownership and moves · Program entry and termination · Fibers and scheduling · Suspension and cancellation · `silk/effect`, `silk/result`
+Typed failures · Services and providers · Closures and callable types · Functions and methods · Lifetimes · Generics · Ownership and moves · Program entry and termination · Fibers and scheduling · Suspension and cancellation · `silk/core/effect`, `silk/core/result`
 
 ## Open questions
 

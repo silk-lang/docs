@@ -20,9 +20,9 @@ effect fn show(task: &Task) -> () ! LogError ? &mut Logger {
 Every value in that record is a number or a string. It would be nicer to hand the template a `Priority` and a `TaskId` directly. Try it with a smaller example first, in the scratch project from chapter 5. This program logs a `Status` value:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 union Status {
   Open,
@@ -102,7 +102,7 @@ The new names come from three modules. Add these imports:
 
 ```silk
 import silk.format { Display, Format, Formatter }
-import silk.writer { Writer, WriterError }
+import silk.io.writer { Writer, WriterError }
 ```
 
 Now `show` can pass the values themselves. The `#` moved into `TaskId`, so the template loses it:
@@ -421,15 +421,15 @@ This one checks, runs, and exits with status 0. The rules are the borrowing rule
 Here is the top of `src/main.silk` with all its imports:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 import silk.equal { Equal }
 import silk.format { Display, Format, Formatter }
-import silk.logger { Logger, LogError }
+import silk.io.logger { Logger, LogError }
 import silk.order { Order, Ordering }
-import silk.os_logger { StdoutLogger }
-import silk.ownership { Copy }
-import silk.string { String }
-import silk.writer { Writer, WriterError }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.ownership { Copy }
+import silk.text.string { String }
+import silk.io.writer { Writer, WriterError }
 ```
 
 ```sh

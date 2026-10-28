@@ -1,7 +1,7 @@
 Frame and protect TLS 1.3 records (RFC 8446, section 5) over a byte transport that you drive.
 
 ## When to use
-Most programs use `silk.tls_connection` or `silk.tls_client`, which use this module. Use
+Most programs use `silk.tls.connection` or `silk.tls.client`, which use this module. Use
 [`TlsRecordSender`](#TlsRecordSender) and [`TlsRecordReceiver`](#TlsRecordReceiver) directly to build another TLS endpoint or a test
 tool. The `makePlaintext` functions frame records without encryption, for the first handshake
 messages. The `make` functions take a traffic secret and encrypt with the [`CipherSuite`](#CipherSuite).
@@ -27,10 +27,10 @@ for that receiver. Secrets are not erased.
 ## Examples
 ### Send a record and receive it
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.result { Result }
-import silk.tls_record {
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.core.result { Result }
+import silk.tls.record {
   ContentType,
   InputDemand,
   InputProgress,
@@ -90,7 +90,7 @@ pub effect fn main() -> i32
 }
 ```
 
-Import as `TlsRecordSender` with `import silk.tls_record { TlsRecordSender }`.
+Import as `TlsRecordSender` with `import silk.tls.record { TlsRecordSender }`.
 
 Public declarations: 11.
 
@@ -526,7 +526,7 @@ pub struct TlsRecordSender
 
 The send direction of a TLS record layer. It holds at most one encoded record.
 
-Most programs use `silk.tls_connection` or `silk.tls_client`, which use the record layer. Use it
+Most programs use `silk.tls.connection` or `silk.tls.client`, which use the record layer. Use it
 directly to build another TLS endpoint or a test tool. `makePlaintext` frames records without
 encryption, for the first handshake messages. `make` takes a traffic secret and encrypts with
 the [`CipherSuite`](#CipherSuite).
@@ -683,7 +683,7 @@ pub struct TlsRecordReceiver
 
 The receive direction of a TLS record layer. It holds at most one complete record.
 
-Most programs use `silk.tls_connection` or `silk.tls_client`, which use the record layer. Use it
+Most programs use `silk.tls.connection` or `silk.tls.client`, which use the record layer. Use it
 directly to build another TLS endpoint or a test tool. It allocates a fixed buffer one
 time, when you make it, and takes input in pieces with [`TlsRecordReceiver.feedInput`](#TlsRecordReceiver.impl.feedInput).
 

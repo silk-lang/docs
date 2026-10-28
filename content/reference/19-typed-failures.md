@@ -43,7 +43,7 @@ FailStatement  = 'fail' Expression
 
 ## Recovering
 
-- The recovery combinators belong to the struct `Effect` in `silk/effect`. Each returns a new lazy Effect.
+- The recovery combinators belong to the struct `Effect` in `silk/core/effect`. Each returns a new lazy Effect.
 
 | Member | Result | Behavior |
 | --- | --- | --- |
@@ -62,13 +62,13 @@ FailStatement  = 'fail' Expression
 - A handler may be a partially applied effect function. The given arguments fill the trailing parameters and the failure fills the first: with `effect fn recover(error: Missing, base: i32) -> i32`, `Effect.catchAll(recover(5))` runs `recover(error, 5)`.
 - For `catch`, `S` may be written explicitly or inferred from the handler's parameter. `S` must be a member of the row (`where S in E`). Otherwise it is SEM0067: "Invalid Effect.catch handler: `main.Other` is not a failure of the handled Effect, which fails with `main.Problem`".
 - A handler is an effect function. A plain `fn` handler is SEM0067, and the message says to declare it `effect fn` with the same parameter and result.
-- For `catchAll`, a handler whose parameter does not accept every failure of the row is SEM0067 at the handler. With `explain(failure: Oops)` for a row `Oops | LogError`: "Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk.logger.LogError`, a failure of the handled Effect; add it to the parameter's union". The message is the same for a union parameter that lacks a member, for an Effect with a single failure, and in the pipeline form `e |> Effect.catchAll(h)`. With several missing failures it lists them all and says "add them to the parameter's union".
+- For `catchAll`, a handler whose parameter does not accept every failure of the row is SEM0067 at the handler. With `explain(failure: Oops)` for a row `Oops | LogError`: "Invalid Effect.catch handler: its parameter type `main.Oops` does not accept `silk.io.logger.LogError`, a failure of the handled Effect; add it to the parameter's union". The message is the same for a union parameter that lacks a member, for an Effect with a single failure, and in the pipeline form `e |> Effect.catchAll(h)`. With several missing failures it lists them all and says "add them to the parameter's union".
 - Requirements of the protected Effect and of the handler both remain. See Services and providers.
 - `retry` takes a reusable `mut Effect`. `retry(e, 0)` runs once. Earlier failure values are dropped before the next attempt; the last failure propagates.
 
 ## Result
 
-- `Result<A, F>` from `silk/result` is a union with members `Success { value: A }` and `Failure { error: F }`.
+- `Result<A, F>` from `silk/core/result` is a union with members `Success { value: A }` and `Failure { error: F }`.
 - It is completed data: it does not run, needs no providers and does not propagate.
 - Members: `Result<A, F>.succeed(v)`, `Result<A, F>.failResult(e)`, `map`, `mapError`, `flatMap` and `unwrapOr`.
 - `Effect.result(e)` runs `e` and returns `Result<A, E>`. For a row `A | B`, the error type is the union `A | B`.
@@ -107,7 +107,7 @@ FailStatement  = 'fail' Expression
 Selective and complete recovery of a two-member row:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 struct Missing {
   code: i32,
@@ -159,8 +159,8 @@ pub fn main() -> i32 {
 Mapping a failure and inspecting the outcome as data:
 
 ```silk
-import silk.effect { Effect }
-import silk.result { Result }
+import silk.core.effect { Effect }
+import silk.core.result { Result }
 
 struct Missing {
   code: i32,
@@ -207,8 +207,8 @@ pub fn main() -> i32 {
 A failure drops the frame's locals, runs the finalizers innermost first, then reaches the handler:
 
 ```silk
-import silk.effect { Effect }
-import silk.ownership { Drop }
+import silk.core.effect { Effect }
+import silk.core.ownership { Drop }
 
 struct Problem {
   code: i32,
@@ -292,7 +292,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Effects and run · Services and providers · Program entry and termination · Ownership and moves · Patterns and match · Enums and unions · Suspension and cancellation · `silk/effect`, `silk/result`
+Effects and run · Services and providers · Program entry and termination · Ownership and moves · Patterns and match · Enums and unions · Suspension and cancellation · `silk/core/effect`, `silk/core/result`
 
 ## Open questions
 

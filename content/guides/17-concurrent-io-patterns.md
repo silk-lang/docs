@@ -11,13 +11,13 @@ fanout ask <port> <milliseconds> <word>...
 
 ## The rules that shape the code
 
-Fibers come from `silk/fiber`, `silk/scheduler` and `silk/local_scheduler`. A few rules decide how the program is laid out:
+Fibers come from `silk/concurrency/fiber`, `silk/concurrency/scheduler` and `silk/concurrency/local_scheduler`. A few rules decide how the program is laid out:
 
 - **One thread, cooperative.** A fiber runs until it waits: on a socket, on a timer, or on another fiber. Then the scheduler resumes another one that is ready. Nothing runs in parallel on several cores.
 - **`main` sets up the scheduler.** `main` makes a `LocalScheduler` and a `MonotonicClock` and runs the first task with `LocalScheduler.execute`. Code that may wait on a fiber cannot run directly under `main`.
 - **A child requires only the scheduler and the clock.** `Fiber<A, E>.forkChild(child)` takes an effect whose row is at most `? &mut Scheduler | &mut MonotonicClock`, and the child may not borrow from its parent. Everything else the child needs, it either owns (moved in) or makes itself: its own allocator, its own writer.
 - **Children do not outlive their parent.** When a task finishes, the scheduler cancels its unfinished children. A parent that wants its children's work done must `join` (or `await`) them.
-- **There is no channel, select or timeout in the standard library.** Fibers that need to talk share a `Shared<T>` value from `silk/shared` and poll it. The program below builds a mailbox and a timeout that way.
+- **There is no channel, select or timeout in the standard library.** Fibers that need to talk share a `Shared<T>` value from `silk/mem/shared` and poll it. The program below builds a mailbox and a timeout that way.
 
 The socket operations from the Networking guide wait on the `MonotonicClock`. Inside a `LocalScheduler` task, that wait parks only the current fiber, so they are the building blocks used here.
 
@@ -26,32 +26,32 @@ The socket operations from the Networking guide wait on the `MonotonicClock`. In
 The imports, and helpers used by both commands. `readAll` and `writeAll` are the loops from the Networking guide. `passed` and `tenths` work with `Instant` values, which have no comparison of their own:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.byte_duplex { ByteDuplex, ByteIoError, ReadTransfer }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.fiber { Cancelled, Fiber }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.byte_duplex { ByteDuplex, ByteIoError, ReadTransfer }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Cancelled, Fiber }
 import silk.format { Format }
-import silk.host_input { HostInput, HostInputError }
-import silk.list { List }
-import silk.local_scheduler { LocalScheduler, StalledError }
-import silk.monotonic_clock { MonotonicClock }
-import silk.native_socket { Accepted, AcceptedView, ConnectOptions, ListenOptions, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted }
-import silk.network_address { Endpoint, IpAddress, Ipv4Address, Port }
+import silk.system.host_input { HostInput, HostInputError }
+import silk.collections.list { List }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.net.socket_native { Accepted, AcceptedView, ConnectOptions, ListenOptions, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted }
+import silk.net.address { Endpoint, IpAddress, Ipv4Address, Port }
 import silk.option { Option }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.os_writer { StdoutWriter }
-import silk.result { Result }
-import silk.scheduler { Scheduler, TaskIdExhaustedError }
-import silk.shared { Shared }
-import silk.slice { Slice }
-import silk.string { String }
-import silk.system_clock { Instant, SystemClock }
-import silk.u8
-import silk.u32
-import silk.u64
-import silk.usize
-import silk.writer { Writer, WriterError }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.io.writer_native { StdoutWriter }
+import silk.core.result { Result }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.mem.shared { Shared }
+import silk.collections.slice { Slice }
+import silk.text.string { String }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.num.u8
+import silk.num.u32
+import silk.num.u64
+import silk.num.usize
+import silk.io.writer { Writer, WriterError }
 
 // ---------------------------------------------------------------------------
 // Time helpers: `Instant` is not Copy and has no comparison, so the program carries its own.
@@ -183,7 +183,7 @@ effect fn serve(port: u16, count: u32) -> () ! NativeSocketError | WriterError |
 
 `serve` keeps every child's `Fiber` in a list and joins them all once it has accepted `count` connections. Without the joins, `serve` would return while children were still working, and the scheduler would cancel them.
 
-The same shape works for the HTTP server from the HTTP server and WebSockets guide. Instead of `serveNext`, which accepts and serves one connection in the same task, accept in the parent and call `withConnection` from `silk/http_server` in the child. With that guide's `Greeter` handler and `limits()`:
+The same shape works for the HTTP server from the HTTP server and WebSockets guide. Instead of `serveNext`, which accepts and serves one connection in the same task, accept in the parent and call `withConnection` from `silk/http/server` in the child. With that guide's `Greeter` handler and `limits()`:
 
 ```silk
 effect<'call> fn useConnection<'call>(view: &'call mut AcceptedView<'call>) -> u16
@@ -577,20 +577,20 @@ With no server listening, every request fails at once:
 
 ## What about the HTTP client?
 
-`NativeHttp` from `silk/http_client_native` keeps its own `OsMonotonicClock` and waits on it, rather than on the clock of the task that calls it. Waiting on that clock blocks the thread, so the scheduler cannot switch fibers while a request is in flight. Two fibers that each send a request to a server taking one second to answer finish after two seconds, not one; the same two requests made over native sockets, as above, finish after one. Until that changes:
+`NativeHttp` from `silk/http/client_native` keeps its own `OsMonotonicClock` and waits on it, rather than on the clock of the task that calls it. Waiting on that clock blocks the thread, so the scheduler cannot switch fibers while a request is in flight. Two fibers that each send a request to a server taking one second to answer finish after two seconds, not one; the same two requests made over native sockets, as above, finish after one. Until that changes:
 
 - Forking HTTP client requests into fibers is correct but gives no overlap.
 - `within` cannot cut a `NativeHttp` request short, because the request never lets the scheduler run. Use the request's own `timeoutSeconds`, described in the HTTP client guide.
-- The lower layers, `silk/http_fetch` and `silk/http_exchange_native`, take the `MonotonicClock` from their caller's requirements instead of making their own, so under a scheduler they wait on the task's clock. They are the place to start if HTTP requests must overlap.
+- The lower layers, `silk/http/fetch` and `silk/http/exchange_native`, take the `MonotonicClock` from their caller's requirements instead of making their own, so under a scheduler they wait on the task's clock. They are the place to start if HTTP requests must overlap.
 
 ## API reference
 
-- `silk/fiber`: `Fiber`, `Fiber.forkChild`, `Fiber.join`, `Fiber.await`, `Fiber.yieldNow`, `Cancelled`
-- `silk/local_scheduler`: `LocalScheduler`, `StalledError`
-- `silk/scheduler`: `Scheduler`, `TaskIdExhaustedError`
-- `silk/shared`: `Shared`
-- `silk/monotonic_clock`: `MonotonicClock`
-- `silk/effect`: `Effect.sleep`, `Effect.result`
-- `silk/native_socket`: `listen`, `accept`, `withAccepted`, `connectResolvedOwned`
-- `silk/http_server`: `withConnection`
-- `silk/http_client_native`: `NativeHttp`
+- `silk/concurrency/fiber`: `Fiber`, `Fiber.forkChild`, `Fiber.join`, `Fiber.await`, `Fiber.yieldNow`, `Cancelled`
+- `silk/concurrency/local_scheduler`: `LocalScheduler`, `StalledError`
+- `silk/concurrency/scheduler`: `Scheduler`, `TaskIdExhaustedError`
+- `silk/mem/shared`: `Shared`
+- `silk/system/monotonic_clock`: `MonotonicClock`
+- `silk/core/effect`: `Effect.sleep`, `Effect.result`
+- `silk/net/socket_native`: `listen`, `accept`, `withAccepted`, `connectResolvedOwned`
+- `silk/http/server`: `withConnection`
+- `silk/http/client_native`: `NativeHttp`

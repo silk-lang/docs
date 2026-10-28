@@ -52,9 +52,9 @@ The manifest does not name the root module, because the default is the file `sil
 `src/main.silk` is a complete program:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
 pub effect fn main() -> ()
   ! LogError {
@@ -91,15 +91,15 @@ Hello, world!
 Replace `src/main.silk` with this:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.host_input { HostInput, HostInputError }
-import silk.logger { LogError }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.system.host_input { HostInput, HostInputError }
+import silk.io.logger { LogError }
 import silk.option { Option }
-import silk.os_logger { StdoutLogger }
-import silk.result { Result }
-import silk.string { String, InvalidUtf8 }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.result { Result }
+import silk.text.string { String, InvalidUtf8 }
 
 pub effect fn main() -> i32
   ! LogError | HostInputError | OutOfMemoryError

@@ -221,7 +221,7 @@ Each row is a `src/main.silk` in `/home/you/demo`. The first column is the progr
 | `if (Point { x: 1 }).x == 1 && x(Point { x: 1 }) == 1 { return 0 }` | Builds and exits 0. |
 | `if let Slot.Full { value } = move Slot.Full { value: 2 } { return value }` | ``3:54: error[PAR0002] Unexpected `:`; expected valid syntax`` and more |
 | `let b = a` | With `[0]` on the next line: `4:3: error[SEM0087]`. The `[0]` is a new array statement, not an index. |
-| `pub import silk.list` | `` 2:1: error[PAR0001] Expected `{` `` |
+| `pub import silk.collections.list` | `` 2:1: error[PAR0001] Expected `{` `` |
 | `static if true { return 0 } else static if false { return 1 }` | `` 2:36: error[PAR0001] Expected `{` `` (inside a function body) |
 | `return match n { k => k }` | `` 4:7: error[PAR0001] Expected `{` `` and `4:5: error[SEM0001] Unknown type k` |
 | `let chained = 1 == 1 != false` | ``3:24: error[PAR0002] Unexpected `!=`; expected valid syntax`` |

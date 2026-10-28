@@ -1,12 +1,12 @@
 Native TCP, Unix socket, and TLS connections for HTTP clients.
 
 ## When to use
-Most code uses `silk.http_client_native` or `silk.http_fetch_native`, which call this module.
+Most code uses `silk.http.client_native` or `silk.http.fetch_native`, which call this module.
 Use it directly to control the connection:
 - [`withConnection`](#withConnection) opens a connection to one origin and lends it to a handler. The handler
-  sends its exchanges with `silk.http_exchange`.
+  sends its exchanges with `silk.http.exchange`.
 - [`withUnixConnection`](#withUnixConnection) does the same through a Unix socket, for example to a local daemon.
-- [`withProxyRoute`](#withProxyRoute) connects through a route from `silk.http_proxy`.
+- [`withProxyRoute`](#withProxyRoute) connects through a route from `silk.http.proxy`.
 - [`acquireOwned`](#acquireOwned) and [`acquireUnixOwned`](#acquireUnixOwned) return the connection, for a pool. The caller closes
   it.
 
@@ -41,13 +41,13 @@ prepare.
 ## Examples
 ### Check a deadline before contact
 ```silk
-import silk.http_exchange_native { NativeExchangeError, Options, preflight }
-import silk.http_origin { Origin, OriginError }
+import silk.http.exchange_native { NativeExchangeError, Options, preflight }
+import silk.http.origin { Origin, OriginError }
 import silk.option { Option }
-import silk.result { Result }
-import silk.system_clock { Instant, SystemClock }
-import silk.uri { Uri }
-import silk.uri_reference { ParseError }
+import silk.core.result { Result }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.uri.uri { Uri }
+import silk.uri.reference { ParseError }
 
 fn origin(text: string<'static>) -> Option<Origin> {
   let uri = match Uri.parse(text) {
@@ -110,7 +110,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `HttpExchangeNative` with `import silk.http_exchange_native as HttpExchangeNative`.
+Import as `HttpExchangeNative` with `import silk.http.exchange_native as HttpExchangeNative`.
 
 Public declarations: 16.
 
@@ -179,7 +179,7 @@ InvalidConnectOptions
 ```
 
 The poll interval or the attempt count of [`Options`](#Options) is out of range. See
-`silk.native_socket`.
+`silk.net.socket_native`.
 
 ::Anchor{id="NativeExchangeError.UnsupportedDeadline"}
 
@@ -843,7 +843,7 @@ pub struct NativeRedirectClient<'configuration, 'policy, A, HandlerError, ?Handl
 Opens a new native connection for each attempt of a redirect operation.
 
 ### Details
-`silk.http_fetch_native` uses it with `silk.http_redirect`. For each attempt, it selects the
+`silk.http.fetch_native` uses it with `silk.http.redirect`. For each attempt, it selects the
 route for the current URI again, checks the request and the route before contact, and uses the
 deadline of the operation. Each `https` attempt loads fresh trust. A tunnel still checks the
 certificate of the original origin.

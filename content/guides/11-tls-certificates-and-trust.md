@@ -15,7 +15,7 @@ Along the way it covers trust sources and snapshots, certificate path validation
 
 Before writing code, it helps to know the limits, because they shape what you can build:
 
-- **Client side only.** There is a TLS client and no TLS server. A Silk program can connect to an HTTPS server but cannot accept TLS connections itself. To serve HTTPS today, put a TLS-terminating proxy in front of a plain HTTP server built with `silk/http_server`.
+- **Client side only.** There is a TLS client and no TLS server. A Silk program can connect to an HTTPS server but cannot accept TLS connections itself. To serve HTTPS today, put a TLS-terminating proxy in front of a plain HTTP server built with `silk/http/server`.
 - **TLS 1.3 only.** The client offers TLS 1.3 and nothing older. It supports the three TLS 1.3 cipher suites (`TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`) and two key-exchange groups (X25519 and P-256). A server that only speaks TLS 1.2 fails the handshake.
 - **Names come from subjectAltName only.** A certificate must list the host in its subjectAltName extension, as a DNS name or an IP address. The common name (CN) is never consulted, which matches what browsers do.
 - **No revocation checks.** Path validation does not consult CRLs or OCSP. A validated path, and the connection's authentication evidence, report `RevocationStatus.NotChecked`.
@@ -90,9 +90,9 @@ python3 server.py 8445 chained &
 
 ## Trust: sources and snapshots
 
-A **trust anchor** is a root certificate you have decided to believe. A **trust snapshot** (`TrustSnapshot`, from `silk/trust_snapshot`) is an immutable list of anchors. Path validation and TLS connections take a snapshot, never a file name. Once loaded, it does not change, even if the file on disk does.
+A **trust anchor** is a root certificate you have decided to believe. A **trust snapshot** (`TrustSnapshot`, from `silk/tls/trust_snapshot`) is an immutable list of anchors. Path validation and TLS connections take a snapshot, never a file name. Once loaded, it does not change, even if the file on disk does.
 
-Snapshots come from a **trust source** (`TrustSource`, from `silk/trust_source`). It is a service with one operation, `load`, so the place anchors come from can be swapped like any other provider. `NativeFileTrustSource` (from `silk/native_file_trust_source`) reads a PEM file; `MemoryTrustSource` (from `silk/memory_trust_source`) serves anchors you already hold, which suits tests.
+Snapshots come from a **trust source** (`TrustSource`, from `silk/tls/trust_source`). It is a service with one operation, `load`, so the place anchors come from can be swapped like any other provider. `NativeFileTrustSource` (from `silk/tls/trust_source_native`) reads a PEM file; `MemoryTrustSource` (from `silk/tls/trust_source_memory`) serves anchors you already hold, which suits tests.
 
 `tlsget` treats `system` as the bundle Debian and Ubuntu generate, and anything else as a PEM file:
 
@@ -141,7 +141,7 @@ effect fn check(name: &[u8], chainFile: &[u8], choice: &[u8]) -> bool
   ...
 ```
 
-`CertificateBundle.decodePem` (from `silk/certificate_bundle`) parses every certificate in the PEM text. `intoCertificates` hands back the decoded `Certificate` values, in file order. By convention the first is the leaf, the server's own certificate, and the rest are intermediates.
+`CertificateBundle.decodePem` (from `silk/tls/certificate_bundle`) parses every certificate in the PEM text. `intoCertificates` hands back the decoded `Certificate` values, in file order. By convention the first is the leaf, the server's own certificate, and the rest are intermediates.
 
 Path validation needs the current time, because every certificate has a validity window. It reads the wall clock (`SystemClock`), not the monotonic clock. The time is a parameter, not a hidden call, so a test can validate as of any date it likes.
 
@@ -162,7 +162,7 @@ Path validation needs the current time, because every certificate has a validity
   }
 ```
 
-`CertificatePath.validate` (from `silk/certificate_path`) builds a path from the leaf, through any of the intermediates it needs, to one of the anchors. It checks signatures, validity dates, CA flags, path length and key usage. On success the `ValidatedPath` says which anchor it reached and how many intermediates it used. The intermediates do not need to be in path order, and ones the path does not use are ignored.
+`CertificatePath.validate` (from `silk/tls/certificate_path`) builds a path from the leaf, through any of the intermediates it needs, to one of the anchors. It checks signatures, validity dates, CA flags, path length and key usage. On success the `ValidatedPath` says which anchor it reached and how many intermediates it used. The intermediates do not need to be in path order, and ones the path does not use are ignored.
 
 On failure, `ValidationError.reason` is the broad class of problem. When the validator tried several candidate paths and all were rejected, `reason` is the general `NoValidPath`, and `detailReason` carries the reason the first rejected candidate failed. `tlsget` prefers the detail when it has one. The program names the common reasons and calls the rest "rejected":
 
@@ -181,7 +181,7 @@ fn reasonName(reason: ValidationReason) -> string<'static> {
 
 ## Matching the host name
 
-A valid path proves a trusted CA issued the certificate. It does not prove the certificate is for this host. That is a separate check, in `silk/https_identity`.
+A valid path proves a trusted CA issued the certificate. It does not prove the certificate is for this host. That is a separate check, in `silk/tls/https_identity`.
 
 The **reference identity** is the name you meant to reach, taken from the host as the user typed it, before any DNS lookup. Checking against the resolved address would let anyone who can tamper with DNS pick the name.
 
@@ -199,9 +199,9 @@ effect fn identityOf<'a>(host: &'a Host) -> ReferenceIdentity<'a> ! BadHost {
 }
 ```
 
-`Host.parse` (from `silk/network_address`) already tells a domain name from an IP literal, so each case maps straight onto an `OriginHost`. A domain must be ASCII: an internationalized name has to be converted to its `xn--` form first, and a trailing dot is rejected.
+`Host.parse` (from `silk/net/address`) already tells a domain name from an IP literal, so each case maps straight onto an `OriginHost`. A domain must be ASCII: an internationalized name has to be converted to its `xn--` form first, and a trailing dot is rejected.
 
-The **presented identities** are the names in the certificate's subjectAltName extension. `CertificateSan.decode` (from `silk/certificate_identities`) writes them into storage you provide, here room for 16, and `HttpsIdentity.verify` compares the reference against them:
+The **presented identities** are the names in the certificate's subjectAltName extension. `CertificateSan.decode` (from `silk/tls/certificate_identities`) writes them into storage you provide, here room for 16, and `HttpsIdentity.verify` compares the reference against them:
 
 ```silk
 fn nameMatch<'a>(leaf: &'a Certificate, reference: &ReferenceIdentity) -> Option<usize> {
@@ -242,7 +242,7 @@ A TLS connection needs four things: a connected transport, a `ClientConfig`, a t
   }
 ```
 
-`ClientConfig` (from `silk/tls_client`) holds the reference identity, the ALPN protocols to offer (`AlpnConfig.defaults()` offers none) and the client's buffer and size limits. For a DNS name, the same reference identity is sent as SNI, so the server knows which certificate to present. An IP address sends no SNI.
+`ClientConfig` (from `silk/tls/client`) holds the reference identity, the ALPN protocols to offer (`AlpnConfig.defaults()` offers none) and the client's buffer and size limits. For a DNS name, the same reference identity is sent as SNI, so the server knows which certificate to present. An IP address sends no SNI.
 
 The transport is an ordinary TCP connection, made the way the Networking guide makes one:
 
@@ -263,7 +263,7 @@ effect fn connect(name: &[u8], port: u16) -> Connection
 }
 ```
 
-Then `withClient` (from `silk/tls_connection`) takes ownership of the connection and the snapshot, runs the handshake, and calls `talk` with the authenticated connection:
+Then `withClient` (from `silk/tls/connection`) takes ownership of the connection and the snapshot, runs the handshake, and calls `talk` with the authenticated connection:
 
 ```silk
   let mut resolver = NativeSystemResolver.make()
@@ -504,18 +504,18 @@ tlsget: the host could not be resolved
 
 ## API reference
 
-- `silk/trust_source`: `TrustSource`
-- `silk/trust_snapshot`: `TrustSnapshot`, `TrustLoadLimits`, `SnapshotLimits`, `TrustSourceError`
-- `silk/trust_anchor`: `TrustAnchor`
-- `silk/native_file_trust_source`: `NativeFileTrustSource`
-- `silk/memory_trust_source`: `MemoryTrustSource`
-- `silk/certificate`: `Certificate`, `CertificateTime`, `DecodeLimits`, `DecodeError`
-- `silk/certificate_bundle`: `CertificateBundle`
-- `silk/certificate_path`: `CertificatePath`, `ValidatedPath`, `ValidationError`, `ValidationReason`, `ValidationLimits`, `RevocationStatus`
-- `silk/certificate_identities`: `CertificateSan`, `SanDecodeLimits`
-- `silk/https_identity`: `HttpsIdentity`, `OriginHost`, `ReferenceIdentity`, `PresentedIdentity`, `CertificateIdentities`, `IdentityLimits`
-- `silk/tls_client`: `ClientConfig`, `AlpnConfig`, `ClientLimits`, `Authentication`, `NamedGroup`, `TlsError`
-- `silk/tls_record`: `CipherSuite`
-- `silk/tls_connection`: `withClient`, `authenticateOwned`, `OwnedConnection`, `ConnectionOptions`, `ConnectionError`
-- `silk/system_clock`: `SystemClock`, `Instant`
-- `silk/random`: `Random`
+- `silk/tls/trust_source`: `TrustSource`
+- `silk/tls/trust_snapshot`: `TrustSnapshot`, `TrustLoadLimits`, `SnapshotLimits`, `TrustSourceError`
+- `silk/tls/trust_anchor`: `TrustAnchor`
+- `silk/tls/trust_source_native`: `NativeFileTrustSource`
+- `silk/tls/trust_source_memory`: `MemoryTrustSource`
+- `silk/tls/certificate`: `Certificate`, `CertificateTime`, `DecodeLimits`, `DecodeError`
+- `silk/tls/certificate_bundle`: `CertificateBundle`
+- `silk/tls/certificate_path`: `CertificatePath`, `ValidatedPath`, `ValidationError`, `ValidationReason`, `ValidationLimits`, `RevocationStatus`
+- `silk/tls/certificate_identities`: `CertificateSan`, `SanDecodeLimits`
+- `silk/tls/https_identity`: `HttpsIdentity`, `OriginHost`, `ReferenceIdentity`, `PresentedIdentity`, `CertificateIdentities`, `IdentityLimits`
+- `silk/tls/client`: `ClientConfig`, `AlpnConfig`, `ClientLimits`, `Authentication`, `NamedGroup`, `TlsError`
+- `silk/tls/record`: `CipherSuite`
+- `silk/tls/connection`: `withClient`, `authenticateOwned`, `OwnedConnection`, `ConnectionOptions`, `ConnectionError`
+- `silk/system/system_clock`: `SystemClock`, `Instant`
+- `silk/system/random`: `Random`

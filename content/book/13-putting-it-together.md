@@ -200,18 +200,18 @@ The HTTP logic is tested before a single port is opened.
 
 Now the part that does touch the network. It uses four standard library modules:
 
-- `silk/native_socket`: `listen` opens a listening socket, and `withListener` runs an effect with it.
-- `silk/http_server_native`: `serveNext` accepts one connection and hands it to your handler.
-- `silk/http_server`: the `ConnectionHandler` interface, `withRequest`, `readSome` and `respond`.
-- `silk/http`, `silk/http_head`, `silk/http_headers` and `silk/http_body`: headers, status codes and limits.
+- `silk/net/socket_native`: `listen` opens a listening socket, and `withListener` runs an effect with it.
+- `silk/http/server_native`: `serveNext` accepts one connection and hands it to your handler.
+- `silk/http/server`: the `ConnectionHandler` interface, `withRequest`, `readSome` and `respond`.
+- `silk/http/message`, `silk/http/head`, `silk/http/headers` and `silk/http/body`: headers, status codes and limits.
 
 Several of these modules each export a type called `Limits`, so the imports rename them with `as`:
 
 ```silk
-import silk.http_body { Limits as BodyLimits, TrailerPolicy }
-import silk.http_head { Limits as HeadLimits }
-import silk.http_headers { Headers, Limits as ValueLimits }
-import silk.http_server { BodyMode, Connection as HttpConnection, ConnectionHandler, Limits as HttpLimits, Request, ResponseWriter, ReusePolicy, ServerError, readSome, respond, withRequest }
+import silk.http.body { Limits as BodyLimits, TrailerPolicy }
+import silk.http.head { Limits as HeadLimits }
+import silk.http.headers { Headers, Limits as ValueLimits }
+import silk.http.server { BodyMode, Connection as HttpConnection, ConnectionHandler, Limits as HttpLimits, Request, ResponseWriter, ReusePolicy, ServerError, readSome, respond, withRequest }
 ```
 
 ### Limits
@@ -230,7 +230,7 @@ fn limits() -> HttpLimits {
     },
 ```
 
-The body limits allow 1 KiB of payload, which is plenty for a task title. Two other settings shape the service: `maxRequestsPerConnection: 1`, and, below, `ReusePolicy.CloseAfterResponse`. Each connection carries one request and is then closed. See the `silk/http_server` page of the std lib API reference for every field.
+The body limits allow 1 KiB of payload, which is plenty for a task title. Two other settings shape the service: `maxRequestsPerConnection: 1`, and, below, `ReusePolicy.CloseAfterResponse`. Each connection carries one request and is then closed. See the `silk/http/server` page of the std lib API reference for every field.
 
 The limits are only checked when a connection arrives, not at build time. If you set `head.maxOwnedBytes` to 8192, too small for 8192 bytes of head plus the header records, everything builds. Then each request fails:
 
@@ -699,14 +699,14 @@ cannot listen on 127.0.0.1:18413
 
 The server handles one connection at a time. Requests run in order, each one loads `tasks.txt` in full, and a slow client makes the next one wait. That keeps the board consistent with no locking at all, and it is plenty for a personal tool.
 
-It also speaks plain HTTP. The standard library's TLS support is client-side only (`silk/tls_client` and `silk/tls_connection`), so a Silk program can call an HTTPS service but cannot yet serve one. Keep the server on 127.0.0.1. If it must be reachable from elsewhere, put a TLS-terminating proxy in front of it.
+It also speaks plain HTTP. The standard library's TLS support is client-side only (`silk/tls/client` and `silk/tls/connection`), so a Silk program can call an HTTPS service but cannot yet serve one. Keep the server on 127.0.0.1. If it must be reachable from elsewhere, put a TLS-terminating proxy in front of it.
 
 ## Summary
 
 - You can reuse a whole program as a service by changing a provider: `BodyLogger` turns CLI output into a response body.
 - Typed failures map directly to HTTP statuses, and the same `explain` writes the message for both front ends.
 - Keeping routing and answering free of sockets lets you test them with the fakes you already have.
-- `silk/native_socket` and `silk/http_server` give you `listen`, `serveNext`, `withRequest`, `readSome` and `respond`, with explicit limits checked per connection.
+- `silk/net/socket_native` and `silk/http/server` give you `listen`, `serveNext`, `withRequest`, `readSome` and `respond`, with explicit limits checked per connection.
 - A staged call such as `writeBody(move reply.body)` builds a callback from a named function, which keeps a long callback out of the call that receives it.
 - An array literal takes its element type from its first element, so put the shortest-lived borrow first.
 
@@ -717,7 +717,7 @@ That is the end of the book. In thirteen chapters `tasks` grew from one log line
 From here, three places will serve you best:
 
 - **The Language reference.** Every page this book linked, from **Lexical structure** to **Package parameters**, gives the full rules and the diagnostic codes. When the compiler prints a code like SEM0021, the reference page for that topic explains the rule behind it.
-- **The std lib API reference.** One page per module, generated from the source. Start with the modules you used here: `silk/effect`, `silk/logger`, `silk/filesystem`, `silk/hash_map`, `silk/list`, `silk/local_scheduler` and `silk/http_server`.
+- **The std lib API reference.** One page per module, generated from the source. Start with the modules you used here: `silk/core/effect`, `silk/io/logger`, `silk/system/filesystem`, `silk/collections/hash_map`, `silk/collections/list`, `silk/concurrency/local_scheduler` and `silk/http/server`.
 - **The guides.** Shorter, task-focused pages for things this book only touched on, or left out.
 
 A good next project is to extend `tasks` yourself. Add a `DELETE /tasks/<id>` route and a `remove` command, give tasks due dates, or write a second program that depends on `taskcore` and prints a weekly summary. Each one exercises the same pieces: a new typed failure, a new `Command` variant, a test with fake providers, and a build that tells you exactly what you missed.

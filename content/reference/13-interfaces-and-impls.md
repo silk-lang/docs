@@ -92,7 +92,7 @@ InterfaceType  = Path TypeArguments?
 
 ## Copy and Drop
 
-- `Copy` and `Drop` in `silk/ownership` are aliases of the sealed properties `Intrinsic.Copy` and `Intrinsic.Drop`.
+- `Copy` and `Drop` in `silk/core/ownership` are aliases of the sealed properties `Intrinsic.Copy` and `Intrinsic.Drop`.
 - `impl Copy for Point {}` lets values of `Point` duplicate on use. It has no members; declaring one is SEM0083. `impl<T: Copy> Copy for Box<T> {}` is conditional.
 - `impl Drop for Token { fn drop(self: &mut Self) -> () { ... } }` gives a type a cleanup operation. The impl holds exactly this member with exactly this signature. Anything else, including a `mut self` receiver binding, is SEM0084.
 - `Copy` can be a bound; `Drop` cannot (SEM0083). See Ownership and moves.
@@ -283,7 +283,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Generics · Functions and methods · Closures and callable types · Ownership and moves · Expressions and operators · Effects and run · Typed failures · Services and providers · `silk/ops`, `silk/equal`, `silk/order`, `silk/ownership`
+Generics · Functions and methods · Closures and callable types · Ownership and moves · Expressions and operators · Effects and run · Typed failures · Services and providers · `silk/ops`, `silk/equal`, `silk/order`, `silk/core/ownership`
 
 ## Open questions
 

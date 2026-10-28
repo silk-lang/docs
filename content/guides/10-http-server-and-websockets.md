@@ -13,13 +13,13 @@ A Silk HTTP server is a loop you write yourself: listen on a socket, accept one 
 
 | Step | Module | Names |
 | --- | --- | --- |
-| Open a listening socket | `silk/native_socket` | `listen`, `ListenOptions`, `withListener` |
-| Accept one connection | `silk/http_server_native` | `serveNext` |
-| Handle the connection | `silk/http_server` | `ConnectionHandler`, `withRequest` |
-| Read the request | `silk/http_server` | `Request.head`, `readSome`, `Request.bodyComplete` |
-| Write the response | `silk/http_server`, `silk/http` | `respond`, `ResponseHead`, `BodyMode`, `ResponseWriter` |
-| Upgrade to a WebSocket | `silk/websocket_upgrade` | `withUpgrade`, `DecisionHandler`, `Decision` |
-| Exchange messages | `silk/websocket_server` | `withServer`, `readEvent`, `writeText` |
+| Open a listening socket | `silk/net/socket_native` | `listen`, `ListenOptions`, `withListener` |
+| Accept one connection | `silk/http/server_native` | `serveNext` |
+| Handle the connection | `silk/http/server` | `ConnectionHandler`, `withRequest` |
+| Read the request | `silk/http/server` | `Request.head`, `readSome`, `Request.bodyComplete` |
+| Write the response | `silk/http/server`, `silk/http/message` | `respond`, `ResponseHead`, `BodyMode`, `ResponseWriter` |
+| Upgrade to a WebSocket | `silk/http/websocket_upgrade` | `withUpgrade`, `DecisionHandler`, `Decision` |
+| Exchange messages | `silk/http/websocket_server` | `withServer`, `readEvent`, `writeText` |
 
 Everything is lent through callbacks. A request, a response writer and a WebSocket exist only inside the callback that receives them, so none of them can outlive its connection. That is why the code below carries several lifetime parameters: they say that the writer borrows the request, which borrows the connection, which borrows the socket. See **Lifetimes** and **Closures and callable types** in the reference.
 
@@ -30,38 +30,38 @@ The program is one file, `src/main.silk`, shown here in order. Create a package 
 Several modules export a type called `Limits`, so the imports rename them with `as`:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.buffered_duplex { BufferedDuplex }
-import silk.byte_duplex { ByteDuplex }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.http { Header, ResponseHead, Status, Version }
-import silk.http_body { Limits as BodyLimits, TrailerPolicy }
-import silk.http_head { Limits as HeadLimits }
-import silk.http_headers { Headers, Limits as ValueLimits }
-import silk.http_server { BodyMode, Connection as HttpConnection, ConnectionHandler, Limits as HttpLimits, Request, ResponseWriter, ReusePolicy, ServerError, readSome, respond, withRequest }
-import silk.http_server_native { serveNext }
-import silk.http_target { RequestTarget }
-import silk.logger { LogError, Logger }
-import silk.monotonic_clock { MonotonicClock }
-import silk.native_socket { Connection, ListenOptions, Listener, listen, withListener }
-import silk.network_address { Endpoint, IpAddress, Ipv4Address, Port }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.buffered_duplex { BufferedDuplex }
+import silk.io.byte_duplex { ByteDuplex }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.http.message { Header, ResponseHead, Status, Version }
+import silk.http.body { Limits as BodyLimits, TrailerPolicy }
+import silk.http.head { Limits as HeadLimits }
+import silk.http.headers { Headers, Limits as ValueLimits }
+import silk.http.server { BodyMode, Connection as HttpConnection, ConnectionHandler, Limits as HttpLimits, Request, ResponseWriter, ReusePolicy, ServerError, readSome, respond, withRequest }
+import silk.http.server_native { serveNext }
+import silk.http.target { RequestTarget }
+import silk.io.logger { LogError, Logger }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.net.socket_native { Connection, ListenOptions, Listener, listen, withListener }
+import silk.net.address { Endpoint, IpAddress, Ipv4Address, Port }
 import silk.option { Option }
-import silk.os_logger { StdoutLogger }
-import silk.os_monotonic_clock { OsMonotonicClock }
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.string { String }
-import silk.system_clock { Instant }
-import silk.u64
-import silk.usize
-import silk.websocket_server as WebSocket { Event, Limits as SocketLimits, ServerWebSocket, WebSocketError }
-import silk.websocket_upgrade { Decision, DecisionHandler, Limits as UpgradeLimits, Offer, Outcome, UpgradeError, withUpgrade }
+import silk.io.logger_native { StdoutLogger }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.core.result { Result }
+import silk.collections.slice { Slice }
+import silk.text.string { String }
+import silk.system.system_clock { Instant }
+import silk.num.u64
+import silk.num.usize
+import silk.http.websocket_server as WebSocket { Event, Limits as SocketLimits, ServerWebSocket, WebSocketError }
+import silk.http.websocket_upgrade { Decision, DecisionHandler, Limits as UpgradeLimits, Offer, Outcome, UpgradeError, withUpgrade }
 ```
 
 ## Limits
 
-A server reads bytes from strangers, so you decide up front how much it may read and keep: the longest request line, the most headers, the largest body. There are no defaults to fall back on. `limits()` fills in one `silk/http_server` `Limits` value:
+A server reads bytes from strangers, so you decide up front how much it may read and keep: the longest request line, the most headers, the largest body. There are no defaults to fall back on. `limits()` fills in one `silk/http/server` `Limits` value:
 
 ```silk
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ A few things to notice:
 
 ## The WebSocket route
 
-A WebSocket starts as an ordinary GET with `Upgrade: websocket` headers. `withUpgrade` from `silk/websocket_upgrade` checks the handshake, asks your `DecisionHandler` whether to accept, sends `101 Switching Protocols`, and lends you the connection's buffered channel. `withServer` from `silk/websocket_server` turns that channel into a `ServerWebSocket`:
+A WebSocket starts as an ordinary GET with `Upgrade: websocket` headers. `withUpgrade` from `silk/http/websocket_upgrade` checks the handshake, asks your `DecisionHandler` whether to accept, sends `101 Switching Protocols`, and lends you the connection's buffered channel. `withServer` from `silk/http/websocket_server` turns that channel into a `ServerWebSocket`:
 
 ```silk
 // ---------------------------------------------------------------------------
@@ -341,7 +341,7 @@ effect<'call> fn chat<'call, 'request: 'call, 'connection: 'request, 'transport:
 
 To send, use `writeText`, `writeBinary` and `writePing`. To close from the server side, use `sendClose` and then `finishClose`. When the `withServer` callback returns, the channel closes.
 
-A message larger than your buffer, or than `maxMessageBytes` in the `silk/websocket_server` `Limits` (64 KiB by default), ends the session with an error. Fragmented messages and compression extensions are not supported. A fragmented message ends the session, with close code 1003 sent when a finite deadline allows it.
+A message larger than your buffer, or than `maxMessageBytes` in the `silk/http/websocket_server` `Limits` (64 KiB by default), ends the session with an error. Fragmented messages and compression extensions are not supported. A fragmented message ends the session, with close code 1003 sent when a finite deadline allows it.
 
 ## One request, one connection
 
@@ -570,18 +570,18 @@ The last request was not a valid handshake, so `withUpgrade` failed with an `Upg
 ## What this server does not do
 
 - **One connection at a time.** `serveNext` serves one connection and returns; a slow client makes the next one wait. The Concurrent I/O patterns guide shows how to serve many at once with fibers.
-- **No TLS.** The standard library has TLS for clients only (`silk/tls_client`), so a Silk program cannot serve HTTPS or `wss://`. Keep the server on 127.0.0.1, or put a TLS-terminating proxy in front of it.
-- **No router or middleware.** Routing is your own code over the method and target bytes. To split a target into path and query, parse it with `UriReference.parse` from `silk/uri_reference` and call `path()` and `query()`.
+- **No TLS.** The standard library has TLS for clients only (`silk/tls/client`), so a Silk program cannot serve HTTPS or `wss://`. Keep the server on 127.0.0.1, or put a TLS-terminating proxy in front of it.
+- **No router or middleware.** Routing is your own code over the method and target bytes. To split a target into path and query, parse it with `UriReference.parse` from `silk/uri/reference` and call `path()` and `query()`.
 - **Deadlines are yours to set.** Every read and write takes an `Option<Instant>` deadline. This example passes `none()` everywhere; a public server should pass a deadline built from `MonotonicClock.now()` and `MonotonicClock.deadlineAfter`, so a silent client cannot hold a connection forever.
 
 ## API reference
 
-- `silk/native_socket`: `listen`, `ListenOptions`, `Listener`, `withListener`
-- `silk/http_server_native`: `serveNext`
-- `silk/http_server`: `ConnectionHandler`, `Request`, `withRequest`, `readSome`, `respond`, `ResponseWriter`, `BodyMode`, `ReusePolicy`, `Limits`, `ServerError`
-- `silk/http`: `Header`, `ResponseHead`, `Status`, `Version`
-- `silk/http_head`, `silk/http_body`, `silk/http_headers`: `Limits`, `Headers`, `TrailerPolicy`
-- `silk/http_target`: `RequestTarget`
-- `silk/websocket_upgrade`: `withUpgrade`, `DecisionHandler`, `Decision`, `Offer`, `Outcome`, `inspect`, `reject`, `UpgradeError`
-- `silk/websocket_server`: `withServer`, `ServerWebSocket`, `readEvent`, `writeText`, `Event`, `Limits`, `WebSocketError`
-- `silk/network_address`: `Endpoint`, `IpAddress`, `Ipv4Address`, `Port`
+- `silk/net/socket_native`: `listen`, `ListenOptions`, `Listener`, `withListener`
+- `silk/http/server_native`: `serveNext`
+- `silk/http/server`: `ConnectionHandler`, `Request`, `withRequest`, `readSome`, `respond`, `ResponseWriter`, `BodyMode`, `ReusePolicy`, `Limits`, `ServerError`
+- `silk/http/message`: `Header`, `ResponseHead`, `Status`, `Version`
+- `silk/http/head`, `silk/http/body`, `silk/http/headers`: `Limits`, `Headers`, `TrailerPolicy`
+- `silk/http/target`: `RequestTarget`
+- `silk/http/websocket_upgrade`: `withUpgrade`, `DecisionHandler`, `Decision`, `Offer`, `Outcome`, `inspect`, `reject`, `UpgradeError`
+- `silk/http/websocket_server`: `withServer`, `ServerWebSocket`, `readEvent`, `writeText`, `Event`, `Limits`, `WebSocketError`
+- `silk/net/address`: `Endpoint`, `IpAddress`, `Ipv4Address`, `Port`

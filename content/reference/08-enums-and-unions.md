@@ -88,7 +88,7 @@ pub union Option<T> {
   Some { pub value: T }
 }
 
-// silk/result
+// silk/core/result
 pub union Result<A, F> {
   Success { pub value: A },
   Failure { pub error: F }
@@ -236,7 +236,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Patterns and match · Structs, tuples and arrays · Generics · Interfaces and impls · Ownership and moves · `silk/option`, `silk/result`
+Patterns and match · Structs, tuples and arrays · Generics · Interfaces and impls · Ownership and moves · `silk/option`, `silk/core/result`
 
 ## Open questions
 

@@ -13,7 +13,7 @@ DropConformance   = 'impl' GenericParameters? Drop 'for' Type '{' DropHook '}'
 DropHook          = 'fn' 'drop' '(' 'self' ':' '&' 'mut' Type ')' '->' '(' ')' Block
 ```
 
-`Copy` and `Drop` are the names exported by `silk/ownership`. They are aliases of `Intrinsic.Copy` and `Intrinsic.Drop`, so `impl Intrinsic.Copy for T {}` is the same conformance.
+`Copy` and `Drop` are the names exported by `silk/core/ownership`. They are aliases of `Intrinsic.Copy` and `Intrinsic.Drop`, so `impl Intrinsic.Copy for T {}` is the same conformance.
 
 ## Owners
 
@@ -106,13 +106,13 @@ Everything else moves. That includes exclusive references `&mut T` and `&mut [T]
 
 - `Intrinsic.replace(place, value)` stores `value` into `place` and returns the old value. No drop runs.
 - `place` must be a writable place: a `let mut` binding, a field, an indexed element, or `r.*` with `r: &mut T`. Otherwise SEM0035 or SEM0036.
-- `silk/ownership` has no wrapper for it; call the intrinsic directly.
+- `silk/core/ownership` has no wrapper for it; call the intrinsic directly.
 - An assignment whose right side moves out of the place being assigned is OWN0004, for example `t = next(move t)`. Move the old value out first, or use `Intrinsic.replace`.
 
 ## Examples
 
 ```silk
-import silk.ownership { Copy }
+import silk.core.ownership { Copy }
 
 struct Point {
   x: i32,
@@ -187,10 +187,10 @@ pub fn main() -> i32 {
 Drop order, recorded through a shared log:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.effect { Effect }
-import silk.ownership { Drop }
-import silk.shared { Shared }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.core.ownership { Drop }
+import silk.mem.shared { Shared }
 
 struct Log {
   order: i32,
@@ -277,4 +277,4 @@ pub fn main() -> i32 {
 
 ## See also
 
-Borrowing · Lifetimes · Patterns and match · Bindings and statements · Allocation and shared ownership · Closures and callable types · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/ownership`, `silk/shared`
+Borrowing · Lifetimes · Patterns and match · Bindings and statements · Allocation and shared ownership · Closures and callable types · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/core/ownership`, `silk/mem/shared`

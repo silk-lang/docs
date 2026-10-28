@@ -5,12 +5,12 @@ response.
 Use this module to stream a request or a response body, or to reuse a connection. Make a
 [`Connection`](#Connection) around a transport with [`makeOwned`](#makeOwned), [`withOwned`](#withOwned), or [`withConnected`](#withConnected), or
 let [`withRoute`](#withRoute) connect through a proxy route. Then call [`withExchange`](#withExchange) for each request.
-Most programs use `silk.http_client` or `silk.http_fetch`, which call this module.
+Most programs use `silk.http.client` or `silk.http.fetch`, which call this module.
 
 ## Details
 A connection runs one exchange at a time. In the callback of [`withExchange`](#withExchange), call the steps in
 order:
-1. [`send`](#send) sends the head of a `PreparedRequest` from `silk.http_request`.
+1. [`send`](#send) sends the head of a `PreparedRequest` from `silk.http.request`.
 2. [`writeSome`](#writeSome) sends the body, and [`finishRequest`](#finishRequest) ends it. Call [`finishRequest`](#finishRequest) also when
    there is no body.
 3. [`receive`](#receive) or [`receiveFinal`](#receiveFinal) reads a response head. Then [`readSome`](#readSome) reads the body, or
@@ -35,32 +35,32 @@ an error.
 This example uses a transport with a fixed response in place of a network connection.
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.byte_duplex { ByteDuplex, ReadTransfer }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
-import silk.http { Header, Method, ValueError, Version }
-import silk.http_exchange { Connection, Exchange, ExchangeError, Limits, RequestOptions }
-import silk.http_exchange as Client
-import silk.http_headers { Headers, Limits as ValueLimits }
-import silk.http_origin { Origin, OriginError }
-import silk.http_request { BodyMode, HeaderPolicy, PreparedRequest, RequestError, fromUri }
-import silk.http_transport { HttpTransport, TransportError }
-import silk.list { List }
-import silk.memory_byte_duplex {
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.byte_duplex { ByteDuplex, ReadTransfer }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
+import silk.http.message { Header, Method, ValueError, Version }
+import silk.http.exchange { Connection, Exchange, ExchangeError, Limits, RequestOptions }
+import silk.http.exchange as Client
+import silk.http.headers { Headers, Limits as ValueLimits }
+import silk.http.origin { Origin, OriginError }
+import silk.http.request { BodyMode, HeaderPolicy, PreparedRequest, RequestError, fromUri }
+import silk.http.transport { HttpTransport, TransportError }
+import silk.collections.list { List }
+import silk.io.memory_byte_duplex {
   MemoryByteDuplex,
   MemoryReadEvent,
   MemoryWriteAction,
   MemoryWriteEvent
 }
-import silk.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock { MonotonicClock }
 import silk.option { Option }
-import silk.random { Random }
-import silk.result { Result }
-import silk.system_clock { Instant, SystemClock }
-import silk.u64
-import silk.uri { Uri }
-import silk.uri_reference { ParseError }
+import silk.system.random { Random }
+import silk.core.result { Result }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.num.u64
+import silk.uri.uri { Uri }
+import silk.uri.reference { ParseError }
 
 // A transport that answers with fixed bytes and accepts all writes.
 struct ScriptedTransport {
@@ -258,7 +258,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `Exchange` with `import silk.http_exchange { Exchange }`.
+Import as `Exchange` with `import silk.http.exchange { Exchange }`.
 
 Public declarations: 44.
 
@@ -644,7 +644,7 @@ Content decoding failed.
 pub error: ContentError<'static>
 ```
 
-The error from `silk.http_content`.
+The error from `silk.http.content`.
 
 ::Anchor{id="ExchangeError.Head"}
 
@@ -664,7 +664,7 @@ A response head is not valid, or the head limits are not valid.
 pub error: ParseError
 ```
 
-The error from `silk.http_head`.
+The error from `silk.http.head`.
 
 ::Anchor{id="ExchangeError.Body"}
 
@@ -684,7 +684,7 @@ The body framing failed.
 pub error: BodyError
 ```
 
-The error from `silk.http_body`.
+The error from `silk.http.body`.
 
 ::Anchor{id="ExchangeError.Transport"}
 
@@ -704,7 +704,7 @@ The transport failed.
 pub error: TransportError
 ```
 
-The error from `silk.http_transport`.
+The error from `silk.http.transport`.
 
 ::Anchor{id="ExchangeError.Output"}
 
@@ -724,7 +724,7 @@ The transport failed during a write. `progress` tells what was already accepted 
 pub error: TransportError
 ```
 
-The error from `silk.http_transport`.
+The error from `silk.http.transport`.
 
 ::Anchor{id="ExchangeError.Output.progress"}
 
@@ -897,7 +897,7 @@ Checks `limits` without allocation or I/O.
 
 ### Details
 The buffer sizes must not be 0, and `maxDiscardWireBytes` must be at most 1048576. The head
-limits must pass `validateLimits` of `silk.http_head`. That error is returned in `Head`.
+limits must pass `validateLimits` of `silk.http.head`. That error is returned in `Head`.
 
 ::Anchor{id="DiscardOutcome"}
 
@@ -1098,8 +1098,8 @@ after the last response.
 
 Use it to stream a request or a response body, or to reuse a connection. Make one with
 [`makeOwned`](#makeOwned), [`withOwned`](#withOwned), or [`withConnected`](#withConnected), or let [`withRoute`](#withRoute) connect through a proxy
-route. Then call [`withExchange`](#withExchange) for each request. Most programs use `silk.http_client` or
-`silk.http_fetch` instead.
+route. Then call [`withExchange`](#withExchange) for each request. Most programs use `silk.http.client` or
+`silk.http.fetch` instead.
 
 ### Details
 
@@ -1679,7 +1679,7 @@ pub effect fn withExchange<'exchange, 'callback, P, A, E, ?R>(
 Runs one exchange of `request` on the connection, in `callback`.
 
 In `callback`, call the steps in order:
-1. [`send`](#send) sends the head of a `PreparedRequest` from `silk.http_request`.
+1. [`send`](#send) sends the head of a `PreparedRequest` from `silk.http.request`.
 2. [`writeSome`](#writeSome) sends the body, and [`finishRequest`](#finishRequest) ends it. Call [`finishRequest`](#finishRequest) also when
    there is no body.
 3. [`receive`](#receive) or [`receiveFinal`](#receiveFinal) reads a response head. Then [`readSome`](#readSome) reads the body, or

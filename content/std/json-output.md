@@ -16,7 +16,7 @@ Each operation writes to the `Writer` at once. It does not flush and does not al
 ## Examples
 ### Choose two-space indentation
 ```silk
-import silk.json_output { JsonOptions }
+import silk.json.output { JsonOptions }
 
 pub fn main() -> i32 {
   let options = JsonOptions.indented(2)
@@ -27,7 +27,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `JsonOutput` with `import silk.json_output { JsonOutput }`.
+Import as `JsonOutput` with `import silk.json.output { JsonOutput }`.
 
 Public declarations: 2.
 

@@ -4,13 +4,13 @@ Read JSON as a sequence of tokens, without building a tree and without allocatin
 Use [`JsonScanner`](#JsonScanner) to read a complete document that is in one slice, token by token. It is the
 input of `Deserialize` implementations. Use [`JsonScanState`](#JsonScanState) when the bytes arrive in pieces
 and you keep the parts of each token yourself. To read from a `BufferedInput`, use
-`silk.json_reader.JsonReader`. To get a tree, use `silk.json_value.Json.parse`.
+`silk.json.reader.JsonReader`. To get a tree, use `silk.json.value.Json.parse`.
 
 ## Details
 The scanner checks the full JSON grammar (RFC 8259) as it reads, including UTF-8 in strings and
 the nesting of arrays and objects. A string or number token gives a [`JsonSpan`](#JsonSpan) in the source.
 Strings keep their source spelling. The token says if the string has escapes, so you can decode
-it with `silk.json_text.JsonText.decode` only when needed. All offsets are byte offsets from the
+it with `silk.json.text.JsonText.decode` only when needed. All offsets are byte offsets from the
 start of the document.
 
 ## Errors
@@ -19,13 +19,13 @@ start of the document.
 
 ## Gotchas
 Nesting is limited to [`MAX_DEPTH`](#MAX_DEPTH) (64) levels. The scanner does not check for duplicate keys.
-`silk.json_value.Json.parse` does.
+`silk.json.value.Json.parse` does.
 
 ## Examples
 ### Read the tokens of an array
 ```silk
-import silk.json_scanner { JsonError, JsonScanner, JsonToken }
-import silk.result { Result }
+import silk.json.scanner { JsonError, JsonScanner, JsonToken }
+import silk.core.result { Result }
 
 fn countNumbers(input: &[u8]) -> i32 {
   let mut scanner = JsonScanner.make(input)
@@ -57,7 +57,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `JsonScanner` with `import silk.json_scanner { JsonScanner }`.
+Import as `JsonScanner` with `import silk.json.scanner { JsonScanner }`.
 
 Public declarations: 9.
 
@@ -683,16 +683,16 @@ A JSON scanner over a complete document in one slice. Make one with [`JsonScanne
 Use it to read a document that is in one slice, token by token, without building a tree and
 without allocating. It is the input of `Deserialize` implementations. When the bytes arrive in
 pieces, use [`JsonScanState`](#JsonScanState). To read from a `BufferedInput`, use
-`silk.json_reader.JsonReader`. To get a tree, use `silk.json_value.Json.parse`.
+`silk.json.reader.JsonReader`. To get a tree, use `silk.json.value.Json.parse`.
 
 ### Details
 The scanner checks the full JSON grammar (RFC 8259) as it reads, including UTF-8 in strings and
 the nesting of arrays and objects, up to [`MAX_DEPTH`](#MAX_DEPTH) (64) levels. A string or number token
 gives a [`JsonSpan`](#JsonSpan) in the source. Strings keep their source spelling. The token says if the
-string has escapes, so you can decode it with `silk.json_text.JsonText.decode` only when needed.
+string has escapes, so you can decode it with `silk.json.text.JsonText.decode` only when needed.
 
 ### Gotchas
-The scanner does not check for duplicate keys. `silk.json_value.Json.parse` does. After an
+The scanner does not check for duplicate keys. `silk.json.value.Json.parse` does. After an
 error, the scanner cannot continue. Make a new one.
 
 ::Anchor{id="JsonScanState.impl"}

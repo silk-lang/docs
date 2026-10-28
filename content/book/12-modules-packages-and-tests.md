@@ -83,7 +83,7 @@ members = ["tasks", "taskcore"]
 The new package has a `silk.toml` and one source file, `src/lib.silk`, with a function and a test. It gets no `.gitignore` of its own: the workspace's `.gitignore` already covers the shared `build` folder.
 
 ```silk
-import silk.testing { AssertionError, Testing }
+import silk.testing.testing { AssertionError, Testing }
 
 /// The sum of `left` and `right`.
 pub fn add(left: i32, right: i32) -> i32 {
@@ -127,7 +127,7 @@ import Export { exportBoard }
 import Remind { MILLISECOND, remindTasks }
 ```
 
-These are the same braces you have used for the standard library since chapter 1. `silk.effect` is just a module of the package `silk`.
+These are the same braces you have used for the standard library since chapter 1. `silk.core.effect` is just a module of the package `silk`.
 
 Because the name is the path, it must match the file exactly, capital letters included. Here is `main.silk` with `cli.command` instead of `cli.Command`:
 

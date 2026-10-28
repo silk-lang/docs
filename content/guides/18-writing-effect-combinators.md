@@ -1,18 +1,18 @@
 # Writing effect combinators
 
-An effect combinator is a function that takes effects and returns an effect. `Effect.map`, `Effect.catchAll` and `Effect.retry` in `silk/effect` are combinators, and there is nothing special about them: each is an `effect fn` with an Effect parameter. This guide writes three of your own. `retrying` repeats a failing effect with a growing pause and lets the caller decide which failures are worth repeating. `withBudget` measures an effect and fails when it took too long. `inVirtualTime` supplies a service to whatever effect it is given. Along the way it covers generic rows, the three Effect modes, and what you may borrow while an effect is alive.
+An effect combinator is a function that takes effects and returns an effect. `Effect.map`, `Effect.catchAll` and `Effect.retry` in `silk/core/effect` are combinators, and there is nothing special about them: each is an `effect fn` with an Effect parameter. This guide writes three of your own. `retrying` repeats a failing effect with a growing pause and lets the caller decide which failures are worth repeating. `withBudget` measures an effect and fails when it took too long. `inVirtualTime` supplies a service to whatever effect it is given. Along the way it covers generic rows, the three Effect modes, and what you may borrow while an effect is alive.
 
 The program, `weather`, reads a temperature from stations that fail in different ways. It prints the same output on every run, because it runs on a virtual clock. **Effects and run**, **Typed failures** and **Services and providers** in the language reference have the full rules this guide relies on.
 
 ## The operation to retry
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError, Logger }
-import silk.monotonic_clock { MonotonicClock }
-import silk.os_logger { StdoutLogger }
-import silk.result { Result }
-import silk.system_clock { Instant, SystemClock }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.io.logger_native { StdoutLogger }
+import silk.core.result { Result }
+import silk.system.system_clock { Instant, SystemClock }
 
 pub struct StationDown { pub code: i32 }
 pub struct TimedOut {
@@ -65,7 +65,7 @@ Calling `readStation(&mut station)` runs nothing. It builds an Effect that holds
 
 ## Writing a retry
 
-`Effect.retry(effect, retries)` from `silk/effect` repeats an effect immediately after any failure. A real client usually wants two more things: a pause that grows between attempts, and a way to give up at once on failures that will not go away, such as a refused login. Here is that combinator:
+`Effect.retry(effect, retries)` from `silk/core/effect` repeats an effect immediately after any failure. A real client usually wants two more things: a pause that grows between attempts, and a way to give up at once on failures that will not go away, such as a refused login. Here is that combinator:
 
 ```silk
 // Runs `action` again after a failure that `transient` accepts, up to `retries` more times.
@@ -122,7 +122,7 @@ effect fn withBudget<'env, A, E, ?R>(
 
 `withBudget` takes a `once Effect`, the most general kind, because it runs the action only once. `run move action` runs it. The result row adds one failure, `TimedOut`, to the action's own row: `! E | TimedOut`. The success type changes too: `Timed<A>` carries the value together with how long it took.
 
-`withBudget` cannot stop the action early. Silk has no hidden preemption: an effect runs until it returns or fails. `withBudget` checks the time when the action is done and rejects a result that came too late. To stop work that is still waiting, give that work a deadline itself. The byte streams in `silk/byte_duplex` take an `Instant` deadline on every read and write, and fail with `ByteIoError.Timeout` when it passes. The Networking and Concurrent I/O patterns guides show deadlines and cancellation.
+`withBudget` cannot stop the action early. Silk has no hidden preemption: an effect runs until it returns or fails. `withBudget` checks the time when the action is done and rejects a result that came too late. To stop work that is still waiting, give that work a deadline itself. The byte streams in `silk/io/byte_duplex` take an `Instant` deadline on every read and write, and fail with `ByteIoError.Timeout` when it passes. The Networking and Concurrent I/O patterns guides show deadlines and cancellation.
 
 ## A combinator that provides a service
 
@@ -432,9 +432,9 @@ Every caller of `withBudget` now needs a `Logger` in its row, and every caller g
 
 ## API reference
 
-- `silk/effect`: `Effect.result`, `Effect.sleep`, `Effect.retry`, `Effect.log`, `Effect.provideMut`, `Effect.bindRequirementOwned`
-- `silk/result`: `Result`
-- `silk/monotonic_clock`: `MonotonicClock`, `MonotonicClock.deadlineAfter`
-- `silk/system_clock`: `SystemClock`, `Instant`
-- `silk/logger`: `Logger`, `LogError`; `silk/os_logger`: `StdoutLogger`
-- `silk/byte_duplex`: `ByteDuplex`, `ByteIoError` (deadlines on I/O)
+- `silk/core/effect`: `Effect.result`, `Effect.sleep`, `Effect.retry`, `Effect.log`, `Effect.provideMut`, `Effect.bindRequirementOwned`
+- `silk/core/result`: `Result`
+- `silk/system/monotonic_clock`: `MonotonicClock`, `MonotonicClock.deadlineAfter`
+- `silk/system/system_clock`: `SystemClock`, `Instant`
+- `silk/io/logger`: `Logger`, `LogError`; `silk/io/logger_native`: `StdoutLogger`
+- `silk/io/byte_duplex`: `ByteDuplex`, `ByteIoError` (deadlines on I/O)

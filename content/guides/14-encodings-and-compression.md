@@ -12,25 +12,25 @@ cd unpack
 The code blocks below, in order, make up the whole of `src/main.silk`. Here are the imports:
 
 ```silk
-import silk.allocator { Allocator, OutOfMemoryError }
-import silk.base64 { Base64, Base64Error, Base64Reason }
-import silk.bytes { Bytes }
-import silk.effect { Effect }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.encoding.base64 { Base64, Base64Error, Base64Reason }
+import silk.collections.bytes { Bytes }
+import silk.core.effect { Effect }
 import silk.format { Format }
-import silk.inflate { Decoder, DecodeError, Format as Container, Limits, Status }
-import silk.inflate
+import silk.compress.inflate { Decoder, DecodeError, Format as Container, Limits, Status }
+import silk.compress.inflate
 import silk.option { Option }
-import silk.os_writer { StdoutWriter }
-import silk.result { Result }
-import silk.slice { Slice }
-import silk.uri { Uri }
-import silk.uri_percent { PercentComponent, UriPercent }
-import silk.uri_reference { ParseError, UriReference }
-import silk.writer { Writer, WriterError }
-import silk.zstd { Zstd, ZstdError, ZstdLimits, ZstdStatus }
+import silk.io.writer_native { StdoutWriter }
+import silk.core.result { Result }
+import silk.collections.slice { Slice }
+import silk.uri.uri { Uri }
+import silk.uri.percent { PercentComponent, UriPercent }
+import silk.uri.reference { ParseError, UriReference }
+import silk.io.writer { Writer, WriterError }
+import silk.compress.zstd { Zstd, ZstdError, ZstdLimits, ZstdStatus }
 ```
 
-Two modules both export a type called `Format`: `silk/format` (text templates) and `silk/inflate` (the compressed container). One file cannot import both under the same name, so the inflate one is renamed with `Format as Container`. `import silk.inflate` on its own line also brings the module name into scope, for its constant `inflate.MEMORY_BOUND`.
+Two modules both export a type called `Format`: `silk/format` (text templates) and `silk/compress/inflate` (the compressed container). One file cannot import both under the same name, so the inflate one is renamed with `Format as Container`. `import silk.compress.inflate` on its own line also brings the module name into scope, for its constant `inflate.MEMORY_BOUND`.
 
 If you import both as `Format`, `silk check` stops at the second import and points at the first:
 
@@ -47,7 +47,7 @@ Failed unpack in 0.30s
 Writing `inflate.Format.Gzip` through the module name does not work either. A module import names the module's types in type positions, but not their members as values:
 
 ```
-src/main.silk:111:38: error[SEM0238] Format is a type of module silk.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.inflate { Format }`
+src/main.silk:111:38: error[SEM0238] Format is a type of module silk.compress.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.compress.inflate { Format }`
 ```
 
 Here `Format` is already taken, so rename on import instead.
@@ -92,7 +92,7 @@ effect fn fromBase64(text: &[u8], out: &mut [u8]) -> usize ! Base64Error {
 
 `Base64.encodeInto(output, input)` writes into a slice you own and returns how many bytes it wrote. `decodeInto` is the reverse. Neither allocates. To size a buffer exactly, ask first: `Base64.encodedLength(n)` and `Base64.decodedLength(text)`. A too-small buffer fails with `OutputTooSmall` and reports the `required` length.
 
-The decoder is strict. It accepts only the standard alphabet with `=` padding, rejects whitespace, and rejects input whose length is not a multiple of four. `aGVsbG8` is `hello` with its padding stripped, so `decodedLength` fails with `Base64Reason.InvalidLength`. Every failure is a `Base64Error` with a `reason` and, where it helps, an `offset`. There is no URL-safe alphabet in `silk/base64`.
+The decoder is strict. It accepts only the standard alphabet with `=` padding, rejects whitespace, and rejects input whose length is not a multiple of four. `aGVsbG8` is `hello` with its padding stripped, so `decodedLength` fails with `Base64Reason.InvalidLength`. Every failure is a `Base64Error` with a `reason` and, where it helps, an `offset`. There is no URL-safe alphabet in `silk/encoding/base64`.
 
 ## URIs and percent-encoding
 
@@ -139,13 +139,13 @@ effect fn uriDemo() -> () ! ParseError | OutOfMemoryError | WriterError ? &mut A
 }
 ```
 
-`Uri.parse` validates a URI that has a scheme and borrows its parts from your text without copying. Each accessor returns a slice of the original: `host()` is `example.com`, `port()` is the digits as text, and `path()` keeps its escapes (`guide%20one.html`). Optional parts return `Option<string>`, and an empty part (a bare `?`) is `Some("")`, not `None`. For a reference that may lack a scheme, such as `../images/logo.png`, use `UriReference.parse` from `silk/uri_reference`. Parse failures are a `ParseError` with a `reason`, the `component` that failed and an `offset`.
+`Uri.parse` validates a URI that has a scheme and borrows its parts from your text without copying. Each accessor returns a slice of the original: `host()` is `example.com`, `port()` is the digits as text, and `path()` keeps its escapes (`guide%20one.html`). Optional parts return `Option<string>`, and an empty part (a bare `?`) is `Some("")`, not `None`. For a reference that may lack a scheme, such as `../images/logo.png`, use `UriReference.parse` from `silk/uri/reference`. Parse failures are a `ParseError` with a `reason`, the `component` that failed and an `offset`.
 
-Percent-encoding lives in `silk/uri_percent`. `UriPercent.decodeOwned(text)` returns the decoded bytes in an owned `Bytes`. They are bytes, not text, because `%FF` is a valid escape that is not UTF-8; check with `String.fromUtf8` if you need a string. A `+` stays a `+`. Decoding fails with a `DecodeError` at the offset of a broken escape such as `%G1`.
+Percent-encoding lives in `silk/uri/percent`. `UriPercent.decodeOwned(text)` returns the decoded bytes in an owned `Bytes`. They are bytes, not text, because `%FF` is a valid escape that is not UTF-8; check with `String.fromUtf8` if you need a string. A `+` stays a `+`. Decoding fails with a `DecodeError` at the offset of a broken escape such as `%G1`.
 
 `UriPercent.encodeOwned(bytes, component)` escapes what that part of a URI cannot hold. The `PercentComponent` matters: as a `PathSegment`, the slash in `notes/2026` becomes `%2F` so it stays inside one segment, while `Path` would keep it. Use `Unreserved` to escape everything except letters, digits and `-._~`. The `Into` and `ToWriter` variants write into a buffer or a `Writer` instead of allocating.
 
-`Uri.resolveOwned(&base, &reference)` resolves a relative reference against a base the way a browser does, removing `..` segments, and returns an `OwnedUri`. Call `view()` on it to get a borrowed `Uri` back. To build a URI from parts, fill a `UriComponents` from `silk/uri_components` and call `serializeOwned`.
+`Uri.resolveOwned(&base, &reference)` resolves a relative reference against a base the way a browser does, removing `..` segments, and returns an `OwnedUri`. Call `view()` on it to get a borrowed `Uri` back. To build a URI from parts, fill a `UriComponents` from `silk/uri/components` and call `serializeOwned`.
 
 ## Decompress gzip
 
@@ -190,7 +190,7 @@ effect fn gunzip() -> () ! Base64Error | DecodeError | OutOfMemoryError | Writer
 }
 ```
 
-`Decoder.make(format, limits)` from `silk/inflate` allocates the decoder's fixed state, about 64 KiB. You must name the container: `Container.Gzip`, `Container.Zlib` or `Container.Raw` for bare DEFLATE. The module never sniffs the format and never compresses.
+`Decoder.make(format, limits)` from `silk/compress/inflate` allocates the decoder's fixed state, about 64 KiB. You must name the container: `Container.Gzip`, `Container.Zlib` or `Container.Raw` for bare DEFLATE. The module never sniffs the format and never compresses.
 
 `Limits` is required, and every field counts. Decoding fails with `InputLimit` or `OutputLimit` when the totals pass `maxInputBytes` or `maxOutputBytes`, which is how you stop a small file from expanding into gigabytes. `maxMembers` caps concatenated gzip members, `maxHeaderBytes` caps gzip header extras such as the file name, and `maxMemoryBytes` must be at least `MEMORY_BOUND` (65536) or `make` fails with `MemoryLimit`.
 
@@ -227,7 +227,7 @@ effect fn unzstd() -> () ! Base64Error | ZstdError | OutOfMemoryError | WriterEr
 }
 ```
 
-`Zstd` from `silk/zstd` follows the same loop with its own types: `ZstdLimits`, `ZstdProgress`, `ZstdStatus` and `ZstdError`. `ZstdLimits.make()` gives safe defaults: 64 MiB of input, 256 MiB of output, 1024 frames and an 8 MiB window. Build a `ZstdLimits` yourself to tighten them. Dictionaries are not supported, and there is no Zstandard encoder.
+`Zstd` from `silk/compress/zstd` follows the same loop with its own types: `ZstdLimits`, `ZstdProgress`, `ZstdStatus` and `ZstdError`. `ZstdLimits.make()` gives safe defaults: 64 MiB of input, 256 MiB of output, 1024 frames and an 8 MiB window. Build a `ZstdLimits` yourself to tighten them. Dictionaries are not supported, and there is no Zstandard encoder.
 
 The HTTP client uses both decoders to undo `Content-Encoding: gzip` and `zstd`, so you rarely call them for web traffic. The HTTP client guide covers that.
 
@@ -277,11 +277,11 @@ zstd: 57 compressed bytes -> 128 bytes
 
 ## API reference
 
-- `silk/base64`: `Base64`, `Base64Error`, `Base64Reason`
-- `silk/uri`: `Uri`, `OwnedUri`
-- `silk/uri_reference`: `UriReference`, `OwnedUriReference`, `ParseError`, `HostKind`
-- `silk/uri_percent`: `UriPercent`, `PercentComponent`, `DecodeError`
-- `silk/uri_components`: `UriComponents`
-- `silk/inflate`: `Decoder`, `Format`, `Limits`, `Progress`, `Status`, `DecodeError`, `ErrorKind`, `MEMORY_BOUND`
-- `silk/zstd`: `Zstd`, `ZstdLimits`, `ZstdProgress`, `ZstdStatus`, `ZstdError`
-- `silk/bytes`: `Bytes`; `silk/slice`: `Slice`; `silk/writer`: `Writer`
+- `silk/encoding/base64`: `Base64`, `Base64Error`, `Base64Reason`
+- `silk/uri/uri`: `Uri`, `OwnedUri`
+- `silk/uri/reference`: `UriReference`, `OwnedUriReference`, `ParseError`, `HostKind`
+- `silk/uri/percent`: `UriPercent`, `PercentComponent`, `DecodeError`
+- `silk/uri/components`: `UriComponents`
+- `silk/compress/inflate`: `Decoder`, `Format`, `Limits`, `Progress`, `Status`, `DecodeError`, `ErrorKind`, `MEMORY_BOUND`
+- `silk/compress/zstd`: `Zstd`, `ZstdLimits`, `ZstdProgress`, `ZstdStatus`, `ZstdError`
+- `silk/collections/bytes`: `Bytes`; `silk/collections/slice`: `Slice`; `silk/io/writer`: `Writer`

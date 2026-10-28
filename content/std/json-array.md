@@ -13,7 +13,7 @@ depth. It does not allocate.
 - `JsonError` if the nesting is deeper than the limit in the options, or a value fails.
 - `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
 
-Import as `JsonArray` with `import silk.json_array { JsonArray }`.
+Import as `JsonArray` with `import silk.json.array { JsonArray }`.
 
 Public declarations: 1.
 

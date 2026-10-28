@@ -9,9 +9,9 @@ Your `tasks` program prints one fixed line. Before it can track anything, it nee
 Here is the shape of `src/main.silk` for this first step:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
 
 effect fn report() -> ()
   ! LogError
@@ -103,7 +103,7 @@ Failed tasks in 0.17s
 
 Line 13, column 15 is the `<` in `while index < estimates.length`. The message names the operator and the two operand types it got. In Silk, an operator such as `<` is backed by an interface, and each number type opts in for its own operands. SEM0135 says none of those versions accepts `(i32, usize)`. Where did the `i32` come from? Without an annotation, `index` became an `i32`. `estimates.length` is a `usize`. Silk never converts between number types on its own, so `i32 < usize` has no meaning. Put the `: usize` back.
 
-When you really do need to change type, you call a conversion function. They live in modules named after the source type: `silk/usize` has `usize.toI32`, `silk/i32` has `i32.toI64`, and so on. You will use one later in this chapter. Each one stops the program if the value does not fit in the new type. See **Values and primitive types** in the reference for every integer type and conversion.
+When you really do need to change type, you call a conversion function. They live in modules named after the source type: `silk/num/usize` has `usize.toI32`, `silk/num/i32` has `i32.toI64`, and so on. You will use one later in this chapter. Each one stops the program if the value does not fit in the new type. See **Values and primitive types** in the reference for every integer type and conversion.
 
 ## let and let mut
 
@@ -237,10 +237,10 @@ A `const` is fixed when the program is compiled. Its type is always written out.
 Here is the whole file:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { Logger, LogError }
-import silk.os_logger { StdoutLogger }
-import silk.usize
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.num.usize
 
 const MINUTES_PER_HOUR: i32 = 60
 
@@ -297,7 +297,7 @@ pub effect fn main() -> ()
 
 Three things are new at the end of `report`.
 
-`import silk.usize` imports a whole module rather than names from it. You then call its functions through the module name: `usize.toI32(estimates.length)` turns the `usize` length into an `i32`, so it can mix with `open`.
+`import silk.num.usize` imports a whole module rather than names from it. You then call its functions through the module name: `usize.toI32(estimates.length)` turns the `usize` length into an `i32`, so it can mix with `open`.
 
 The log arguments are records with several fields, one per placeholder. Fields can hold any expression, including function calls. A field may share its name with a function, as `noun` does here.
 
@@ -371,7 +371,7 @@ It is the same SEM0135 you saw with `index`, this time for `+`: there is no `+` 
 Widen the `i32` yourself:
 
 ```silk
-import silk.i32
+import silk.num.i32
 
 fn total(minutes: i32, extra: i64) -> i64 {
   return i32.toI64(minutes) + extra
@@ -417,7 +417,7 @@ fatal trap: arithmetic overflow
 
 200 plus 90 is 290, which a `u8` cannot hold. Silk does not wrap around to 34 quietly. It stops the program with a trap, names the reason and points at line 2, column 10 of the `main` module, the `+`. The exit status 132 is how the shell reports the signal a trap raises, and your shell may add a line such as `Illegal instruction`.
 
-A trap is for bugs, not for expected situations. When wrapping or clamping is what you want, ask for it by name: `silk/u8` and the other integer modules have `wrappingAdd`, `saturatingAdd` and `checkedAdd`. See **Values and primitive types** in the reference.
+A trap is for bugs, not for expected situations. When wrapping or clamping is what you want, ask for it by name: `silk/num/u8` and the other integer modules have `wrappingAdd`, `saturatingAdd` and `checkedAdd`. See **Values and primitive types** in the reference.
 
 Go back to the `tasks` folder before the next chapter:
 

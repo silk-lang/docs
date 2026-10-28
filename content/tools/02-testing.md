@@ -4,10 +4,10 @@ A Silk test is a function marked `test`. It lives in the same file as the code i
 
 ## Write a test
 
-Mark a function with `test`. A plain `test fn` passes when it returns. A `test effect fn` can fail, and the usual way to make it fail is `Testing.expect` from `silk/testing`:
+Mark a function with `test`. A plain `test fn` passes when it returns. A `test effect fn` can fail, and the usual way to make it fail is `Testing.expect` from `silk/testing/testing`:
 
 ```silk
-import silk.testing { AssertionError, Testing }
+import silk.testing.testing { AssertionError, Testing }
 
 /// The sum of `left` and `right`.
 pub fn add(left: i32, right: i32) -> i32 {
@@ -175,10 +175,10 @@ Code that logs, reads files or asks for the time names those services in its `?`
 This program greets names through the `Logger` service and skips empty ones:
 
 ```silk
-import silk.effect { Effect }
-import silk.logger { LogError, Logger }
-import silk.os_logger { StdoutLogger }
-import silk.testing { AssertionError, Testing }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_native { StdoutLogger }
+import silk.testing.testing { AssertionError, Testing }
 
 // Greets each name, skipping empty ones. Returns how many it greeted.
 effect fn greetAll(names: &[string]) -> i32
@@ -275,7 +275,7 @@ Each package tests its own modules. At a workspace root, `silk test` runs every 
 
 ## API reference
 
-- `silk/testing`: `Testing.expect`, `AssertionError`, and `Testing.matchesQualified` for custom runners
-- `silk/logger`: `Logger.inMemoryProvider`, `Logger.length`, `InMemoryLogger`
-- `silk/effect`: `Effect.provideMut`, `Effect.result`
-- `silk/allocator`: `Allocator.systemAllocatorProvider`
+- `silk/testing/testing`: `Testing.expect`, `AssertionError`, and `Testing.matchesQualified` for custom runners
+- `silk/io/logger`: `Logger.inMemoryProvider`, `Logger.length`, `InMemoryLogger`
+- `silk/core/effect`: `Effect.provideMut`, `Effect.result`
+- `silk/mem/allocator`: `Allocator.systemAllocatorProvider`

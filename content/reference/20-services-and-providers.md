@@ -84,7 +84,7 @@ Constraint       = Type 'in' Type
 
 ## Supplying providers
 
-These operations live in `Effect` from `silk/effect`. Each takes an Effect and a provider, and returns an Effect whose row lacks the selected entry. All other entries remain.
+These operations live in `Effect` from `silk/core/effect`. Each takes an Effect and a provider, and returns an Effect whose row lacks the selected entry. All other entries remain.
 
 | Operation | Provider | Satisfies |
 | --- | --- | --- |
@@ -160,7 +160,7 @@ These operations live in `Effect` from `silk/effect`. Each takes an Effect and a
 
 ## What main is given
 
-- Process startup supplies exactly one service: `&mut HostInput` from `silk/host_input`, holding arguments, environment and working directory.
+- Process startup supplies exactly one service: `&mut HostInput` from `silk/system/host_input`, holding arguments, environment and working directory.
 - `pub effect fn main() -> i32 ? &mut HostInput` (or `-> ()`) receives it. A failure row is allowed.
 - Any other requirement on `main` must be provided inside the program. A `main` that declares one is SEM0225, reported at `main` by both `silk check` and `silk build`.
 - Startup supplies no allocator, clock or scheduler. Create providers such as `Allocator.systemAllocatorProvider()` or `OsMonotonicClock.make()` and provide them yourself. See Allocation and shared ownership, and Fibers and scheduling.
@@ -170,7 +170,7 @@ These operations live in `Effect` from `silk/effect`. Each takes an Effect and a
 A service with a shared and an exclusive operation, an inline member and a mapped member:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 service Counter {
   effect fn next() -> i32 ? &mut Counter
@@ -221,7 +221,7 @@ pub fn main() -> i32 {
 Two providers of one service, kept apart by a role:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 role Audit
 
@@ -269,7 +269,7 @@ pub fn main() -> i32 {
 Generic providers over a row variable, with `provides`, `in` and `Without`:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 service Counter {
   effect fn next() -> i32 ? &mut Counter
@@ -333,7 +333,7 @@ pub fn main() -> i32 {
 A row variable included in another with `where S in R`:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 
 service Counter {
   effect fn next() -> i32 ? &mut Counter
@@ -373,8 +373,8 @@ pub fn main() -> i32 {
 `main` receiving the startup service:
 
 ```silk
-import silk.host_input { HostInput, HostInputError }
-import silk.usize
+import silk.system.host_input { HostInput, HostInputError }
+import silk.num.usize
 
 pub effect fn main() -> i32
   ! HostInputError
@@ -390,7 +390,7 @@ pub effect fn main() -> i32
 An optional tracer. `measure` runs `traced` when a `Tracer` is provided and `plain` otherwise:
 
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 import silk.option { Option, provideSome, withSome }
 
 service Tracer {
@@ -467,7 +467,7 @@ src/main.silk:33:14: error[SEM0123] The provider matches no compatible requireme
 
 ## See also
 
-Effects and run · Typed failures · Fibers and scheduling · Suspension and cancellation · Interfaces and impls · Generics · Borrowing · Lifetimes · Allocation and shared ownership · Program entry and termination · Intrinsics · `silk/effect` · `silk/option` · `silk/host_input` · `silk/allocator` · `silk/monotonic_clock`
+Effects and run · Typed failures · Fibers and scheduling · Suspension and cancellation · Interfaces and impls · Generics · Borrowing · Lifetimes · Allocation and shared ownership · Program entry and termination · Intrinsics · `silk/core/effect` · `silk/option` · `silk/system/host_input` · `silk/mem/allocator` · `silk/system/monotonic_clock`
 
 ## Open questions
 

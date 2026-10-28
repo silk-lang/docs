@@ -36,7 +36,7 @@ The operand of a borrow is usually a place: a binding, a field `x.f`, an element
 - `&arr` converts to a slice `&[T]` where a slice is expected. `&mut arr` converts to `&mut [T]`.
 - An array is never passed where a slice is expected without `&` (SEM0012).
 - A slice has `.length` and is indexed like an array. Out-of-range indexes trap.
-- `Slice.view(values, offset, length)` from `silk/slice` borrows a subrange of a shared slice.
+- `Slice.view(values, offset, length)` from `silk/collections/slice` borrows a subrange of a shared slice.
 
 ## Reborrowing
 
@@ -291,4 +291,4 @@ pub fn main() -> i32 {
 
 ## See also
 
-Ownership and moves · Lifetimes · Patterns and match · Functions and methods · Structs, tuples and arrays · Allocation and shared ownership · `silk/slice`
+Ownership and moves · Lifetimes · Patterns and match · Functions and methods · Structs, tuples and arrays · Allocation and shared ownership · `silk/collections/slice`

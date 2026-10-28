@@ -75,7 +75,7 @@ A callable's invocation mode follows from its captures:
 - When omitted, the environment lifetime is elided like a reference lifetime. A result `fn(...)` with no reference input to tie it to is SEM0210.
 - A callable that borrows a local of the returning function cannot be returned (OWN0018). Move the value in instead and return a `once fn<'static>`.
 - `for<'a> fn(&'a T) -> &'a U` is higher-ranked: the callable must work for every `'a` chosen at each call.
-- `for<use 'call> ...` binds a lifetime that is fresh for each invocation; it appears in `silk/effect`. See Lifetimes.
+- `for<use 'call> ...` binds a lifetime that is fresh for each invocation; it appears in `silk/core/effect`. See Lifetimes.
 
 ## Returning callables
 

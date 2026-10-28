@@ -12,7 +12,7 @@ Silk documentation lives in the source, in comments that start with `///` or `//
 //! # When to use
 //! Use [`diameter`] and [`circumference`] for quick integer estimates.
 
-import silk.testing { AssertionError, Testing }
+import silk.testing.testing { AssertionError, Testing }
 
 /// The diameter of a circle with radius `radius`.
 pub fn diameter(radius: i32) -> i32 {
@@ -146,7 +146,7 @@ To show brackets and code without a link, escape the bracket: `\[`. An ordinary 
 
 ## How links look on a reference page
 
-Each declaration on a generated page has an anchor named after its path in the module: `Rect`, `Rect.width`, `Rect.impl.square` for a method, and `Rect.impl.Drop` for an interface implementation. A repeated path gets `-2`, `-3` and so on. A link to another module points at that module's page, named after the last part of the module path in lowercase, with `-` in place of `_`: `silk.http_client` is on `http-client.md`.
+Each declaration on a generated page has an anchor named after its path in the module: `Rect`, `Rect.width`, `Rect.impl.square` for a method, and `Rect.impl.Drop` for an interface implementation. A repeated path gets `-2`, `-3` and so on. A link to another module points at that module's page, named after the last part of the module path in lowercase, with `-` in place of `_`: `silk.http.client` is on `http-client.md`.
 
 This is how the `silk/option` module comment renders in the standard library reference. The source:
 

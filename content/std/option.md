@@ -2,7 +2,7 @@ Optional owned values that are present or absent, with no explanation for the ab
 
 ## When to use
 Use [`Option`](#Option) when "no value" is a normal answer, such as a lookup that finds nothing. Use
-`silk.result.Result` when the caller must know why the value is missing.
+`silk.core.result.Result` when the caller must know why the value is missing.
 
 Use [`map`](#Option.impl.map) to transform a present value, [`flatMap`](#Option.impl.flatMap) when the next step can also produce no
 value, and [`unwrapOr`](#Option.impl.unwrapOr) to get a plain value with a fallback. Use `match` when the present and
@@ -45,7 +45,7 @@ pub fn main() -> i32 {
 ### Make a service optional
 An effect that requires `&Option<&S>` runs with or without a provider of `S`. See [`withSome`](#withSome).
 ```silk
-import silk.effect { Effect }
+import silk.core.effect { Effect }
 import silk.option { Option, provideSome, withSome }
 
 service Tracer {
@@ -103,7 +103,7 @@ An owned value of type `T` that is present ([`Some`](#Option.Some)) or absent ([
 ### When to use
 
 Use `Option` as a return type when "no value" is a normal result and needs no reason. Use
-`silk.result.Result` when the caller must know why the value is missing.
+`silk.core.result.Result` when the caller must know why the value is missing.
 
 ### Details
 
@@ -168,6 +168,16 @@ pub value: T
 ```
 
 The owned present value.
+
+::Anchor{id="Option.impl.Copy"}
+
+## Implementation `Copy for Option<T>`
+
+```silk
+impl<T: Copy> Copy for Option<T>
+```
+
+An `Option` of a `Copy` type is `Copy`, so a struct with an `Option` field can be `Copy` too.
 
 ::Anchor{id="Option.impl"}
 

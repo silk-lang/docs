@@ -158,8 +158,8 @@ In a byte string, `\u{…}` must be at most `FF`.
 ```silk
 //! Lexical forms in one file.
 
-import silk.string { String }
-import silk.usize
+import silk.text.string { String }
+import silk.num.usize
 
 /// Counts bytes in a few literals.
 pub fn main() -> i32 {
@@ -212,4 +212,4 @@ The Diagnostic codes appendix has a failing program and the printed message for 
 
 ## See also
 
-Values and primitive types · Expressions and operators · `silk/string`, `silk/char`
+Values and primitive types · Expressions and operators · `silk/text/string`, `silk/text/char`

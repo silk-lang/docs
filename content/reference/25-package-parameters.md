@@ -116,7 +116,7 @@ The value is plain TOML. Silk checks it against the parameter's declared type:
 
 ## Profiles and precedence
 
-- `[profiles.<name>]` is a named build profile. `target` defaults to the host. Other fields include `optimization`, `safety`, `threading`, `debug`, `libc` and `artifact`; `silk/compilation` and `silk/target` read them. The native compiler refuses `safety = "unchecked"` and `threading = "multi"` for now; see Targets and profiles in the Projects section.
+- `[profiles.<name>]` is a named build profile. `target` defaults to the host. Other fields include `optimization`, `safety`, `threading`, `debug`, `libc` and `artifact`; `silk/core/compilation` and `silk/core/target` read them. The native compiler refuses `safety = "unchecked"` and `threading = "multi"` for now; see Targets and profiles in the Projects section.
 - `[build].profile` names the default profile. `--profile <name>` selects another. An unknown name is refused, and so is an empty one: `profile = ""` is `InvalidInput: build.profile`.
 - A build of a named profile, selected by `--profile` or by `[build].profile`, writes its output to `build/llvm/<triple>/<name>/`. Other builds use `debug/` or `release/`.
 - `--profile-input <json>` supplies a complete profile, with the same fields and tagged `bindings`, as JSON.
@@ -199,4 +199,4 @@ pub fn main() -> i32 {
 
 ## See also
 
-Static evaluation · Static control flow and reflection · Program entry and termination · `silk/compilation`, `silk/target`
+Static evaluation · Static control flow and reflection · Program entry and termination · `silk/core/compilation`, `silk/core/target`

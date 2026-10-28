@@ -16,13 +16,13 @@ The object keeps track of commas and of the depth. It does not allocate.
 ## Examples
 ### Write a struct as an object
 ```silk
-import silk.effect { Effect }
-import silk.json_codec { Serialize }
-import silk.json_object { JsonObject }
-import silk.json_output { JsonOptions }
-import silk.json_scanner { JsonError }
-import silk.json_value { Json }
-import silk.writer { Writer, WriterError }
+import silk.core.effect { Effect }
+import silk.json.codec { Serialize }
+import silk.json.object { JsonObject }
+import silk.json.output { JsonOptions }
+import silk.json.scanner { JsonError }
+import silk.json.value { Json }
+import silk.io.writer { Writer, WriterError }
 
 struct CaptureWriter {
   bytes: [u8; 64],
@@ -90,7 +90,7 @@ pub effect fn main() -> i32
 }
 ```
 
-Import as `JsonObject` with `import silk.json_object { JsonObject }`.
+Import as `JsonObject` with `import silk.json.object { JsonObject }`.
 
 Public declarations: 1.
 

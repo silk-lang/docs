@@ -244,4 +244,4 @@ pub fn main() -> i32 {
 
 ## See also
 
-Expressions and operators, Interfaces and impls, Generics, Keywords. Modules: `silk/ops`, `silk/equal`, `silk/order`, `silk/numeric`.
+Expressions and operators, Interfaces and impls, Generics, Keywords. Modules: `silk/ops`, `silk/equal`, `silk/order`, `silk/num/numeric`.
