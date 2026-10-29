@@ -170,7 +170,7 @@ A directive is a line such as `@inline` or `@features("avx2")` written before a 
 
 The class says what removing the directive does. Removing a hint leaves the same program. Removing an optimizer fact leaves the same behavior with fewer optimizations. Removing a checked contract leaves the same runtime behavior, but some uses may stop compiling. Removing a target directive gives the same results in slower code. A codegen shape describes a body written for that shape, so removing it breaks the body.
 
-- Write each directive on its own line before the declaration, after any `///` doc comment or before it: both attach. Order does not matter. `silk format` puts each directive on its own line.
+- Write each directive on its own line before the declaration, after any `///` doc comment or before it. Both attach for the compiler, but `silk doc` reads only a comment placed before the first directive. Order does not matter. `silk format` puts each directive on its own line.
 - In a service, interface or `impl` body, a directive goes before the member: `@nonParking effect fn close() -> ()` on two lines.
 - A foreign function type takes `@foreign` before `extern`: `@foreign(memory: "none") extern "C" fn(i32) -> i32`.
 - Arguments are literals: text, decimal integers, `true`, `false`, and parenthesized tuples of them. `@features("avx2", "bmi2")` and `@features(("avx2", "bmi2"))` mean the same. A name or a call in an argument is a parse error (PAR0002), followed by SEM0235 for the directive.
@@ -181,7 +181,7 @@ The class says what removing the directive does. Removing a hint leaves the same
 - A known directive on a declaration that does not take it is SEM0236 at the directive: "This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions". Examples: `@naked` on a plain function, `@inline` on a service operation or a struct, `@features` on an `export "C"` function, and any directive on a `static fn`. SEM0235 takes precedence.
 - A directive before an `import` or a `static if` is a parse error at the `@` (PAR0002), followed by SEM0236.
 - The same directive twice, or two of the inline hints (`@cold` with `@inline`, for example), stops `silk check` with "unsupported: this construct is not supported by the native compiler yet" (exit status 2).
-- A leftover `with` clause is PAR0011 at the clause. The message names the directive to write: `fn work() -> i32 with Intrinsic.inline() { return 1 }` prints ``Silk has no `with` clauses; write `@inline` on the line before the declaration``. For `with Intrinsic.foreign(...)` and `with Intrinsic.machine(...)` it lists the directives that replace each field. `module with ...` is gone and is PAR0011 too, with no replacement.
+- A leftover `with` clause is PAR0011 at the clause. The message names the directive to write: `fn work() -> i32 with Intrinsic.inline() { return 1 }` prints ``Silk has no `with` clauses; write `@inline` on the line before the declaration``. For `with Intrinsic.foreign(...)` and `with Intrinsic.machine(...)` it lists the directives that replace each field. `module with ...` is gone and is PAR0011 too; delete the line, since a module takes no directives.
 
 ## Functions compiled for CPU features
 

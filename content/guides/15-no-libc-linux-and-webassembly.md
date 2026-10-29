@@ -1,8 +1,8 @@
 # No-libc Linux and WebAssembly
 
-Silk compiles for eight targets, in the reference's naming. Three are ordinary hosted systems with a C library: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu` and `x86_64-unknown-linux-gnu`. The other five have no C library at all:
+Silk builds for six targets, and the std lib reference documents eight profiles of them. Three profiles are ordinary hosted systems with a C library: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu` and `x86_64-unknown-linux-gnu`. The other five have no C library at all:
 
-- Linux without libc: `x86_64-unknown-linux-gnu-no-libc` and its `aarch64` twin.
+- Linux without libc: `x86_64-unknown-linux-gnu-no-libc` and its `aarch64` twin, which are the Linux targets with `libc = "none"` in the profile, not separate target names.
 - Bare WebAssembly: `wasm32-unknown-unknown`, which gets nothing from its host.
 - WASI: `wasm32-wasip1` (a core module that imports `wasi_snapshot_preview1`) and `wasm32-wasip2` (a WASI 0.2 component).
 
@@ -29,7 +29,7 @@ On WASI, `OsFileSystem` reaches only the directories the host preopens, and `OsR
 
 The std lib API reference has one page per module. Each declaration on it ends with a `Profiles:` line that names the profiles where it is declared. On the `silk.io.writer_native` page, for example, the `Writer` operations of `StdoutWriter` list the three hosted profiles plus `wasm32-wasip1` and `wasm32-wasip2`. A declaration missing from a profile is the SEM0014 error shown below. The overview page ends with the list of profile identities and the target each one uses.
 
-A declaration that lists every profile can still refuse a target when you use it. `OsRandom.make()` is declared on all eight, but on `wasm32-unknown-unknown` it stops the build with a `compileError`. The provider's doc comment and its "Gotchas" section say which profiles it supports.
+A declaration that lists every profile can still refuse a target when you use it. `OsRandom.make()` is declared on all eight profiles, but on `wasm32-unknown-unknown` it stops the build with a `compileError`. The provider's doc comment and its "Gotchas" section say which profiles it supports.
 
 ## The manifest
 

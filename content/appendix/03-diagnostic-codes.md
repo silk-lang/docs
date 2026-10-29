@@ -529,7 +529,7 @@ pub fn main() -> i32 {
 src/main.silk:3:5: error[PAR0010] Silk has no compound assignment; write `x = x + 1` instead of `x += 1`
 ```
 
-The message names the Silk form of each spelling, such as a `while` loop with a counter for `for ... in`, `let mut` for `var`, and `n.*` for `*n`. Three of them:
+The message names the Silk form of each spelling, such as a `while` loop with a counter for `for ... in`, `let mut` for `var`, and `n.*` for `*n`. Some of them:
 
 - `flag ? 1 : 2` prints ``Silk has no `c ? a : b`; write an `if` with a final `else` as the value, as in `if c { a } else { b }` ``.
 - `1 << 3` prints ``Silk has no `<<` or `>>`; shift with the functions of the value's type, as in `i32.shiftLeft(value, count)` or `i32.shiftRight(value, count)` ``, at the operator.
@@ -558,7 +558,7 @@ The column is the `with`. The message names the directive that replaces the clau
 
 - `with Intrinsic.machine(naked: true)` prints ``Silk has no `with` clauses; write the fields of `Intrinsic.machine(...)` as directives before the declaration: `@features(...)`, `@naked` or `@noReturn` ``.
 - `with Intrinsic.foreign(memory: "none")` prints ``Silk has no `with` clauses; write the fields of `Intrinsic.foreign(...)` as directives before the declaration: its facts as `@foreign(...)`, its callbacks as `@callbacks(...)`, `@threadCallbacks(...)`, `@deferredCallbacks(...)` or `@invokesDeferredCallbacks`, and a WebAssembly module and name as `as "module#name"` after the signature``.
-- Any other clause, and `module with ...` at the top of a file, prints ``Silk has no `with` clauses; write directives such as `@inline` on the line before the declaration``.
+- Any other clause, such as an unknown `with Intrinsic.name("x")`, prints ``Silk has no `with` clauses; write directives such as `@inline` on the line before the declaration``.
 
 Fix: Write the directive on the line before the declaration:
 

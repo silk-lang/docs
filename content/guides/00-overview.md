@@ -20,7 +20,7 @@ The guides sit between the book and the reference. The book teaches the language
 12. **Cryptography**: hashing, HMAC and HKDF, authenticated encryption, key agreement and signatures.
 13. **JSON and TOML**: value trees, streaming readers, typed codecs, codecs derived with reflection, and writing output.
 14. **Encodings and compression**: Base64, URI parsing and percent-encoding, gzip, Zstandard, XZ and LZMA decoding, DEFLATE encoding, and UUIDs.
-15. **No-libc Linux and WebAssembly**: the eight targets, what changes without a C library, startup modules, bare WebAssembly and WASI modules, and reading the per-target API pages.
+15. **No-libc Linux and WebAssembly**: the six targets and eight profiles, what changes without a C library, startup modules, bare WebAssembly and WASI modules, and reading the per-target API pages.
 16. **Testing with providers**: replacing real providers with fakes and checking failures as well as successes.
 17. **Concurrent I/O patterns**: many connections at once, parallel requests, producer and consumer fibers, and timeouts.
 18. **Writing effect combinators**: effects that take effects, generic rows, your own retry and budget, and borrowing while an effect is alive.
