@@ -1,6 +1,6 @@
 # Unsafe code and C interop
 
-Unsafe code is code whose memory safety the compiler cannot check. This page covers `unsafe` blocks, functions and calls, raw pointer types, and C interoperation: foreign functions and statics, exported functions, SIMD vectors in C signatures, C-layout records and callbacks.
+Unsafe code is code whose memory safety the compiler cannot check. This page covers `unsafe` blocks, functions and calls, raw pointer types, and C interoperation: foreign functions and statics, the directives on them, exported functions, SIMD vectors in C signatures, C-layout records, callbacks and WebAssembly imports.
 
 ## Syntax
 
@@ -9,18 +9,18 @@ UnsafeBlock      = 'unsafe' Block
 UnsafeCall       = 'unsafe' Expression
 UnsafeFunction   = 'unsafe' 'effect'? 'fn' Name Signature Block
 
-ForeignFunction  = 'unsafe' 'extern' '"C"' 'fn' Name ForeignParameters '->' Type Symbol? PropertyClause*
-ForeignStatic    = 'unsafe' 'extern' '"C"' 'static' Name ':' Type Symbol? PropertyClause*
-ExportFunction   = 'unsafe'? 'export' '"C"' 'fn' Name Parameters '->' Type Symbol? PropertyClause* Block
+ForeignFunction  = Directive* 'unsafe' 'extern' '"C"' 'fn' Name ForeignParameters '->' Type Symbol?
+ForeignStatic    = 'unsafe' 'extern' '"C"' 'static' Name ':' Type Symbol?
+ExportFunction   = Directive* 'unsafe'? 'export' '"C"' 'fn' Name Parameters '->' Type Symbol? Block
 ExportStatic     = 'export' '"C"' 'static' Name ':' Type Symbol? '=' Expression
-CLayoutStruct    = 'pub'? 'extern' '"C"' 'struct' Name '{' Field* '}'
+CLayoutStruct    = 'pub'? 'extern' '"C"' 'struct' Name LifetimeParameters? '{' Field* '}'
 ForeignParameters = '(' ( Parameter ( ',' Parameter )* ( ',' '...' )? )? ')'
 Symbol           = 'as' TextLiteral
-PropertyClause   = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Name ':' Expression )* )? ')'
+Directive        = '@' Name ( '(' Arguments ')' )?
 
 PointerType      = '?'? ( '*' | '[' '*' ']' ) ( 'const' | 'mut' ) Qualifier* Type
 Qualifier        = 'align' '(' Decimal ')' | 'addrspace' '(' Decimal ')'
-ForeignFnType    = 'extern' '"C"' 'fn' '(' ( Type ( ',' Type )* )? ')' '->' Type PropertyClause*
+ForeignFnType    = Directive* '?'? 'extern' '"C"' 'fn' '(' ( Type ( ',' Type )* )? ')' '->' Type
 ```
 
 ## What requires unsafe
@@ -31,7 +31,7 @@ An unsafe operation must appear inside an `unsafe` block or be acknowledged by a
 - calling a foreign (`extern "C"`) function;
 - reading a foreign static or an exported static;
 - calling an unsafe `Intrinsic` member, such as `Intrinsic.pointerWrite` or `Intrinsic.pointerRequalify`;
-- calling an `export "C"` function directly from Silk.
+- calling an `export "C"` function directly from Silk, as in `unsafe twice(21)`.
 
 Forming a pointer is safe: `Pointer.fromRef`, `Pointer.fromMutRef`, `Pointer.fromSlice`, `Pointer.null`, `Pointer.isNull`, `Pointer.address` and `Pointer.nonNull` need no `unsafe`.
 
@@ -85,6 +85,8 @@ Unsafe operations (the caller proves the storage contract):
 - `read<T: Copy>(*const T) -> T` and `write<T: Copy>(*mut T, T)` for naturally aligned storage. A non-Copy T is SEM0121.
 - `readUnaligned` and `writeUnaligned` for `align(1)` pointers.
 - `at` and `atMut`: pointer to element `index` of a many-element pointer.
+- `take<T>(*mut T) -> T` moves the value out. `put<T>(*mut T, T)` moves one in. `dropInPlace<T>(*mut T)` runs the value's drop where it lies and leaves the storage uninitialized, without copying the value out first.
+- `borrow`, `borrowMut`, `borrowMany`, `borrowManyMut`: a reference or slice whose loan is tied to an anchor the caller passes.
 - `assumeAligned`, `assumeAlignedMut`, `assumeMany`, `assumeManyMut`, `bytes`.
 
 ## Foreign functions
@@ -92,25 +94,54 @@ Unsafe operations (the caller proves the storage contract):
 - `unsafe extern "C" fn name(...) -> T` declares a C function. It has no body.
 - The declaration must be `unsafe` (SEM0186) and its ABI string must be `"C"` (SEM0185). It may not have generic parameters or be `static` or `effect` (SEM0188). Each is reported at the declaration by `silk check`, whether or not the function is called.
 - `as "symbol"` links to a different native name. Without it, the Silk name is the symbol.
-- Parameter and result types must be C-compatible: integer and float types, `usize`, `isize`, raw pointers, C function pointers, `extern "C" struct` types by value, and `()` as a result. SIMD vectors cross too, with the limits in SIMD vectors at the C boundary below.
+- Parameter and result types must be C-compatible: integer and float types, `usize`, `isize`, raw pointers, C function pointers (`extern "C" fn(...) -> T`, or `?extern "C" fn(...) -> T` when C may pass or receive null), `extern "C" struct` types by value, and `()` as a result. A struct passed or returned by value follows the platform's C rules, in registers or in memory, as a C compiler would pass it. SIMD vectors cross too, with the limits in SIMD vectors at the C boundary below.
 - Any other type is rejected at the declaration (SEM0187): `bool`, `char`, `string` and references are "not admitted by the C ABI", and the message for a struct without `extern "C"` says it has no C layout and to declare it `extern "C" struct`.
 - A trailing `...` declares a C variadic function. Variadic arguments follow the named ones.
 - A foreign function cannot be used as a value; it can only be called (SEM0189).
 
-## Foreign properties
+## Foreign directives
 
-A foreign declaration may carry `with Intrinsic.foreign(...)`. It holds either one `noCapture` or `callbacks` field, or a `memory` and `locality` contract:
+A foreign or exported function takes directives on the lines before it. They state facts about the C side that the compiler cannot see. Intrinsics lists every directive and its class.
 
-| Field | Meaning |
+| Directive | Meaning |
 | --- | --- |
-| `noCapture: ("p", ...)` | Hint that the named pointer parameters are not retained |
-| `callbacks: ("f", ...)` | Names every C function-pointer parameter exactly once; required when one exists |
-| `memory: "none" \| "read" \| "write" \| "readwrite"` | Memory contract, together with `locality` |
-| `locality: "arguments" \| "external"` | Which memory the function may access |
+| `@foreign(memory: "none" \| "read" \| "write" \| "readwrite")` | What the function does with memory. The optimizer trusts it |
+| `@foreign(locality: "arguments" \| "external")` | Which memory: only what the pointer arguments reach, or any. Write it together with `memory` |
+| `@foreign(noCapture: ("p", ...))` | The named pointer parameters are not kept after the call returns |
+| `@callbacks("compare", ...)` | C calls these function-pointer parameters on this thread, before it returns |
+| `@threadCallbacks("routine", ...)` | C may call these on another thread, during or after the call |
+| `@deferredCallbacks("info.callback", ...)` | C keeps these and calls them later, on this thread, from a call marked `@invokesDeferredCallbacks` |
+| `@invokesDeferredCallbacks` | This call may run callbacks that an earlier `@deferredCallbacks` call registered on this thread |
 
-- `memory` and `locality` also annotate a foreign function type: `extern "C" fn(*const i32) -> i32 with Intrinsic.foreign(memory: "read", locality: "arguments")`.
-- Any other field in a declaration's `Intrinsic.foreign(...)`, such as `bogus: ("value",)`, is SEM0235 at the clause, in both `silk check` and `silk build`. In a foreign function type it is SEM0188.
-- `Intrinsic.foreign(...)` and `Intrinsic.machine(...)` apply only to functions with `extern "C"` or `export "C"` linkage. On a plain function, or on an interface or service operation, either is SEM0236 at the clause. An unknown property or field is SEM0235 instead.
+- The arguments of `@foreign` are named, each at most once, and may be combined: `@foreign(memory: "read", noCapture: ("left", "right"))`.
+- A foreign function type takes `@foreign` with `memory` and `locality` only: `@foreign(memory: "read", locality: "arguments") extern "C" fn(*const i32) -> i32`. Any other directive or argument there, such as `noCapture` or `@callbacks`, is SEM0188 at the type.
+- An unknown argument, such as `@foreign(bogus: 1)`, or a repeated one is SEM0235 at the directive, in both `silk check` and `silk build`.
+- `@foreign`, the callback directives, `@naked` and `@noReturn` apply only to `extern "C"` and `export "C"` functions. On a plain function, or on an interface or service operation, each is SEM0236 at the directive.
+- A leftover `with Intrinsic.foreign(...)` clause is PAR0011. Its message says to write the facts as `@foreign(...)`, the callbacks as `@callbacks(...)`, `@threadCallbacks(...)`, `@deferredCallbacks(...)` or `@invokesDeferredCallbacks`, and a WebAssembly module and name as `as "module#name"`.
+
+## Callbacks
+
+A C function-pointer parameter, or a field of one inside a by-value `extern "C" struct` argument, is a callback. Every callback must be named in exactly one callback directive. The name is the parameter's name, or a path through struct fields: `"info.callback"` is the `callback` field of the parameter `info`. A path cannot pass through a raw pointer.
+
+- A callback parameter named by no directive is SEM0187 at the declaration, and the message gives the directive to add: ``A C function-pointer parameter must be named in the declaration's directives; add `@callbacks("compare")` before the declaration``.
+- Any other broken contract is SEM0187 at the declaration with one message: "Invalid C callback contract: name every direct or by-value struct callback exactly once across the callback lists, with at most one list per mode; retained callbacks and deferred reentry cannot carry reference loans, and callback contracts cannot promise restricted memory access". That covers an unnamed callback field in a struct argument, a callback named twice, a path through a raw pointer, and a path that names no callback.
+- One declaration may combine lists of different modes, such as `@deferredCallbacks("lost")` with `@threadCallbacks("error")`, with at most one list per mode.
+- The same SEM0187 refuses a callback directive together with `@foreign(memory: ...)`, since a callback can touch any memory. It also refuses `@deferredCallbacks` or `@invokesDeferredCallbacks` on a declaration with a reference or slice parameter, since the loan would outlive the call.
+- `@invokesDeferredCallbacks` takes no argument and goes on an imported function. On an `export "C"` function it is SEM0187.
+- The value passed for a callback is an `export "C"` function, or a value of a C function-pointer type. An ordinary `fn` is a type error (SEM0012).
+
+### Nullable function pointers
+
+- `?extern "C" fn(i32, *mut i32) -> ()` is a C function pointer that may be null. Use it for a parameter or a C-layout field that C allows to be `NULL`.
+- An `export "C"` function or an `extern "C" fn` value converts to it. `Intrinsic.pointerNullFunction<F>()` is the null value of the nullable type `F`.
+- It cannot be called directly (SEM0075). Test it with `Intrinsic.pointerIsNull<F>(value)`, then refine it with `unsafe Intrinsic.pointerRequalify<F, extern "C" fn(...) -> T>(value)` and call the result.
+- A nullable callback is named in a callback directive like any other.
+
+## WebAssembly imports
+
+On `wasm32` targets, `as "module#name"` imports a function from a host module: `unsafe extern "C" fn hostAdd(a: i32, b: i32) -> i32 as "env#host_add"` imports `host_add` from `env`. `"module#"` with nothing after `#` uses the function's own Silk name. Without `#`, the text is a plain symbol name, as on native targets. The WASI modules of the std lib import this way, for example `as "wasi:io/poll@0.2.12#poll"`.
+
+- A `#` import is for WebAssembly only. `silk check` accepts it for any target, but `silk build` for a native target stops with "unsupported[foreign-contract] not supported by the native compiler yet" (exit status 2). Put such declarations under `static if Target.arch() == Arch.Wasm32` when the package also builds natively.
 
 ## Statics
 
@@ -147,7 +178,7 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 - Any other width, such as `simd<u8, 8>` on x86-64, is SEM0244: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width".
 - A width whose feature the profile does not select is also SEM0244: "simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`".
 - For a foreign function, SEM0244 is reported at each call, at the callee's name. A declaration that is never called is not checked. For an `export "C"` function, it is reported at the vector type in the declaration, by `silk check` as well as `silk build`.
-- Only the profile's `cpu` counts. A `features` list from `Intrinsic.machine(...)` on the calling function does not satisfy SEM0244. See Targets and profiles for `cpu`.
+- Only the profile's `cpu` counts. An `@features` directive on the calling function does not satisfy SEM0244. See Targets and profiles for `cpu`.
 - A C function-pointer type cannot carry a vector: `extern "C" fn(simd<f32, 4>) -> f32` is SEM0187.
 
 ## Native symbols
@@ -156,14 +187,14 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 - A symbol must be an ASCII identifier: a letter or `_`, then letters, digits, `_` or `$`. Otherwise SEM0190.
 - Reserved symbols are SEM0191: `main` and `_start` (unless no runtime is selected), `silk_raw_process_entry`, names starting `__silk_`, `silk_suspend_` or `silk_execution_storage_`, `silk_` plus 32 lowercase hex digits, and `silk_` names ending in `__`.
 - All claims of one symbol must agree (SEM0192). Two exports of one symbol conflict. An import and an export of one symbol must both be functions or both be statics, with the same C types and the same variadic shape.
-- An import whose C types exactly match a package export binds to that export.
+- An import whose C types exactly match a package export binds to that export. Silk code may also call the export by its Silk name, with `unsafe`.
 - Imports alone are not compared: two `extern` declarations of one symbol with different types are accepted.
 
 ## C-layout records
 
 - `extern "C" struct Name { ... }` declares a record laid out as a C struct.
-- A C-layout record cannot have type parameters (SEM0205).
-- Fields may be C scalars (integers, floats, `usize`, `isize`), raw pointers, C function addresses (`extern "C" fn` types), fixed arrays, other C-layout records, and enums with a representation (`enum(u8) Name`).
+- A C-layout record cannot have type parameters (SEM0205). It may have lifetime parameters, as in `extern "C" struct BufferRef<'a> { data: ?[*]const u8, length: usize }`. A lifetime has no representation, so the layout stays that of the fields; it ties a record to the Silk data its pointers point into.
+- Fields may be C scalars (integers, floats, `usize`, `isize`), raw pointers, C function addresses (`extern "C" fn` and `?extern "C" fn` types), fixed arrays, other C-layout records, and enums with a representation (`enum(u8) Name`).
 - Any other field type is SEM0206. That includes `bool`, `char`, `string`, `()`, references, ordinary structs, Silk callables and enums without `(R)`.
 - Pass a C-layout record to C by value, as a C struct is, or through a pointer, for example `Pointer.fromMutRef(&mut value)`.
 
@@ -207,12 +238,13 @@ A C callback, sorting with libc `qsort`:
 ```silk
 import silk.mem.pointer { Pointer }
 
+@callbacks("compare")
 unsafe extern "C" fn qsort(
   base: ?[*]mut i32,
   count: usize,
   size: usize,
   compare: extern "C" fn(*const i32, *const i32) -> i32
-) -> () with Intrinsic.foreign(callbacks: ("compare",))
+) -> ()
 
 export "C" fn descending(left: *const i32, right: *const i32) -> i32 {
   let a = unsafe Pointer.read(left)
@@ -267,7 +299,7 @@ pub fn main() -> i32 {
 }
 ```
 
-An exported function and static, read through matching imports:
+An exported function and static, read directly and through matching imports:
 
 ```silk
 export "C" static limit: i32 = 40
@@ -285,7 +317,7 @@ pub fn main() -> i32 {
     if limit != 40 || seenLimit != 40 {
       return 1
     }
-    if doubled(21) != 42 {
+    if doubled(21) != 42 || twice(21) != 42 {
       return 2
     }
   }
@@ -351,16 +383,145 @@ exit 110
 
 The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way under a profile with `[profiles.avx.cpu] features = ["avx"]`, run with `silk run --profile avx`, and with the C file compiled with `-mavx`. Under the default profile, its call is SEM0244.
 
+Callbacks in three modes, with a nullable function pointer. C calls `notify`'s callback before it returns, keeps the listener's handler, and calls it later from `pump`. The C file `native/events.c`:
+
+```c
+#include <stddef.h>
+#include <stdint.h>
+
+typedef void (*Handler)(int32_t code, int32_t *total);
+
+struct Listener {
+  Handler handler;
+  int32_t *total;
+};
+
+static struct Listener pending;
+
+void listen(struct Listener listener) { pending = listener; }
+
+int32_t pump(int32_t code) {
+  if (pending.handler == NULL) return 0;
+  pending.handler(code, pending.total);
+  return 1;
+}
+
+int32_t notify(Handler maybe, int32_t *total) {
+  if (maybe == NULL) return 0;
+  maybe(1, total);
+  return 1;
+}
+```
+
+Compile it and link the object as above (`clang -c -fPIC native/events.c -o native/events.o`, then `link = [{ object = "native/events.o" }]` under `[native]`):
+
+```silk
+import silk.mem.pointer { Pointer }
+
+type Handler = ?extern "C" fn(i32, *mut i32) -> ()
+
+extern "C" struct Listener {
+  handler: Handler,
+  total: *mut i32,
+}
+
+// C keeps the handler and calls it later, on this thread, from `pump`.
+@deferredCallbacks("listener.handler")
+unsafe extern "C" fn listen(listener: Listener) -> ()
+
+@invokesDeferredCallbacks
+unsafe extern "C" fn pump(code: i32) -> i32
+
+// C calls `maybe` before it returns, unless it is null.
+@callbacks("maybe")
+unsafe extern "C" fn notify(maybe: Handler, total: *mut i32) -> i32
+
+export "C" fn add(code: i32, total: *mut i32) -> () {
+  unsafe Pointer.write(total, unsafe Pointer.read(total) + code)
+}
+
+// Silk never calls a nullable function pointer directly: test it, then refine it.
+fn callTwice(handler: Handler, total: *mut i32) -> bool {
+  if Intrinsic.pointerIsNull<Handler>(handler) {
+    return false
+  }
+  let present = unsafe Intrinsic.pointerRequalify<Handler, extern "C" fn(i32, *mut i32) -> ()>(handler)
+  unsafe present(2, total)
+  unsafe present(2, total)
+  return true
+}
+
+pub fn main() -> i32 {
+  let mut total: i32 = 0
+  let place = Pointer.fromMutRef(&mut total)
+  let none = Intrinsic.pointerNullFunction<Handler>()
+  if unsafe notify(none, place) != 0 || callTwice(none, place) {
+    return 1
+  }
+  if unsafe notify(add, place) != 1 || !callTwice(add, place) {
+    return 2
+  }
+  unsafe listen(Listener { handler: add, total: place })
+  if unsafe pump(100) != 1 {
+    return 3
+  }
+  return total
+}
+```
+
+```sh
+silk run; echo "exit $?"
+```
+
+```
+exit 105
+```
+
+`notify` adds 1, the two direct calls in `callTwice` add 2 each, and the deferred call from `pump` adds 100.
+
+A WebAssembly import. Build it with `silk build --target wasm32-unknown-unknown`; the module imports `host_add` from `env` and `tick` from `clock`, and exports `main`:
+
+```silk
+unsafe extern "C" fn hostAdd(a: i32, b: i32) -> i32 as "env#host_add"
+unsafe extern "C" fn tick() -> () as "clock#"
+
+pub fn main() -> i32 {
+  unsafe tick()
+  return unsafe hostAdd(40, 2) - 42
+}
+```
+
+A host supplies the imports. With Node.js:
+
+```js
+import { readFileSync } from "node:fs";
+let ticks = 0;
+const { instance } = await WebAssembly.instantiate(readFileSync(process.argv[2]), {
+  env: { host_add: (a, b) => a + b },
+  clock: { tick: () => { ticks += 1; } },
+});
+console.log(`main returned ${instance.exports.main()} after ${ticks} tick`);
+```
+
+```sh
+node host.mjs build/llvm/wasm32-unknown-unknown/debug/w
+```
+
+```
+main returned 0 after 1 tick
+```
+
 ## Diagnostics
 
 | Code | Meaning |
 | --- | --- |
+| PAR0011 | A leftover `with Intrinsic.foreign(...)` clause; write directives before the declaration |
 | SEM0082 | Unsafe operation outside an `unsafe` block or acknowledgement, including reading a static |
 | SEM0121 | `T: Copy` cannot be proved, for example `Pointer.read` of a non-`Copy` type |
 | SEM0137 | `unsafe` does not acknowledge a complete unsafe invocation |
 | SEM0185 | Foreign function ABI string is not `"C"` |
 | SEM0186 | Foreign function declared without `unsafe` |
-| SEM0187 | Foreign parameter or result type is not a C-compatible scalar, including `mask<N>` and pointer-sized vector lanes |
+| SEM0187 | Foreign parameter or result type is not C-compatible, including `mask<N>` and pointer-sized vector lanes; or a callback contract that is missing or broken |
 | SEM0188 | Silk-only contract syntax on a foreign declaration |
 | SEM0189 | Foreign function used as a value instead of called |
 | SEM0190 | Native symbol is not an ASCII identifier |
@@ -373,8 +534,8 @@ The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` wo
 | SEM0207 | Value cannot become a noncapturing C callback address |
 | SEM0208 | Foreign static used on a target without native symbol linkage |
 | SEM0215 | Invalid pointer alignment, address space or qualifier conversion |
-| SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause |
-| SEM0236 | `Intrinsic.foreign` or `Intrinsic.machine` on a function without linkage, or on an interface or service operation |
+| SEM0235 | Unknown directive or directive argument, such as `@foreign(bogus: 1)` |
+| SEM0236 | A C-only directive such as `@foreign` or `@callbacks` on a function without linkage, or on an interface or service operation |
 | SEM0244 | SIMD vector in a foreign call or `export "C"` signature that the target's C ABI cannot pass in a vector register the profile selects |
 
 ## See also
@@ -385,6 +546,6 @@ Values and primitive types (SIMD vectors and masks) · Targets and profiles · B
 
 The rules above come from compiler source and the diagnostic catalog. Several are not enforced as written:
 
-- SEM0207, SEM0193, SEM0208 have no producer in the compiler. Without the `callbacks` property, a callback parameter is an unsupported gap (`unsupported[ForeignCallback]`).
-- A direct Silk call to an `export "C"` function needs `unsafe` and is then an unsupported gap ("foreign-export").
+- SEM0207, SEM0193, SEM0208 have no producer in the compiler.
+- A direct Silk call to an `export "C"` function needs `unsafe`, like a foreign call, although the body is Silk code the compiler checked.
 - `addrspace(n)` other than `0` may be meant for other targets.
