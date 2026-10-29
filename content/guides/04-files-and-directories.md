@@ -18,7 +18,7 @@ All file access goes through the `FileSystem` service from `silk/system/filesyst
 
 Inside the provider, `/` means that root, not the host's `/`. So `/notes/groceries.txt` is `notes/groceries.txt` under the directory you run the program from. The provider refuses paths that would leave the root, including through symbolic links. That makes the root a boundary you choose once in `main`, and the rest of the program cannot reach past it.
 
-`OsFileSystem.make` takes the root as text, such as `"/tmp"`. `OsFileSystem.makeBytes` takes it as bytes, such as the working directory from `HostInput.workingDirectory`. Both need an absolute, non-empty native path and trap on anything else. It does no I/O; nothing is opened until the first operation. The native provider exists on Linux and macOS with libc. On other targets you supply a provider of your own.
+`OsFileSystem.make` takes the root as text, such as `"/tmp"`. `OsFileSystem.makeBytes` takes it as bytes, such as the working directory from `HostInput.workingDirectory`. Both need an absolute, non-empty native path and trap on anything else. It does no I/O; nothing is opened until the first operation. The native provider exists on Linux and macOS with libc, and on WASI (`wasm32-wasip1` and `wasm32-wasip2`), where the root names a directory the host preopened for the module and the host decides what it may do there. On other targets you supply a provider of your own.
 
 ## Paths
 
@@ -269,14 +269,14 @@ pub effect fn main() -> i32 ! LogError | HostInputError | OutOfMemoryError ? &mu
 
 ```
 Checking notes (x86_64-unknown-linux-gnu)
-  load     57 modules, 1 in package          0.09s
-  check    failed: 2 modules, 1 error        0.74s
+  load     153 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
-src/main.silk:190:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk.system.filesystem.AtomicWriteError | silk.system.filesystem.FileError | silk.mem.allocator.OutOfMemoryError` does not accept `silk.io.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
-Failed notes in 0.84s
+src/main.silk:189:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk.system.filesystem.AtomicWriteError | silk.system.filesystem.FileError | silk.mem.allocator.OutOfMemoryError` does not accept `silk.io.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
+Failed notes in 0.15s
 ```
 
-Column 58 is `explain`, and the message names the failure its parameter is missing. The two must also agree on the result type: `execute` returns `i32` like `explain`. With `execute` returning `()`, the `run` in `main` fails with SEM0040, "A union conversion whose source has members its target lacks", because the result would be `() | i32`.
+Column 58 is `explain`, and the message names the failure its parameter is missing. The two must also agree on the result type: `execute` returns `i32` like `explain`. With `execute` returning `()`, the result of the `run` in `main` would be `() | i32`, and the `return` fails with SEM0040: "The value can be (), which the target type does not hold; match on it to handle that case first".
 
 The imports:
 
@@ -339,6 +339,8 @@ usage: notes list | add <name> <text> | show <name> | remove <name>
 ```
 
 `../escape` never reaches the disk. `Path.join` rejects it while building the path.
+
+The same program builds for WASI with `silk build --target wasm32-wasip1`. There the host decides which directory the program sees as its root. Under Node's `node:wasi` module with `preopens: { '/': dir }`, the commands above give the same output, and the notes land in `dir/notes`.
 
 ## Temporary directories in a test
 
@@ -422,18 +424,20 @@ silk test
     PASS  4 ms
 
 Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 1 discovered)
-Time   4 ms
+Time   5 ms
 ```
 
-Afterwards, `ls /tmp` shows no `notes-test-` directory. Change the expected text to `b"eggs"` and the test fails, and the directory is still removed. The report prints the message of the failing `expect` under the test's name, and the trace names its line:
+Afterwards, `ls /tmp` shows no `notes-test-` directory. Change the expected text to `b"eggs"` and the test fails, and the directory is still removed. The report prints the message of the failing `expect` under the test's name, followed by the calls that led to it, innermost first, as `module:line:column`:
 
 ```
   main::addRefusesToOverwrite
     assertion failed: the first text was kept
-    FAIL  4 ms
+      at main.scenario (main:254:3)
+      at main.addRefusesToOverwrite (main:272:3)
+    FAIL  6 ms
 
 Tests  0 passed, 1 failed (0 cached, 1 executed, 1 selected, 1 discovered)
-Time   4 ms
+Time   6 ms
 ```
 
 ## API reference
