@@ -193,12 +193,12 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 | --- | --- |
 | Scalar operations | `silk/num/i8` ... `silk/num/usize`, `silk/num/f32`, `silk/num/f64`, `silk/core/bool`, `silk/text/char` |
 | `Copy`, `Drop` | `silk/core/ownership` |
-| Operator interfaces | `silk/ops`, `silk/equal`, `silk/order` |
+| Operator interfaces | `silk/core/ops`, `silk/core/equal`, `silk/core/order` |
 | Pointers | `silk/mem/pointer` |
 | Atomics | `silk/concurrency/atomic` |
 | SIMD vectors | `silk/simd/simd` and one module per shape, such as `silk/simd/u8x16` and `silk/simd/mask16` |
 | Architecture operations | `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm` |
-| Allocation, raw storage | `silk/mem/allocator`, `silk/mem/arena`, `silk/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/box`, `silk/collections/list` |
+| Allocation, raw storage | `silk/mem/allocator`, `silk/mem/arena`, `silk/mem/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/box`, `silk/collections/list` |
 | Shared ownership | `silk/mem/shared` |
 | Execution | `silk/concurrency/execution` |
 | Effect composition | `silk/core/effect` (`provide`, `provideMut`, `catch`, `catchAll`, finalizers) |
@@ -241,7 +241,7 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 pub fn main() -> i32 {
   let big: i32 = 2147483647

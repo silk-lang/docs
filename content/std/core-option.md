@@ -16,7 +16,7 @@ dropped. No combinator copies `T`, so `T` does not need to be `Copy`.
 ## Examples
 ### Look up a port and fall back to a default
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 fn portFor(scheme: string) -> Option<i32> {
   if scheme == "http" {
@@ -46,7 +46,7 @@ pub fn main() -> i32 {
 An effect that requires `&Option<&S>` runs with or without a provider of `S`. See [`withSome`](#withSome).
 ```silk
 import silk.core.effect { Effect }
-import silk.option { Option, provideSome, withSome }
+import silk.core.option { Option, provideSome, withSome }
 
 service Tracer {
   effect fn trace(value: i32) -> i32 ? &Tracer
@@ -86,7 +86,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `Option` with `import silk.option { Option }`.
+Import as `Option` with `import silk.core.option { Option }`.
 
 Public declarations: 5.
 
@@ -120,7 +120,7 @@ provider of `S`. Branch on it with [`withSome`](#withSome).
 #### Handle both cases with `match`
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 fn describe(found: Option<i32>) -> i32 {
   return match move found {
@@ -240,7 +240,7 @@ This function borrows `self`, so the option and its value stay available.
 ##### Test an option and keep it
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 pub fn main() -> i32 {
   let found = Option<i32>.some(3)
@@ -276,7 +276,7 @@ This function borrows `self`, so the option and its value stay available.
 ##### Test an absent option
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 pub fn main() -> i32 {
   let missing = Option<i32>.none()
@@ -318,7 +318,7 @@ use `match` on a borrow of the option.
 ##### Double a present value
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 fn double(value: i32) -> i32 {
   return value * 2
@@ -360,7 +360,7 @@ function consumes `self` and moves the present value into `transform`.
 ##### Reject a value in the second step
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 fn positive(value: i32) -> Option<i32> {
   if value > 0 {
@@ -414,7 +414,7 @@ is expensive to make, use `match` and make the fallback only in the absent case.
 ##### Use a present value and an absent value
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 pub fn main() -> i32 {
   let present = Option<i32>.some(7)

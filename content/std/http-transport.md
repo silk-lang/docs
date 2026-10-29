@@ -40,7 +40,7 @@ import silk.io.memory_byte_duplex {
   MemoryWriteEvent
 }
 import silk.system.monotonic_clock { MonotonicClock }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.system.random { Random }
 import silk.core.result { Result }
 import silk.system.system_clock { Instant, SystemClock }
@@ -275,7 +275,7 @@ Sends all bytes that writes accepted to the provider.
 ### Operation `close`
 
 ```silk
-effect fn close() -> () ! TransportError ? &mut HttpTransport with Intrinsic.nonParking()
+effect fn close() -> () ! TransportError ? &mut HttpTransport
 ```
 
 Closes the transport without waiting. A second call does nothing. It does not flush. After it,

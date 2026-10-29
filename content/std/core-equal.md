@@ -16,7 +16,7 @@ rules. Generic code that uses `==` gives incorrect results if the rules are not 
 ## Examples
 ### Compare two values of a user type
 ```silk
-import silk.equal { Equal }
+import silk.core.equal { Equal }
 
 struct Point {
   x: i32,
@@ -41,7 +41,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `Equal` with `import silk.equal { Equal }`.
+Import as `Equal` with `import silk.core.equal { Equal }`.
 
 Public declarations: 1.
 

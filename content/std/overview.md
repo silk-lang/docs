@@ -35,6 +35,10 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.core.bool`](/docs/std/core-bool) | Core | `bool` | Named functions for Boolean equality and negation. |
 | [`silk.core.compilation`](/docs/std/core-compilation) | Core | `Compilation` | Build choices of the current compilation, such as safety, threading, and artifact kind, for use in static evaluation. |
 | [`silk.core.effect`](/docs/std/core-effect) | Core | `Effect` | Combinators for lazy effect values: transform success, recover typed failures, supply services, and run cleanup. |
+| [`silk.core.equal`](/docs/std/core-equal) | Core | `Equal` | The interface that gives user types the \`==\` and \`!=\` operators. |
+| [`silk.core.ops`](/docs/std/core-ops) | Core | `Add` | The interfaces that give user types the arithmetic, bitwise, and logical operators. |
+| [`silk.core.option`](/docs/std/core-option) | Core | `Option` | Optional owned values that are present or absent, with no explanation for the absence. |
+| [`silk.core.order`](/docs/std/core-order) | Core | `Order` | The interface that gives user types the \`\<\`, \`\<=\`, \`\>\`, and \`\>=\` operators. |
 | [`silk.core.ownership`](/docs/std/core-ownership) | Core | `Copy` | The ordinary names for the sealed ownership properties \`Copy\` and \`Drop\`. |
 | [`silk.core.reflect`](/docs/std/core-reflect) | Core | `Reflect` | Compile-time descriptions of the fields of a struct or tuple type, for generic code that visits each field. |
 | [`silk.core.result`](/docs/std/core-result) | Core | `Result` | Completed outcomes that hold a success value or a failure value as ordinary data. |
@@ -58,8 +62,6 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.crypto.x25519`](/docs/std/crypto-x25519) | Cryptography | `X25519` | Agree on a shared secret with X25519 (RFC 7748) Diffie-Hellman. |
 | [`silk.encoding.base64`](/docs/std/encoding-base64) | Data formats | `Base64` | Encode and decode standard Base64 (RFC 4648, with padding) into byte slices that you supply. |
 | [`silk.encoding.uuid`](/docs/std/encoding-uuid) | Data formats | `Uuid` | UUID values and constructors for versions 1 through 8, with RFC 9562 byte order. |
-| [`silk.equal`](/docs/std/equal) | Core | `Equal` | The interface that gives user types the \`==\` and \`!=\` operators. |
-| [`silk.format`](/docs/std/format) | Text | `Format` | Text output for values through the ambient \`Writer\`, compile-time checked templates, and decimal parsing. |
 | [`silk.http.basic`](/docs/std/http-basic) | HTTP | `HttpBasic` | Make the value of an \`Authorization: Basic\` header from a username and a password. |
 | [`silk.http.body`](/docs/std/http-body) | HTTP | `Decoder` | Read and write the body of an HTTP/1 message: fixed length, chunked, or until the connection closes. |
 | [`silk.http.client`](/docs/std/http-client) | HTTP | `HttpClient` | A simple HTTP client: send a request, and get the whole response in memory. |
@@ -121,10 +123,10 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.json.scanner`](/docs/std/json-scanner) | Data formats | `JsonScanner` | Read JSON as a sequence of tokens, without building a tree and without allocating. |
 | [`silk.json.text`](/docs/std/json-text) | Data formats | `JsonText` | Decode the text of a JSON string token, including its escapes, into owned bytes. |
 | [`silk.json.value`](/docs/std/json-value) | Data formats | `Json` | Parse JSON into a tree of values, read fields from it, and write it back. |
-| [`silk.layout`](/docs/std/layout) | Memory | `Layout` | Byte size and alignment values that describe the memory to request from an allocator. |
 | [`silk.mem.allocator`](/docs/std/mem-allocator) | Memory | `Allocator` | The \`Allocator\` service: the source of owned heap storage in the standard library. |
 | [`silk.mem.arena`](/docs/std/mem-arena) | Memory | `Arena` | A bump allocator over chunks it acquires from another allocator. |
 | [`silk.mem.box`](/docs/std/mem-box) | Memory | `Box` | One owned value on the heap, for recursive data and for values that must have a fixed-size handle. |
+| [`silk.mem.layout`](/docs/std/mem-layout) | Memory | `Layout` | Byte size and alignment values that describe the memory to request from an allocator. |
 | [`silk.mem.metrics`](/docs/std/mem-metrics) | Memory | `AllocationMetrics` | Allocation counters that an \`Allocator\` provider can keep and publish. |
 | [`silk.mem.output`](/docs/std/mem-output) | Memory | `Uninitialized` | Owned storage for one \`Copy\` value that a foreign function writes through a pointer. |
 | [`silk.mem.pointer`](/docs/std/mem-pointer) | Memory | `Pointer` | Raw data pointers: make them, check them for null, move along them, and read and write through them. |
@@ -155,9 +157,6 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.num.u64`](/docs/std/num-u64) | Numbers | `u64` | Sixty-four-bit unsigned integers for wide masks, counters, hashes, and exact interchange values. |
 | [`silk.num.u8`](/docs/std/num-u8) | Numbers | `u8` | Eight-bit unsigned integers for bytes, compact counters, and exact binary representations. |
 | [`silk.num.usize`](/docs/std/num-usize) | Numbers | `usize` | Pointer-width unsigned integers for lengths, indices, capacities, and allocation sizes. |
-| [`silk.ops`](/docs/std/ops) | Core | `Add` | The interfaces that give user types the arithmetic, bitwise, and logical operators. |
-| [`silk.option`](/docs/std/option) | Core | `Option` | Optional owned values that are present or absent, with no explanation for the absence. |
-| [`silk.order`](/docs/std/order) | Core | `Order` | The interface that gives user types the \`\<\`, \`\<=\`, \`\>\`, and \`\>=\` operators. |
 | [`silk.platform.linux.mapping`](/docs/std/platform-linux-mapping) | Native platform | `Mapping` | Anonymous memory mappings from the Linux kernel, for programs that run without libc. |
 | [`silk.platform.linux.mapping`](/docs/std/platform-linux-mapping) | Native platform | `Mapping` | Anonymous memory mappings from the Linux kernel, for programs that run without libc. |
 | [`silk.platform.linux.process_inputs`](/docs/std/platform-linux-process-inputs) | Native platform | `ProcessInputs` | The arguments, environment and page size of a raw Linux process, read from the initial stack. |
@@ -260,6 +259,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.testing.testing`](/docs/std/testing-testing) | Testing | `Testing` | Assertions for tests, and the filter rules that the test runner uses to select tests. |
 | [`silk.text.byte_search`](/docs/std/text-byte-search) | Text | `byte_search` | Fast searches over byte slices: the first or last position of a byte, the first of two or three bytes, the number of times a byte occurs, and the first position of a byte sequence. |
 | [`silk.text.char`](/docs/std/text-char) | Text | `char` | Conversion between \`char\` and integers, and named comparison functions for \`char\`. |
+| [`silk.text.format`](/docs/std/text-format) | Text | `Format` | Text output for values through the ambient \`Writer\`, compile-time checked templates, and decimal parsing. |
 | [`silk.text.string`](/docs/std/text-string) | Text | `String` | UTF-8 text: owned strings, validation of bytes, search, splitting, trimming, and traversal one Unicode scalar at a time. |
 | [`silk.text.unicode`](/docs/std/text-unicode) | Text | `Unicode` | Unicode canonical normalization (NFC and NFD), with data from Unicode 17.0.0. |
 | [`silk.text.unicode_tables`](/docs/std/text-unicode-tables) | Text | `UnicodeTables` | Generated Unicode data tables for canonical normalization. \`silk.text.unicode\` uses these tables. |

@@ -1,6 +1,6 @@
 # Operators
 
-Silk has eleven binary operator levels, one prefix level and one postfix level. The table runs from weakest to strongest and comes from the parser's precedence table. Each overloadable operator is bound to one interface; `silk/ops`, `silk/equal` and `silk/order` name them.
+Silk has eleven binary operator levels, one prefix level and one postfix level. The table runs from weakest to strongest and comes from the parser's precedence table. Each overloadable operator is bound to one interface; `silk/core/ops`, `silk/core/equal` and `silk/core/order` name them.
 
 ## Precedence
 
@@ -52,7 +52,7 @@ src/main.silk:2:19: error[SEM0087] Expression statement produces i32, but only (
 | `a && b`, `a \|\| b` | none | `bool` only, short-circuit |
 | `x \|> f(y)` | none | calls `f(x, y)` |
 
-- The interfaces live in the `Intrinsic` namespace. `silk/ops` exports `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder`, `Negate`, `BitAnd`, `BitOr`, `BitXor`, `BitNot` and `Not`. `silk/equal` exports `Equal`; `silk/order` exports `Order` and `Ordering`.
+- The interfaces live in the `Intrinsic` namespace. `silk/core/ops` exports `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder`, `Negate`, `BitAnd`, `BitOr`, `BitXor`, `BitNot` and `Not`. `silk/core/equal` exports `Equal`; `silk/core/order` exports `Order` and `Ordering`.
 - Arithmetic, bitwise, `Negate`, `BitNot` and `Not` take their operands by value. `Equal` and `Order` take `&Self`, so a user type compares through references: `&a == &b`.
 - `!=` is the negation of `equals`. `<` tests `compare == Less`, `<=` tests `!= Greater`, `>` tests `== Greater`, `>=` tests `!= Less`.
 - `Right` and `Output` let one type combine with another, as in `impl Multiply<f64, Vec2> for Vec2`.
@@ -90,7 +90,7 @@ src/main.silk:4:14: error[SEM0121] `bool: intrinsic/operators.Subtract<bool, boo
 Every overloadable operator on one user type. The program exits 0.
 
 ```silk
-import silk.ops {
+import silk.core.ops {
   Add,
   Subtract,
   Multiply,
@@ -103,8 +103,8 @@ import silk.ops {
   BitNot,
   Not
 }
-import silk.equal { Equal }
-import silk.order { Order, Ordering }
+import silk.core.equal { Equal }
+import silk.core.order { Order, Ordering }
 
 struct N {
   v: i32,
@@ -244,4 +244,4 @@ pub fn main() -> i32 {
 
 ## See also
 
-Expressions and operators, Interfaces and impls, Generics, Keywords. Modules: `silk/ops`, `silk/equal`, `silk/order`, `silk/num/numeric`.
+Expressions and operators, Interfaces and impls, Generics, Keywords. Modules: `silk/core/ops`, `silk/core/equal`, `silk/core/order`, `silk/num/numeric`.

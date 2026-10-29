@@ -94,7 +94,7 @@ pub fn main() -> i32 {
 An uncaught failure:
 
 ```silk
-import silk.format { Debug, Format, Formatter }
+import silk.text.format { Debug, Format, Formatter }
 import silk.io.writer { Writer, WriterError }
 
 pub struct NotFound { pub code: i32 }
@@ -132,7 +132,7 @@ import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
 import silk.system.host_input { HostInput, HostInputError }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.io.standard_input_native { OsStandardInput }
 import silk.io.writer_native { StdoutWriter }
 import silk.io.standard_input { StandardInput, StreamReadError }

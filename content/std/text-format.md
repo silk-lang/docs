@@ -40,8 +40,8 @@ you display it, use `f64.isFinite` or `f32.isFinite`.
 ### Write a padded number and a template into a buffer
 ```silk
 import silk.core.effect { Effect }
-import silk.format { Alignment, Format, FormatOptions, Sign, Style }
-import silk.option { Option }
+import silk.text.format { Alignment, Format, FormatOptions, Sign, Style }
+import silk.core.option { Option }
 import silk.io.writer { Writer, WriterError }
 
 struct CaptureWriter {
@@ -116,7 +116,7 @@ pub effect fn main() -> i32
 
 ### Read a number from text
 ```silk
-import silk.format { Format, NotANumber, OutOfRange, ParseError }
+import silk.text.format { Format, NotANumber, OutOfRange, ParseError }
 import silk.core.result { Result }
 
 fn read(text: string) -> i32 {
@@ -142,7 +142,7 @@ pub fn main() -> i32 {
 - `silk.io.writer_native` for `StdoutWriter` and `StderrWriter`, which write to standard output and
   standard error.
 
-Import as `Format` with `import silk.format { Format }`.
+Import as `Format` with `import silk.text.format { Format }`.
 
 Public declarations: 14.
 
@@ -737,7 +737,7 @@ private fields, or it is a union with fields in a variant. Write each field with
 [`Format.debugField`](#Format.impl.debugField) and end with [`Format.debugFinish`](#Format.impl.debugFinish). This one leaves out a secret:
 
 ```silk
-import silk.format { Debug, Format, Formatter }
+import silk.text.format { Debug, Format, Formatter }
 import silk.io.writer { Writer, WriterError }
 
 struct Account {
@@ -873,7 +873,7 @@ and a negative one traps.
 
 ```silk
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.io.writer { Writer, WriterError }
 
 struct CaptureWriter {
@@ -1641,7 +1641,7 @@ use [`Format.writeLeadingPadding`](#Format.impl.writeLeadingPadding) and [`Forma
 
 ```silk
 import silk.core.effect { Effect }
-import silk.format { Display, Format, Formatter }
+import silk.text.format { Display, Format, Formatter }
 import silk.io.writer { Writer, WriterError }
 
 struct CaptureWriter {

@@ -110,7 +110,7 @@ There is also `get`, which looks more direct. Try it in a scratch file:
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.core.effect { Effect }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.collections.list { List }
 
 struct Task { title: string<'static> }
@@ -373,7 +373,7 @@ In `execute`, the `List` arm now passes `&mut board`. See **Borrowing** in the r
 
 ## Writing the file with templates
 
-In chapter 8, `render` built each line by hand and even had its own digit-printing loop. But you already have a tool that turns numbers and text into bytes: the template in `Effect.log`. Templates are not tied to the logger. `Format.format` from `silk/format` writes a template to any `Writer`, and `Writer` from `silk/io/writer` is a service. So you need a provider that collects bytes in memory.
+In chapter 8, `render` built each line by hand and even had its own digit-printing loop. But you already have a tool that turns numbers and text into bytes: the template in `Effect.log`. Templates are not tied to the logger. `Format.format` from `silk/text/format` writes a template to any `Writer`, and `Writer` from `silk/io/writer` is a service. So you need a provider that collects bytes in memory.
 
 ```silk
 // A Writer that collects bytes in memory. It owns its allocator because a Writer

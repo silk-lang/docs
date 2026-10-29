@@ -148,7 +148,7 @@ To show brackets and code without a link, escape the bracket: `\[`. An ordinary 
 
 Each declaration on a generated page has an anchor named after its path in the module: `Rect`, `Rect.width`, `Rect.impl.square` for a method, and `Rect.impl.Drop` for an interface implementation. A repeated path gets `-2`, `-3` and so on. A link to another module points at that module's page, named after the last part of the module path in lowercase, with `-` in place of `_`: `silk.http.client` is on `http-client.md`.
 
-This is how the `silk/option` module comment renders in the standard library reference. The source:
+This is how the `silk/core/option` module comment renders in the standard library reference. The source:
 
 ```
 //! Use [`Option`] when absence is an expected answer and needs no error payload. Use [`map`] for a

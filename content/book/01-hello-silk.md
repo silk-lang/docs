@@ -229,7 +229,7 @@ Failed tasks in 0.19s
 
 `silk check` type-checks the package for each target without producing a program, so it is fast. While it works, it reports its progress: the package and target it is checking, one row per phase with what the phase covered and how long it took, and a last line that says whether it finished or failed. Here `load` read your one module and 52 modules of the standard library, and `check` stopped with one error. Then come the errors themselves. Each error line has a file, a line and a column, then the error code in brackets, then a message.
 
-Line 9, column 7 is the start of the `Effect.log` call. The template is checked by the standard library module `silk/format`, which runs while your code compiles. When it finds a placeholder with no matching field, it asks the compiler to stop the build, and the compiler reports the stop at your call. SEM0177 means library code requested the failure, and the message is the text the library gave: the placeholder it could not fill, `{versoin}`, and the fields you did pass, here just `version`. Compare the two and the typo is plain.
+Line 9, column 7 is the start of the `Effect.log` call. The template is checked by the standard library module `silk/text/format`, which runs while your code compiles. When it finds a placeholder with no matching field, it asks the compiler to stop the build, and the compiler reports the stop at your call. SEM0177 means library code requested the failure, and the message is the text the library gave: the placeholder it could not fill, `{versoin}`, and the fields you did pass, here just `version`. Compare the two and the typo is plain.
 
 Fix the spelling back to `{version}` and check again:
 

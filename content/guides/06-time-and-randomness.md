@@ -236,7 +236,7 @@ import silk.core.effect { Effect }
 import silk.system.insecure_random { InsecureRandom }
 import silk.io.logger { Logger, LogError }
 import silk.system.monotonic_clock { MonotonicClock }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.io.logger_native { StdoutLogger }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 import silk.system.random_native { OsRandom }

@@ -16,10 +16,10 @@ import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.encoding.base64 { Base64, Base64Error, Base64Reason }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.compress.inflate { Decoder, DecodeError, Format as Container, Limits, Status }
 import silk.compress.inflate
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.result { Result }
 import silk.collections.slice { Slice }
@@ -30,7 +30,7 @@ import silk.io.writer { Writer, WriterError }
 import silk.compress.zstd { Zstd, ZstdError, ZstdLimits, ZstdStatus }
 ```
 
-Two modules both export a type called `Format`: `silk/format` (text templates) and `silk/compress/inflate` (the compressed container). One file cannot import both under the same name, so the inflate one is renamed with `Format as Container`. `import silk.compress.inflate` on its own line also brings the module name into scope, for its constant `inflate.MEMORY_BOUND`.
+Two modules both export a type called `Format`: `silk/text/format` (text templates) and `silk/compress/inflate` (the compressed container). One file cannot import both under the same name, so the inflate one is renamed with `Format as Container`. `import silk.compress.inflate` on its own line also brings the module name into scope, for its constant `inflate.MEMORY_BOUND`.
 
 If you import both as `Format`, `silk check` stops at the second import and points at the first:
 

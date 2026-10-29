@@ -38,7 +38,7 @@ and then sorts first.
 ## Examples
 ### Order a user type
 ```silk
-import silk.order { Order, Ordering }
+import silk.core.order { Order, Ordering }
 
 struct Version {
   major: i32,
@@ -75,7 +75,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `Order` with `import silk.order { Order }`.
+Import as `Order` with `import silk.core.order { Order }`.
 
 Public declarations: 2.
 

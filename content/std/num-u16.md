@@ -28,13 +28,13 @@ reinterprets bits.
 zero, both zero counts return [`BITS`](#BITS).
 
 [`parse`](#parse) reads decimal text. A sign is not valid. To write a value as text, use
-`silk.format.Format.display` or `Format.displayWith` with a `Writer`. Neither needs an
+`silk.text.format.Format.display` or `Format.displayWith` with a `Writer`. Neither needs an
 `Allocator`.
 
 ## Examples
 ### Recover from a narrowing conversion
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.num.u16
 import silk.num.u8
 
@@ -51,7 +51,7 @@ pub fn main() -> i32 {
 
 ### Parse decimal text and reject invalid text
 ```silk
-import silk.format { ParseError }
+import silk.text.format { ParseError }
 import silk.core.result { Result }
 import silk.num.u16
 
@@ -105,7 +105,6 @@ The fixed width of `u16`, in bits.
 
 ```silk
 pub fn toU8(value: u16) -> u8
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `u8`. Traps if `value` is outside the `u8` range. Use
@@ -150,7 +149,6 @@ checked-conversion code can select the same source and destination type.
 
 ```silk
 pub fn toU32(value: u16) -> u32
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` exactly to `u32`. Every `u16` value is representable.
@@ -172,7 +170,6 @@ representable.
 
 ```silk
 pub fn toU64(value: u16) -> u64
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` exactly to `u64`. Every `u16` value is representable.
@@ -194,7 +191,6 @@ representable.
 
 ```silk
 pub fn toUsize(value: u16) -> usize
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` exactly to `usize`. Every `u16` value is representable.
@@ -216,7 +212,6 @@ representable.
 
 ```silk
 pub fn toI8(value: u16) -> i8
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `i8`. Traps if `value` is outside the `i8` range. Use
@@ -239,7 +234,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toI16(value: u16) -> i16
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `i16`. Traps if `value` is outside the `i16` range. Use
@@ -262,7 +256,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toI32(value: u16) -> i32
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` exactly to `i32`. Every `u16` value is representable.
@@ -284,7 +277,6 @@ representable.
 
 ```silk
 pub fn toI64(value: u16) -> i64
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` exactly to `i64`. Every `u16` value is representable.
@@ -306,7 +298,6 @@ representable.
 
 ```silk
 pub fn toIsize(value: u16) -> isize
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` exactly to `isize`. Every `u16` value is representable.
@@ -846,10 +837,10 @@ accept digit separators.
 
 ### Errors
 
-- `ParseError` with reason `silk.format.NotANumber` if `text` is empty, has a sign, contains a
+- `ParseError` with reason `silk.text.format.NotANumber` if `text` is empty, has a sign, contains a
   byte that is not a digit, or has bytes after the number. `offset` gives the byte position
   where the read stopped.
-- `ParseError` with reason `silk.format.OutOfRange` if the number is outside the range of `u16`.
+- `ParseError` with reason `silk.text.format.OutOfRange` if the number is outside the range of `u16`.
 
 Category: Numbers.
 

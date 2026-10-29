@@ -27,7 +27,7 @@ import silk.io.logger { LogError, Logger }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.net.socket_native { ConnectOptions, NativeSocketError, connectResolvedOwned }
 import silk.net.address { Endpoint, IpAddress, Ipv4Address, Port }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.system.filesystem_native { OsFileSystem }
 import silk.io.logger_native { StdoutLogger }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
@@ -178,11 +178,11 @@ import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
 import silk.system.filesystem { AtomicWriteError, DirectoryEntry, DirectoryInfo, Durability }
 import silk.system.filesystem { FileError, FileInfo, FileSystem, Path, PublicationPolicy }
-import silk.layout { Layout }
+import silk.mem.layout { Layout }
 import silk.collections.list { List }
 import silk.io.logger { InMemoryLogger, Logger }
 import silk.system.monotonic_clock { MonotonicClock }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.system.random { Random }
 import silk.system.system_clock { Instant, SystemClock }
 
@@ -411,7 +411,7 @@ import silk.collections.list { List }
 import silk.io.logger { InMemoryLogger, LogError, Logger }
 import silk.io.memory_byte_duplex { MemoryByteDuplex, MemoryReadEvent, MemoryWriteAction, MemoryWriteEvent }
 import silk.system.monotonic_clock { MonotonicClock }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.system.random { Random }
 import silk.core.result { Result }
 import silk.system.system_clock { SystemClock }
@@ -661,6 +661,6 @@ Provide every service inside the test or in a helper it calls, as `send` does. T
 - `silk/io/byte_duplex`: `ByteDuplex`, `ByteIoError`, `ByteIoOperation`
 - `silk/system/monotonic_clock`: `MonotonicClock`; `silk/system/system_clock`: `SystemClock`, `Instant`
 - `silk/system/random`: `Random`; `silk/system/insecure_random`: `InsecureRandom`
-- `silk/mem/allocator`: `Allocator`, `OutOfMemoryError`; `silk/layout`: `Layout`
+- `silk/mem/allocator`: `Allocator`, `OutOfMemoryError`; `silk/mem/layout`: `Layout`
 - `silk/system/filesystem`: `FileSystem`, `Path`, `FileError`
 - `silk/tls/trust_source_memory`: `MemoryTrustSource`

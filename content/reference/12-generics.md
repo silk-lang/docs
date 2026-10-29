@@ -135,8 +135,8 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.ops { Add }
-import silk.order { Order }
+import silk.core.ops { Add }
+import silk.core.order { Order }
 
 struct Meters {
   value: i32,
@@ -245,7 +245,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Interfaces and impls · Closures and callable types · Functions and methods · Lifetimes · Structs, tuples and arrays · Enums and unions · Static evaluation · Effects and run · Typed failures · Services and providers · `silk/ops`, `silk/order`, `silk/core/ownership`
+Interfaces and impls · Closures and callable types · Functions and methods · Lifetimes · Structs, tuples and arrays · Enums and unions · Static evaluation · Effects and run · Typed failures · Services and providers · `silk/core/ops`, `silk/core/order`, `silk/core/ownership`
 
 ## Open questions
 

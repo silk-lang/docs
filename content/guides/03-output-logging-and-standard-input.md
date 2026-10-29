@@ -132,7 +132,7 @@ The program keeps standard output clean for the numbered lines, so the logger is
 import silk.mem.allocator { Allocator, OutOfMemoryError, SystemAllocator }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.io.logger { Logger, LogError, LogLevel }
 import silk.io.logger_native { StderrLogger }
 import silk.io.standard_input_native { OsStandardInput }
@@ -369,6 +369,6 @@ The guide "Testing with providers" goes further with fakes, and chapter 8 of the
 - `silk/io/standard_input`: `StandardInput`, `ReadOutcome`, `StreamReadError`
 - `silk/io/standard_input_native`: `OsStandardInput`
 - `silk/core/effect`: `Effect` (`log`, `logInfo`, `logWarning`, `provideMut`, `catchAll`)
-- `silk/format`: `Format`
+- `silk/text/format`: `Format`
 - `silk/testing/testing`: `Testing`, `AssertionError`
 - `silk/collections/bytes`: `Bytes`

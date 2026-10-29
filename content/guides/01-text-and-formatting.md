@@ -53,7 +53,7 @@ A scalar is a code point, not what a reader sees as one character. `e` followed 
 
 ## Writing through a template
 
-`Format.format` from `silk/format` writes a template to the ambient `Writer`:
+`Format.format` from `silk/text/format` writes a template to the ambient `Writer`:
 
 ```silk
 effect fn describe(text: string) -> () ! WriterError ? &mut Writer {
@@ -99,7 +99,7 @@ src/main.silk:8:7: error[SEM0177] template placeholder 3 `{}` has no positional 
 A value whose type has no `Display` stops the build at the call too, with SEM0121. For a struct `Plain` without an `impl Display`:
 
 ```
-src/main.silk:10:7: error[SEM0121] `main.Plain: silk.format.Display` cannot be proved: no implementation of `silk.format.Display` exists for `main.Plain`
+src/main.silk:10:7: error[SEM0121] `main.Plain: silk.text.format.Display` cannot be proved: no implementation of `silk.text.format.Display` exists for `main.Plain`
 ```
 
 Implement `Display` for the type, as the next sections show, or pass one of its fields instead.
@@ -148,7 +148,7 @@ effect fn debugging() -> () ! WriterError ? &mut Writer {
 }
 ```
 
-To give a struct of your own a `Debug` form, implement `Debug` from `silk/format` and call `Format.debugFields(self, "Name", &mut formatter)`, which writes `Name { field: value, ... }`. `{:#?}` puts each field on its own line. `Format.debugList` writes a sequence as `[1, 2, 3]`.
+To give a struct of your own a `Debug` form, implement `Debug` from `silk/text/format` and call `Format.debugFields(self, "Name", &mut formatter)`, which writes `Name { field: value, ... }`. `{:#?}` puts each field on its own line. `Format.debugList` writes a sequence as `[1, 2, 3]`.
 
 ## A type that prints itself
 
@@ -375,8 +375,8 @@ The imports at the top of the file:
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.text.char
 import silk.core.effect { Effect }
-import silk.format { Display, Format, Formatter, NotANumber, OutOfRange }
-import silk.option { Option }
+import silk.text.format { Display, Format, Formatter, NotANumber, OutOfRange }
+import silk.core.option { Option }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.result { Result }
 import silk.collections.slice { Slice }
@@ -426,7 +426,7 @@ Read it against the code. The price column pads `2.50` to 8 columns, `{:.3}` cut
 - `silk/text/char`: `fromU32`, `toU32`
 - `silk/text/utf8_decoder`: `Utf8Decoder`, `Utf8Step`
 - `silk/text/unicode`: `Unicode`
-- `silk/format`: `Format`, `FormatOptions`, `Display`, `Debug`, `Formatter`, `ParseError`
+- `silk/text/format`: `Format`, `FormatOptions`, `Display`, `Debug`, `Formatter`, `ParseError`
 - `silk/io/writer`: `Writer`, `WriterError`
 - `silk/io/writer_native`: `StdoutWriter`
 - `silk/collections/slice`: `Slice`

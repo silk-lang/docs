@@ -31,14 +31,14 @@ import silk.io.byte_duplex { ByteDuplex, ByteIoError, ReadTransfer }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
 import silk.concurrency.fiber { Cancelled, Fiber }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.system.host_input { HostInput, HostInputError }
 import silk.collections.list { List }
 import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.net.socket_native { Accepted, AcceptedView, ConnectOptions, ListenOptions, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted }
 import silk.net.address { Endpoint, IpAddress, Ipv4Address, Port }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.result { Result }

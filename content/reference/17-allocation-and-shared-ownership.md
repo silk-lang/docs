@@ -84,7 +84,7 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 
 Application code should use `Box`, `List`, `Bytes` and `Shared`. Collection authors can build on lower layers:
 
-- `silk/layout`: `Layout.of<T>()`, `Layout.make(size, alignment)` and `Layout.repeat(layout, count)` describe storage to request.
+- `silk/mem/layout`: `Layout.of<T>()`, `Layout.make(size, alignment)` and `Layout.repeat(layout, count)` describe storage to request.
 - `silk/mem/raw_buffer`: `RawBuffer` operations view an `Intrinsic.Allocation` as typed storage for a counted number of elements.
 - `silk/mem/slot`: `Slot` operations move one element in or out of a raw buffer.
 - Most `RawBuffer` and `Slot` operations are `unsafe`. See Unsafe code and C interop and Intrinsics.
@@ -219,7 +219,7 @@ A provider that refuses every request, to test the failure path:
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.core.effect { Effect }
-import silk.layout { Layout }
+import silk.mem.layout { Layout }
 import silk.collections.list { List }
 
 struct Refusing {}
@@ -265,7 +265,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Ownership and moves · Borrowing · Closures and callable types · Unsafe code and C interop · Intrinsics · Effects and run · Typed failures · Services and providers · Program entry and termination · `silk/mem/allocator`, `silk/mem/arena`, `silk/mem/box`, `silk/collections/list`, `silk/mem/shared`, `silk/collections/bytes`, `silk/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/core/effect`
+Ownership and moves · Borrowing · Closures and callable types · Unsafe code and C interop · Intrinsics · Effects and run · Typed failures · Services and providers · Program entry and termination · `silk/mem/allocator`, `silk/mem/arena`, `silk/mem/box`, `silk/collections/list`, `silk/mem/shared`, `silk/collections/bytes`, `silk/mem/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/core/effect`
 
 ## Open questions
 

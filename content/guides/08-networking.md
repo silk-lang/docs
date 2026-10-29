@@ -33,13 +33,13 @@ import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.io.byte_duplex { ByteDuplex, ByteIoError, ReadTransfer }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.system.host_input { HostInput, HostInputError }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.net.resolver_native { NativeSystemResolver }
 import silk.net.socket_native { AcceptedView, AttemptFailure, ConnectOptions, ListenOptions, Listener, NativeSocketError, accept, connectResolvedOwned, listen, withAccepted, withListener }
 import silk.net.address { Endpoint, Host, IpAddress, Ipv4Address, Port }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 import silk.io.writer_native { StdoutWriter }
 import silk.net.resolver { FamilySelection, ResolveRequest, ResolvedEndpoints, Resolver, ResolverError }
