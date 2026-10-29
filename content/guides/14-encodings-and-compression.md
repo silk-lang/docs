@@ -280,7 +280,7 @@ effect fn deflateDemo() -> () ! EncodeError | DecodeError | OutOfMemoryError | W
 }
 ```
 
-`Deflate.encode(input, output, format)` from `silk/compress/deflate` compresses a whole buffer at once and returns the encoded length. The container is the same `Format` the decoder takes, so `Container.Gzip`, `Container.Zlib` or `Container.Raw`. The output is deterministic: gzip gets timestamp zero and no file name. The encoder uses fixed Huffman codes and a 32 KiB window, has no compression levels, and allocates a 32768-entry match table through the ambient `Allocator` for the duration of the call. If `output` is too small it fails with `EncodeError`, whose `written` says how far it got; discard that partial stream.
+`Deflate.encode(input, output, format)` from `silk/compress/deflate` compresses a whole buffer at once and returns the encoded length. The container is the same `Format` the decoder takes, so `Container.Gzip`, `Container.Zlib` or `Container.Raw`. The output is deterministic: gzip gets timestamp zero and no file name. The encoder uses fixed Huffman codes and a 32 KiB window, has no compression levels, and allocates a 32768-entry match table through the ambient `Allocator` for the duration of the call. If `output` is too small it fails with `EncodeError`, whose `written` says how far it got; discard that partial stream. `Deflate.encodedBound(length, format)` returns an output size that never fails, or `None` if it does not fit in `usize`. For this 81-byte line with `Container.Gzip` it is 111, so the 128-byte `packed` buffer is enough.
 
 Byte slices have no `==`, so `sameBytes` compares the round trip byte by byte.
 

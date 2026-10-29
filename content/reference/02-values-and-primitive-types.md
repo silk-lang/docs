@@ -51,7 +51,7 @@ MaskType      = 'mask' '<' Expression '>'
 ## Floating-point types
 
 - `f32` is IEEE binary32 and `f64` is IEEE binary64. A float literal with no context is `f64`.
-- A float literal too large for its type becomes infinity: `let x: f32 = 1e39` is accepted.
+- A float literal that rounds to infinity at its type's width is an error (SEM0095), reported at the literal: `let x: f32 = 1e39` prints "Float literal 1e39 rounds to infinity as f32, whose largest finite value is 3.4028235e38". The same literal is a valid `f64`. For infinity, use `f32.INFINITY` or `f64.INFINITY`.
 - Arithmetic rounds to nearest, ties to even.
 - Division by zero and overflow produce infinities or NaN. They never trap.
 - `==` and ordering return `false` when either operand is NaN.
@@ -516,6 +516,7 @@ fatal trap: arithmetic overflow
 | SEM0034 | Constant array index outside the array length |
 | SEM0037 | Initializer or assigned value has the wrong type, e.g. `let x: f64 = 1` |
 | SEM0060 | Negative literal used as `usize` |
+| SEM0095 | Float literal that rounds to infinity at its type, e.g. `let x: f32 = 1e39` |
 | SEM0130 | A reachable path of a non-unit function falls through without returning |
 | SEM0135 | No operator accepts these operand types, e.g. `i32 + i64` or `-x` on `u8` |
 | SEM0176 | A `shuffle` index that is not static |

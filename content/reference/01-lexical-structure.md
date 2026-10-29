@@ -113,6 +113,7 @@ exponent     = ( 'e' | 'E' ) ( '+' | '-' )? digits
 - A fraction needs a digit after the dot, so `1.` isn't a float, and `1..5` stays a range.
 - An exponent needs digits (LEX0006).
 - With no context a float literal is `f64`. Use an annotation for `f32`.
+- A float literal must round to a finite value of its type. `1.0e400`, or `1e39` used as an `f32`, is SEM0095. See Values and primitive types.
 
 ## Duration literals
 

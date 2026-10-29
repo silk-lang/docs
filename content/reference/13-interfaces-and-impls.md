@@ -95,6 +95,7 @@ InterfaceType  = Path TypeArguments?
 - `Order` maps `<` to `compare == Less`, `<=` to `!= Greater`, `>` to `== Greater` and `>=` to `!= Less`. `Ordering` has `Less`, `Equal` and `Greater`.
 - No conformance accepting the operand types is SEM0135. More than one is SEM0136. The expected result type never selects between them.
 - A generic function uses an operator on `T` only through a bound: `T: Add<T, T>`. A primitive type satisfies a bound when its built-in operator accepts it: `i32` satisfies `Add<i32, i32>`, `Order` and `BitXor<i32, i32>`, and `f64` satisfies `Add<f64, f64>` and `Equal` but not `Order`. The full table is in the Operators appendix.
+- A generic body may also use an operator on a generic type, such as `scale * point` with `Scale<T>` and `Point<T>`, through a conditional impl like `impl<T: Copy + Multiply<T, T>> Multiply<Point<T>, Point<T>> for Scale<T>`. The body's own bounds must prove the impl's bounds; if they don't, it is SEM0121 at the operator. See Generics.
 
 ## Copy and Drop
 
