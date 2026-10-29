@@ -16,13 +16,13 @@ ask send <host> <port> <message>
 
 | Type | What it holds | Make one with |
 | --- | --- | --- |
-| `Ipv4Address`, `Ipv6Address` | The address octets, in network order | `Ipv4Address.fromOctets([127, 0, 0, 1])`, `Ipv4Address.parse(b"10.0.0.1")` |
+| `Ipv4Address`, `Ipv6Address` | The address octets, in network order | `Ipv4Address.fromOctets([127, 0, 0, 1])`, `Ipv4Address.parse("10.0.0.1")` |
 | `IpAddress` | Either kind | `IpAddress.V4 { value: ... }`, `IpAddress.V6 { value: ... }` |
 | `Port` | A port number | `Port.fromU16(8080)`, or `Port.make(n)` to check a `usize` |
 | `Endpoint` | An address and a port | `Endpoint.make(address, port)` |
-| `Host` | A domain name, an IPv4 address or an IPv6 address | `Host.parse(b"example.com")` |
+| `Host` | A domain name, an IPv4 address or an IPv6 address | `Host.parse("example.com")` |
 
-`Host.parse` takes a host as it appears in a URL: `example.com`, `127.0.0.1`, or an IPv6 address in brackets, `[::1]`. It accepts ASCII names only, so an internationalized name must already be in its `xn--` form. It rejects a port, a trailing dot, and spaces. Parsing and formatting allocate nothing; `formatInto` writes an address into a byte buffer you supply and returns the length.
+`Host.parse` takes a host as it appears in a URL: `example.com`, `127.0.0.1`, or an IPv6 address in brackets, `[::1]`. It accepts ASCII names only, so an internationalized name must already be in its `xn--` form. It rejects a port, a trailing dot, and spaces. Each `parse` takes a `string`; `parseBytes` takes the same text as bytes, such as a command-line argument that has not been checked for UTF-8. Parsing and formatting allocate nothing; `formatInto` writes an address into a byte buffer you supply and returns the length.
 
 ## The program: resolving
 
@@ -59,7 +59,7 @@ pub struct BadHost {}
 effect fn resolveHost(name: &[u8], port: u16) -> ResolvedEndpoints
 ! BadHost | ResolverError | OutOfMemoryError
 ? &mut Resolver | &mut MonotonicClock | &mut Allocator {
-  let host = match move Host.parse(name) {
+  let host = match move Host.parseBytes(name) {
     Result.Success { value } => move value
     Result.Failure { .. } => { fail BadHost {} }
   }
@@ -396,6 +396,10 @@ ask: the deadline passed while talking
 
 The connection itself succeeded, because the kernel accepts it on the server's behalf. It was the read that ran out of time.
 
+## Other targets
+
+`silk/net/socket_native` and `silk/net/resolver_native` exist on Linux with glibc and on macOS. A WebAssembly component built for `wasm32-wasip2` gets its network from the host instead, through WASI Preview 2. There `silk/net/socket_wasi` has `Network.make()`, which takes the network the host granted, with `connect`, `listen` and `accept` taking a `SocketAddress` made from an `Endpoint`, and a connection that provides `ByteDuplex` like a native one. `silk/net/resolver_wasi` has `WasiResolver.make()`, a `Resolver` provider, and `silk/net/datagram_wasi` has UDP sockets. The host decides which addresses a component may use. On `wasm32-wasip1` these modules are empty, because Preview 1 has no sockets. The No-libc Linux and WebAssembly guide shows how to build for these targets.
+
 ## API reference
 
 - `silk/net/address`: `Host`, `IpAddress`, `Ipv4Address`, `Ipv6Address`, `Port`, `Endpoint`
@@ -404,3 +408,4 @@ The connection itself succeeded, because the kernel accepts it on the server's b
 - `silk/net/socket_native`: `listen`, `accept`, `withListener`, `withAccepted`, `connectResolved`, `connectResolvedOwned`, `ConnectOptions`, `ListenOptions`, `Connection`, `NativeSocketError`
 - `silk/io/byte_duplex`: `ByteDuplex`, `ReadTransfer`, `ByteIoError`
 - `silk/system/monotonic_clock`: `MonotonicClock`
+- `silk/net/socket_wasi`, `silk/net/resolver_wasi`, `silk/net/datagram_wasi`: the same roles on `wasm32-wasip2`
