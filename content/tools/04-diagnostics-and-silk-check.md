@@ -12,13 +12,13 @@ With no errors, you get a heading, one row per compiler phase, and a final line:
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.08s
-  check    2 modules                         0.16s
-  borrow   99 bodies                         0.00s
-Finished hello in 0.24s
+  load     143 modules, 1 in package         0.06s
+  check    2 modules                         0.14s
+  borrow   123 bodies                        0.00s
+Finished hello in 0.22s
 ```
 
-The heading names the package and the target. `load` reads and parses the modules your package needs: 51 here, the std lib modules included, and 1 of them in your package. `check` analyzes the modules that matter to the program, and `borrow` checks ownership and borrowing in each function body. The times are wall-clock times and vary from run to run. **Progress output** below explains how these lines change in a terminal and how to turn them off.
+The heading names the package and the target. `load` reads and parses the modules your package needs: 143 here, the std lib modules included, and 1 of them in your package. `check` analyzes the modules that matter to the program, and `borrow` checks ownership and borrowing in each function body. The times are wall-clock times and vary from run to run. **Progress output** below explains how these lines change in a terminal and how to turn them off.
 
 `silk build`, `silk run` and `silk test` report the same diagnostics, in the same form, before they stop. `silk check` is the quick way to see them. It exits 0 when every target checks, and 1 when any target has an error.
 
@@ -39,11 +39,11 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.04s
-  check    failed: 2 modules, 1 error        0.11s
+  load     135 modules, 1 in package         0.01s
+  check    failed: 2 modules, 1 error        0.07s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
-Failed hello in 0.15s
+Failed hello in 0.10s
 ```
 
 Read it piece by piece:
@@ -74,14 +74,14 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.04s
-  check    failed: 2 modules, 2 errors       0.09s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 2 errors       0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:5:4: error[SEM0003] Duplicate declaration name half
   note: src/main.silk:1:4: related location
 src/main.silk:5:4: error[SEM0016] Multiple bindings claim half; rename one with `as`, as in `import a.b as other` or `import a.b { half as other }`
   note: src/main.silk:1:4: related location
-Failed hello in 0.14s
+Failed hello in 0.10s
 ```
 
 The second error follows from the first: fix the duplicate and it goes away.
@@ -101,7 +101,7 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
+  load     135 modules, 1 in package         0.02s
   check    failed: 2 modules, 2 errors       0.11s
 [x86_64-unknown-linux-gnu]
 src/main.silk:1:20: error[PAR0001] Expected `)`
@@ -119,17 +119,17 @@ silk check --target host --target wasm32-unknown-unknown
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.10s
+  load     135 modules, 1 in package         0.06s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
-Failed hello in 0.16s
+Failed hello in 0.17s
 Checking hello (wasm32-unknown-unknown)
-  load     47 modules, 1 in package          0.03s
-  check    failed: 2 modules, 1 error        0.02s
+  load     126 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.03s
 [wasm32-unknown-unknown]
 src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
-Failed hello in 0.06s
+Failed hello in 0.07s
 ```
 
 The targets are checked one after the other, and each one prints its own heading, rows and final line. A failed phase says `failed:` and counts the errors it reported. The diagnostics follow the rows, and the `borrow` phase does not run once `check` has failed.
@@ -150,17 +150,23 @@ The letters of a code say which part of the compiler found the problem. A syntax
 | Family | Phase | Typical causes | Example |
 | --- | --- | --- | --- |
 | `LEX` | Lexical: reading characters into tokens | A number like `0x` with no digits, a misplaced digit separator, an unterminated literal | LEX0004 |
-| `PAR` | Parser: building the syntax tree | A missing token, an unexpected token such as a `;` after a statement | ``error[PAR0002] Unexpected `;`; expected valid syntax`` |
+| `PAR` | Parser: building the syntax tree | A missing token, an unexpected token such as a `;` after a statement, a habit from another language | ``error[PAR0002] Unexpected `;`; expected valid syntax`` |
 | `MOD` | Modules: resolving imports | An import of a module that does not exist, or that its package does not export | `error[MOD0001] Unknown module silk.vector` |
 | `SEM` | Semantic analysis | Unknown names, type mismatches, wrong arguments, effect rows, services, generics, static evaluation | `error[SEM0012] Expected i32 but received i64` |
 | `OWN` | Ownership and borrowing | Use after move, conflicting borrows, a borrow that outlives its value | `error[OWN0001] data was moved and cannot be used again` |
+
+Some `PAR` codes catch habits from other languages and name the Silk spelling. PAR0010 covers `x++`, `c ? a : b`, `<<` and `>>`, and tuple literals with field names; PAR0011 covers a `with` clause after a declaration header, which Silk replaced by `@` directives before it:
+
+```
+src/main.silk:1:18: error[PAR0011] Silk has no `with` clauses; write `@inline` on the line before the declaration
+```
 
 `SEM` is by far the largest family. The ownership rules behind `OWN` codes are in **Ownership and moves** and **Borrowing** in the language reference.
 
 `silk check` and `silk build` report a lexical mistake at the bad token and skip parse errors inside it:
 
 ```
-src/main.silk:2:15: error[LEX0004] Base-16 integer literal without digits
+src/main.silk:2:16: error[LEX0004] Base-16 integer literal without digits
 ```
 
 `silk format` refuses such a file and lists its codes, parse errors included: `cannot format damaged source (LEX0004, PAR0002)`.
@@ -194,22 +200,22 @@ A phase that fails says so in its row: `check    failed: 2 modules, 1 error`. A 
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.10s
-  check    1 module                          0.11s
-  codegen  422 functions                     0.28s
-  borrow   137 bodies                        0.01s
+  load     143 modules, 1 in package         0.06s
+  check    1 module                          0.14s
+  codegen  689 functions                     0.13s
+  borrow   229 bodies                        0.01s
 silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable
   link     failed                            0.00s
-Failed hello in 0.52s
+Failed hello in 0.35s
 ```
 
-A build that is refused before any module is checked, such as a package parameter binding that names no parameter or an `exports` entry that names no module, still gets a `load` row, then the message:
+A build that is refused before any module is checked, such as an `exports` entry that names no module, still gets a `load` row, then the message:
 
 ```
-Checking taskcore (x86_64-unknown-linux-gnu)
+Checking text-utils (x86_64-unknown-linux-gnu)
   load     failed: 1 error                   0.00s
-silk: invalid exports of taskcore@0.1.0: Stores is not a module of the package
-Failed taskcore in 0.00s
+Invalid Silk project manifest /home/you/text-utils/silk.toml:6: exports of text-utils@0.1.0: Stores is not a module of the package
+Failed text-utils in 0.01s
 ```
 
 How the rows look depends on where standard error goes:
@@ -235,7 +241,7 @@ silk check --quiet
 ```
 
 ```
-Finished hello in 0.20s
+Finished hello in 0.15s
 ```
 
 `--json` and `--replay` print no progress output at all.
@@ -250,22 +256,25 @@ silk check --timings
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    2 modules                         0.21s
-  borrow   126 bodies                        0.00s
+  load     143 modules, 1 in package         0.02s
+  check    2 modules                         0.09s
+  borrow   104 bodies                        0.00s
   Slowest modules to check
-      206.4ms  silk/platform/native/start.silk
-       3.61ms  main.silk
+       46.3ms  silk/platform/native/start.silk
+       17.1ms  silk/text/format.silk
+       5.21ms  silk/platform/native/host_input.silk
+       2.27ms  silk/concurrency/execution.silk
+       1.92ms  silk/core/effect.silk
   Slowest bodies to borrow-check
-       1.00ms  silk/collections/list.releaseBuffer
-       0.28ms  silk/platform/native/start.start
-       0.26ms  silk/concurrency/execution_storage.acquire
-       0.22ms  silk/platform/native/diagnostics.makePool
-       0.21ms  silk/platform/native/start.(EntryResult<Effect<'env; () ! E ? &mut HostInput>> for Application<Effect<'env; () ! E ? &mut HostInput>>).code
-Finished hello in 0.27s
+       1.01ms  silk/text/format.writeFillGroup
+       0.25ms  silk/platform/native/start.failed
+       0.25ms  silk/platform/native/host_input.copyArguments
+       0.23ms  silk/platform/native/start.silkNativeFault
+       0.22ms  silk/text/format.signedDisplay
+Finished hello in 0.13s
 ```
 
-`silk build --timings` also lists the slowest functions to emit. Std lib modules appear in the lists because they are checked with your program. A body is named by its module and its name as written: `silk/platform/native/diagnostics.makePool` for a function, `silk/collections/list.List<T>.appendBytes` for a method. A body inside a conformance shows the conformance in parentheses, as the `code` body of `silk/platform/native/start` does above. A header written over several lines is shown on one line, with its spacing and trailing commas dropped. `--quiet` turns the lists off.
+`silk build --timings` also lists the slowest functions to emit. Std lib modules appear in the lists because they are checked with your program. A body is named by its module and its name as written: `silk/text/format.writeFillGroup` for a function, `silk/collections/list.List<T>.appendBytes` for a method. A body inside a conformance shows the conformance in parentheses, such as `main.(Equal for Point).equals`. A header written over several lines is shown on one line, with its spacing and trailing commas dropped. `--quiet` turns the lists off.
 
 ## Replay edits
 
@@ -297,9 +306,9 @@ silk check --replay edits.toml
 ```
 
 ```
-silk-replay step=0 kind=initial module=- demands=19659 hits=17540 units-run=2119 marked-outdated=0 fingerprinted=1402 unchanged=0 verified=0 graph-units=2119 graph-bytes=1114368 rejections=0 update-us=0 check-us=216831
-silk-replay step=1 kind=trivia module=main.silk demands=1162 hits=1160 units-run=2 marked-outdated=2 fingerprinted=0 unchanged=0 verified=0 graph-units=2119 graph-bytes=1114368 rejections=0 update-us=57 check-us=8088
-silk-replay step=2 kind=body module=main.silk demands=3102 hits=3068 units-run=34 marked-outdated=2 fingerprinted=0 unchanged=0 verified=0 graph-units=2151 graph-bytes=1769728 rejections=0 update-us=38 check-us=22087
+silk-replay step=0 kind=initial module=- demands=18480 hits=15897 units-run=2772 marked-outdated=0 fingerprinted=1869 unchanged=0 verified=0 graph-units=2862 graph-bytes=2015744 answers=2768 mir-functions=202 rejections=0 update-us=0 check-us=120670
+silk-replay step=1 kind=trivia module=main.silk demands=162 hits=551 units-run=3 marked-outdated=5 fingerprinted=0 unchanged=0 verified=0 graph-units=2863 graph-bytes=2015744 answers=2768 mir-functions=202 rejections=0 update-us=54 check-us=1987
+silk-replay step=2 kind=body module=main.silk demands=167 hits=554 units-run=5 marked-outdated=6 fingerprinted=1 unchanged=1 verified=0 graph-units=2863 graph-bytes=2015744 answers=2768 mir-functions=202 rejections=0 update-us=33 check-us=1534
 ```
 
 Step 0 is the first full check. Each later step is one edit: `units-run` counts the pieces of work the checker redid, `hits` the ones it reused, and `check-us` the time in microseconds. The lines go to standard output. Add `--differential` to also check each step from scratch and compare: each step gets a `silk-replay-differential step=N rejections=0 differences=0` line, and the command exits 1 when the two disagree. A bad script exits 2 with a `silk:` line, such as `silk: replay edit 2 (main.silk): its find text does not occur exactly once`.

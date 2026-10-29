@@ -46,7 +46,7 @@ import silk.io.logger_native { StdoutLogger }
 
 struct Point {
   x: i32,
-  y: i32,
+  y: i32
 }
 
 fn sum(p: &Point) -> i32 {
@@ -61,7 +61,24 @@ pub effect fn main() -> ()
 }
 ```
 
-Each struct field gets its own line, a one-line function body is split over three lines, a struct literal that fits joins onto one line, and the failure row of an effect signature moves to its own line.
+Each struct field gets its own line, a one-line function body is split over three lines, a struct literal that fits joins onto one line, and the failure row of an effect signature moves to its own line. A comma after the last field stays as you wrote it: `y: i32` had none, so it gets none.
+
+Directives go one per line before the declaration they apply to. A `//` comment after a directive stays on its line, and so does a `///` doc comment, which may sit before or after the directives:
+
+```silk
+@inline // hot path
+@nonParking fn f() -> i32 { return 1 }
+```
+
+becomes
+
+```silk
+@inline // hot path
+@nonParking
+fn f() -> i32 {
+  return 1
+}
+```
 
 ## Format some files
 
@@ -112,7 +129,7 @@ A damaged file is skipped, not guessed at. Fix the syntax error first; `silk che
 
 ```
 /home/you/tidy/src/main.silk: unchanged
-/home/you/tidy/src/util/One.silk: cannot format damaged source (PAR0002)
+/home/you/tidy/src/util/One.silk: cannot format damaged source (PAR0001)
 ```
 
 ## Workspaces

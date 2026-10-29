@@ -11,16 +11,15 @@ silk change minor "Add the perimeter function"
 ```
 
 ```
-Created /home/you/geo/.changes/c4d6bb3e81c0516606b360e59704bfb8.md
-silk change: no migration notes supplied. Consider --migration for API, behavior, defaults, or data changes; explicitly say when no action is needed.
+Created /home/you/geo/.changes/275cb498234186fcab7dd488cee5dbdf.md
 ```
 
-The size is `patch`, `minor` or `major`, following semantic versioning: a fix, a compatible addition, or a breaking change. Anything else fails with `bump must be patch, minor, or major`.
+The size is `patch`, `minor` or `major`, following semantic versioning: a fix, a compatible addition, or a breaking change. Any other word is not a subcommand and fails with `Unknown command. Use silk change --help for usage.`
 
-`--migration` tells users what to do about the change. Leaving it out means the impact is unknown, not that there is none, so the tool reminds you. When users need do nothing, say so:
+Write the summary as one line. `--migration` tells users what they must change in their code or builds. Add it only when they must act; a note without it means nothing is needed. An empty `--migration ""` is refused.
 
 ```sh
-silk change patch "Fix area for zero-width rectangles" --migration "No action needed."
+silk change patch "Return 0 from area for a zero-width rectangle" --migration "Code that checked for a negative area should check for 0 instead."
 ```
 
 Each `add` creates its own file with a random name, so two branches that each add a note never conflict. The file is short Markdown that you can edit by hand before the release:
@@ -30,11 +29,11 @@ Each `add` creates its own file with a random name, so two branches that each ad
 bump: patch
 ---
 
-Fix area for zero-width rectangles
+Return 0 from area for a zero-width rectangle
 
 ## Migration
 
-No action needed.
+Code that checked for a negative area should check for 0 instead.
 ```
 
 A note without `--migration` has no `## Migration` section. Commit the note together with the change it describes.
@@ -47,12 +46,12 @@ silk change status
 
 ```
 geo: 0.1.0 -> 0.2.0
-  patch ab14a4fb77e96204fcb2fb35c0748324.md
-  minor c4d6bb3e81c0516606b360e59704bfb8.md
-1 pending changes have no migration notes; review API and behavior impact.
+  minor 275cb498234186fcab7dd488cee5dbdf.md
+  patch 9272bd12d6fe746a535d8e17ce791401.md
+1 pending change needs consumers to migrate.
 ```
 
-The first line is the current version and the one a release would produce. The largest pending size wins: one `minor` and one `patch` make a minor release. With nothing pending, it prints `No pending changes.`
+The first line is the current version and the one a release would produce. The largest pending size wins: one `minor` and one `patch` make a minor release. The last line counts the notes that have a `## Migration` section, and is left out when none do. With nothing pending, it prints `No pending changes.`
 
 ## Release a version
 
@@ -88,25 +87,25 @@ version = "0.2.0"
 base = "0.1.0"
 
 [[changes]]
-id = "c4d6bb3e81c0516606b360e59704bfb8.md"
+id = "9272bd12d6fe746a535d8e17ce791401.md"
+bump = "patch"
+summary = """
+Return 0 from area for a zero-width rectangle"""
+migration = """
+Code that checked for a negative area should check for 0 instead."""
+
+[[changes]]
+id = "275cb498234186fcab7dd488cee5dbdf.md"
 bump = "minor"
 summary = """
 Add the perimeter function"""
-
-[[changes]]
-id = "ab14a4fb77e96204fcb2fb35c0748324.md"
-bump = "patch"
-summary = """
-Fix area for zero-width rectangles"""
-migration = """
-No action needed."""
 ```
 
 `from` is the version released just before this one, and `base` is the last stable version the changes are counted from. Here the release promoted the prerelease `0.2.0-beta.1`, so it lists the changes since `0.1.0`.
 
 ### The changelog
 
-The generated `CHANGELOG.md` groups each release's notes by size:
+The generated `CHANGELOG.md` groups each release's notes by size, one bullet per change, with its migration note under it:
 
 ```markdown
 # Changelog
@@ -117,19 +116,15 @@ Auto-generated from `.changes/releases/*.toml`. Manual edits are overwritten on 
 
 ### Minor
 
-Add the perimeter function
-
-#### Migration
-
-Migration notes not provided
+- Add the perimeter function
 
 ### Patch
 
-Fix area for zero-width rectangles
+- Return 0 from area for a zero-width rectangle
+  - **Migration:** Code that checked for a negative area should check for 0 instead.
 
-#### Migration
-
-No action needed.
+## 0.2.0-beta.1
+...
 ```
 
 Do not edit `CHANGELOG.md` by hand. To fix a released entry, edit its TOML record; the next release regenerates the changelog from it.
@@ -144,9 +139,9 @@ silk change status --tag beta
 
 ```
 geo: 0.1.0 -> 0.2.0-beta.1
-  patch ab14a4fb77e96204fcb2fb35c0748324.md
-  minor c4d6bb3e81c0516606b360e59704bfb8.md
-1 pending changes have no migration notes; review API and behavior impact.
+  minor 275cb498234186fcab7dd488cee5dbdf.md
+  patch 9272bd12d6fe746a535d8e17ce791401.md
+1 pending change needs consumers to migrate.
 ```
 
 ```sh
@@ -161,11 +156,12 @@ The prerelease consumes the pending notes and writes its own record and changelo
 
 | You run | From `0.2.0-beta.1` you get |
 | --- | --- |
-| `add ...` then `version --tag beta` | `0.2.0-beta.2` |
+| `patch`, `minor` or `major` to add a note, then `version --tag beta` | `0.2.0-beta.2` |
+| `version --tag beta` with nothing pending | `0.2.0-beta.1` again; nothing changes |
 | `version --tag rc` | `0.2.0-rc.1`, even with nothing pending |
 | `version` | `0.2.0`, the stable release |
 
-A prerelease on the same channel needs new pending notes; without them it fails with `A tagged release needs pending changes.` Switching to a new channel, such as from `beta` to `rc`, does not. Plain `version` promotes the prerelease to stable, and the stable record lists every change since the last stable version, as in the record above.
+A new prerelease on the same channel needs new pending notes; without them, the command changes nothing and prints the current version. From a stable version, `version --tag` with nothing pending fails with `A tagged release needs pending changes.` Switching to a new channel, such as from `beta` to `rc`, needs no new notes. Plain `version` promotes the prerelease to stable, and the stable record lists every change since the last stable version, as in the record above.
 
 A tag name is ASCII letters, digits and hyphens, and starts with a letter.
 
@@ -223,14 +219,18 @@ silk change release
 
 ### Minor
 
-Add the perimeter function
-...
+- Add the perimeter function
+
+### Patch
+
+- Return 0 from area for a zero-width rectangle
+  - **Migration:** Code that checked for a negative area should check for 0 instead.
 ```
 
 It reads the release record and changes nothing. It fails when notes are still pending, when the history in `.changes/releases/` is incomplete, or when the version file does not match. `--json` gives the same for a publishing script:
 
 ```json
-{"package":"geo","version":"0.2.0","tag":"v0.2.0","prerelease":false,"notes":"## 0.2.0\n\n..."}
+{"package":"geo","version":"0.2.0","tag":"v0.2.0","prerelease":false,"notes":"## 0.2.0\n\n### Minor\n\n- Add the perimeter function\n\n..."}
 ```
 
 `tag` is the Git tag to create, and `prerelease` is `true` for a tagged version. The tool does not create the tag; your script does.
@@ -270,7 +270,7 @@ silk change since geo --source ../geo --from 0.2.0
 | `--source PATH` | Read a checkout or a snapshot TOML file instead of GitHub, relative to the project root |
 | `--json` | JSON output for tools |
 
-A dependency without `repository` in its `[release]` table can be read only with `--source`; otherwise `since` fails and says so. When nothing newer exists, it prints `No new recorded change entries in this range.` Fetching from GitHub uses HTTPS with the certificate bundle in `SSL_CERT_FILE` when set, and fails when access is denied or rate-limited.
+A dependency without `repository` in its `[release]` table can be read only with `--source`; otherwise `since` fails with `Dependency has no published history source. Declare [release] repository = "owner/repo" in its manifest, or supply --source PATH.` When nothing newer exists, it prints `No new recorded change entries in this range.` Fetching from GitHub uses HTTPS with the certificate bundle in `SSL_CERT_FILE` when set, and fails when access is denied or rate-limited.
 
 ## Workspaces and other directories
 
@@ -305,7 +305,7 @@ Other errors, such as a bad argument, print only their own message.
 
 ## Summary
 
-- `silk change patch|minor|major "Summary" [--migration "..."]` records a change as a file in `.changes/`.
+- `silk change patch|minor|major "Summary" [--migration "..."]` records a change as a file in `.changes/`. Add `--migration` only when users must act.
 - `silk change status` shows the next version; `silk change version` makes it, writing `silk.toml`, a TOML release record and `CHANGELOG.md`. Commit them together.
 - `--tag beta` makes prereleases; plain `version` promotes to stable.
 - `[release] version-file` generates a module whose `value()` returns the version.

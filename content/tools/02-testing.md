@@ -45,17 +45,17 @@ silk test
 
 ```
   Circle::diameterIsTwiceRadius
-    PASS  <1 us
+    PASS  5 us
   lib::areaMultipliesSides
-    PASS  <1 us
+    PASS  4 us
   lib::emptyRectHasNoArea
-    PASS  1 us
+    PASS  2 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   50 us
+Time   1 ms
 ```
 
-The runner is a separate executable, built under `build/test/llvm/<target>/<profile>/` with the package's name. It always runs on the host, so `--target` must name the host. Each test is printed as `module::name`, where the module is the file's path under the source root: `Circle` is `src/Circle.silk`.
+The runner is a separate executable, built under `build/test/llvm/<target>/<profile>/` with the package's name. It runs on the host, so `--target` must name the host, or a WASI target, whose runner `silk test` starts with `wasmtime` (see **Targets and profiles**). Each test is printed as `module::name`, where the module is the file's path under the source root: `Circle` is `src/Circle.silk`.
 
 While it builds the runner, `silk test` prints no progress rows, unlike `silk build`. A compile error is printed as its diagnostic line, and the command exits 1 without running any test.
 
@@ -68,7 +68,8 @@ The summary line counts tests at each stage. Discovered tests were found by the 
 Change the expectation in `Circle.silk` so it is wrong, and run again:
 
 ```silk
-test effect fn diameterIsTwiceRadius() -> () ! AssertionError<'static> {
+test effect fn diameterIsTwiceRadius() -> ()
+  ! AssertionError<'static> {
   run Testing.expect(diameter(5) == 11, "radius 5")
 }
 ```
@@ -76,45 +77,47 @@ test effect fn diameterIsTwiceRadius() -> () ! AssertionError<'static> {
 ```
   Circle::diameterIsTwiceRadius
     assertion failed: radius 5
-      at Circle.diameterIsTwiceRadius (Circle:9:3)
-    FAIL  15 us
+      at Circle.diameterIsTwiceRadius (Circle:10:3)
+    FAIL  42 us
   lib::areaMultipliesSides
-    PASS  <1 us
+    PASS  3 us
   lib::emptyRectHasNoArea
-    PASS  <1 us
+    PASS  3 us
 
 Tests  2 passed, 1 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   60 us
+Time   1 ms
 ```
 
-The other tests still run, and the command exits with status 1. When the failure is an `AssertionError`, the runner prints `assertion failed:` and the message you passed to `expect` under the test's name, so write the message as the expected fact. The `at` line below it is the call that failed: `Circle:9:3` is line 9, column 3 of `src/Circle.silk`. A test that fails with another typed failure prints `unhandled error:` and the failure's type instead, with the calls that led to it, innermost first:
+The other tests still run, and the command exits with status 1. When the failure is an `AssertionError`, the runner prints `assertion failed:` and the message you passed to `expect` under the test's name, so write the message as the expected fact. The `at` line below it is the call that failed: `Circle:10:3` is line 10, column 3 of `src/Circle.silk`. A test that fails with another typed failure prints `unhandled error:` and the failure's type instead, with the calls that led to it, innermost first:
 
 ```
   faults::typedFailure
     unhandled error: faults.NotFound
-      at faults.lookup (faults:6:3)
-      at faults.typedFailure (faults:10:15)
-    FAIL  39 us
+      at faults.lookup (faults:7:3)
+      at faults.typedFailure (faults:12:15)
+    FAIL  34 us
 ```
 
-A test that traps, for example on an index out of bounds, stops the runner process. `silk test` shows the trap report under the test's name, marks the test `FAIL  stopped the test process`, and starts the runner again after it, so the remaining tests still run and the command exits with status 1:
+A test that traps, for example on an index out of bounds, stops the runner process. `silk test` shows the trap report under the test's name, marks the test `FAIL  stopped the test process`, and starts the runner again after it, so the remaining tests still run and the command exits with status 1. The `at` line names the function where the trap happened, here a helper `at` that the test called:
 
 ```
-  lib::readsPastTheEnd
+  faults::readsPastTheEnd
     fatal trap: index out of bounds
-      at lib.readsPastTheEnd (lib:18:11)
+      at faults.at (faults:17:10)
     FAIL  stopped the test process
-  lib::sumsTheValues
-    PASS  <1 us
+  faults::sumsTheValues
+    PASS  7 us
 ```
+
+Tests run in order of their printed names, not in source order.
 
 Deep recursion fails the same way, with `fatal trap: stack overflow` and no frames, printed at the start of the line because it comes from the process's fault handler on standard error. A test that never finishes is stopped after 60 seconds, and the rest still run. `--timeout <seconds>` changes the limit, and `--timeout 0` removes it:
 
 ```
-  lib::overflows
+  faults::overflows
 fatal trap: stack overflow
     FAIL  stopped the test process
-  lib::spins
+  faults::spins
 silk test: the test did not finish within 2 s; pass --timeout <seconds> to change the limit, or 0 for none
     FAIL  stopped the test process
 ```
@@ -135,10 +138,10 @@ In a program, a test in `src/extra.silk` is not found while `main.silk` does not
 
   ```
     extra::extraRuns
-      PASS  <1 us
+      PASS  5 us
   
   Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 1 discovered)
-  Time   28 us
+  Time   546 us
   ```
 - Import the test module from the root module, for example `import tests` in `main.silk`, so a plain `silk test` finds it. Chapter 12 of the book uses this layout, with tests in `src/tests.silk` and helpers in `src/tests/`.
 
@@ -152,10 +155,10 @@ silk test --filter circle::
 
 ```
   Circle::diameterIsTwiceRadius
-    PASS  1 us
+    PASS  68 us
 
 Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 3 discovered)
-Time   58 us
+Time   854 us
 ```
 
 `--file <path>` keeps the tests declared in one source file. The path is relative to the package directory, so it is `src/Circle.silk` even when you run the command from inside `src/`. Unlike `--root`, it does not change discovery; it only selects.
@@ -164,7 +167,7 @@ Both options only select. When a `--file` or `--filter` matches no test, nothing
 
 ```
 Tests  0 passed, 0 failed (0 cached, 0 executed, 0 selected, 3 discovered)
-Time   5 us
+Time   43 us
 silk test: no tests matched the --file or --filter selection
 ```
 
@@ -236,12 +239,12 @@ silk test
 
 ```
   main::emptyNamesAreSkipped
-    PASS  6 us
+    PASS  23 us
   main::onlyEmptyNamesLogNothing
-    PASS  <1 us
+    PASS  8 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   45 us
+Time   1 ms
 ```
 
 The same pattern works for any service. A fake for a service with no ready-made test provider is your own struct with an `impl` of the service, like the fixed clock and in-memory file system in chapter 8 of the book. The **Testing with providers** guide goes further, and **Services and providers** in the language reference has the rules.
