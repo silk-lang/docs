@@ -180,18 +180,18 @@ silk test
 
 ```
   tests::doneRouteCarriesTheId
-    PASS  9 us
+    PASS  28 us
   tests::duplicatesAreConflicts
-    PASS  75 us
+    PASS  141 us
   tests::finishingRecordsTheClockTime
-    PASS  49 us
+    PASS  141 us
   tests::slowRemindersAreCancelled
-    PASS  167 us
+    PASS  309 us
   tests::unknownTaskIsReported
-    PASS  15 us
+    PASS  53 us
 
 Tests  5 passed, 0 failed (0 cached, 5 executed, 5 selected, 5 discovered)
-Time   430 us
+Time   2 ms
 ```
 
 The HTTP logic is tested before a single port is opened.
@@ -298,10 +298,10 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     56 modules, 1 in package          0.07s
-  check    2 modules                         0.17s
-  borrow   108 bodies                        0.00s
-Finished tasks in 0.25s
+  load     145 modules, 1 in package         0.07s
+  check    2 modules                         0.10s
+  borrow   92 bodies                         0.00s
+Finished tasks in 0.18s
 ```
 
 The two elements look alike, but their types differ in the lifetime. The first is a `Header<'static>`. The second borrows `length`, so it can only live as long as `length` does. An array has one element type, and the compiler settles on the shorter of the two lifetimes. A `'static` header is fine wherever a shorter-lived one is expected, so both fit, in either order.
@@ -347,10 +347,10 @@ The natural first try is a closure, passed as the last argument of `respond`, th
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     95 modules, 8 in package          0.15s
-  check    9 modules                         7.67s
-  borrow   1,329 bodies                      0.14s
-Finished tasks in 7.83s
+  load     235 modules, 8 in package         0.14s
+  check    13 modules                        1.90s
+  borrow   891 bodies                        0.07s
+Finished tasks in 2.06s
 ```
 
 That works. The closure borrows `reply.body`, and the borrow is fine because `respond` is done with the callback before it returns. But ten lines of body writing now sit in the middle of the `respond` call. This chapter moves them into a named function plus a staged call. Write the body writer as a function whose last parameter is the body:
@@ -503,12 +503,12 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     95 modules, 8 in package          0.15s
-  check    8 modules                         5.32s
-  codegen  7,485 functions                   5.72s
-  borrow   1,349 bodies                      0.14s
-  link     clang                             2.80s
-Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 14.36s
+  load     235 modules, 8 in package         0.12s
+  check    12 modules                        1.48s
+  codegen  7,945 functions                   2.83s
+  borrow   1,452 bodies                      0.11s
+  link     clang                             1.07s
+Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 5.54s
 ```
 
 ```sh
@@ -708,7 +708,7 @@ It also speaks plain HTTP. The standard library's TLS support is client-side onl
 - Keeping routing and answering free of sockets lets you test them with the fakes you already have.
 - `silk/net/socket_native` and `silk/http/server` give you `listen`, `serveNext`, `withRequest`, `readSome` and `respond`, with explicit limits checked per connection.
 - A staged call such as `writeBody(move reply.body)` builds a callback from a named function, which keeps a long callback out of the call that receives it.
-- An array literal takes its element type from its first element, so put the shortest-lived borrow first.
+- The elements of one array literal may borrow for different lifetimes. The array gets the shortest of them, whatever the order.
 
 ## Where to go next
 
