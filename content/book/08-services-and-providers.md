@@ -350,11 +350,11 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     59 modules, 1 in package          0.08s
-  check    failed: 2 modules, 1 error        2.33s
+  load     162 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
-src/main.silk:539:10: error[SEM0071] This `run` needs `&mut FileSystem`, which the enclosing function does not provide; add `? &mut FileSystem` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
-Failed tasks in 2.41s
+src/main.silk:601:10: error[SEM0071] This `run` needs `&mut FileSystem`, which the enclosing function does not provide; add `? &mut FileSystem` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
+Failed tasks in 0.21s
 ```
 
 SEM0071 means "this `run` leaves a requirement that nobody provides." The location points at the `run`. The effect still needs `&mut FileSystem`, and `main` does not declare it either. Put the line back.
@@ -378,11 +378,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.13s
+  load     135 modules, 1 in package         0.05s
+  check    failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
 src/main.silk:10:17: error[SEM0071] This `run` needs `&mut SystemClock`, which the enclosing function does not provide; add `? &mut SystemClock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
-Failed scratch in 0.19s
+Failed scratch in 0.14s
 ```
 
 A plain `fn` cannot declare a `?` row, so every effect it runs must be fully provided first. See **Services and providers** in the reference for how requirements flow.
@@ -406,11 +406,11 @@ silk check
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.06s
-  check    failed: 2 modules                 0.11s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.07s
 [x86_64-unknown-linux-gnu]
 src/main.silk:3:15: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` and whose errors all implement `Debug`
-Failed scratch in 0.18s
+Failed scratch in 0.11s
 ```
 
 SEM0225 points at `main` and lists what the runtime can start. An effectful `main` may require `&mut HostInput` and nothing more. A `SystemClock` is something the runtime won't hand you. The fix is what `tasks` already does. Create the providers inside `main` and provide them yourself.
@@ -436,11 +436,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.09s
+  load     145 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
 src/main.silk:12:21: error[SEM0131] A provider whose key matches but whose access cannot satisfy the requirement
-Failed scratch in 0.14s
+Failed scratch in 0.12s
 ```
 
 SEM0131 says you lent the right service, but with too little access. Write `let mut clock` and `Effect.provideMut<SystemClock>(&mut clock)`. The same borrowing rules you learned in chapter 4 apply: a provider lent exclusively is yours again once the `run` finishes.
@@ -653,12 +653,12 @@ silk test
 
 ```
   main::finishingRecordsTheClockTime
-    PASS  56 us
+    PASS  92 us
   main::unknownTaskIsReported
-    PASS  13 us
+    PASS  32 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   154 us
+Time   1 ms
 ```
 
 Both tests run in microseconds and touch no files.

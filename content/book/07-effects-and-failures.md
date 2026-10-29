@@ -39,11 +39,11 @@ pub effect fn main() -> () ! LogError {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.10s
-  check    failed: 2 modules, 1 error        0.18s
+  load     143 modules, 1 in package         0.05s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:11:3: error[SEM0087] Expression statement produces an Effect of `()` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
-Failed scratch in 0.29s
+Failed scratch in 0.17s
 ```
 
 Line 11 is `greet()`. It builds an Effect and throws it away, which is never what you meant. SEM0087 says an Effect is a result you may not drop silently, and the message names both ways out: `run` it, or say `drop` to discard it on purpose. You can also store it and run it later.
@@ -135,11 +135,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:5:5: error[SEM0063] Only an `effect fn` can `fail`; declare `complete` as an `effect fn` that names the failure type after `!`
-Failed scratch in 0.17s
+Failed scratch in 0.10s
 ```
 
 This time the message says it all. A plain `fn` promises to return a value, so its callers never need to think about failure.
@@ -168,11 +168,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.10s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:10:3: error[SEM0066] This `run` can fail with `NoSuchTask`, which the enclosing function does not declare; add `! NoSuchTask` to its signature, or handle the failure with `Effect.result`
-Failed scratch in 0.15s
+Failed scratch in 0.09s
 ```
 
 SEM0066 is the heart of the system, and its message says it plainly. `run complete(id)` can fail with `NoSuchTask`, and `finish` says it can't fail at all. You have two honest choices: declare the failure, or handle it. For `parseBoard`, declare both:
@@ -456,11 +456,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.10s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:18:37: error[SEM0099] One named type parameter left undetermined by an explicit prefix and the arguments
-Failed scratch in 0.15s
+Failed scratch in 0.10s
 ```
 
 SEM0099 says a type parameter was left undetermined. The handler is generic over `'text`, and in the pipeline form the compiler can't work out which lifetime to use. Pass both arguments directly and it can:
@@ -487,11 +487,11 @@ The obvious finalizer is a log line:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.18s
+  load     144 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-src/main.silk:390:50: error[SEM0052] This call needs an Effect that cannot fail, but the one passed here can fail with silk.io.logger.LogError; wrap it in `Effect.result(...)` and handle the Result it returns
-Failed tasks in 0.24s
+src/main.silk:460:50: error[SEM0052] This call needs an Effect that cannot fail, but the one passed here can fail with silk.io.logger.LogError; wrap it in `Effect.result(...)` and handle the Result it returns
+Failed tasks in 0.19s
 ```
 
 SEM0052 points at the finalizer: `ensuring` wants one whose failure row is `never`. A finalizer must not fail. If it could, which failure would win, the command's or the cleanup's? `Effect.log` can fail with `LogError`, so it isn't allowed as is. Handle its failure first, inside the finalizer:
