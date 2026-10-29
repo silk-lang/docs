@@ -22,11 +22,11 @@ A library kind's root module defaults to `src/lib.silk`.
 
 ```
 Checking app (x86_64-unknown-linux-gnu)
-  load     54 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.10s
+  load     145 modules, 1 in package         0.06s
+  check    failed: 3 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 src/main.silk:4:8: error[MOD0003] Module lib is not exported by package text-utils@0.1.0
-Failed app in 0.16s
+Failed app in 0.20s
 ```
 
 - The root module is not exported unless listed. `silk init --lib` lists it: `exports = ["lib"]`.
@@ -34,13 +34,42 @@ Failed app in 0.16s
 - `check`, `build` and `test` cover every exported module, whether or not the root imports it.
 - No `exports` key, or `exports = []`, means nothing is importable. The package still builds.
 
-| Bad `exports` | Message |
+A bad list is a manifest error at the `exports` line, with exit status 2:
+
+```
+Invalid Silk project manifest /home/you/text-utils/silk.toml:6: exports of text-utils@0.1.0: Hiddn is not a module of the package
+```
+
+| Bad `exports` | Message after `exports of text-utils@0.1.0:` |
 | --- | --- |
-| `exports = "lib"` | `silk: invalid exports of text-utils@0.1.0: [package].exports must be an array of module names` |
-| `exports = ["codec/Unit"]` | `` silk: invalid exports of text-utils@0.1.0: codec/Unit is not a module name such as `codec.Json`  `` |
-| `exports = ["Hiddn"]` | `silk: invalid exports of text-utils@0.1.0: Hiddn is not a module of the package` |
-| `exports = ["codec.mod"]` | ``silk: invalid exports of text-utils@0.1.0: codec.mod names a `mod.silk` file; list its directory's path without `.mod` `` |
-| `exports = ["codec"]` with both `codec.silk` and `codec/mod.silk` | ``silk: invalid exports of text-utils@0.1.0: codec names both a module file and its directory's `mod.silk`; remove or rename one of them`` |
+| `exports = "lib"` | `[package].exports must be an array of module names` |
+| `exports = ["codec/Unit"]` | `` codec/Unit is not a module name such as `codec.Json` `` |
+| `exports = ["Hiddn"]` | `Hiddn is not a module of the package` |
+| `exports = ["codec.mod"]` | ``codec.mod names a `mod.silk` file; list its directory's path without `.mod` `` |
+| `exports = ["codec"]` with both `codec.silk` and `codec/mod.silk` | ``codec names both a module file and its directory's `mod.silk`; remove or rename one of them`` |
+
+## Conformances a library can define
+
+A library may implement an interface for a type it declares, or an interface it declares for any type. It may also define a conformance whose first type argument is a type it declares, even for a type it does not own. That lets a library give `2.0 * vector` a meaning, with the scalar on the left:
+
+```silk
+import silk.core.ops { Multiply }
+
+/// A vector on the plane.
+pub struct Vector {
+  pub x: f64,
+  pub y: f64,
+}
+
+/// `factor * vector` scales the vector.
+impl Multiply<Vector, Vector> for f64 {
+  fn multiply(left: f64, right: Vector) -> Vector {
+    return Vector { x: left * right.x, y: left * right.y }
+  }
+}
+```
+
+A package that depends on it writes `2.0 * Vector { x: 1.5, y: 3.0 }`. The rule is IMPL-004; see **Interfaces and impls** in the reference.
 
 ## Library artifacts
 
@@ -107,12 +136,12 @@ silk build
 
 ```
 Compiling text-utils (x86_64-unknown-linux-gnu, debug)
-  load     41 modules, 2 in package          0.05s
+  load     117 modules, 2 in package         0.04s
   check    2 modules                         0.00s
   codegen  2 functions                       0.00s
   borrow   2 bodies                          0.00s
-  link     clang                             0.04s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a in 0.09s
+  link     clang                             0.13s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a in 0.19s
 ```
 
 The symbol map next to the archive shows the C name and the Silk declaration it comes from:

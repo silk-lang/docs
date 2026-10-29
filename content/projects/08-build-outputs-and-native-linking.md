@@ -7,15 +7,19 @@
 ```
 build/
   llvm/<target>/<profile>/<file>          silk build, silk run
-  llvm/<target>/<profile>/<file>.symbols  symbol map
+  llvm/<target>/<profile>/<file>.symbols  symbol map (builds with debug information)
+  llvm/<target>/<profile>/<file>.inputs   the files the build read, to skip an unchanged rebuild
+  llvm/<target>/<profile>/<file>.units/   cached compiled code, reused by the next build
   test/llvm/<target>/<profile>/<name>     silk test runner
+  cache/<package>/                        the checker's cache, per package
   documentation.json                      silk doc
   documentation/<member>.json             silk doc at a workspace root
 ```
 
 - `build` is `[build].output-dir`, or `[workspace].output-dir` for workspace members. See **Workspaces**.
 - `<target>` is the full target name, such as `x86_64-unknown-linux-gnu`.
-- `<profile>` is `debug`, `release` or `release-with-debug`, or the name of the selected `[profiles.<name>]`. See **Targets and profiles**.
+- `<profile>` is `debug`, `release`, `release-with-debug`, `release-size` or `release-size-with-debug`, or the name of the selected `[profiles.<name>]`. See **Targets and profiles**.
+- The `.inputs`, `.units` and `cache` entries only make the next build faster. Deleting them is safe.
 - `silk clean` deletes the whole output directory.
 
 ## File names
@@ -40,26 +44,26 @@ build/
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.07s
-  check    1 module                          0.06s
-  codegen  422 functions                     0.22s
-  borrow   137 bodies                        0.00s
-  link     clang                             0.15s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello.s in 0.55s
+  load     143 modules, 1 in package         0.06s
+  check    1 module                          0.14s
+  codegen  689 functions                     0.18s
+  borrow   229 bodies                        0.01s
+  link     clang                             0.29s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello.s in 0.71s
 ```
 
 The `link` row is the Clang step whatever the stage; for `assembly` it runs `clang -S`.
 
 ## The symbol map
 
-Each output has a `.symbols` file beside it. Each line is a native symbol, its kind and the Silk declaration it comes from, separated by tabs:
+Each output of a build with debug information, such as the default `debug` profile, has a `.symbols` file beside it. Each line is a native symbol, its kind and the Silk declaration it comes from, separated by tabs:
 
 ```
 main	export	hello@0.1.0:silk/platform/native/start.silk::_._.enter
-silk_5d3308971cc4722980f0a2011e60fca5	function	hello@0.1.0:silk/platform/native/start.silk::_._.enter
+silk_e0307b61cbd3a68762f928296596e9cb	function	hello@0.1.0:silk/platform/native/start.silk::_._.enter
 ```
 
-Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled src/main.silk -> hello.s (llvm, x86_64-unknown-linux-gnu, 210 symbols)`, with both paths relative to the current directory, or in full when a file is outside it. Its symbol count is the number of lines in this file.
+Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled src/main.silk -> hello.s (llvm, x86_64-unknown-linux-gnu, 339 symbols)`, with both paths relative to the current directory, or in full when a file is outside it. Its symbol count is the number of lines in this file.
 
 ## Finding Clang
 
@@ -73,6 +77,8 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 - Static archives use `SILK_LLVM_AR` when set, else the `llvm-ar` in Clang's directory.
 - Clang runs with only `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL` and `LC_CTYPE` from your environment. `CFLAGS`, `LDFLAGS` and similar are not passed.
 - An executable link adds `-lc -lm` after everything else.
+- On Linux, an executable links with the `ld.lld` in Clang's installation directory (the `InstalledDir` line of `clang --version`) when there is one, through `--ld-path`. Otherwise Clang uses the system linker. A `platform-supply` that names a linker, and a no-libc build, keep their own linker. The progress row reads `link     clang` either way.
+- On Linux, an executable is not position independent unless its profile sets `relocation = "pic"`: the default links with `-fno-pic` and `-no-pie`. See Targets and profiles.
 
 | Problem | Message |
 | --- | --- |
@@ -180,6 +186,27 @@ An entry with no kind, or with two, ends in `an entry is exactly one object, sta
 
 See **Unsafe code and C interop** in the reference for `extern "C"`.
 
+## Function order
+
+`[native].function-order` names a text file of symbols that a Linux or macOS executable places first, in the order listed, so that code which runs together shares memory pages:
+
+```toml
+[native]
+function-order = "order.txt"
+```
+
+```
+# hot path first
+silk_f0247e45df317956d0904dd2e95b51a8
+main
+```
+
+- One symbol per line, as the symbol map or `nm` spells it. Blank lines and lines starting with `#` are skipped. On macOS the compiler adds the leading `_` itself.
+- Linux links with function sections and passes the file to lld as `--symbol-ordering-file`; macOS passes it as `-order_file`. A wasm32 module ignores it.
+- The path follows the same rule as `[native].link`: `silk: invalid native link input: /home/you/hello/silk.toml: [native].function-order must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files` (exit 1).
+- A file that cannot be read stops the link: `silk: cannot read the function order file /home/you/hello/order.txt that [native].function-order names` (exit 2).
+- Editing the file relinks the executable, with no other recompilation.
+
 ## Runtime composition (advanced)
 
 An executable starts in a runtime module that sets up the process and calls `main`. Without `[unstable].composition`, the compiler takes it from the std lib's catalog (`compositions.json`):
@@ -189,6 +216,7 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | `aarch64-apple-darwin` | `system` | `silk/platform/native/start` (hosted) |
 | Linux x86-64 and arm64 | `gnu` | `silk/platform/native/start` (hosted) |
 | `wasm32-unknown-unknown` | `none` | `silk/platform/wasm/start` (standalone) |
+| `wasm32-wasip1`, `wasm32-wasip2` | `none` | `silk/platform/wasi/start` (wasi) |
 
 `[unstable].composition` replaces the catalog for one package. Its keys:
 
@@ -211,7 +239,7 @@ composition = { runtimes = [
 ```
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:9: unstable.composition.runtimes.modul is not a supported field
+Invalid Silk project manifest /home/you/hello/silk.toml:9: unstable.composition.runtimes.modul is not a supported field; did you mean unstable.composition.runtimes.module?
 ```
 
 Line 9 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`unstable.composition.retention.decl is not a supported field`), and in a component's `bindings` entry as `unstable.composition.components.bindings.<key>`.
@@ -247,13 +275,13 @@ exit 3
 A `main` the runtime cannot start is SEM0225. Here `main` is a plain `pub fn main() -> i32`:
 
 ```
-Compiling tiny (x86_64-unknown-linux-gnu, debug)
-  load     45 modules, 1 in package          0.10s
-  check    1 module                          0.00s
-  codegen  failed: 89 functions, 1 error     0.09s
+Compiling sync (x86_64-unknown-linux-gnu, debug)
+  load     123 modules, 1 in package         0.07s
+  check    1 module                          0.05s
+  codegen  failed: 117 functions, 1 error    0.01s
 [x86_64-unknown-linux-gnu]
 src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/platform/native/start_sync` cannot start
-Failed tiny in 0.26s
+Failed sync in 0.15s
 ```
 
 A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/platform/linux/start` case.
@@ -289,13 +317,13 @@ An executable that exports no C `main` is refused before Clang runs, with exit s
 
 ```
 Compiling tiny (x86_64-unknown-linux-gnu, bare)
-  load     40 modules, 1 in package          0.06s
+  load     116 modules, 1 in package         0.00s
   check    1 module                          0.00s
   codegen  0 functions                       0.00s
   borrow   1 body                            0.00s
 [x86_64-unknown-linux-gnu]
 silk: an executable built with runtime = { kind = "none" } has no `main`; export one, as `export "C" fn start() -> i32 as "main"` does, or select a runtime
-Failed tiny in 0.06s
+Failed tiny in 0.01s
 ```
 
 - `silk check` does not look for the C `main`; only an executable build does.

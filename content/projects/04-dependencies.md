@@ -77,7 +77,7 @@ silk run
 
 - No cycles. A package cannot depend on itself, directly or through others.
 - One version and one copy per package name. Two paths that reach different versions, or different directories, of `text-utils` are refused.
-- Each dependency's manifest must be readable and valid, with a `[package]` name and version, and its `exports` must name real modules.
+- Each dependency's manifest must be readable and valid, with a `[package]` name, and its `exports` must name real modules.
 
 The whole graph is checked before any source is compiled.
 
@@ -93,7 +93,11 @@ silk: invalid dependency `nothing`: the package has no dependency of that name
 Cannot read Silk project manifest /home/you/nothing/silk.toml
 ```
 
-From a build, check or test, for a manifest edited by hand (exit 1). Each line starts with ``silk: invalid dependency `<name>` of <package@version>:`` and ends with the reason:
+From a build, check or test, for a manifest edited by hand, the problem is a manifest error (exit 2). The message names the manifest and the line of the entry, then ``dependency `<name>` of <package@version>:`` and the reason:
+
+```
+Invalid Silk project manifest /home/you/app/silk.toml:8: dependency `Text-Utils` of app@0.1.0: a dependency name must be an identifier
+```
 
 | Reason | Cause |
 | --- | --- |
@@ -101,24 +105,24 @@ From a build, check or test, for a manifest edited by hand (exit 1). Each line s
 | `the name is reserved for the toolchain` | Key `silk` or `Intrinsic` |
 | `a dependency must be a table such as { path = "../library" }` | Entry written as a bare string |
 | `path must name the directory of the dependency's silk.toml` | No `path` |
-| `no readable silk.toml at its path` | Wrong path |
-| `its silk.toml is not valid TOML` | Broken dependency manifest |
-| `its silk.toml has no [package] name and version` | Dependency is not a package |
+| `no readable silk.toml at /home/you/nothere` | Wrong path |
+| `its silk.toml is not valid TOML: ...` | Broken dependency manifest. The message names that manifest and its line instead of yours |
+| `its silk.toml has no [package] name` | Dependency is not a package, such as a workspace root. The message names that manifest |
 | `package does not match the name in the dependency's silk.toml` | Wrong `package` value |
 | `the name is also a top-level module or directory of this package's source root` | Name clash with your own module |
 | `<a> depends on <b>, which depends on <a> in turn, directly or through other packages, so they form a cycle` | Cycle |
 | `the build already has a different version or copy of this package` | Two versions or copies |
 
-For example, a cycle:
+For example, a cycle, reported at the entry that closes it:
 
 ```
-silk: invalid dependency `app` of text-utils@0.1.0: text-utils@0.1.0 depends on app@0.1.0, which depends on text-utils@0.1.0 in turn, directly or through other packages, so they form a cycle
+Invalid Silk project manifest /home/you/text-utils/silk.toml:9: dependency `app` of text-utils@0.1.0: text-utils@0.1.0 depends on app@0.1.0, which depends on text-utils@0.1.0 in turn, directly or through other packages, so they form a cycle
 ```
 
-`silk add` runs the same graph check, so it refuses a second version too:
+`silk add` runs the same graph check, so it refuses a second copy too. Here `other` already depends on a copy of `text-utils` in another directory:
 
 ```
-silk: invalid dependency `text_utils` of other@0.1.0: the build already has a different version or copy of this package
+Invalid Silk project manifest /home/you/other/silk.toml:6: dependency `tu2` of other@0.1.0: the build already has a different version or copy of this package
 ```
 
 A dependency entry cannot pin a version yet. `version = "1"` is a manifest error (exit 2), named at the line that writes it:
@@ -129,10 +133,10 @@ text_utils = { path = "../text-utils", package = "text-utils", version = "1" }
 ```
 
 ```
-Invalid Silk project manifest /home/you/app/silk.toml:8: dependencies.text_utils.version is not supported yet
+Invalid Silk project manifest /home/you/app/silk.toml:7: dependencies.text_utils.version is not supported yet
 ```
 
-When the entry's table spans several lines, the line is the one with that key, not the one with the dependency name. Any other key the entry does not take is refused the same way, as "is not a supported field".
+When the entry's table spans several lines, the line is the one with that key, not the one with the dependency name. Any other key the entry does not take is refused the same way, as "is not a supported field", with a suggestion when one is close: `dependencies.text_utils.pth is not a supported field; did you mean dependencies.text_utils.path?`.
 
 ## See also
 
