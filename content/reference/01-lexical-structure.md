@@ -1,6 +1,6 @@
 # Lexical structure
 
-Source files are UTF-8 text. This page covers how the compiler splits a file into tokens: whitespace, comments, identifiers, keywords, punctuation and literals.
+Source files are UTF-8 text. This page covers how the compiler splits a file into tokens: whitespace, comments, identifiers, keywords, punctuation, directives and literals.
 
 ## Whitespace
 
@@ -52,8 +52,6 @@ These words have special meaning only in certain positions, and are ordinary ide
 | `where` | Bounds on generics and package parameters |
 | `provides`, `from` | Provider bounds in `where` clauses |
 | `in` | Membership bounds in `where` clauses |
-| `with` | Property clauses on declarations |
-| `module` | `module with …` at the top of a file |
 | `use` | Lifetime binders in a callable's `for<…>` list |
 | `some` | Opaque return types |
 | `typeof` | The type of a declaration |
@@ -66,14 +64,32 @@ These words have special meaning only in certain positions, and are ordinary ide
 
 `loop` is not a keyword either and may name a binding. A statement written `loop { ... }` is PAR0006; see Control flow.
 
+`with` and `module` have no special meaning any more. A `with Intrinsic.inline()` clause after a declaration header, or `module with ...`, is PAR0011; see Directives below.
+
 ## Punctuation
 
 ```
 (  )  {  }  [  ]  :  ;  ,  .  ..  ...  =  ==  !=  <  <=  >  >=
-+  -  *  /  %  !  ?  @  &  &&  |  ||  |>  ^  ~  =>  ->
++  -  *  /  %  !  ?  @  #  &  &&  |  ||  |>  ^  ~  =>  ->
 ```
 
 There are no shift operators and no compound assignment operators such as `+=`. See Expressions and operators.
+
+- `@` starts a directive (below).
+- `#` marks the role of a reference type: `&Port #Reader`. Requirement rows name a role with `at` instead: `? &mut Journal at Audit`. See Services and providers.
+
+## Directives
+
+```
+Directive    = '@' Identifier ( '(' ( DirectiveArg ( ',' DirectiveArg )* ','? )? ')' )?
+DirectiveArg = ( Identifier ':' )? Literal
+```
+
+- A directive is written before a function, a method, a service or interface operation, or a foreign function type: `@inline`, `@features("avx2")`, `@foreign(memory: "read", locality: "arguments")`. Several may stand before one declaration. `silk format` puts each on its own line.
+- Arguments are literals only: text, decimal integers, `true`, `false`, and parenthesized tuples of them. A name or an expression there is PAR0002.
+- `@` before an `import` or a module-level `static if` is PAR0002 at the `@`.
+- The set of directives is closed. The full table, and where each one goes, is in Intrinsics.
+- Silk has no `with` clauses. `fn work() -> i32 with Intrinsic.inline() { return 1 }` prints ``error[PAR0011] Silk has no `with` clauses; write `@inline` on the line before the declaration``.
 
 ## Integer literals
 
@@ -200,6 +216,7 @@ first
 | LEX0012 | Duration amount too large for its unit |
 | LEX0013 | Digit outside the base of a prefixed integer |
 | LEX0014 | Type suffix on a numeric literal, such as `7u8` |
+| PAR0011 | A `with` clause after a declaration header, or `module with ...`; write a directive before the declaration |
 | SEM0002 | Integer literal outside its type's range, including a `usize` or `isize` literal outside the target's word size |
 
 `silk check` and `silk build` report the LEX codes at the invalid token and exit with status 1. Parse errors inside the invalid token are not reported. `let value = 0x` prints:
@@ -212,4 +229,4 @@ The Diagnostic codes appendix has a failing program and the printed message for 
 
 ## See also
 
-Values and primitive types · Expressions and operators · `silk/text/string`, `silk/text/char`
+Values and primitive types · Expressions and operators · Intrinsics (directives) · Keywords · `silk/text/string`, `silk/text/char`
