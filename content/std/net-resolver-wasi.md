@@ -5,10 +5,56 @@ Provide `WasiResolver` for the portable `Resolver` service in a Preview 2 compon
 The runtime must grant name lookup. The provider owns its network capability and releases each
 lookup stream on success, failure, or timeout.
 
-Public declarations: 0.
+Import as `WasiResolver` with `import silk.net.resolver_wasi { WasiResolver }`.
 
-This module declares no public items.
+Public declarations: 1.
+
+::Anchor{id="WasiResolver"}
+
+## `WasiResolver`
+
+```silk
+pub struct WasiResolver
+```
+
+The WASI provider for `Resolver`, owning its network capability and host monotonic clock.
+Domain deadlines are absolute times on `OsMonotonicClock`. Host policy controls name lookup.
+
+::Anchor{id="WasiResolver.impl"}
+
+## Implementation `WasiResolver`
+
+```silk
+impl WasiResolver
+```
+
+::Anchor{id="WasiResolver.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> WasiResolver
+```
+
+Acquires the host-granted default network and a host monotonic clock.
+
+::Anchor{id="WasiResolver.impl.Resolver"}
+
+## Implementation `Resolver for WasiResolver`
+
+```silk
+impl Resolver for WasiResolver
+```
+
+::Anchor{id="WasiResolver.impl.Resolver.resolveDomain"}
+
+### Operation `resolveDomain`
+
+```silk
+effect fn resolveDomain(self: &mut Self, request: &ResolveRequest, domain: &DomainHost) -> ResolvedEndpoints
+      ! ResolverError | OutOfMemoryError ? &mut Allocator
+```
 
 Category: Networking.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`.
+Profiles: `wasm32-wasip2`.

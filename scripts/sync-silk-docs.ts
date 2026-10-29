@@ -38,21 +38,46 @@ type SourcePage = Readonly<{
 
 type SyncedPage = SourcePage & Readonly<{ title: string; markdown: string }>
 
-const isProfileVariant = (fileName: string): boolean =>
-  /\.profile-\d+\.md$/.test(fileName)
+const publicDeclarations = (path: string): number =>
+  Number(
+    readFileSync(path, 'utf8').match(/^Public declarations: (\d+)\.$/m)?.[1] ??
+      0,
+  )
 
-const markdownFiles = (directory: string): ReadonlyArray<string> =>
-  readdirSync(directory)
+// A module whose API differs between profiles has one page per surface:
+// `name.md` and `name.profile-N.md`. The site has one page per module, so it
+// shows the surface with the most public declarations, such as the no-libc
+// `RawLinux` rather than the empty hosted page.
+const markdownFiles = (
+  directory: string,
+): ReadonlyArray<Readonly<{ name: string; fileName: string }>> => {
+  const chosen = new Map<
+    string,
+    Readonly<{ fileName: string; count: number }>
+  >()
+  for (const fileName of readdirSync(directory)
     .filter(fileName => fileName.endsWith('.md'))
-    .filter(fileName => !isProfileVariant(fileName))
-    .sort()
+    .sort()) {
+    const name = basename(fileName.replace(/\.profile-\d+\.md$/, '.md'), '.md')
+    const count = publicDeclarations(join(directory, fileName))
+    const current = chosen.get(name)
+    if (current === undefined || count > current.count) {
+      chosen.set(name, { fileName, count })
+    }
+  }
+  return [...chosen.entries()]
+    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([name, { fileName }]) => ({ name, fileName }))
+}
 
 const sourcePages = (silkRoot: string): ReadonlyArray<SourcePage> => [
-  ...markdownFiles(join(silkRoot, 'reference/stdlib')).map(fileName => ({
-    directory: 'std' as const,
-    slug: fileName === 'index.md' ? 'overview' : basename(fileName, '.md'),
-    sourcePath: `reference/stdlib/${fileName}`,
-  })),
+  ...markdownFiles(join(silkRoot, 'reference/stdlib')).map(
+    ({ name, fileName }) => ({
+      directory: 'std' as const,
+      slug: name === 'index' ? 'overview' : name,
+      sourcePath: `reference/stdlib/${fileName}`,
+    }),
+  ),
 ]
 
 // LINKS

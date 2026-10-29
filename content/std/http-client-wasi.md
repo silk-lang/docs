@@ -10,10 +10,54 @@ redirects. Request overrides are honored. Redirects follow Fetch method rules, r
 downgrades, and remove credentials when the origin changes. Request and response bodies stream
 through host backpressure; the returned response owns the complete body.
 
-Public declarations: 0.
+Import as `WasiHttp` with `import silk.http.client_wasi { WasiHttp }`.
 
-This module declares no public items.
+Public declarations: 1.
+
+::Anchor{id="WasiHttp"}
+
+## `WasiHttp`
+
+```silk
+pub struct WasiHttp
+```
+
+A WASI HTTP provider with a host monotonic clock. Hosts control transport and TLS policy.
+
+::Anchor{id="WasiHttp.impl"}
+
+## Implementation `WasiHttp`
+
+```silk
+impl WasiHttp
+```
+
+::Anchor{id="WasiHttp.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> WasiHttp
+```
+
+Makes a client with a 30-second deadline, a 16 MiB body limit, and ten redirects by default.
+
+::Anchor{id="WasiHttp.impl.Http"}
+
+## Implementation `Http for WasiHttp`
+
+```silk
+impl Http for WasiHttp
+```
+
+::Anchor{id="WasiHttp.impl.Http.send"}
+
+### Operation `send`
+
+```silk
+effect fn send(self: &mut Self, request: Request) -> Response ! HttpError | OutOfMemoryError ? &mut Allocator
+```
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`.
+Profiles: `wasm32-wasip2`.

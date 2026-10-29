@@ -8,10 +8,1160 @@ Functions return a WASI errno: zero means success. Pointer arguments use the Pre
 Calls do not retain pointers. The host controls descriptor rights and available resources.
 Preview 2 builds translate these calls through the WASI command adapter.
 
-Public declarations: 0.
+Import as `wasi` with `import silk.platform.wasi.preview1 as wasi`.
 
-This module declares no public items.
+Public declarations: 53.
+
+::Anchor{id="IoVector"}
+
+## `IoVector`
+
+```silk
+pub extern "C" struct IoVector
+```
+
+The Preview 1 `IoVector` memory record, with the canonical ABI layout.
+
+::Anchor{id="IoVector.base"}
+
+### Field `base`
+
+```silk
+pub base: ?[*]mut u8
+```
+
+The writable buffer.
+
+::Anchor{id="IoVector.length"}
+
+### Field `length`
+
+```silk
+pub length: u32
+```
+
+The buffer capacity in bytes.
+
+::Anchor{id="ConstIoVector"}
+
+## `ConstIoVector`
+
+```silk
+pub extern "C" struct ConstIoVector
+```
+
+The Preview 1 `ConstIoVector` memory record, with the canonical ABI layout.
+
+::Anchor{id="ConstIoVector.base"}
+
+### Field `base`
+
+```silk
+pub base: ?[*]const u8
+```
+
+The readable buffer.
+
+::Anchor{id="ConstIoVector.length"}
+
+### Field `length`
+
+```silk
+pub length: u32
+```
+
+The buffer length in bytes.
+
+::Anchor{id="FdStat"}
+
+## `FdStat`
+
+```silk
+pub extern "C" struct FdStat
+```
+
+The Preview 1 `FdStat` memory record, with the canonical ABI layout.
+
+::Anchor{id="FdStat.kind"}
+
+### Field `kind`
+
+```silk
+pub kind: u8
+```
+
+The WASI file type.
+
+::Anchor{id="FdStat.flags"}
+
+### Field `flags`
+
+```silk
+pub flags: u16
+```
+
+The descriptor flags.
+
+::Anchor{id="FdStat.rights"}
+
+### Field `rights`
+
+```silk
+pub rights: u64
+```
+
+The descriptor rights.
+
+::Anchor{id="FdStat.inheriting"}
+
+### Field `inheriting`
+
+```silk
+pub inheriting: u64
+```
+
+The rights available to child descriptors.
+
+::Anchor{id="FileStat"}
+
+## `FileStat`
+
+```silk
+pub extern "C" struct FileStat
+```
+
+The Preview 1 `FileStat` memory record, with the canonical ABI layout.
+
+::Anchor{id="FileStat.device"}
+
+### Field `device`
+
+```silk
+pub device: u64
+```
+
+The device identifier.
+
+::Anchor{id="FileStat.inode"}
+
+### Field `inode`
+
+```silk
+pub inode: u64
+```
+
+The inode identifier.
+
+::Anchor{id="FileStat.kind"}
+
+### Field `kind`
+
+```silk
+pub kind: u8
+```
+
+The WASI file type.
+
+::Anchor{id="FileStat.links"}
+
+### Field `links`
+
+```silk
+pub links: u64
+```
+
+The link count.
+
+::Anchor{id="FileStat.size"}
+
+### Field `size`
+
+```silk
+pub size: u64
+```
+
+The file size in bytes.
+
+::Anchor{id="FileStat.access"}
+
+### Field `access`
+
+```silk
+pub access: u64
+```
+
+The access time in nanoseconds.
+
+::Anchor{id="FileStat.modified"}
+
+### Field `modified`
+
+```silk
+pub modified: u64
+```
+
+The modification time in nanoseconds.
+
+::Anchor{id="FileStat.changed"}
+
+### Field `changed`
+
+```silk
+pub changed: u64
+```
+
+The status-change time in nanoseconds.
+
+::Anchor{id="Prestat"}
+
+## `Prestat`
+
+```silk
+pub extern "C" struct Prestat
+```
+
+The Preview 1 `Prestat` memory record, with the canonical ABI layout.
+
+::Anchor{id="Prestat.kind"}
+
+### Field `kind`
+
+```silk
+pub kind: u8
+```
+
+The preopen type; zero identifies a directory.
+
+::Anchor{id="Prestat.length"}
+
+### Field `length`
+
+```silk
+pub length: u32
+```
+
+The preopened directory name length in bytes.
+
+::Anchor{id="Subscription"}
+
+## `Subscription`
+
+```silk
+pub extern "C" struct Subscription
+```
+
+The Preview 1 `Subscription` memory record, with the canonical ABI layout.
+
+::Anchor{id="Subscription.userdata"}
+
+### Field `userdata`
+
+```silk
+pub userdata: u64
+```
+
+The caller identifier returned with the event.
+
+::Anchor{id="Subscription.kind"}
+
+### Field `kind`
+
+```silk
+pub kind: u8
+```
+
+The event type; zero selects a clock.
+
+::Anchor{id="Subscription.reserved"}
+
+### Field `reserved`
+
+```silk
+pub reserved: [u8; 7]
+```
+
+Reserved bytes; initialize to zero.
+
+::Anchor{id="Subscription.clock"}
+
+### Field `clock`
+
+```silk
+pub clock: u32
+```
+
+The clock identifier for a clock subscription.
+
+::Anchor{id="Subscription.timeout"}
+
+### Field `timeout`
+
+```silk
+pub timeout: u64
+```
+
+The clock deadline or duration, in nanoseconds.
+
+::Anchor{id="Subscription.precision"}
+
+### Field `precision`
+
+```silk
+pub precision: u64
+```
+
+The permitted clock tolerance, in nanoseconds.
+
+::Anchor{id="Subscription.flags"}
+
+### Field `flags`
+
+```silk
+pub flags: u16
+```
+
+The clock flags; one selects an absolute deadline.
+
+::Anchor{id="Event"}
+
+## `Event`
+
+```silk
+pub extern "C" struct Event
+```
+
+The Preview 1 `Event` memory record, with the canonical ABI layout.
+
+::Anchor{id="Event.userdata"}
+
+### Field `userdata`
+
+```silk
+pub userdata: u64
+```
+
+The caller identifier from the subscription.
+
+::Anchor{id="Event.error"}
+
+### Field `error`
+
+```silk
+pub error: u16
+```
+
+The WASI errno for this event.
+
+::Anchor{id="Event.kind"}
+
+### Field `kind`
+
+```silk
+pub kind: u8
+```
+
+The event type.
+
+::Anchor{id="Event.bytes"}
+
+### Field `bytes`
+
+```silk
+pub bytes: u64
+```
+
+The readable or writable byte count for a descriptor event.
+
+::Anchor{id="Event.flags"}
+
+### Field `flags`
+
+```silk
+pub flags: u16
+```
+
+The descriptor event flags.
+
+::Anchor{id="args_get"}
+
+## `args_get`
+
+```silk
+pub unsafe extern "C" fn args_get(
+    argv: ?[*]mut ?[*]mut u8,
+    buffer: ?[*]mut u8
+  ) -> u32 as "silk_wasi_args_get"
+```
+
+Calls WASI `args_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="args_sizes_get"}
+
+## `args_sizes_get`
+
+```silk
+pub unsafe extern "C" fn args_sizes_get(
+    count: *mut u32,
+    size: *mut u32
+  ) -> u32 as "silk_wasi_args_sizes_get"
+```
+
+Calls WASI `args_sizes_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="environ_get"}
+
+## `environ_get`
+
+```silk
+pub unsafe extern "C" fn environ_get(
+    environ: ?[*]mut ?[*]mut u8,
+    buffer: ?[*]mut u8
+  ) -> u32 as "silk_wasi_environ_get"
+```
+
+Calls WASI `environ_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="environ_sizes_get"}
+
+## `environ_sizes_get`
+
+```silk
+pub unsafe extern "C" fn environ_sizes_get(
+    count: *mut u32,
+    size: *mut u32
+  ) -> u32 as "silk_wasi_environ_sizes_get"
+```
+
+Calls WASI `environ_sizes_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="clock_res_get"}
+
+## `clock_res_get`
+
+```silk
+pub unsafe extern "C" fn clock_res_get(
+    clock: u32,
+    resolution: *mut u64
+  ) -> u32 as "silk_wasi_clock_res_get"
+```
+
+Calls WASI `clock_res_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="clock_time_get"}
+
+## `clock_time_get`
+
+```silk
+pub unsafe extern "C" fn clock_time_get(
+    clock: u32,
+    precision: u64,
+    time: *mut u64
+  ) -> u32 as "silk_wasi_clock_time_get"
+```
+
+Calls WASI `clock_time_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_advise"}
+
+## `fd_advise`
+
+```silk
+pub unsafe extern "C" fn fd_advise(
+    fd: u32,
+    offset: u64,
+    length: u64,
+    advice: u32
+  ) -> u32 as "silk_wasi_fd_advise"
+```
+
+Calls WASI `fd_advise` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_allocate"}
+
+## `fd_allocate`
+
+```silk
+pub unsafe extern "C" fn fd_allocate(
+    fd: u32,
+    offset: u64,
+    length: u64
+  ) -> u32 as "silk_wasi_fd_allocate"
+```
+
+Calls WASI `fd_allocate` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_close"}
+
+## `fd_close`
+
+```silk
+pub unsafe extern "C" fn fd_close(fd: u32) -> u32 as "silk_wasi_fd_close"
+```
+
+Calls WASI `fd_close` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_datasync"}
+
+## `fd_datasync`
+
+```silk
+pub unsafe extern "C" fn fd_datasync(fd: u32) -> u32 as "silk_wasi_fd_datasync"
+```
+
+Calls WASI `fd_datasync` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_fdstat_get"}
+
+## `fd_fdstat_get`
+
+```silk
+pub unsafe extern "C" fn fd_fdstat_get(
+    fd: u32,
+    stat: *mut FdStat
+  ) -> u32 as "silk_wasi_fd_fdstat_get"
+```
+
+Calls WASI `fd_fdstat_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_fdstat_set_flags"}
+
+## `fd_fdstat_set_flags`
+
+```silk
+pub unsafe extern "C" fn fd_fdstat_set_flags(
+    fd: u32,
+    flags: u32
+  ) -> u32 as "silk_wasi_fd_fdstat_set_flags"
+```
+
+Calls WASI `fd_fdstat_set_flags` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_fdstat_set_rights"}
+
+## `fd_fdstat_set_rights`
+
+```silk
+pub unsafe extern "C" fn fd_fdstat_set_rights(
+    fd: u32,
+    base: u64,
+    inheriting: u64
+  ) -> u32 as "silk_wasi_fd_fdstat_set_rights"
+```
+
+Calls WASI `fd_fdstat_set_rights` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_filestat_get"}
+
+## `fd_filestat_get`
+
+```silk
+pub unsafe extern "C" fn fd_filestat_get(
+    fd: u32,
+    stat: *mut FileStat
+  ) -> u32 as "silk_wasi_fd_filestat_get"
+```
+
+Calls WASI `fd_filestat_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_filestat_set_size"}
+
+## `fd_filestat_set_size`
+
+```silk
+pub unsafe extern "C" fn fd_filestat_set_size(
+    fd: u32,
+    size: u64
+  ) -> u32 as "silk_wasi_fd_filestat_set_size"
+```
+
+Calls WASI `fd_filestat_set_size` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_filestat_set_times"}
+
+## `fd_filestat_set_times`
+
+```silk
+pub unsafe extern "C" fn fd_filestat_set_times(
+    fd: u32,
+    access: u64,
+    modified: u64,
+    flags: u32
+  ) -> u32 as "silk_wasi_fd_filestat_set_times"
+```
+
+Calls WASI `fd_filestat_set_times` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_pread"}
+
+## `fd_pread`
+
+```silk
+pub unsafe extern "C" fn fd_pread(
+    fd: u32,
+    vectors: ?[*]const IoVector,
+    count: u32,
+    offset: u64,
+    read: *mut u32
+  ) -> u32 as "silk_wasi_fd_pread"
+```
+
+Calls WASI `fd_pread` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_prestat_get"}
+
+## `fd_prestat_get`
+
+```silk
+pub unsafe extern "C" fn fd_prestat_get(
+    fd: u32,
+    stat: *mut Prestat
+  ) -> u32 as "silk_wasi_fd_prestat_get"
+```
+
+Calls WASI `fd_prestat_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_prestat_dir_name"}
+
+## `fd_prestat_dir_name`
+
+```silk
+pub unsafe extern "C" fn fd_prestat_dir_name(
+    fd: u32,
+    path: ?[*]mut u8,
+    length: u32
+  ) -> u32 as "silk_wasi_fd_prestat_dir_name"
+```
+
+Calls WASI `fd_prestat_dir_name` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_pwrite"}
+
+## `fd_pwrite`
+
+```silk
+pub unsafe extern "C" fn fd_pwrite(
+    fd: u32,
+    vectors: ?[*]const ConstIoVector,
+    count: u32,
+    offset: u64,
+    written: *mut u32
+  ) -> u32 as "silk_wasi_fd_pwrite"
+```
+
+Calls WASI `fd_pwrite` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_read"}
+
+## `fd_read`
+
+```silk
+pub unsafe extern "C" fn fd_read(
+    fd: u32,
+    vectors: ?[*]const IoVector,
+    count: u32,
+    read: *mut u32
+  ) -> u32 as "silk_wasi_fd_read"
+```
+
+Calls WASI `fd_read` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_readdir"}
+
+## `fd_readdir`
+
+```silk
+pub unsafe extern "C" fn fd_readdir(
+    fd: u32,
+    buffer: ?[*]mut u8,
+    length: u32,
+    cookie: u64,
+    used: *mut u32
+  ) -> u32 as "silk_wasi_fd_readdir"
+```
+
+Calls WASI `fd_readdir` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_renumber"}
+
+## `fd_renumber`
+
+```silk
+pub unsafe extern "C" fn fd_renumber(from: u32, to: u32) -> u32 as "silk_wasi_fd_renumber"
+```
+
+Calls WASI `fd_renumber` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_seek"}
+
+## `fd_seek`
+
+```silk
+pub unsafe extern "C" fn fd_seek(
+    fd: u32,
+    offset: i64,
+    whence: u32,
+    position: *mut u64
+  ) -> u32 as "silk_wasi_fd_seek"
+```
+
+Calls WASI `fd_seek` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_sync"}
+
+## `fd_sync`
+
+```silk
+pub unsafe extern "C" fn fd_sync(fd: u32) -> u32 as "silk_wasi_fd_sync"
+```
+
+Calls WASI `fd_sync` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_tell"}
+
+## `fd_tell`
+
+```silk
+pub unsafe extern "C" fn fd_tell(
+    fd: u32,
+    position: *mut u64
+  ) -> u32 as "silk_wasi_fd_tell"
+```
+
+Calls WASI `fd_tell` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="fd_write"}
+
+## `fd_write`
+
+```silk
+pub unsafe extern "C" fn fd_write(
+    fd: u32,
+    vectors: ?[*]const ConstIoVector,
+    count: u32,
+    written: *mut u32
+  ) -> u32 as "silk_wasi_fd_write"
+```
+
+Calls WASI `fd_write` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_create_directory"}
+
+## `path_create_directory`
+
+```silk
+pub unsafe extern "C" fn path_create_directory(
+    fd: u32,
+    path: ?[*]const u8,
+    length: u32
+  ) -> u32 as "silk_wasi_path_create_directory"
+```
+
+Calls WASI `path_create_directory` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_filestat_get"}
+
+## `path_filestat_get`
+
+```silk
+pub unsafe extern "C" fn path_filestat_get(
+    fd: u32,
+    flags: u32,
+    path: ?[*]const u8,
+    length: u32,
+    stat: *mut FileStat
+  ) -> u32 as "silk_wasi_path_filestat_get"
+```
+
+Calls WASI `path_filestat_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_filestat_set_times"}
+
+## `path_filestat_set_times`
+
+```silk
+pub unsafe extern "C" fn path_filestat_set_times(
+    fd: u32,
+    lookup: u32,
+    path: ?[*]const u8,
+    length: u32,
+    access: u64,
+    modified: u64,
+    flags: u32
+  ) -> u32 as "silk_wasi_path_filestat_set_times"
+```
+
+Calls WASI `path_filestat_set_times` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_link"}
+
+## `path_link`
+
+```silk
+pub unsafe extern "C" fn path_link(
+    oldfd: u32,
+    flags: u32,
+    oldpath: ?[*]const u8,
+    oldlength: u32,
+    newfd: u32,
+    newpath: ?[*]const u8,
+    newlength: u32
+  ) -> u32 as "silk_wasi_path_link"
+```
+
+Calls WASI `path_link` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_open"}
+
+## `path_open`
+
+```silk
+pub unsafe extern "C" fn path_open(
+    fd: u32,
+    lookup: u32,
+    path: ?[*]const u8,
+    length: u32,
+    flags: u32,
+    rights: u64,
+    inheriting: u64,
+    descriptorFlags: u32,
+    opened: *mut u32
+  ) -> u32 as "silk_wasi_path_open"
+```
+
+Calls WASI `path_open` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_readlink"}
+
+## `path_readlink`
+
+```silk
+pub unsafe extern "C" fn path_readlink(
+    fd: u32,
+    path: ?[*]const u8,
+    length: u32,
+    buffer: ?[*]mut u8,
+    capacity: u32,
+    used: *mut u32
+  ) -> u32 as "silk_wasi_path_readlink"
+```
+
+Calls WASI `path_readlink` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_remove_directory"}
+
+## `path_remove_directory`
+
+```silk
+pub unsafe extern "C" fn path_remove_directory(
+    fd: u32,
+    path: ?[*]const u8,
+    length: u32
+  ) -> u32 as "silk_wasi_path_remove_directory"
+```
+
+Calls WASI `path_remove_directory` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_rename"}
+
+## `path_rename`
+
+```silk
+pub unsafe extern "C" fn path_rename(
+    oldfd: u32,
+    oldpath: ?[*]const u8,
+    oldlength: u32,
+    newfd: u32,
+    newpath: ?[*]const u8,
+    newlength: u32
+  ) -> u32 as "silk_wasi_path_rename"
+```
+
+Calls WASI `path_rename` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_symlink"}
+
+## `path_symlink`
+
+```silk
+pub unsafe extern "C" fn path_symlink(
+    oldpath: ?[*]const u8,
+    oldlength: u32,
+    fd: u32,
+    newpath: ?[*]const u8,
+    newlength: u32
+  ) -> u32 as "silk_wasi_path_symlink"
+```
+
+Calls WASI `path_symlink` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="path_unlink_file"}
+
+## `path_unlink_file`
+
+```silk
+pub unsafe extern "C" fn path_unlink_file(
+    fd: u32,
+    path: ?[*]const u8,
+    length: u32
+  ) -> u32 as "silk_wasi_path_unlink_file"
+```
+
+Calls WASI `path_unlink_file` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="poll_oneoff"}
+
+## `poll_oneoff`
+
+```silk
+pub unsafe extern "C" fn poll_oneoff(
+    subscriptions: ?[*]const Subscription,
+    events: ?[*]mut Event,
+    count: u32,
+    received: *mut u32
+  ) -> u32 as "silk_wasi_poll_oneoff"
+```
+
+Calls WASI `poll_oneoff` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="proc_exit"}
+
+## `proc_exit`
+
+```silk
+pub unsafe extern "C" fn proc_exit(code: u32) -> () as "silk_wasi_proc_exit"
+```
+
+Calls WASI `proc_exit` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+This call terminates the process without resource cleanup.
+
+::Anchor{id="proc_raise"}
+
+## `proc_raise`
+
+```silk
+pub unsafe extern "C" fn proc_raise(signal: u32) -> u32 as "silk_wasi_proc_raise"
+```
+
+Calls WASI `proc_raise` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="random_get"}
+
+## `random_get`
+
+```silk
+pub unsafe extern "C" fn random_get(
+    buffer: ?[*]mut u8,
+    length: u32
+  ) -> u32 as "silk_wasi_random_get"
+```
+
+Calls WASI `random_get` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="sched_yield"}
+
+## `sched_yield`
+
+```silk
+pub unsafe extern "C" fn sched_yield() -> u32 as "silk_wasi_sched_yield"
+```
+
+Calls WASI `sched_yield` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="sock_accept"}
+
+## `sock_accept`
+
+```silk
+pub unsafe extern "C" fn sock_accept(
+    fd: u32,
+    flags: u32,
+    accepted: *mut u32
+  ) -> u32 as "silk_wasi_sock_accept"
+```
+
+Calls WASI `sock_accept` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="sock_recv"}
+
+## `sock_recv`
+
+```silk
+pub unsafe extern "C" fn sock_recv(
+    fd: u32,
+    vectors: ?[*]const IoVector,
+    count: u32,
+    flags: u32,
+    received: *mut u32,
+    resultFlags: *mut u16
+  ) -> u32 as "silk_wasi_sock_recv"
+```
+
+Calls WASI `sock_recv` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="sock_send"}
+
+## `sock_send`
+
+```silk
+pub unsafe extern "C" fn sock_send(
+    fd: u32,
+    vectors: ?[*]const ConstIoVector,
+    count: u32,
+    flags: u32,
+    sent: *mut u32
+  ) -> u32 as "silk_wasi_sock_send"
+```
+
+Calls WASI `sock_send` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
+
+::Anchor{id="sock_shutdown"}
+
+## `sock_shutdown`
+
+```silk
+pub unsafe extern "C" fn sock_shutdown(fd: u32, how: u32) -> u32 as "silk_wasi_sock_shutdown"
+```
+
+Calls WASI `sock_shutdown` with the Preview 1 ABI.
+
+### Gotchas
+All pointers must address the buffers and structures that the WASI specification requires for this call.
 
 Category: Native platform.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `wasm32-wasip1`, `wasm32-wasip2`.
