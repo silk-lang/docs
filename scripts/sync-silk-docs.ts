@@ -211,6 +211,23 @@ const transform = (
 // name code imports, `silk.http_server`.
 const moduleName = (path: string): string => path.replace(/\//g, '.')
 
+const compareModulePaths = (left: string, right: string): number => {
+  const leftSegments = left.split('.')
+  const rightSegments = right.split('.')
+  for (
+    let index = 0;
+    index < Math.min(leftSegments.length, rightSegments.length);
+    index++
+  ) {
+    const leftSegment = leftSegments[index] ?? ''
+    const rightSegment = rightSegments[index] ?? ''
+    if (leftSegment !== rightSegment) {
+      return leftSegment < rightSegment ? -1 : 1
+    }
+  }
+  return leftSegments.length - rightSegments.length
+}
+
 const stdTitle = (title: string): string =>
   title.startsWith('silk/') ? moduleName(title) : title
 
@@ -325,7 +342,13 @@ const main = (): void => {
   }
 
   const stdOverview = synced.filter(page => page.slug === 'overview')
-  const stdModules = synced.filter(page => page.slug !== 'overview')
+  // The sidebar lists modules by path, one segment at a time, so a module
+  // comes before the modules below it and before its longer-named siblings
+  // (silk.io.logger, silk.io.logger_native, silk.io.reader). File names do
+  // not sort that way: `-` stands for `/` and sorts before `.`.
+  const stdModules = synced
+    .filter(page => page.slug !== 'overview')
+    .sort((left, right) => compareModulePaths(left.title, right.title))
 
   const groupEntries = [
     groupEntry('std', 'Standard library', true, [
