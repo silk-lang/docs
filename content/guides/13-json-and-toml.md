@@ -107,7 +107,29 @@ effect fn sumLines() -> () ! JsonError | OutOfMemoryError | WriterError ? &mut A
 
 `Json.deserialize<T>` decodes one complete document into any type with a `Deserialize` witness. The std lib provides witnesses for the integer and float types, `bool`, `String`, `Option<T>` and `List<T>`. For types that need no allocation there is also `Json.decode<T>`, which uses the `Decode` interface and has no `Allocator` requirement: `Json.decode<i32>(b"42")` returns `Result<i32, JsonError>`.
 
-Your own structs get no decoder automatically. Reflection can read fields but cannot build a struct from them, so a `Deserialize` witness for a struct is written by hand: it pulls tokens from the `JsonScanner` it is given, matches keys, and decodes each field with `JsonCodec.deserializeOne<T>`. That is a page of code per type. For a few fields, the value tree above is usually simpler.
+Your own structs get no decoder automatically. A `Deserialize` witness for a struct is written by hand: it pulls tokens from the `JsonScanner` it is given, matches keys, and decodes each field with `JsonCodec.deserializeOne<T>`. That is a page of code per type. For a few fields, the value tree above is usually simpler.
+
+Reflection can do the matching for you when the fields are alike. `Reflect.fields<Owner>()` lists a struct's fields at compile time, `Reflect.fieldLabel` gives each name, and `Reflect.borrowFieldMut` lends one field of a value for writing. This generic function fills every `i32` field of a struct from the member of a JSON object that has the field's name, and leaves a field alone when the member is missing:
+
+```silk
+struct Stock {
+  pub apples: i32,
+  pub pears: i32,
+  pub plums: i32,
+}
+
+// Fills every i32 field of `owner` from the member of `document` with the field's name.
+fn fill<Owner>(owner: &mut Owner, document: &Value) -> () {
+  static for field in Reflect.fields<Owner>() {
+    let place = Reflect.borrowFieldMut<Owner, i32>(&mut owner.*, field)
+    if let Option.Some { value } = Json.asI32(Json.field(document, Reflect.fieldLabel(field))) {
+      place.* = value
+    }
+  }
+}
+```
+
+With `import silk.core.reflect { Reflect }`, filling `Stock { apples: 0, pears: 0, plums: 0 }` from `{"apples": 4, "plums": 9}` gives `apples 4, pears 0, plums 9`. The `static for` runs at compile time, so each field becomes a plain field access with its name as a constant. A struct whose fields have different types needs a decode step per type, which is where a hand-written `Deserialize` witness comes back in. The reference page **Static control flow and reflection** lists the `Reflect` operations.
 
 ## Scan tokens without a tree
 
@@ -282,6 +304,7 @@ title = "Spring stock"
 - `silk/json/reader`: `JsonReader`
 - `silk/json/codec`: `JsonCodec`, `Serialize`, `Decode`, `Deserialize`
 - `silk/json/reflect`: `JsonReflect`
+- `silk/core/reflect`: `Reflect` (`fields`, `fieldLabel`, `borrowFieldMut`)
 - `silk/json/output`: `JsonOptions`, `JsonOutput`
 - `silk/json/object`, `silk/json/array`: `JsonObject`, `JsonArray` (hand-written object and array writers)
 - `silk/toml/value`: `Toml`, `Value`
