@@ -335,7 +335,9 @@ pub fn main() -> i32 {
 src/main.silk:3:5: error[PAR0001] Expected `:`
 ```
 
-Fix: Write the missing token. Struct fields need `name: Type`. See Lexical structure.
+A missing comma between struct fields, `x: i32` and `y: i32` on separate lines with no `,`, prints ``Expected `,` `` at the start of the second field.
+
+Fix: Write the missing token. Struct fields need `name: Type`, separated by commas. See Lexical structure.
 
 ### PAR0002
 
@@ -511,7 +513,7 @@ Fix: Add a final `else { ... }`, or write the `if` as a statement. See Control f
 
 ### PAR0010
 
-A spelling from another language that Silk writes differently: `+=`, `++`, `for ... in`, `var`, `c ? a : b`, `=> return x`, a prefix `*n`, `<<` or `>>`, `Pair { 0: a }` or a bare `{ ... }` block.
+A spelling from another language that Silk writes differently: `+=`, `++`, `for ... in`, `var`, `c ? a : b`, `=> return x`, a prefix `*n`, `<<` or `>>`, `Pair { 0: a }`, a comma between match arms, a plain name as a whole-value pattern or a bare `{ ... }` block.
 
 ```silk
 pub fn main() -> i32 {
@@ -532,6 +534,8 @@ The message names the Silk form of each spelling, such as a `while` loop with a 
 - `flag ? 1 : 2` prints ``Silk has no `c ? a : b`; write an `if` with a final `else` as the value, as in `if c { a } else { b }` ``.
 - `1 << 3` prints ``Silk has no `<<` or `>>`; shift with the functions of the value's type, as in `i32.shiftLeft(value, count)` or `i32.shiftRight(value, count)` ``, at the operator.
 - `Pair { 0: 1, 1: 2 }` for `tuple Pair(i32, i32)` prints ``A tuple's elements have no field names; build it by position, as in `Pair(first, second)` ``, at the `{`.
+- A `,` after a match arm prints ``Match arms are not separated by commas; remove the `,` ``, at the comma.
+- A match arm whose pattern is a bare name, `value => value`, prints ``A pattern that takes the whole value names its type, as in `i32 value`, or is `_` ``, at the name.
 
 Fix: Write the Silk form the message names. See Bindings and statements.
 
@@ -4901,9 +4905,11 @@ pub fn main() -> u64 { return 0 }
 src/main.silk:1:8: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` and whose errors all implement `Debug`
 ```
 
+A package with no `main` at all gets the same code, at 1:1 of the entry module: ``Entry point `main` is missing: the entry module must declare `pub fn main`, or a library package sets `kind = "library"` under `[package]` in silk.toml``.
+
 The message describes the runtime that was selected. For a wasm32 build with `silk/platform/wasm/start`, `pub effect fn main() -> i32` gives ``Entry point `main` has a result the selected runtime `silk/platform/wasm/start` cannot start; it accepts i32, (), or an Effect producing () with no requirements``.
 
-Fix: Return `i32` or `()` from `main`, or an Effect that produces one of them. Implement `Debug` for each failure type `main` can raise, for example with `Format.debugFields`. See Program entry and termination.
+Fix: Declare `pub fn main`, or set `kind = "library"` for a library. Return `i32` or `()` from `main`, or an Effect that produces one of them. Implement `Debug` for each failure type `main` can raise, for example with `Format.debugFields`. See Program entry and termination.
 
 ### SEM0226
 
