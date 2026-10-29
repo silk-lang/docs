@@ -59,6 +59,7 @@ FailStatement  = 'fail' Expression
 - The handler's success type joins the protected success type: a handler returning `bool` for an `i32` effect gives `i32 | bool`.
 - A handler declared `-> never ! F` re-raises a different failure. The success type stays `A`.
 - For `catchAll`, the handler's parameter type is the whole failure row, for example `A | B`. Match on it to tell members apart. See Patterns and match.
+- The parameter may also be a wider closed union than the row: `effect fn either(failure: Missing | Denied) -> i32` handles an Effect that fails only with `Missing`. The failure is widened to the parameter's union at the call.
 - A handler may be a partially applied effect function. The given arguments fill the trailing parameters and the failure fills the first: with `effect fn recover(error: Missing, base: i32) -> i32`, `Effect.catchAll(recover(5))` runs `recover(error, 5)`.
 - For `catch`, `S` may be written explicitly or inferred from the handler's parameter. `S` must be a member of the row (`where S in E`). Otherwise it is SEM0067: "Invalid Effect.catch handler: `main.Other` is not a failure of the handled Effect, which fails with `main.Problem`".
 - A handler is an effect function. A plain `fn` handler is SEM0067, and the message says to declare it `effect fn` with the same parameter and result.
@@ -297,4 +298,3 @@ Effects and run · Services and providers · Program entry and termination · Ow
 ## Open questions
 
 - SEM0061 ("failure type must be a detached ordinary value type") has no producer in the compiler. A reference failure type such as `! &i32` is accepted, and `Effect.catchAll` can recover it.
-- A plain `fn` handler passed to `Effect.catchAll` stops `silk check` with "unsupported: this construct is not supported by the native compiler yet", even when its parameter type is right.

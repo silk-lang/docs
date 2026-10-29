@@ -27,6 +27,7 @@ The operand of a borrow is usually a place: a binding, a field `x.f`, an element
 - Borrowing a value that is not a place creates a temporary: `&make()`, `&5`, `&(a + 1)`, `&mut make()`.
 - The temporary lives until the end of the enclosing statement. `read(&make())` is fine.
 - `let r = &5` followed by a use of `r` is OWN0019. Bind the value to a local first.
+- A shared borrow of a constant is not a temporary. `&TABLE` and `&TABLE[i]`, with `const TABLE: [i32; 4]`, are `&'static` and may be returned from any function. An empty array literal borrowed as a slice, `&[]`, is `&'static [T]` too.
 - A bound method value such as `make().get` cannot borrow a temporary receiver (SEM0056). Call it directly or bind the receiver first.
 
 ## Projections
@@ -36,7 +37,7 @@ The operand of a borrow is usually a place: a binding, a field `x.f`, an element
 - `&arr` converts to a slice `&[T]` where a slice is expected. `&mut arr` converts to `&mut [T]`.
 - An array is never passed where a slice is expected without `&` (SEM0012).
 - A slice has `.length` and is indexed like an array. Out-of-range indexes trap.
-- `Slice.view(values, offset, length)` from `silk/collections/slice` borrows a subrange of a shared slice.
+- `Slice.view(values, offset, length)` from `silk/collections/slice` borrows a subrange of a shared slice. `Slice.viewMut` does the same for an exclusive slice and returns `&mut [T]`.
 
 ## Reborrowing
 

@@ -58,11 +58,12 @@ Everything else moves. That includes exclusive references `&mut T` and `&mut [T]
   - is a field of a temporary such as `make().field`,
   - is reached through a reference, as in `move r.field` with `r: &P`.
 - Moving a whole referent or slice element out, as in `move r.*` or `move s[0]`, is OWN0012. See Borrowing.
+- Raw pointers own nothing, so moving a value out of one is an unsafe operation of `silk/mem/pointer`: `Pointer.take` moves it out, and `Pointer.dropInPlace` drops it where it lies. See Unsafe code and C interop.
 
 ## Moving out in match
 
 - `match move e { ... }` consumes the scrutinee. Arm bindings own the parts they bind.
-- `match e` on a non-`Copy` place without `move` or a borrow is OWN0003.
+- `match e` on a non-`Copy` place without `move` or a borrow is OWN0003. Through a borrow, `match status.*` with `status: &Status` is one OWN0003 that suggests the borrow: "`match status.*` would move `status.*` out of a borrow, which cannot give it away; write `match &status.*` to look at it". Checking continues as if `&` were written.
 - `match &e` and `match &mut e` borrow instead. See Borrowing.
 - A guard cannot consume a binding of its own arm (OWN0008). Guards read; arms consume.
 - See Patterns and match for patterns and `match place`.
