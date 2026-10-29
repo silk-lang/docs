@@ -87,7 +87,7 @@ Write the entry by hand. `silk add` only adds path dependencies.
 
 ### Fetching
 
-`silk build`, `silk check`, `silk test` and `silk run` fetch each commit that is not on the machine yet, before they load the package graph. Only the dependency's commit is downloaded, with the `git` found on `PATH`. If the server will not hand out a single commit by its hash, every branch and tag is fetched and the commit is taken from them. Git never prompts for a password, so a private repository needs credentials git already has, such as an SSH agent or a credential helper.
+`silk build`, `silk check`, `silk test` and `silk run` fetch each commit that is not on the machine yet, before they load the package graph. Only that one commit is downloaded (a shallow fetch), with the `git` found on `PATH`. If the server will not hand out a single commit by its hash, every branch and tag is fetched and the commit is taken from them. Git never prompts for a password, so a private repository needs credentials git already has, such as an SSH agent or a credential helper.
 
 Here the repository holds two packages, `vector` and `shared`, and `vector/silk.toml` depends on `shared = { path = "../shared" }`. `vector` exports a `length` module whose `length()` returns 42, and the program prints it:
 
@@ -125,7 +125,7 @@ The editor (`silk lsp`), `silk add`, `silk doc` and `silk doctest` never fetch. 
 Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `vector` of app@0.1.0: commit fb09a5d023a80e50a973adb896a198ab4daab4db of https://example.com/geometry.git is not fetched yet; silk build, check, test and run fetch it
 ```
 
-`silk doc` and `silk doctest` stop with `silk doc: invalid project, target, profile, source, or compiler analysis` (exit 2), and the editor shows no diagnostics for the package. Run `silk check` once to fetch.
+`silk doc` stops with `silk doc: invalid project, target, profile, source, or compiler analysis` and `silk doctest` with the same line starting `silk doctest:` (exit 2), and the editor shows no diagnostics for the package. Run `silk check` once to fetch.
 
 There is no lock file. The `rev` in the manifest is the whole record of what a build uses.
 

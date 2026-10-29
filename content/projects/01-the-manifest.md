@@ -119,7 +119,7 @@ vector = { git = "https://example.com/geometry.git", rev = "fb09a5d023a80e50a973
 
 | Key | Required | Meaning |
 | --- | --- | --- |
-| `path` | yes, without `git` | Path dependency: directory of the dependency's `silk.toml`, relative to this manifest. Git dependency: directory of the package inside the repository, relative to its root; default the root. |
+| `path` | yes, without `git` | Path dependency: directory of the dependency's `silk.toml`, relative to this manifest. Git dependency: directory of the package inside the repository, relative to its root. Default: the repository root. |
 | `git` | for a git dependency | The repository: a URL, an scp-style `host:path`, or an absolute path. |
 | `rev` | with `git` | The full commit hash, 40 or 64 lowercase hexadecimal digits. |
 | `package` | no | The dependency's `[package].name`. When given, it must match. |
