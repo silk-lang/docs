@@ -17,7 +17,7 @@ cd numberlines
 
 A `Writer` moves bytes. A `Logger` receives whole events, each with a level. Use a writer for the program's output and a logger for messages about the run. Code that needs one says so with `? &mut Writer`, `? &mut Logger` or `? &mut StandardInput`, and never names a provider. `main` picks the real ones.
 
-The native providers exist only on Linux and macOS with libc. On WebAssembly and the no-libc targets the `os_*` modules are empty, and you supply your own provider.
+The native providers exist on Linux and macOS with libc, and on the WASI targets `wasm32-wasip1` and `wasm32-wasip2`. On `wasm32-unknown-unknown` and Linux without libc the `*_native` modules are empty, and you supply your own provider.
 
 ## Writing output
 
@@ -42,7 +42,7 @@ effect fn emit(number: u32, line: &[u8]) -> () ! WriterError | LogError ? &mut W
 
 `Format.format` writes to the ambient `Writer`. For bytes with no template, use `Writer.writeString(text)` or `Writer.writeAll(bytes)`. The guide "Text and formatting" covers templates and options in full.
 
-`StdoutWriter` and `StderrWriter` have no buffer of their own: each write goes straight to the descriptor, and `flush` does nothing. Each `StderrWriter` write holds the standard error lock, described below, for its duration. A failed write may already have written a prefix.
+`StdoutWriter` and `StderrWriter` have no buffer of their own: each write goes straight to the descriptor, and `flush` does nothing. Each `StderrWriter` write holds the standard error lock, described below, for its duration. A failed write may already have written a prefix. **Buffering standard output** below shows how to put a buffer in front of them.
 
 ## Logging
 
@@ -187,6 +187,44 @@ With empty input, the first read reports the end:
 ```
 info: 0 lines, 0 bytes
 ```
+
+## Buffering standard output
+
+`Format.format` writes each piece of a template separately: the padding, the number, the two spaces, the text and the newline. With an unbuffered `StdoutWriter`, each piece is one system call, 24 writes to standard output for this input. `BufferedWriter` from `silk/io/buffered_output` collects small writes in a buffer and sends them when it fills. It wraps any `Writer` provider and is itself a `Writer`, so `numberLines` does not change. Only `main` does:
+
+```silk
+pub effect fn main() -> i32
+! StreamReadError | WriterError | LogError | BufferError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut input = OsStandardInput.make()
+  let mut out = run BufferedWriter<StdoutWriter>.make(StdoutWriter.make(), 4096)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  let mut logger = StderrLogger.make()
+  drop run numberLines()
+    |> Effect.provideMut<StandardInput>(&mut input)
+    |> Effect.provideMut<Writer>(&mut out)
+    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  drop run BufferedWriter<StdoutWriter>.finish(move out)
+  return 0
+}
+```
+
+Add `import silk.io.buffered_output { BufferedWriter }` and `import silk.io.buffered_input { BufferError }`. `BufferedWriter.make(destination, capacity)` takes the provider by value and allocates the buffer, which is why it needs the allocator and can fail with `BufferError` (a capacity of zero or over 1 MiB). Under `strace -e trace=write`, the run on `input.txt` now makes one write to standard output, of 78 bytes.
+
+`finish` sends what is left, flushes the destination and gives it back. `Writer.flush()` sends the pending bytes without ending the writer. Dropping a `BufferedWriter` does not flush it, so bytes that were never flushed are lost. Buffering also changes the order in which the two streams reach a terminal. The logger still writes at once, so with `2>&1` the warning and the summary now come first and the numbered lines after them:
+
+```
+warning: line 5 is not UTF-8 (byte 4); skipped
+info: 6 lines, 58 bytes
+   1  first line
+   2  second line
+   3  
+   4  café
+   6  no newline at end
+```
+
+For a stream protocol with deadlines, use `BufferedOutput` from the same module, which the Byte streams and buffering guide covers.
 
 ## A quick message on standard error
 
@@ -335,28 +373,29 @@ silk test
 
 ```
   main::numbersEveryLine
-    PASS  40 us
+    PASS  41 us
   main::warnsAboutInvalidUtf8
-    PASS  19 us
+    PASS  28 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   146 us
+Time   1 ms
 ```
 
-When an expectation fails, the runner prints its message under the test's name. Expect four lines instead of three, `lines == 4`, and the run exits with status 1:
+When an expectation fails, the runner prints its message under the test's name, and below it the place of the failed call. Expect four lines instead of three, `lines == 4`, and the run exits with status 1:
 
 ```
   main::numbersEveryLine
     assertion failed: three lines
-    FAIL  64 us
+      at main.numbersEveryLine (main:146:3)
+    FAIL  102 us
   main::warnsAboutInvalidUtf8
-    PASS  15 us
+    PASS  45 us
 
 Tests  1 passed, 1 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   139 us
+Time   1 ms
 ```
 
-The message is the text you passed to `expect`, unchanged, which is why it still says three. Put the 3 back.
+The message is the text you passed to `expect`, unchanged, which is why it still says three. `main:146:3` is the line and column of that `Testing.expect` call in `src/main.silk`. Put the 3 back.
 
 The guide "Testing with providers" goes further with fakes, and chapter 8 of the book introduces services and providers.
 
@@ -364,6 +403,7 @@ The guide "Testing with providers" goes further with fakes, and chapter 8 of the
 
 - `silk/io/writer`: `Writer`, `WriterError`
 - `silk/io/writer_native`: `StdoutWriter`, `StderrWriter` (`print`, `lock`), `LockedStderr`
+- `silk/io/buffered_output`: `BufferedWriter`; `silk/io/buffered_input`: `BufferError`
 - `silk/io/logger`: `Logger`, `LogLevel`, `LogError`, `InMemoryLogger`
 - `silk/io/logger_native`: `StderrLogger`, `StdoutLogger`
 - `silk/io/standard_input`: `StandardInput`, `ReadOutcome`, `StreamReadError`

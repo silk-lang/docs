@@ -151,7 +151,7 @@ effect fn roll() -> u64 ? &mut Random {
 }
 ```
 
-`OsRandom` uses `getrandom` on Linux and `arc4random_buf` on macOS. Like the clocks, it has no failure row. If the system can't deliver secure bytes, the program stops with a trap rather than carry on with weak ones. A provider of `Random` must never hand out predictable bytes, so a target without a secure source simply has no `Random` provider.
+`OsRandom` uses `getrandom` on Linux, `arc4random_buf` on macOS and `random_get` on WASI. Like the clocks, it has no failure row. If the system can't deliver secure bytes, the program stops with a trap rather than carry on with weak ones. A provider of `Random` must never hand out predictable bytes, so a target without a secure source simply has no `Random` provider.
 
 ## Seeded random values
 
@@ -189,11 +189,11 @@ The two services are separate on purpose. Try to provide the seeded generator wh
 
 ```
 Checking timing (x86_64-unknown-linux-gnu)
-  load     60 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        1.75s
+  load     161 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-src/main.silk:144:7: error[SEM0123] The provider matches no compatible requirement
-Failed timing in 1.81s
+src/main.silk:144:7: error[SEM0123] silk.system.insecure_random.Xoshiro256StarStar does not implement silk.system.random.Random, so it cannot provide it
+Failed timing in 0.14s
 ```
 
 SEM0123 means the value given to `provideMut<Random>` does not implement `Random`. A seeded generator can't stand in for a secure source by accident.
@@ -254,10 +254,10 @@ silk run
 ```
 
 ```
-now: 1792518771 s since 1970 = 2026-10-20, 17:52 UTC
+now: 1793292657 s since 1970 = 2026-10-29, 16:50 UTC
 asked for 50 ms, slept 50 ms
-token: 8343ba6a350cde8651ecaa655bd7c90f
-secure dice: 6 and 5
+token: 1be2b1b55137184ca997347c4bc18311
+secure dice: 3 and 1
 seed 42: 1 1 6 6 5 1 5 4
 seed 42: 1 1 6 6 5 1 5 4
 seed 7: 1 3 1 5 3 6 5 5
@@ -346,14 +346,14 @@ silk test
 
 ```
   main::convertsDays
-    PASS  2 us
+    PASS  9 us
   main::sleepUsesTheProvidedClock
-    PASS  2 us
+    PASS  10 us
   main::wallClockReadsTheProvider
-    PASS  15 us
+    PASS  28 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   71 us
+Time   1 ms
 ```
 
 For code that needs `Random`, a test can provide a scripted `fillBytes` that writes known bytes. Use such a provider only in tests. In production, `Random` must come from `OsRandom` or another real secure source.

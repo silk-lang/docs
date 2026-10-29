@@ -64,6 +64,8 @@ The scope never flushes for you. When the callback returns or fails, anything st
 
 Failures from these operations are `BufferError` from `silk/io/buffered_input`. The transport's own failures arrive wrapped, with how far the operation got: `ReadFailed { progress, error }` and `WriteFailed { accepted, drained, error }`, where `error` is the `ByteIoError`. After such a failure the session is terminal, and further operations fail with `BufferError.Terminal`.
 
+The buffers also exist on their own. `BufferedOutput` from `silk/io/buffered_output` is the output half without a session: make it with `BufferedOutput.make(capacity)`, write through it to a `ByteDuplex` with a deadline, and end with `finish`, because dropping it does not flush. Code that writes text through the `Writer` service, such as `Format.format`, wants `BufferedWriter` from the same module instead. It wraps a `Writer` provider such as `StdoutWriter` and is a `Writer` itself; the Output, logging and standard input guide shows it. Use `BufferedOutput` when the destination is a `ByteDuplex` or the caller keeps it, and `BufferedWriter` for code that requires `&mut Writer`.
+
 ## The protocol
 
 `numberLines` is the server's work, written against a session over any provider `P`:
@@ -393,14 +395,14 @@ silk test
 
 ```
   main::aSilentPeerTimesOut
-    PASS  61 us
+    PASS  76 us
   main::copiesEveryByte
-    PASS  30 us
+    PASS  43 us
   main::numbersLinesSplitAcrossReads
-    PASS  33 us
+    PASS  66 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   193 us
+Time   1 ms
 ```
 
 ## The program
@@ -556,7 +558,7 @@ A client that sends one line and then goes quiet gets its answer at once, becaus
 - `silk/io/byte_duplex`: `ByteDuplex`, `ReadTransfer`, `ByteIoError`, `ByteIoOperation`
 - `silk/io/buffered_duplex`: `BufferedDuplex`, `withBuffered`, `withBufferedCapacity`, `withBufferedPairCapacity`, `DEFAULT_CAPACITY`
 - `silk/io/buffered_input`: `BufferedInput`, `BufferError`, `FillOutcome`
-- `silk/io/buffered_output`: `BufferedOutput`
+- `silk/io/buffered_output`: `BufferedOutput`, `BufferedWriter`
 - `silk/io/buffered_transfer`: `BufferedTransfer`, `TransferOutcome`
 - `silk/io/memory_byte_duplex`: `MemoryByteDuplex`, `MemoryReadEvent`, `MemoryWriteEvent`, `MemoryWriteAction`
 - `silk/system/monotonic_clock`: `MonotonicClock`

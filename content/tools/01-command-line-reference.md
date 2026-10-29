@@ -125,16 +125,18 @@ Analyzes every planned target without generating code. Each target prints a head
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.06s
-  check    2 modules                         0.13s
-  borrow   99 bodies                         0.00s
-Finished hello in 0.20s
-Checking hello (wasm32-unknown-unknown)
-  load     47 modules, 1 in package          0.06s
-  check    2 modules                         0.04s
-  borrow   27 bodies                         0.00s
+  load     143 modules, 1 in package         0.06s
+  check    2 modules                         0.14s
+  borrow   123 bodies                        0.00s
+Finished hello in 0.22s
+Checking hello (wasm32-wasip1)
+  load     136 modules, 1 in package         0.02s
+  check    2 modules                         0.08s
+  borrow   79 bodies                         0.00s
 Finished hello in 0.11s
 ```
+
+That is `silk check --target host --target wasm32-wasip1` on the program `silk init` writes.
 
 | Option | Meaning |
 | --- | --- |
@@ -155,12 +157,12 @@ Builds every planned target. The rows add `codegen` and `link`, and the final li
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     51 modules, 1 in package          0.07s
+  load     143 modules, 1 in package         0.03s
   check    1 module                          0.00s
-  codegen  364 functions                     0.25s
-  borrow   115 bodies                        0.01s
-  link     clang                             0.17s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.55s
+  codegen  689 functions                     0.28s
+  borrow   229 bodies                        0.01s
+  link     clang                             0.36s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.71s
 ```
 
 `--progress`, `--quiet` and `--timings` work as for `check`. `--timings` also lists the slowest functions to emit.
@@ -171,20 +173,20 @@ Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.55s
 silk run [project options] [--progress <mode>] [--quiet] [arguments...] [-- arguments...]
 ```
 
-Builds the host executable and runs it in the current directory. The build prints the same progress output as `silk build`, on standard error, and ends with `Finished` before the program starts or `Failed` when it does not build. Standard output carries only the program's output. `--progress` and `--quiet` work as for `check`.
+Builds the executable and runs it in the current directory. On a WASI target it runs the module with `wasmtime`; see **Targets and profiles**. The build prints the same progress output as `silk build`, on standard error, and ends with `Finished` before the program starts or `Failed` when it does not build. Standard output carries only the program's output. `--progress` and `--quiet` work as for `check`.
 
 Options are read up to `--`. Any argument that does not start with `-`, and every argument after `--`, is passed to the program in order. The exit status is the program's own. A program whose `main` returns 7 makes `silk run` exit 7. A build that fails exits 1, or 2 when Clang is missing or the construct is not supported yet, and the program does not start.
 
 ```
 $ silk run --quiet -- Ada
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 1.49s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.78s
 Hello, Ada!
 ```
 
 At a workspace root, `run` runs the only executable member. With two or more, pass `-p`. A library cannot run:
 
 ```
-Cannot run static-library artifact
+Cannot run library artifact
 ```
 
 ## test
@@ -227,7 +229,7 @@ Formats every `.silk` file under the package's source root, or only the given fi
 silk lsp [--stdlib <directory>]
 ```
 
-Runs a language server that speaks the Language Server Protocol over standard input and output. An editor starts it; you do not run it by hand. It reports diagnostics as you type, lists the declarations in a file, folds blocks, and formats the file the way `silk format` does. Hover, go to definition and signature help work for the functions you call, from your package or the std lib, and for local variables where they are used. Inlay hints show the type of each `let` binding. Completion, find references, rename and workspace symbol search work over the package. See **Editor setup** in Get started.
+Runs a language server that speaks the Language Server Protocol over standard input and output. An editor starts it; you do not run it by hand. It reports diagnostics as you type, lists the declarations in a file, folds blocks, and formats the file the way `silk format` does. Hover and go to definition work on the names you use and declare, from your package or the std lib, and signature help on the call you type. Inlay hints show the type of each `let` binding. Completion, find references, rename and workspace symbol search work over the package. See **Editor setup** in Get started.
 
 ## doc, doctest and doc-reference
 
@@ -281,7 +283,7 @@ Each installed version is a release archive unpacked as is, without its `bin/sil
 | `set <version>` | Pin the project to that version in `silk.toml`. Downloads nothing |
 | `update self` | Replace the tool with the one from the newest release. Installs no Silk version |
 
-A version is a release such as `0.1.0` or `0.1.0-dev.11`, `latest` (the newest stable release) or `dev` (the newest release, dev releases included); `latest --dev` is the same as `dev`. `use <version>` and `set` always write the full version, build metadata included.
+A version is a release such as `0.1.0` or `0.1.0-dev.11`, `latest` (the newest stable release) or `dev` (the newest release, dev releases included); `latest --dev` is the same as `dev`. Until a stable release is published, `latest` names nothing: `silk use latest` exits 1 with `` silk: no stable Silk release is published yet; `latest --dev` names the newest dev release ``. `use <version>` and `set` always write the full version, build metadata included.
 
 ```
 $ silk use list
@@ -375,7 +377,7 @@ $ silk use uninstall 0.5.0
 
 ### update
 
-`silk update self` takes the newest stable release (the newest dev release while none is stable, or always with `--dev`), checks its archive's signature, and replaces `$SILK_HOME/bin/silk` with its `bin/silk`. It installs no Silk version, and leaves a tool that is already as new alone. This and the installer are the only ways the tool changes; it never updates itself on its own.
+`silk update self` takes the newest stable release (the newest dev release while none is stable, or always with `--dev`), checks its archive's signature, and replaces `$SILK_HOME/bin/silk` with its `bin/silk`. It installs no Silk version, and leaves a tool that is already as new alone, saying `silk 0.1.0 is up to date (newest release: 0.1.0)`. This and the installer are the only ways the tool changes; it never updates itself on its own.
 
 `silk update silk` changes nothing and exits 2, because Silk versions are installed side by side rather than updated:
 
@@ -406,17 +408,17 @@ No silk.toml found from /home/you/loose; run `silk init` to create a package her
 ```
 
 ```
-silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|object] [--target <triple>] [--clang <path>] [--stdlib <directory>] [--optimization none|speed] [--debug true|false] [--stats]
-silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--timeout <seconds>] [--optimization none|speed] [--debug true|false]
+silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|object] [--target <triple>] [--clang <path>] [--stdlib <directory>] [--optimization none|speed|size] [--debug true|false] [--stats]
+silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--timeout <seconds>] [--optimization none|speed|size] [--debug true|false] [--no-cache]
 ```
 
-`--emit` picks the output stage: `llvm-ir` writes LLVM text, `object` an object file. `--stats` prints compiler query counters. Diagnostics print the same way as `silk check` prints them, and a successful build prints one `Compiled` line. Paths in that line are relative to the current directory, or absolute when the file is outside it:
+`--emit` picks the output stage: `llvm-ir` writes LLVM text, the whole-program module the executable would link, and `object` an object file. `--optimization` names the Clang optimization directly: `none` (`-O0`), `speed` (`-O2`) or `size` (`-Oz`). The source file must sit below the package's source root; when that folder does not exist, both forms stop with `silk: invalid source root` (exit 1). `--stats` prints compiler query counters. Diagnostics print the same way as `silk check` prints them, and a successful build prints one `Compiled` line. Paths in that line are relative to the current directory, or absolute when the file is outside it:
 
 ```
 $ silk build bad.silk -o out
 /home/you/demo/bad.silk:1:31: error[SEM0129] Return expected i32 but received bool
 $ silk build good.silk -o out
-Compiled good.silk -> out (llvm, x86_64-unknown-linux-gnu, 182 symbols)
+Compiled good.silk -> out (llvm, x86_64-unknown-linux-gnu, 243 symbols)
 ```
 
 With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnostic as a `SILK_BUILD_ERROR=` JSON record with the code, byte span and module instead, for tools that read them.
@@ -426,8 +428,8 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | Status | Meaning |
 | --- | --- |
 | 0 | Success. For `format --check`: every file is already formatted |
-| 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, a source file or folder named `silk` or `Intrinsic`, any `silk change` error including a malformed `silk change` command line |
-| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
+| 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, any `silk change` error including a malformed `silk change` command line |
+| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, a source file or folder named `silk` or `Intrinsic`, a dependency or `exports` problem, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
 | 3, 4, 5 | From the tool: the selected version is not installed, a download failed, or a release failed verification. See "Exit status of the tool" |
 | other | `silk run` only: the program's own status |
 
@@ -446,6 +448,12 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
 | `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
+| `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and profiles** |
+| `SILK_PROFILE_USE` | A merged `.profdata` file: native builds pass `-fprofile-use=<file>` to Clang |
+| `SILK_WASMTIME` | The `wasmtime` that `silk run` and `silk test` use on a WASI target; default `wasmtime` on `PATH` |
+| `SILK_WASM_TOOLS` | The `wasm-tools` that builds a `wasm32-wasip2` component; default `wasm-tools` on `PATH` |
+| `SILK_WASI_ADAPTER` | The Preview 1 command adapter, `wasi_snapshot_preview1.command.wasm`, that a `wasm32-wasip2` executable needs |
+| `SILK_WASI_REACTOR_ADAPTER` | The Preview 1 reactor adapter, for a `wasm32-wasip2` component without a `main` |
 | `SSL_CERT_FILE` | The certificate bundle for `silk change since` and `silk use` when they fetch releases over HTTPS |
 | `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path |
 | `SILK_TOOLCHAIN` | For the tool: the version to run, overriding the project's pin. The tool sets it to the full version it runs |

@@ -437,7 +437,7 @@ pub fn main() -> i32 {
 A `main` that provides the plain provider instead, `let offset = Offset { amount: 10 }` followed by `return run Effect.provide(measure(), &offset)`, is rejected:
 
 ```
-src/main.silk:33:14: error[SEM0123] The provider matches no compatible requirement
+src/main.silk:33:14: error[SEM0123] A provider that matches no member of its concrete source requirement row
 ```
 
 ## Diagnostics

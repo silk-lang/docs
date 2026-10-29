@@ -38,12 +38,14 @@ EffectEnvironment  = 'effect' '<' Lifetime '>' 'fn' ...
 - `'static` lasts for the whole program. It needs no declaration.
 - String literals have type `string<'static>`.
 - A function with no borrowed inputs must write `'static` on a borrowed result: `fn label() -> string<'static>`.
+- A shared borrow of a constant, `&TABLE` or `&TABLE[i]`, has the `'static` lifetime, so `fn table() -> &'static [i32; 4] { return &TABLE }` is valid. So does `&[]` as a slice: `fn none() -> &'static [i32] { return &[] }`.
 
 ## References in structs
 
 - A struct field may name a declared lifetime: `struct View<'a> { item: &'a i32 }`.
+- An `extern "C" struct` may declare lifetime parameters too, to tie raw pointers to the Silk data they point into: `extern "C" struct BufferRef<'a> { data: ?[*]const u8, length: usize }`. See Unsafe code and C interop.
 - A field reference with no lifetime gets a hidden lifetime parameter of the struct, one per omitted lifetime, in field order.
-- `struct Pair { a: &i32 b: &i32 }` therefore has two lifetime parameters. `Pair<'x, 'x>` is valid. `Pair<'x>` is SEM0051.
+- `struct Pair { a: &i32, b: &i32 }` therefore has two lifetime parameters. `Pair<'x, 'x>` is valid. `Pair<'x>` is SEM0051.
 - A `string` field with no lifetime is elided the same way. This works in union variants and in the type's impl blocks: `union Label { Named { text: string }, Empty }`.
 
 ## Lifetime arguments

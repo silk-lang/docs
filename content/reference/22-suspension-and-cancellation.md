@@ -7,11 +7,11 @@ A running Effect can suspend at a `run` and be resumed later, or be cancelled wh
 ```
 PropertyBound     = Bound '+' Property ( '+' Property )*
 Property          = 'Intrinsic' '.' ( 'NonParking' | 'Detached' )
-NonParkingMarker  = 'with' 'Intrinsic' '.' 'nonParking' '(' ')'
+NonParkingMarker  = '@nonParking'
 ```
 
 - A `PropertyBound` appears in a generic parameter list after a callable or Effect bound: `F: once fn() -> i32 + Intrinsic.NonParking`.
-- `NonParkingMarker` ends a service operation signature: `effect fn close() -> () ! E ? &mut S with Intrinsic.nonParking()`.
+- `NonParkingMarker` is a directive on the line before a service or interface operation: `@nonParking` then `effect fn close() -> () ! E ? &mut S`. See Intrinsics for directives.
 
 ## Suspension points
 
@@ -63,9 +63,11 @@ NonParkingMarker  = 'with' 'Intrinsic' '.' 'nonParking' '(' ')'
 - `NonParking` is checked when building, not by `silk check`. A violation is SEM0139, or SEM0225 for the program entry.
 - A `NonParking` value is checked even when the program never runs it.
 - `NonParking` is required by: the finalizer of `Effect.ensuringNonParking`, the release of `Effect.useReleaseNonParking`, the `register` callback of `Execution.park`, the `onReady`, `onComplete` and `onSuspend` callbacks of `Execution`, and the program entry.
-- A service operation marked `with Intrinsic.nonParking()` requires each provider's implementation to be `NonParking`. A parking provider is SEM0139 at the call.
-- `Intrinsic.nonParking()` takes no fields, and there is no `Intrinsic.detached()` clause. `with Intrinsic.nonParking(strict: true)` or `with Intrinsic.detached()` is SEM0235 at the clause, in both `silk check` and `silk build`. `Detached` is only a bound.
-- `Intrinsic.foreign(...)` and `Intrinsic.machine(...)` are not allowed on a service operation. Either is SEM0236 at the clause.
+- A service operation marked `@nonParking` requires each provider's implementation to be `NonParking`. A parking provider is SEM0139 at the call of the operation, when `silk build` checks it: "`close` must not park, because this call needs an `Intrinsic.NonParking` value, but running it can park; move work that can suspend, such as `Effect.sleep`, out of it".
+- `@nonParking` is also accepted on an ordinary function with a Silk body.
+- `@nonParking` takes no arguments, and there is no `@detached` directive. `@nonParking(strict: true)` or `@detached` is SEM0235 at the directive, in both `silk check` and `silk build`. `Detached` is only a bound.
+- The other directives are not allowed on a service operation. `@inline`, `@features`, `@foreign` or `@naked` there is SEM0236 at the directive.
+- A leftover `with Intrinsic.nonParking()` clause is PAR0011: ``Silk has no `with` clauses; write `@nonParking` on the line before the declaration``.
 
 ## Execution, park and wake
 
@@ -498,8 +500,9 @@ SEM0139, a parking finalizer passed to `Effect.ensuringNonParking`. In the cance
 | OWN0016 | Code reached from a `Shared.with` or `Shared.withMut` callback runs an Effect or notifies an execution while the access is held |
 | SEM0139 | An executable fails a sealed property obligation, such as `Intrinsic.NonParking`, or an `Execution.make` body that borrows a caller's local and so is not `Intrinsic.Detached` |
 | SEM0225 | `main` may park, but the runtime starts it without a scheduler |
-| SEM0235 | Unknown property clause or field, such as `with Intrinsic.detached()` |
-| SEM0236 | Known property clause on an operation that does not take it, such as `with Intrinsic.machine(noReturn: true)` |
+| PAR0011 | A leftover `with Intrinsic.nonParking()` clause; write `@nonParking` before the operation |
+| SEM0235 | Unknown directive or argument, such as `@detached` or `@nonParking(strict: true)` |
+| SEM0236 | Known directive on an operation that does not take it, such as `@noReturn` or `@inline` |
 
 ## See also
 
@@ -508,6 +511,6 @@ Effects and run · Fibers and scheduling · Typed failures · Allocation and sha
 ## Open questions
 
 - SEM0139, and SEM0225 for a parking `main`, are reported only by a build. `silk check` accepts a program that violates `Intrinsic.NonParking`.
-- SEM0139 for a parking provider of a `with Intrinsic.nonParking()` operation can point into `silk/core/effect`, for example when `main` runs the operation directly. The user site is not named.
+- SEM0139 for a parking provider of a `@nonParking` operation points into `silk/core/effect` (`effect.silk:835:12` in this build) when `main` runs the operation directly through `Effect.provideMut`. The user site is not named. When another effect function runs the operation, the error is at that call.
 - OWN0016 for a wake inside a callback is reported at `silk/concurrency/execution.silk`, not at the user's call.
 - SEM0201, an `export "C"` function that may park, is also reported only by `silk build`.

@@ -155,13 +155,13 @@ silk run
 ```
 
 ```
-sent 19 bytes as b9a44880 in 0 ms
+sent 19 bytes as 60e4d99f in 0 ms
 ```
 
 `nc` prints what arrived:
 
 ```
-REPORT b9a44880
+REPORT 60e4d99f
 disk 81%
 load 0.42
 ```
@@ -596,18 +596,18 @@ silk test
 
 ```
   tests::logFailureComesAfterSending
-    PASS  55 us
+    PASS  81 us
   tests::missingFileSendsNothing
-    PASS  25 us
+    PASS  31 us
   tests::outOfMemoryIsReported
-    PASS  32 us
+    PASS  26 us
   tests::sendsHeaderThenBody
-    PASS  40 us
+    PASS  39 us
   tests::slowPeerTimesOut
-    PASS  28 us
+    PASS  24 us
 
 Tests  5 passed, 0 failed (0 cached, 5 executed, 5 selected, 5 discovered)
-Time   308 us
+Time   1 ms
 ```
 
 The times vary from run to run; the results do not.
@@ -618,22 +618,23 @@ Suppose you expect the log line to say `in 0 ms`, as it did when you ran the pro
 
 ```
   tests::logFailureComesAfterSending
-    PASS  56 us
+    PASS  120 us
   tests::missingFileSendsNothing
-    PASS  24 us
+    PASS  33 us
   tests::outOfMemoryIsReported
-    PASS  26 us
+    PASS  51 us
   tests::sendsHeaderThenBody
     assertion failed: log line uses virtual time
-    FAIL  73 us
+      at tests.sendsHeaderThenBody (tests:76:3)
+    FAIL  90 us
   tests::slowPeerTimesOut
-    PASS  33 us
+    PASS  39 us
 
 Tests  4 passed, 1 failed (0 cached, 5 executed, 5 selected, 5 discovered)
-Time   359 us
+Time   1 ms
 ```
 
-The command exits with status 1. The line under the test's name is the message of the failing `expect`, and it is the whole report. A message that says what was expected, like `log line uses virtual time`, tells you what broke before you open the file.
+The command exits with status 1. The line under the test's name is the message of the failing `expect`, and the `at` line below it is where that `expect` is: line 76, column 3 of the `tests` module. A message that says what was expected, like `log line uses virtual time`, tells you what broke before you open the file.
 
 Forgetting to provide a fake is caught before anything runs. Remove the `Random` line from `send`, and `silk check` stops:
 

@@ -16,16 +16,17 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 
 - The entry point is the function named `main` in the root module of the package. It must be `pub` and take no parameters.
 - The default hosted runtime is the std lib module `silk/platform/native/start`. It calls `main` and turns its result into the process status.
+- The WebAssembly targets have their own runtimes. `wasm32-wasip1` and `wasm32-wasip2` use `silk/platform/wasi/start`, which accepts the same `main` shapes as the hosted runtime, including `? &mut HostInput`. An uncaught failure there exits with status 1 and writes no report. `wasm32-unknown-unknown` uses `silk/platform/wasm/start`: the host calls the exported `main` with no arguments and no services. On both, `main` must not park.
 - A package can name other runtimes in `silk.toml`, as `[unstable]` `composition = { runtimes = [{ name = "synchronous", module = "silk/platform/native/start_sync" }], defaults = [] }`. A profile picks one with `runtime = { kind = "named", name = "synchronous" }` beside its `target`, and `silk build --profile <name>` uses it. A name listed in `defaults` is used by a plain `silk build`. `silk/platform/native/start_sync` starts only an `effect fn main() -> i32 ? &HostInput`. It also accepts `? &mut HostInput` and a failure row. A typed failure drops its payload and exits with 1, with no report.
 - Under `silk/platform/native/start_sync`, any other `main`, such as `pub fn main() -> i32` or `pub effect fn main() -> i32` with no requirement, is SEM0225 at `main` in both `silk check` and `silk build`: "Entry point `main` has a result or requirement the selected runtime `silk/platform/native/start_sync` cannot start".
 - Both `silk check` and `silk build` check the entry against the runtime, except for parking: a `main` that may park passes `silk check` and fails only `silk build`. A `main` the runtime cannot start is SEM0225, reported at the name `main`, or at line 1, column 1 when there is none:
 
 | Problem | Message |
 | --- | --- |
-| No `main` in the root module | Entry point `main` is missing: the entry module must declare `pub fn main` |
+| No `main` in the root module | Entry point `main` is missing: the entry module must declare `pub fn main`, or a library package sets `kind = "library"` under `[package]` in silk.toml |
 | `main` is not `pub` | Entry point `main` must be `pub` |
 | `main` declares a parameter | Entry point `main` must take no parameters |
-| Unsupported result type or requirement | Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` |
+| Unsupported result type, requirement, or a failure type without `Debug` | Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` and whose errors all implement `Debug` |
 | A `main` shape a std lib runtime such as `silk/platform/native/start_sync` does not adapt | Entry point `main` has a result or requirement the selected runtime `<module>` cannot start |
 | `main` may park | Entry point `main` may park, but the selected runtime starts it without a scheduler, so it must not park |
 
@@ -63,7 +64,8 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 
 - A trap is a fatal runtime error. It does not unwind and runs no cleanup.
 - The runtime writes `fatal trap: <reason>` to standard error, followed by the frame where it happened. The process then stops with an illegal-instruction signal (the shell shows status 132).
-- Reasons include `arithmetic overflow`, `division by zero`, `index out of bounds` and `slice range out of bounds`.
+- Reasons include `arithmetic overflow`, `division by zero`, `index out of bounds`, `slice range out of bounds` and `invalid shift count`.
+- A trap raised inside a std lib function that checks its arguments, such as `u32.shiftLeft` with a count of 32, is reported at the line of the call into the std lib, not inside it.
 - Arithmetic overflow traps for every integer width, including `u8`. Use the `checked*`, `wrapping*` or `saturating*` functions in `silk/num/i32` and the other integer modules to avoid it.
 - Indexes that are known at compile time to be out of range are rejected before the program runs (SEM0034).
 
@@ -179,7 +181,7 @@ fatal trap: index out of bounds
 
 ## See also
 
-Control flow · Functions and methods · Structs, tuples and arrays · Values and primitive types · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/platform/native/start`, `silk/system/host_input`, `silk/io/standard_input`, `silk/io/standard_input_native`, `silk/io/writer_native`, `silk/io/writer`
+Control flow · Functions and methods · Structs, tuples and arrays · Values and primitive types · Effects and run · Typed failures · Services and providers · Fibers and scheduling · `silk/platform/native/start`, `silk/platform/wasi/start`, `silk/platform/wasm/start`, `silk/system/host_input`, `silk/io/standard_input`, `silk/io/standard_input_native`, `silk/io/writer_native`, `silk/io/writer`
 
 ## Open questions
 

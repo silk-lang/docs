@@ -86,12 +86,12 @@ silk run
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.10s
-  check    1 module                          0.16s
-  codegen  422 functions                     0.40s
-  borrow   137 bodies                        0.01s
-  link     clang                             0.25s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.96s
+  load     143 modules, 1 in package         0.06s
+  check    1 module                          0.15s
+  codegen  689 functions                     0.17s
+  borrow   229 bodies                        0.01s
+  link     clang                             0.36s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.80s
 Hello, world!
 ```
 
@@ -205,11 +205,11 @@ silk run
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.10s
-  check    failed: 1 module, 1 error         0.15s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 1 module, 1 error         0.19s
 [x86_64-unknown-linux-gnu]
 src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
-Failed tasks in 0.27s
+Failed tasks in 0.25s
 ```
 
 The program did not compile, so nothing ran, and `silk run` exits with status 1. You get the same report without building anything from `silk check`:
@@ -220,14 +220,14 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.04s
-  check    failed: 2 modules, 1 error        0.14s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
-Failed tasks in 0.19s
+Failed tasks in 0.17s
 ```
 
-`silk check` type-checks the package for each target without producing a program, so it is fast. While it works, it reports its progress: the package and target it is checking, one row per phase with what the phase covered and how long it took, and a last line that says whether it finished or failed. Here `load` read your one module and 52 modules of the standard library, and `check` stopped with one error. Then come the errors themselves. Each error line has a file, a line and a column, then the error code in brackets, then a message.
+`silk check` type-checks the package for each target without producing a program, so it is fast. While it works, it reports its progress: the package and target it is checking, one row per phase with what the phase covered and how long it took, and a last line that says whether it finished or failed. Here `load` read your one module and 142 modules of the standard library, and `check` stopped with one error. Then come the errors themselves. Each error line has a file, a line and a column, then the error code in brackets, then a message.
 
 Line 9, column 7 is the start of the `Effect.log` call. The template is checked by the standard library module `silk/text/format`, which runs while your code compiles. When it finds a placeholder with no matching field, it asks the compiler to stop the build, and the compiler reports the stop at your call. SEM0177 means library code requested the failure, and the message is the text the library gave: the placeholder it could not fill, `{versoin}`, and the fields you did pass, here just `version`. Compare the two and the typo is plain.
 
@@ -239,10 +239,10 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.04s
-  check    2 modules                         0.20s
-  borrow   144 bodies                        0.00s
-Finished tasks in 0.25s
+  load     143 modules, 1 in package         0.05s
+  check    2 modules                         0.14s
+  borrow   127 bodies                        0.00s
+Finished tasks in 0.21s
 ```
 
 The `borrow` row is the ownership check, which runs over each function body once the types are known. Chapter 4 explains what it looks for. The times on your machine will differ.
@@ -259,12 +259,12 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.05s
-  check    1 module                          0.19s
-  codegen  462 functions                     0.25s
-  borrow   155 bodies                        0.01s
-  link     clang                             0.19s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.72s
+  load     143 modules, 1 in package         0.06s
+  check    1 module                          0.17s
+  codegen  709 functions                     0.15s
+  borrow   234 bodies                        0.01s
+  link     clang                             0.34s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.74s
 ```
 
 A build runs the same phases as a check, then two more: `codegen` turns the functions your program uses into machine code, and `link` runs Clang to make the executable. The last line names the file it wrote. The program is a native executable at `build/llvm/<target>/debug/tasks`. On 64-bit Linux the target is `x86_64-unknown-linux-gnu`. `debug` is the default build: compiled quickly, without optimizations. You can run the file directly, with no `silk` involved:
@@ -277,7 +277,7 @@ A build runs the same phases as a check, then two more: `codegen` turns the func
 tasks 0.1: nothing to track yet
 ```
 
-Next to it you will find `tasks.symbols`, a table that maps the program's machine-level symbol names back to Silk names.
+Next to it you will find `tasks.symbols`, a table that maps the program's machine-level symbol names back to Silk names. `tasks.inputs` records the files the build read, and the `tasks.units` folder caches compiled pieces, so the next build can skip work that has not changed.
 
 Two more commands round out the set for now. `silk build --release` builds an optimized program into `build/llvm/<target>/release/` instead. `silk clean` deletes the `build` folder when you want a fresh start. Chapter 11 returns to build options.
 

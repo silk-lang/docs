@@ -169,7 +169,7 @@ silk run; echo "exit $?"
 exit 12
 ```
 
-Importing the private `secret`:
+Adding an import of the private `secret` to `src/main.silk`:
 
 ```silk
 import geometry.Point { secret }
@@ -177,18 +177,18 @@ import geometry.Point { secret }
 
 ```
 Checking shapes (x86_64-unknown-linux-gnu)
-  load     53 modules, 3 in package          0.06s
-  check    failed: 4 modules, 1 error        0.13s
+  load     139 modules, 3 in package         0.03s
+  check    failed: 4 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:1:25: error[SEM0015] `secret` is private to geometry.Point; mark it `pub` there to use it here
-Failed shapes in 0.20s
+Failed shapes in 0.11s
 ```
 
 ## Diagnostics
 
 | Code | Meaning |
 | --- | --- |
-| MOD0001 | No module at that path: `Unknown module geometry.Pointt` |
+| MOD0001 | No module at that path: `Unknown module geometry.Pointt`. When a std lib module with the same last segment exists elsewhere, a note names it: `import silk.list` adds ``note: did you mean `silk.collections.list`?`` |
 | MOD0002 | A module imports itself. Only the import is reported, with no follow-on SEM0016 in that module or in modules that import it |
 | MOD0003 | Another package's module that its `exports` does not list |
 | MOD0004 | An import of `Intrinsic`, or of a module under it other than `Intrinsic.application`. `Intrinsic` needs no import. See **The standard library** for reserved names |

@@ -1,6 +1,6 @@
 # Intrinsics
 
-`Intrinsic` is the compiler-provided namespace of primitive operations, types and properties. The whole namespace is public: any module may use any member. Some members are unsafe. Most programs reach them through standard library wrappers.
+`Intrinsic` is the compiler-provided namespace of primitive operations and types. The whole namespace is public: any module may use any member. Some members are unsafe. Most programs reach them through standard library wrappers. This page also covers directives, the `@name` lines that tell the compiler how to build a function.
 
 ## Syntax
 
@@ -8,7 +8,9 @@
 IntrinsicPath   = 'Intrinsic' '.' Name
 IntrinsicCall   = 'unsafe'? 'Intrinsic' '.' Name TypeArguments? '(' Arguments? ')'
 IntrinsicImport = 'import' 'Intrinsic' '.' Name
-PropertyClause  = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Name ':' Expression )* )? ')'
+Directive       = '@' Name ( '(' ( DirectiveArg ( ',' DirectiveArg )* ','? )? ')' )?
+DirectiveArg    = ( Name ':' )? DirectiveLit
+DirectiveLit    = TextLiteral | '-'? DecimalInteger | 'true' | 'false' | '(' ( DirectiveLit ( ',' DirectiveLit )* ','? )? ')'
 ```
 
 ## The namespace
@@ -17,7 +19,7 @@ PropertyClause  = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Na
 - Importing it is MOD0004. Any import whose path starts with `Intrinsic`, such as `import Intrinsic { replace }`, prints ``Module Intrinsic cannot be imported: `Intrinsic` is reserved for compiler intrinsics, which are written `Intrinsic.<name>` without an import``. The one importable module is `Intrinsic.application`, below.
 - No declaration can take the name: `struct Intrinsic {}` is a binding conflict (SEM0016).
 - Members are fixed by the compiler. An unknown member name is SEM0010.
-- A member is a value (called like a function), a type, or a property used in a `with` clause or a bound.
+- A member is a value (called like a function), a type, or a property used as a bound.
 - Type arguments are never inferred. Write exactly the number the member takes, or it is SEM0051: `Intrinsic.pointerFromMutRef<i32>(&mut v)`.
 - A call's result converts to an annotated binding, a parameter or a declared result like any other value: `let p: ?*const i32 = Intrinsic.pointerNull<i32>()`.
 
@@ -26,24 +28,28 @@ PropertyClause  = 'with' 'Intrinsic' '.' Name '(' ( Name ':' Expression ( ',' Na
 | Category | Count | Members |
 | --- | --: | --- |
 | Scalar operations | 618 | `<scalar><Operation>`, see below |
-| Pointers | 19 | `pointerFromRef`, `pointerFromMutRef`, `pointerFromSlice`, `pointerFromMutSlice`, `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerAddress`, `pointerIsNull`, `pointerNull`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut` |
+| Pointers | 22 | `pointerFromRef`, `pointerFromMutRef`, `pointerFromSlice`, `pointerFromMutSlice`, `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerAddress`, `pointerIsNull`, `pointerNull`, `pointerNullFunction`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `pointerBorrowMany`, `pointerBorrowManyMut` |
 | SIMD vectors | 46 | `simdSplat`, `simdFromArray`, `simdToArray`, `simdExtract`, `simdInsert`, `simdLoad`, `simdStore`, `simdPointerLoad`, `simdPointerStore`, `simdLanesEqual` and the other `simdLanes*` comparisons, `simdSelect`, `simdMinimum`, `simdMaximum`, `simdShuffle`, `simdWrapping*`, `simdSaturating*`, `simdShift*`, `simdRotate*`, `simdSqrt`, `simdMulAdd`, `simdReduce*`, `simdMask*`, `simdConvert`, `simdBitcast` |
 | Architecture operations | 31 | `x86ShuffleBytes`, `x86MultiplyAddBytes`, `x86MultiplyAddWords`, `x86PackUnsignedSaturate`, `x86PackSignedSaturate`, `x86SumAbsoluteDifferences`, `x86AesEncrypt`, `x86AesEncryptLast`, `x86AesDecrypt`, `x86AesDecryptLast`, `x86AesInverseMixColumns`, `x86CarrylessMultiply`, `x86Sha256Rounds2`, `x86Sha256Message1`, `x86Sha256Message2`, `aarch64TableLookup`, `aarch64DotProduct`, `aarch64PairwiseAdd`, `aarch64AesEncrypt`, `aarch64AesDecrypt`, `aarch64AesMixColumns`, `aarch64AesInverseMixColumns`, `aarch64Sha256Hash`, `aarch64Sha256Hash2`, `aarch64Sha256ScheduleUpdate0`, `aarch64Sha256ScheduleUpdate1`, `wasmSwizzle`, `wasmRelaxedSwizzle`, `wasmDot`, `wasmNarrowUnsigned`, `wasmNarrowSigned` |
 | Atomics | 13 | `atomicLoad`, `atomicStore`, `atomicSwap`, `atomicCompareExchange`, `atomicCompareExchangeWeak`, `atomicFetchAdd`, `atomicFetchSubtract`, `atomicFetchBitAnd`, `atomicFetchBitOr`, `atomicFetchBitXor`, `atomicFetchMinimum`, `atomicFetchMaximum`, `atomicFence` |
-| Allocation and raw storage | 16 | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
+| Allocation and raw storage | 17 | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBufferEmpty`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
 | Shared ownership | 4 | `sharedLayout`, `sharedFromAllocation`, `sharedClone`, `sharedWithMut` |
 | Execution | 11 | `executionLayout`, `executionFromAllocation`, `executionDrive`, `relinquish`, `executionCurrent`, `executionRefOf`, `executionLoad`, `executionStore`, `executionCompareExchange`, `executionNotify`, `executionLive` |
 | Effect composition | 8 | `bindRequirement`, `bindRequirementMut`, `bindRequirementOwned`, `catchFailure`, `suspendEffect`, `finalizeEffect`, `finalizeEffectNonParking`, `useReleaseNonParking` |
 | Text and slices | 5 | `stringUtf8Bytes`, `stringFromUtf8Unchecked`, `stringByteLength`, `stringEqualsExact`, `sliceView` |
-| Places | 2 | `replace`, `borrowField` |
+| Places | 3 | `replace`, `borrowField`, `borrowFieldMut` |
 | Target queries | 7 | `targetPointerBits`, `targetPointerAlignment`, `targetArchitecture`, `targetOperatingSystem`, `targetAbi`, `targetObjectFormat`, `targetEndianness` |
 | Profile queries | 3 | `profileText`, `profileFlag`, `profileContains` |
 | Static text | 4 | `staticTextByteLength`, `staticTextByteAt`, `staticTextConcat`, `staticTextSlice` |
 | Static sequences | 5 | `staticSequenceEmpty`, `staticSequenceAppend`, `staticSequenceConcat`, `staticSequenceLength`, `staticSequenceAt` |
-| Reflection | 6 | `reflectType`, `reflectTypeKind`, `reflectFields`, `reflectFieldKind`, `reflectFieldLabel`, `reflectFieldOrdinal` |
+| Reflection | 11 | `reflectType`, `reflectTypeKind`, `reflectFields`, `reflectFieldKind`, `reflectFieldLabel`, `reflectFieldOrdinal`, `reflectVariants`, `reflectVariantLabel`, `reflectVariantFields`, `makeVariant`, `isVariant` |
 | Tests | 3 | `tests`, `testInfo`, `testFunction` |
-| Diagnostics | 2 | `observeUnhandled`, `observeDiagnostics` |
-| Machine code | 1 | `assembly` |
+| Diagnostics | 3 | `observeUnhandled`, `observeHandled`, `observeDiagnostics` |
+| Traps | 1 | `trap` |
+| Machine code and stack | 3 | `assembly`, `frameAddress`, `stackAllocate` |
+| Enums | 1 | `enumValue` |
+
+The inventory holds 829 members: 628 scalar operations and the 201 in the table.
 
 ## Scalar operations
 
@@ -52,6 +58,7 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 | Kind | Count | Operations |
 | --- | --: | --- |
 | Arithmetic | 67 | `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder`, `Negate` |
+| Multiply high | 10 | `MultiplyHigh`: the high half of the double-width product, for every integer type |
 | Wrapping | 35 | `WrappingAdd`, `WrappingSubtract`, `WrappingMultiply`, `WrappingNegate` |
 | Saturating | 35 | `SaturatingAdd`, `SaturatingSubtract`, `SaturatingMultiply`, `SaturatingNegate` |
 | Checked arithmetic | 50 | `CheckedAdd`, `CheckedSubtract`, `CheckedMultiply`, `CheckedDivide`, `CheckedRemainder` |
@@ -122,63 +129,102 @@ Each architecture member stands for one instruction of one target that the porta
 - The x86 AES members take the 16-byte state as `simd<u64, 2>`; the AArch64 ones take `simd<u8, 16>`. An x86 encryption round is `aesenc` alone; an AArch64 round is `aesmc` of `aese`, because `aese` adds the key first and stops before MixColumns.
 - The two SHA-256 sets hold the eight working variables differently. On x86, `abef` holds A, B, E and F in lanes 3, 2, 1 and 0, `cdgh` holds C, D, G and H the same way, and one `sha256rnds2` does two rounds with the two message-plus-constant words in lanes 0 and 1 of `wk`; it returns the new `abef`, and the old `abef` becomes the new `cdgh`. On AArch64, `abcd` and `efgh` hold the variables in lane order, and `sha256h` and `sha256h2` do four rounds with all four lanes of `wk`, returning the new `abcd` and `efgh`. Give `sha256h2` the `abcd` from before the `sha256h` call.
 - For the message schedule, `x86Sha256Message1` and `aarch64Sha256ScheduleUpdate0` compute `W[i] + sigma0(W[i + 1])` for four words. On x86 the caller adds `W[9..12]` before `x86Sha256Message2`; `aarch64Sha256ScheduleUpdate1` takes those words itself.
-- A call is admitted only when the selected target is the member's architecture and the feature is enabled, either by the profile (see Targets and profiles) or by the `features` list of the function that makes the call (below). A feature counts when an enabled feature implies it: `avx2` admits the `ssse3` and `sse4.1` shapes. On arm64, `crypto` admits the `aes` and `sha2` members.
-- Otherwise the call is SEM0241. With the default x86-64 profile, which has SSE2 but not SSSE3, `Intrinsic.x86ShuffleBytes<simd<u8, 16>>(a, a)` prints "Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`". An AArch64 member on x86-64 prints "needs aarch64 with neon".
-- Code for several targets puts each call under a `static if` on `Target.arch()` and `Target.hasCpuFeature`, or in a function that lists the feature.
+- A call is admitted only when the selected target is the member's architecture and the feature is enabled, either by the profile (see Targets and profiles) or by the `@features` directive of the function that makes the call (below). A feature counts when an enabled feature implies it: `avx2` admits the `ssse3` and `sse4.1` shapes. On arm64, `crypto` admits the `aes` and `sha2` members.
+- Otherwise the call is SEM0241. With the default x86-64 profile, which has SSE2 but not SSSE3, `Intrinsic.x86ShuffleBytes<simd<u8, 16>>(a, a)` prints "Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`". The message still says `features`; the directive is `@features`. An AArch64 member on x86-64 prints "needs aarch64 with neon".
+- Code for several targets puts each call under a `static if` on `Target.arch()` and `Target.hasCpuFeature`, or in a function with `@features`.
 - A shape the member does not take is SEM0239 at the call, and the message lists the shapes it takes: `x86ShuffleBytes<simd<u16, 8>>` prints ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. The shape is checked before the target and features, so this is reported on any target.
 - `silk/simd/x86`, `silk/simd/aarch64` and `silk/simd/wasm` wrap each member in a function that compiles to the instruction where the profile enables it and to portable code everywhere else. See Values and primitive types, under SIMD vectors and masks.
 
-## Type and property members
+## Type members
 
 | Category | Members |
 | --- | --- |
 | Storage types | `Allocation`, `RawBuffer<T>`, `Slot<'storage, T>`, `SharedCore<T>`, `StorageFailure`, `Execution<A>`, `ExecutionRef` |
-| Static-only types | `Type<Owner>`, `Field<Owner, Value>`, `Fields<Owner>`, `StaticSequence`, `Test`, `Tests`, `TestInfo` |
+| Static-only types | `Type<Owner>`, `Field<Owner, Value>`, `Fields<Owner>`, `Variant<Union>`, `Variants<Union>`, `StaticSequence`, `Test`, `Tests`, `TestInfo` |
 | Ownership properties | `Copy`, `Drop` |
 | Execution properties | `NonParking`, `Detached` (used as bounds) |
 | Operator interfaces | `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder`, `Negate`, `BitAnd`, `BitOr`, `BitXor`, `BitNot`, `Not`, `Equal`, `Order`, and the enum `Ordering` |
-| Property clauses | `with Intrinsic.foreign(...)`, `with Intrinsic.nonParking()`, `with Intrinsic.machine(...)` |
 | Module | `application`, imported by entry modules as `import Intrinsic.application` |
 
 - `impl Intrinsic.Copy for T {}` and `impl Copy for T {}` (with `Copy` from `silk/core/ownership`) are the same conformance. The same holds for `Drop`.
-- `with Intrinsic.foreign(...)` describes foreign functions; see Unsafe code and C interop.
-- `with Intrinsic.machine(naked: true, noReturn: true)` appears only on startup entry points in the standard library.
-- `with Intrinsic.nonParking()` takes no fields. It is accepted on an ordinary function or service operation.
-- The property vocabulary is closed: `Intrinsic.foreign(memory:, locality:, noCapture:, callbacks:)`, `Intrinsic.machine(naked:, noReturn:, features:)` and `Intrinsic.nonParking()`. A function or service operation header with any other property, or any other field, is SEM0235 at the clause, in both `silk check` and `silk build`. Examples: `with Intrinsic.detached()`, `with Intrinsic.nonParking(strict: true)`.
-- `Intrinsic.foreign(...)` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` and `export "C"` functions. `Intrinsic.machine(features:)` applies only to other runtime functions, and only with no other field. Any other placement, such as `naked:` on a plain function, `features:` on an `export "C"` or `static` function, or either clause on an interface or service operation, is SEM0236 at the clause: "This property clause is not allowed on this declaration; `Intrinsic.foreign` and `Intrinsic.machine(naked:, noReturn:)` apply only to `extern "C"` or `export "C"` functions, and `Intrinsic.machine(features:)` only to other runtime functions".
-- SEM0235 takes precedence: a clause with an unknown field, such as `Intrinsic.machine(naked: true, bogus: 1)` on a plain function, is SEM0235.
+
+## Directives
+
+A directive is a line such as `@inline` or `@features("avx2")` written before a declaration. It tells the compiler how to build that function, never what the function means. The table is closed: no source declares a directive, an argument is a literal, and no static evaluation or reflection can see one. Directives replaced the `with Intrinsic.*(...)` clauses of earlier releases.
+
+| Directive | Arguments | Goes on | Class |
+| --- | --- | --- | --- |
+| `@inline` | none | a function with a Silk body | hint |
+| `@inlineAlways` | none | a function with a Silk body | hint |
+| `@inlineNever` | none | a function with a Silk body | hint |
+| `@cold` | none | a function with a Silk body | hint |
+| `@nonParking` | none | a function with a Silk body, or a service or interface operation | checked contract |
+| `@features("avx2", ...)` | CPU feature names | an `unsafe fn` with a Silk body | target |
+| `@foreign(memory:, locality:, noCapture:)` | named, each at most once | an `extern "C"` or `export "C"` function, or a foreign function type | optimizer fact |
+| `@callbacks("compare", ...)` | parameter paths | an `extern "C"` or `export "C"` function | checked contract |
+| `@threadCallbacks("routine", ...)` | parameter paths | an `extern "C"` or `export "C"` function | checked contract |
+| `@deferredCallbacks("info.callback", ...)` | parameter paths | an `extern "C"` or `export "C"` function | checked contract |
+| `@invokesDeferredCallbacks` | none | an `extern "C"` or `export "C"` function | checked contract |
+| `@naked` | none | an `extern "C"` or `export "C"` function | codegen shape |
+| `@noReturn` | none | an `extern "C"` or `export "C"` function | codegen shape |
+
+The class says what removing the directive does. Removing a hint leaves the same program. Removing an optimizer fact leaves the same behavior with fewer optimizations. Removing a checked contract leaves the same runtime behavior, but some uses may stop compiling. Removing a target directive gives the same results in slower code. A codegen shape describes a body written for that shape, so removing it breaks the body.
+
+- Write each directive on its own line before the declaration, after any `///` doc comment or before it. Both attach for the compiler, but `silk doc` reads only a comment placed before the first directive. Order does not matter. `silk format` puts each directive on its own line.
+- In a service, interface or `impl` body, a directive goes before the member: `@nonParking effect fn close() -> ()` on two lines.
+- A foreign function type takes `@foreign` before `extern`: `@foreign(memory: "none") extern "C" fn(i32) -> i32`.
+- Arguments are literals: text, decimal integers, `true`, `false`, and parenthesized tuples of them. `@features("avx2", "bmi2")` and `@features(("avx2", "bmi2"))` mean the same. A name or a call in an argument is a parse error (PAR0002), followed by SEM0235 for the directive.
+- `@inline`, `@inlineAlways`, `@inlineNever` and `@cold` ask for inlining and code layout. `@cold` keeps the function out of line and lays out the branches that reach it as unlikely. A function takes at most one of the four.
+- `@nonParking` makes every call owe a proof that the callee never parks its thread (SEM0139). See Suspension and cancellation.
+- `@foreign`, the callback directives, `@naked` and `@noReturn` are described in Unsafe code and C interop. `@naked @noReturn` appears only on startup entry points in the standard library.
+- An unknown directive, an argument the directive does not take, or a repeated named argument is SEM0235 at the directive: "This directive, or one of its arguments, is not one the language defines". Examples: `@bogus`, `@detached`, `@nonParking(strict: true)`, `@foreign(bogus: 1)`.
+- A known directive on a declaration that does not take it is SEM0236 at the directive: "This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions". Examples: `@naked` on a plain function, `@inline` on a service operation or a struct, `@features` on an `export "C"` function, and any directive on a `static fn`. SEM0235 takes precedence.
+- A directive before an `import` or a `static if` is a parse error at the `@` (PAR0002), followed by SEM0236.
+- The same directive twice, or two of the inline hints (`@cold` with `@inline`, for example), stops `silk check` with "unsupported: this construct is not supported by the native compiler yet" (exit status 2).
+- A leftover `with` clause is PAR0011 at the clause. The message names the directive to write: `fn work() -> i32 with Intrinsic.inline() { return 1 }` prints ``Silk has no `with` clauses; write `@inline` on the line before the declaration``. For `with Intrinsic.foreign(...)` and `with Intrinsic.machine(...)` it lists the directives that replace each field. `module with ...` is gone and is PAR0011 too; delete the line, since a module takes no directives.
 
 ## Functions compiled for CPU features
 
-`with Intrinsic.machine(features: ("avx2",))` compiles one function for CPU features that the profile does not select. The rest of the program keeps the profile's features, so one binary runs everywhere and takes the faster function only on a machine that has the features.
+`@features("avx2")` compiles one function for CPU features that the profile does not select. The rest of the program keeps the profile's features, so one binary runs everywhere and takes the faster function only on a machine that has the features.
 
 ```
-unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> with Intrinsic.machine(features: ("avx2",)) {
+@features("avx2")
+unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> {
   return Intrinsic.x86ShuffleBytes<simd<u8, 32>>(table, indices)
 }
 ```
 
-- The value is a tuple of text literals, `("ssse3", "avx2")`, or one literal, `"avx2"`. A name outside the target's feature catalog is SEM0242: `features: ("neon",)` on x86-64 prints "neon is not a CPU feature of x86_64-unknown-linux-gnu; `features` lists text literals from the target's catalog". A constant or any other non-literal entry is also SEM0242, with "a non-literal entry" in place of the name. An empty list, `features: ()`, is SEM0242 too: "`features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the clause". Level names such as `"x86-64-v3"` are models, not features.
-- The function must be declared `unsafe fn`; otherwise SEM0243 at the declaration: "safe enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them". Each call is an unsafe operation (SEM0082 outside `unsafe`). Running it on a machine without the features is undefined; check first with `CpuFeatures.detect()` from `silk/simd/cpu`.
-- Free functions, methods, generic functions and effect functions take the clause. `with Intrinsic.nonParking()` may sit beside it. A closure does not take a `with` clause.
+- The arguments are text literals, one per feature: `@features("ssse3", "avx2")`. A name outside the target's feature catalog is SEM0242 at that name: `@features("neon")` on x86-64 prints "neon is not a CPU feature of x86_64-unknown-linux-gnu; `@features` lists text literals from the target's catalog". An empty list, `@features()`, is SEM0242 too: "`@features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the directive". Level names such as `"x86-64-v3"` are models, not features.
+- The function must be declared `unsafe fn`; otherwise SEM0243 at the declaration: "lookup enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them". Each call is an unsafe operation (SEM0082 outside `unsafe`). Running it on a machine without the features is undefined; check first with `CpuFeatures.detect()` from `silk/simd/cpu`.
+- Free functions, methods, generic functions and effect functions take the directive. `@nonParking` and an inline hint may sit beside it. A closure takes no directive.
 - The function is compiled with the listed features, the features they imply and the profile's features. Architecture members that need them are admitted in its body (SEM0241 otherwise). Functions it calls are compiled for the profile, unless the optimizer inlines them into it.
 - `Target.hasCpuFeature` and the other static queries still read the profile inside the function. A `silk/simd/x86` or `silk/simd/aarch64` wrapper called from it takes its portable path unless the profile enables the feature; call the `Intrinsic` member directly instead.
 - A `static if` on `Intrinsic.targetArchitecture()` keeps the function out of builds for other targets, where its features would be SEM0242.
 
 ## Unsafe members
 
-- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `simdPointerLoad`, `simdPointerStore`, `assembly`.
+- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `pointerBorrowMany`, `pointerBorrowManyMut`, `simdPointerLoad`, `simdPointerStore`, `stackAllocate`, `assembly`.
 - Every atomic member except `atomicFence` is unsafe. Each takes its memory order as a static string, such as `"acquire"`; an order or element type the operation does not admit is SEM0237.
 - So are these storage members: `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `sharedFromAllocation`, `stringFromUtf8Unchecked`, `executionFromAllocation`.
 - Call them inside `unsafe { }` or as `unsafe Intrinsic.member(...)`. Otherwise SEM0082.
 - No other member is unsafe. Scalar operations, the other SIMD members, architecture members, target queries and reflection are safe. A function compiled for extra CPU features is unsafe to call; see Functions compiled for CPU features above.
 - `allocationAdopt(base: *mut u8, layout: Layout, reclaim: extern "C" fn(?*mut u8) -> (), context: ?*mut u8)` returns an `Allocation` over storage that the caller manages. Dropping it calls `reclaim(context)` instead of returning memory to the system. `Arena` in `silk/mem/arena` uses it for each allocation it hands out.
 
+## Traps, the stack and slice views
+
+- `Intrinsic.trap(reason)` stops the program with a trap, as an overflow does. `reason` is a `string<'static>`, and the result type is `never`, so `return Intrinsic.trap("...")` ends a branch of any function. The runtime prints `fatal trap: <reason>` and the frame, and the process exits with status 132. The std lib uses it for precondition failures, such as `f32.toU8` of NaN.
+- `Intrinsic.frameAddress()` returns the address of the running function's stack frame as `[*]const u8`. The stack grows down on every target, so a caller's frame is at the same or a higher address. It is safe to call; reading through the address is not.
+- `unsafe Intrinsic.stackAllocate<T>(count)` returns `[*]mut T` storage for `count` values on the running function's stack. The storage is uninitialized, nothing in it is dropped, and it ends when the function returns or suspends. The caller proves it fits in the stack that is left; the compiler does not check. A byte size that overflows `usize` traps.
+- `silk/mem/stack` wraps both: `Stack.frameAddress()` and `unsafe Stack.withStorage<T, A>(count, use)`, which calls `use` once with the storage.
+- `Intrinsic.sliceView<T>(values, offset, length)` returns the subrange `offset..offset + length` with the same loan, and traps when it is out of range. Given a shared `&[T]` it returns `&[T]`. Given an exclusive `&mut [T]` that the caller moves in, as in `Intrinsic.sliceView<T>(move values, 1, 3)`, it returns an exclusive `&mut [T]`. Passing a `&mut [T]` binding without `move` is an error.
+- `Intrinsic.pointerNullFunction<F>()` returns the null value of a nullable C function pointer type `F`, such as `?extern "C" fn(i32) -> ()`. See Unsafe code and C interop.
+
 ## Static-only members
 
-- Target queries, profile queries, static text, static sequences, reflection descriptors, `tests` and `testInfo` exist only during static evaluation.
+- Target queries, profile queries, static text, static sequences, reflection descriptors (`reflectType`, `reflectFields`, `reflectVariants` and the queries on them), `tests` and `testInfo` exist only during static evaluation.
+- `borrowField`, `borrowFieldMut`, `makeVariant` and `isVariant` run at runtime, but take their field or variant descriptor as a `static` argument.
 - Use them in `const` initializers, `static if` conditions and `static fn` bodies. See Static evaluation.
-- Using one in runtime code is SEM0176: `let bits = Intrinsic.targetPointerBits()` inside `main` is rejected.
+- Using one in runtime code is SEM0176: `let bits = Intrinsic.targetPointerBits()` inside `main` prints "Intrinsic.targetPointerBits runs only during static evaluation, so runtime code cannot call it".
 - `profileFlag(name)` returns `bool`. `profileText(name)` returns `string<'static>`.
 
 ## Target availability
@@ -198,6 +244,7 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 | Atomics | `silk/concurrency/atomic` |
 | SIMD vectors | `silk/simd/simd` and one module per shape, such as `silk/simd/u8x16` and `silk/simd/mask16` |
 | Architecture operations | `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm` |
+| Stack frame and scratch storage | `silk/mem/stack` (`Stack.frameAddress()`, `Stack.withStorage`) |
 | Allocation, raw storage | `silk/mem/allocator`, `silk/mem/arena`, `silk/mem/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/box`, `silk/collections/list` |
 | Shared ownership | `silk/mem/shared` |
 | Execution | `silk/concurrency/execution` |
@@ -331,8 +378,8 @@ import silk.simd.cpu { CpuFeatures }
 static if Intrinsic.targetArchitecture() == "x86_64" {
   // Compiled for AVX2, so the 32-byte pshufb is admitted. AVX2 implies SSSE3, so the
   // 16-byte form is admitted too.
-  unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8,
-    32> with Intrinsic .machine (features: ("avx2",)) {
+  @features("avx2")
+  unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> {
     let low = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(
       Intrinsic.simdSplat<simd<u8, 16>>(7),
       Intrinsic.simdSplat<simd<u8, 16>>(0)
@@ -408,8 +455,8 @@ import silk.simd.u32x4
 
 static if Intrinsic.targetArchitecture() == "x86_64" {
   // Compiled for SHA, so sha256rnds2 is admitted in this body.
-  unsafe fn rounds(cdgh: simd<u32, 4>, abef: simd<u32, 4>, wk: simd<u32, 4>) -> simd<u32,
-    4> with Intrinsic .machine (features: ("sha",)) {
+  @features("sha")
+  unsafe fn rounds(cdgh: simd<u32, 4>, abef: simd<u32, 4>, wk: simd<u32, 4>) -> simd<u32, 4> {
     return Intrinsic.x86Sha256Rounds2<simd<u32, 4>>(cdgh, abef, wk)
   }
 }
@@ -437,10 +484,67 @@ pub fn main() -> i32 {
 }
 ```
 
+An exclusive slice view, the stack, and a trap. The program ends with the trap:
+
+```silk
+import silk.mem.pointer { Pointer }
+
+fn checked(divisor: i32) -> i32 {
+  if divisor == 0 {
+    return Intrinsic.trap("checked: the divisor is zero")
+  }
+  return 100 / divisor
+}
+
+fn middle(values: &mut [i32]) -> &mut [i32] {
+  return Intrinsic.sliceView<i32>(move values, 1, 3)
+}
+
+fn deeper(level: i32) -> usize {
+  if level == 0 {
+    return Pointer.addressMany<u8>(Intrinsic.frameAddress())
+  }
+  return deeper(level - 1)
+}
+
+pub fn main() -> i32 {
+  let mut values = [1, 2, 3, 4, 5]
+  let view = middle(&mut values)
+  view[0] = 20
+  view[2] = 40
+  if values[1] != 20 || values[3] != 40 {
+    return 1
+  }
+  let top = Pointer.addressMany<u8>(Intrinsic.frameAddress())
+  if deeper(8) >= top {
+    return 2
+  }
+  unsafe {
+    let scratch = Intrinsic.stackAllocate<i32>(4)
+    Pointer.write<i32>(Pointer.atMut<i32>(scratch, 3), 7)
+    if Pointer.read<i32>(Pointer.atMut<i32>(scratch, 3)) != 7 {
+      return 3
+    }
+  }
+  return checked(0)
+}
+```
+
+```sh
+silk run; echo "exit $?"
+```
+
+```
+fatal trap: checked: the divisor is zero
+  at main.checked (main:5:12)
+exit 132
+```
+
 ## Diagnostics
 
 | Code | Meaning |
 | --- | --- |
+| PAR0011 | A leftover `with Intrinsic.*(...)` clause or `module with ...`; write directives before the declaration |
 | SEM0010 | Unknown member of a known namespace, such as `Intrinsic.bogus` |
 | SEM0016 | Binding conflict, such as declaring a type named `Intrinsic` |
 | SEM0051 | Wrong number of type arguments |
@@ -448,13 +552,13 @@ pub fn main() -> i32 {
 | SEM0093 | Reachable intrinsic unavailable on the selected target |
 | SEM0176 | Static-only member used in runtime code |
 | SEM0215 | Invalid pointer qualifier conversion, such as `pointerRequalify` changing the pointee |
-| SEM0235 | Unknown property or property field in a `with Intrinsic.*` clause, such as `with Intrinsic.detached()` |
-| SEM0236 | Known property on a declaration that does not take it, such as `Intrinsic.machine(naked: true)` on a plain function or `Intrinsic.machine(features:)` on an `export "C"` one |
+| SEM0235 | Unknown directive or directive argument, such as `@detached` or `@nonParking(strict: true)` |
+| SEM0236 | Known directive on a declaration that does not take it, such as `@naked` on a plain function or `@features` on an `export "C"` one |
 | SEM0237 | An atomic member with a memory order or element type it does not admit, such as `atomicStore` with `"acquire"` |
 | SEM0239 | A SIMD or architecture member with a vector shape or lane type it does not admit, such as `simdSqrt<simd<u8, 16>>` or `x86ShuffleBytes<simd<u16, 8>>`, or vectors that differ in lane count, width or lane type where they must match |
 | SEM0241 | An architecture member whose target or CPU feature is not enabled for the calling function |
-| SEM0242 | A `features` entry that is not a text literal naming a CPU feature of the target, or an empty `features` list |
-| SEM0243 | A function with `features` that is not declared `unsafe fn` |
+| SEM0242 | An `@features` entry that names no CPU feature of the target, or an empty `@features` list |
+| SEM0243 | A function with `@features` that is not declared `unsafe fn` |
 
 ## See also
 
@@ -464,4 +568,6 @@ Values and primitive types · Interfaces and impls · Ownership and moves · Uns
 
 - `enumValue` is in the runtime intrinsic catalog, but no compiler or standard library code calls it. Its contract is unconfirmed.
 - SEM0093 (intrinsic unavailable on the requested target) has no producer in the compiler.
-- Inside a runtime function, the SEM0176 message names the target as "unselected-target": "Intrinsic.targetOperatingSystem is not available during static evaluation for unselected-target".
+- SEM0241 still tells the reader to "list the feature in the function's `features`", the spelling of the old clause. The directive is `@features(...)`.
+- SEM0236 lists `@callbacks` and `@threadCallbacks` among the C-only directives but not `@deferredCallbacks` or `@invokesDeferredCallbacks`, which are C-only too.
+- Two of the same directive, or two inline hints, report "unsupported" with no stable code.

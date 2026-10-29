@@ -49,7 +49,7 @@ ConstDeclaration = 'pub'? 'const' Identifier ':' Type '=' Expression
 - Assigning through a shared reference `&T`, or to a non-place such as a call, is SEM0036.
 - Writing through `&mut T` uses `r.* = e`. Field access through a reference needs no explicit `.*`: `r.x = 5` and `r.*.x = 5` both work.
 - The assigned value must have the place's type (SEM0037).
-- There is no compound assignment. `x += 1` is a parse error; write `x = x + 1`.
+- There is no compound assignment. `x += 1` is PAR0010: "Silk has no compound assignment; write `x = x + 1` instead of `x += 1`".
 
 ## Scopes and shadowing
 
@@ -79,7 +79,9 @@ ConstDeclaration = 'pub'? 'const' Identifier ':' Type '=' Expression
 
 - `let static name = e` evaluates `e` at compile time and binds the result. `e` may call only `static fn` functions (SEM0176 otherwise). `let static mut` is not allowed. See Static evaluation.
 - `const NAME: T = e` declares a module-level constant. The type annotation is required: `const A = 5` is SEM0086.
-- A constant's type must be a scalar such as an integer, float or `bool`, or `string`. A struct or array constant is SEM0086.
+- A constant's type is `bool`, `char`, an integer or float type, `string`, a fixed array of these, or a struct or enum: `const ORIGIN: Point = Point { x: 1, y: 1 }` and `const STEPS: [i32; 3] = [1, 2, 3]` are constants. Any other type, such as `&[u8]`, is SEM0086: "Invalid constant: a constant cannot have type `&'static [u8]`; its type must be `bool`, `char`, an integer or float primitive, `string`, a fixed array of these, or a struct or enum".
+- A struct with a `Drop` impl can't be a constant. Its initializer is SEM0176.
+- `&NAME` borrows a constant for `'static`, so it can be passed where a `&'static` reference is expected. See Borrowing.
 - A constant initializer may use operators and `static fn` calls: `const C: i32 = 1 + 2`.
 - `pub const` exports the constant.
 
@@ -148,16 +150,30 @@ pub fn main() -> i32 {
 ```
 
 ```silk
+struct Point {
+  x: i32,
+  y: i32,
+}
+
 const BASE: i32 = 40
+const ORIGIN: Point = Point { x: 1, y: 1 }
+const STEPS: [i32; 3] = [1, 2, 3]
 
 static fn offset(step: i32) -> i32 {
   return step * 2
+}
+
+fn first(steps: &'static [i32; 3]) -> i32 {
+  return steps[0]
 }
 
 pub fn main() -> i32 {
   let static extra = offset(1)
   if BASE + extra != 42 {
     return 1
+  }
+  if ORIGIN.x + STEPS[2] != 4 || first(&STEPS) != 1 {
+    return 2
   }
   return 0
 }
@@ -167,8 +183,9 @@ pub fn main() -> i32 {
 
 | Code | Meaning |
 | --- | --- |
-| PAR0001 | Required token missing, e.g. `let x: i32` with no initializer or `x += 1` |
+| PAR0001 | Required token missing, e.g. `let x: i32` with no initializer |
 | PAR0002 | Unexpected tokens, e.g. `;` as a terminator or `let static mut` |
+| PAR0010 | A habit from another language, e.g. `x += 1` |
 | SEM0006 | Name with no visible binding |
 | SEM0008 | A `let` repeats a name already bound in the same block |
 | SEM0035 | Assignment through an immutable binding |

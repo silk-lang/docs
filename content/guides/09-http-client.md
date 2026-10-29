@@ -165,9 +165,9 @@ Look at the `?` rows. `openTasks`, `addTask` and `session` require `&mut Http` a
 | `failOnStatus()` | off | Every non-2xx final response fails with `HttpErrorKind.Status` |
 | `trustBundle(path)` | platform bundle | The PEM file of trusted roots for HTTPS |
 
-`NativeHttp.fromEnvironment()` is `make()` plus one thing: when `SSL_CERT_FILE` is set, it uses that file as the trust bundle. It needs `HostInput`, so call it from `main`.
+`NativeHttp.fromEnvironment()` is `make()` plus two things: when `SSL_CERT_FILE` is set, it uses that file as the trust bundle, and it routes requests through the proxies named in the environment (see **Proxies** below). It needs `HostInput`, so call it from `main`.
 
-The provider exists on the hosted targets only: Linux with glibc on x86\_64 and aarch64, and macOS on aarch64. On no-libc Linux and WebAssembly, code written against `Http` still compiles; you supply another provider.
+The provider exists on the hosted targets only: Linux with glibc on x86\_64 and aarch64, and macOS on aarch64. A WebAssembly component built for `wasm32-wasip2` uses `WasiHttp.make()` from `silk/http/client_wasi` instead. The host then does the transport, TLS and network policy through `wasi:http`, with the same defaults of 30 seconds, 16 MiB and ten redirects. On no-libc Linux, `wasm32-unknown-unknown` and `wasm32-wasip1`, code written against `Http` still compiles; you supply another provider.
 
 ## Building a request
 
@@ -296,9 +296,33 @@ The rules follow the browser fetch standard. A 303, and a 301 or 302 after a POS
 
 An `https://` URL needs no extra code. `NativeHttp` checks the server's certificate against a PEM bundle of trusted roots: `/etc/ssl/certs/ca-certificates.crt` on Linux and `/etc/ssl/cert.pem` on macOS. The bundle is read on the first HTTPS request, not at `make()`. A GET to `https://example.com/` with `NativeHttp.make()` returns 200.
 
-To trust something else, such as a private CA in tests, either call `.trustBundle(b"/absolute/path/ca.pem")` or start with `NativeHttp.fromEnvironment()` and set `SSL_CERT_FILE`. A path that does not exist fails the request with `Tls: Could not load the PEM trust bundle.` An empty `SSL_CERT_FILE` makes `fromEnvironment` itself fail. The macOS keychain is not consulted.
+To trust something else, such as a private CA in tests, either call `.trustBundle("/absolute/path/ca.pem")` or start with `NativeHttp.fromEnvironment()` and set `SSL_CERT_FILE`. A path that does not exist fails the request with `Tls: Could not load the PEM trust bundle.` An empty `SSL_CERT_FILE` makes `fromEnvironment` itself fail. The macOS keychain is not consulted.
 
 The client speaks TLS 1.3 only. The TLS, certificates and trust guide explains the trust model and the lower-level TLS API.
+
+## Proxies
+
+`NativeHttp.make()` always connects directly. `NativeHttp.fromEnvironment()` reads the usual proxy variables:
+
+| Variable | Used for |
+| --- | --- |
+| `HTTP_PROXY`, then `http_proxy`, `ALL_PROXY`, `all_proxy` | Plain `http://` requests. The first one that is set and not empty wins |
+| `HTTPS_PROXY`, then `https_proxy`, `ALL_PROXY`, `all_proxy` | `https://` requests, through a `CONNECT` tunnel, so TLS still checks the server's certificate |
+| `NO_PROXY` or `no_proxy` | Hosts to reach directly, separated by commas. `example.com` and `.example.com` both match `api.example.com`, and `*` matches every host |
+
+Only `http://` proxy URLs work; an `https://` or `socks5://` one makes `fromEnvironment` fail with `InvalidUrl`. A proxy URL with `user:pass@` sends Basic credentials to the proxy. In `NO_PROXY`, a port is ignored and an address range such as `10.0.0.0/8` matches nothing.
+
+To see it, change `main` to require `? &mut HostInput`, make the client with `run NativeHttp.fromEnvironment()`, and add `HttpError | HostInputError` to its failure row. Then, with a small server on port 8100 that logs what it receives, `HTTP_PROXY=http://127.0.0.1:8100` sends `GET http://tasks.internal/status.json` to that server with the full URL in the request line:
+
+```
+GET http://tasks.internal/status.json HTTP/1.1
+Accept-Encoding: identity
+Host: tasks.internal
+User-Agent: silk-http/1
+Accept: */*
+```
+
+The name `tasks.internal` is never resolved locally; the proxy does that.
 
 ## Testing with a fake provider
 
@@ -356,12 +380,12 @@ silk test
 
 ```
   main::missingIsAStatusError
-    PASS  25 us
+    PASS  26 us
   main::readsTheOpenCount
-    PASS  27 us
+    PASS  52 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   162 us
+Time   968 us
 ```
 
 A provider can also wrap another one, adding a header, logging or retries, and forward with `Effect.provideMut<Http>`. The Testing with providers guide has more on fakes.
@@ -373,9 +397,9 @@ A provider can also wrap another one, adding a header, logging or retries, and f
 - **No content decoding.** It sends `Accept-Encoding: identity`, and if a server compresses anyway, `body()` holds the compressed bytes.
 - **No connection reuse.** Every request, and every redirect hop, opens a fresh HTTP/1.1 connection.
 - **No streaming.** The request body and the whole response body live in memory, up to `maxBodyBytes`.
-- **No proxies.** `HTTPS_PROXY` and similar variables are ignored; the client always connects directly.
+- **Proxies only from the environment.** `fromEnvironment` reads the proxy variables, and only `http://` proxies work. There is no builder method to set a proxy in code.
 - **Deadline gaps.** The deadline does not bound name resolution or the TCP connect.
-- **HTTP/1.1 over TCP only.** No HTTP/2, no Unix sockets.
+- **HTTP/1.1 over TCP only.** The `Http` service does not speak HTTP/2 and has no Unix sockets. HTTP/2 exists as a lower layer, shown below.
 
 ## When to drop down a layer
 
@@ -391,13 +415,128 @@ The facade is built on lower-level modules that you can use directly. They take 
 
 Each of these pages in the std lib API reference starts with a When to use section.
 
+### HTTP/2
+
+`silk/http/http2` is HTTP/2 (RFC 9113) as a state machine that does no I/O. A `Connection` is made for `Role.Client` or `Role.Server`. You queue requests or responses on it, take the bytes to send from `Connection.output`, and feed it the bytes that arrive with `Connection.receive`, which returns at most one `Event` per call: `Headers`, `Data`, `Reset`, `Goaway` and so on. Header fields are compressed with HPACK (RFC 7541), which `silk/http/hpack` implements, and arrive decoded. `silk/http/http2_connection` drives a `Connection` over a plain or TLS `HttpTransport`; on TLS it requires `h2` from ALPN.
+
+Because it does no I/O, a client and a server can talk to each other in memory. This program, `h2`, opens one request stream, answers it, and prints every event:
+
+```silk
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.collections.bytes { Bytes }
+import silk.collections.list { List }
+import silk.collections.slice { Slice }
+import silk.text.format { Format }
+import silk.text.string { String }
+import silk.http.hpack { Field }
+import silk.http.http2 { Connection, Event, Limits, Role }
+import silk.http.http2_frame { ProtocolError }
+import silk.io.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
+
+// Moves every queued byte from one connection to the other and prints the events it causes.
+effect fn pump(from: &mut Connection, to: &mut Connection, label: string) -> ()
+  ! ProtocolError | WriterError | OutOfMemoryError
+  ? &mut Allocator | &mut Writer {
+  let wire = run Bytes.copy(Connection.output(&from.*))
+  run Connection.consumeOutput(&mut from.*, Bytes.length(&wire))
+  let mut at: usize = 0
+  while at < Bytes.length(&wire) {
+    let input = Slice.view(Bytes.asSlice(&wire), at, Bytes.length(&wire) - at)
+    let progress = run Connection.receive(&mut to.*, input)
+    at = at + progress.consumed
+    match move progress.event {
+      Event.Headers { stream, fields, endStream } => {
+        let list = List.asSlice(&fields)
+        let mut index: usize = 0
+        while index < list.length {
+          run Format.format("{label} stream {stream}: {name} = {value}\n", &.{
+            label: label,
+            stream: stream,
+            name: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&list[index].name)),
+            value: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&list[index].value)),
+          })
+          index = index + 1
+        }
+      }
+      Event.Data { stream, bytes, endStream } => {
+        run Format.format("{label} stream {stream}: body {body}\n", &.{
+          label: label,
+          stream: stream,
+          body: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&bytes)),
+        })
+      }
+      _ => {}
+    }
+  }
+}
+
+effect fn exchange() -> ()
+  ! ProtocolError | WriterError | OutOfMemoryError
+  ? &mut Allocator | &mut Writer {
+  let mut client = run Connection.make(Role.Client, Limits.defaults())
+  let mut server = run Connection.make(Role.Server, Limits.defaults())
+  let request = [
+    Field { name: b":method", value: b"GET", sensitive: false },
+    Field { name: b":scheme", value: b"https", sensitive: false },
+    Field { name: b":authority", value: b"tasks.test", sensitive: false },
+    Field { name: b":path", value: b"/status", sensitive: false },
+  ]
+  let stream = run Connection.open(&mut client, &request, true)
+  run pump(&mut client, &mut server, "server got")
+  let response = [
+    Field { name: b":status", value: b"200", sensitive: false },
+    Field { name: b"content-type", value: b"text/plain", sensitive: false },
+  ]
+  run Connection.sendHeaders(&mut server, stream, &response, false)
+  let sent = run Connection.sendData(&mut server, stream, b"2 open", true)
+  run pump(&mut server, &mut client, "client got")
+  run pump(&mut client, &mut server, "server got")
+}
+
+effect fn failed<E>(error: E) -> i32 {
+  drop error
+  return 1
+}
+
+effect fn session() -> i32
+  ! ProtocolError | WriterError | OutOfMemoryError
+  ? &mut Allocator | &mut Writer {
+  run exchange()
+  return 0
+}
+
+pub fn main() -> i32 {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut writer = StdoutWriter.make()
+  return run Effect.catchAll(session(), failed)
+    |> Effect.provideMut<Writer>(&mut writer)
+    |> Effect.provideMut<Allocator>(&mut allocator)
+}
+```
+
+```
+server got stream 1: :method = GET
+server got stream 1: :scheme = https
+server got stream 1: :authority = tasks.test
+server got stream 1: :path = /status
+client got stream 1: :status = 200
+client got stream 1: content-type = text/plain
+client got stream 1: body 2 open
+```
+
+The bytes that cross between the two connections are real HTTP/2 frames: the client preface, SETTINGS frames and their acknowledgments, which the connections queue on their own, and the HEADERS and DATA frames for the stream. `sendData` returns how many bytes flow control let it queue; 0 means wait for a `Writable` event. After you consume received DATA, call `Connection.release` to give the peer its window back. The last `pump` delivers the client's SETTINGS acknowledgment. `ProtocolError` does not implement `Debug`, so `main` turns every failure into exit status 1 with `Effect.catchAll` instead of returning it.
+
 ## API reference
 
 - `silk/http/client`: `Http`, `Request`, `Response`, `HttpError`, `HttpErrorKind`, `HttpCause`
 - `silk/http/client_native`: `NativeHttp`
+- `silk/http/client_wasi`: `WasiHttp` (`wasm32-wasip2` only)
 - `silk/json/value`: `Json`, `Value`
 - `silk/http/exchange`, `silk/http/exchange_native`
 - `silk/http/fetch`, `silk/http/fetch_native`
 - `silk/http/connection_pool`, `silk/http/connection_pool_native`
 - `silk/http/redirect`, `silk/http/proxy`, `silk/http/content`
+- `silk/http/http2`: `Connection`, `Role`, `Limits`, `Event`; `silk/http/http2_frame`: `ProtocolError`; `silk/http/http2_connection`: `Driver`; `silk/http/hpack`: `Field`, `Header`, `Encoder`, `Decoder`
 - `silk/testing/testing`: `Testing`, `AssertionError`

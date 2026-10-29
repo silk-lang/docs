@@ -9,7 +9,7 @@ cd runcheck
 
 ## How a child runs
 
-The `ChildProcess` service from `silk/system/child_process` has one operation: run a `ProcessRequest` to the end and return a `ProcessOutcome`. The native provider is `OsChildProcess` from `silk/system/child_process_native`. The model is deliberately simple:
+The `ChildProcess` service from `silk/system/child_process` has one operation: run a `ProcessRequest` to the end and return a `ProcessOutcome`. The native provider is `OsChildProcess` from `silk/system/child_process_native`. It exists on Linux with glibc and on macOS; WebAssembly, WASI included, has no way to start a process. The model is deliberately simple:
 
 - **No shell.** The request names an executable and a list of arguments. Spaces, quotes, `$` and `*` in an argument are data, never syntax.
 - **No inherited environment.** A request starts with an empty environment. The child sees only the variables you set.
@@ -39,7 +39,7 @@ effect fn command(program: string, args: &[string]) -> ProcessRequest ! FileErro
 
 `ChildProcess.addArgument(&mut request, text)` appends one argument. Arguments are bytes to the operating system, so a value you got from the host as bytes, which need not be valid UTF-8, can be passed on unchanged with `ChildProcess.addArgumentBytes`. The one rule: no NUL byte in an argument, a variable name or a value. The request uses NUL to separate entries.
 
-`addArgument` and `setVariable` are declared on `ChildProcess`, not on `ProcessRequest`, so call them as `ChildProcess.addArgument(&mut request, ...)`. `request.addArgument(...)` is SEM0010, "A known actor called with an unknown operation name".
+`addArgument` and `setVariable` are declared on `ChildProcess`, not on `ProcessRequest`, so call them as `ChildProcess.addArgument(&mut request, ...)`. `request.addArgument(...)` is SEM0010, "silk.system.child_process.ProcessRequest has no method `addArgument`".
 
 For a program with no arguments, pass an empty array. An empty array literal takes its type from what it is assigned to, so name the type in a `let`: `let none: [string; 0] = []`, then `command("/bin/cat", &none)`. Written directly as an argument, `command("/bin/cat", &[])` is SEM0029, "An empty array literal needs an expected Array type", because the parameter is a slice, not an array.
 
@@ -138,7 +138,7 @@ effect fn tryRun(title: string, request: &ProcessRequest) -> ()
 
 `ProcessError` is gone from `tryRun`'s failure row: it is handled here. The other two failures are passed on.
 
-On Linux, a child that fails to start reports the error back to the parent over a pipe. If that report can't be written at all, the parent sees the same thing as a program that started and exited with 127. This is rare, but it means exit code 127 can also mean "did not start".
+On GNU/Linux, a child that cannot start and also cannot report why looks the same as a program that started and exited with 127. This is rare, but it means exit code 127 can also mean "did not start".
 
 ## Seven children
 
@@ -261,7 +261,7 @@ Read it from the top:
 - `silk/system/child_process`: `ChildProcess`, `ProcessRequest`, `ProcessOutcome`, `Exited`, `Signaled`, `ProcessError`, `ProcessReason`, `ProcessOperation`
 - `silk/system/child_process_native`: `OsChildProcess`
 - `silk/system/filesystem`: `Path`, `FileError`
-- `silk/system/host_input`: `HostInput` (`variable`)
+- `silk/system/host_input`: `HostInput` (`variableNamed`)
 - `silk/core/effect`: `Effect` (`result`)
 - `silk/text/string`: `String`
 - `silk/collections/bytes`: `Bytes`

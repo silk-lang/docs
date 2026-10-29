@@ -12,5 +12,5 @@ These pages cover how Silk code is organized and built, from a single file up to
 | **Dependencies** | Path dependencies, `silk add` and `silk remove`, and how names resolve. |
 | **Libraries and exports** | Building a library, the `exports` list, and linking a Silk library from C. |
 | **Workspaces** | Member packages, commands run from the root, `-p` and `--workspace`, and the shared output directory. |
-| **Targets and profiles** | The four accepted targets, cross builds, optimization levels and named profiles. |
+| **Targets and profiles** | The six accepted targets (WASI included), cross builds, optimization levels, named profiles and profile-guided optimization. |
 | **Build outputs and native linking** | Artifact kinds, stages, the output layout, and extra native link inputs. |

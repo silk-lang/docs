@@ -140,11 +140,11 @@ The statement form is a little stricter than the module form. You might want thr
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     68 modules, 1 in package          0.10s
-  check    failed: 2 modules, 1 error        5.10s
+  load     180 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        1.04s
 [x86_64-unknown-linux-gnu]
-src/main.silk:566:10: error[PAR0001] Expected `{`
-Failed tasks in 5.21s
+src/main.silk:610:10: error[PAR0001] Expected `{`
+Failed tasks in 1.11s
 ```
 
 Inside a function, `else` takes a block only. To chain, nest a second `static if` inside the `else` block. Chained `else static if` exists only at module level.
@@ -162,14 +162,14 @@ pub fn main() -> i32 {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.13s
+  load     135 modules, 1 in package         0.08s
+  check    failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 src/main.silk:4:14: error[PAR0001] Expected identifier
-Failed tasks in 0.19s
+Failed tasks in 0.20s
 ```
 
-Silk has no `if` expression either, as you saw in chapter 2. Declare a `let mut` first and assign it in each branch, or return from each branch as `buildKind` does.
+An ordinary `if` with a final `else` can be a value, as you saw in chapter 2, but a `static if` cannot. Declare a `let mut` first and assign it in each branch, or return from each branch as `buildKind` does.
 
 Wire the command into `execute`:
 
@@ -188,12 +188,12 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     68 modules, 1 in package          0.08s
-  check    1 module                          4.62s
-  codegen  4,312 functions                   1.90s
-  borrow   846 bodies                        0.07s
-  link     clang                             1.22s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 8.10s
+  load     180 modules, 1 in package         0.08s
+  check    1 module                          1.50s
+  codegen  4,645 functions                   0.93s
+  borrow   918 bodies                        0.06s
+  link     clang                             0.81s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.36s
 tasks 0.11 (linux, debug build)
 tasks file /tasks.txt, reminders wait 250ms
 ```
@@ -209,12 +209,12 @@ silk build --release
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, release)
-  load     68 modules, 1 in package          0.08s
-  check    1 module                          4.97s
-  codegen  4,312 functions                   1.96s
-  borrow   846 bodies                        0.07s
-  link     clang                             5.13s
-Finished build/llvm/x86_64-unknown-linux-gnu/release/tasks in 12.34s
+  load     180 modules, 1 in package         0.03s
+  check    1 module                          1.46s
+  codegen  4,645 functions                   1.15s
+  borrow   918 bodies                        0.06s
+  link     clang                             6.38s
+Finished build/llvm/x86_64-unknown-linux-gnu/release/tasks in 9.04s
 tasks 0.11 (linux, release build)
 tasks file /tasks.txt, reminders wait 250ms
 ```
@@ -244,12 +244,12 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     68 modules, 1 in package          0.08s
-  check    1 module                          4.78s
-  codegen  4,312 functions                   2.04s
-  borrow   846 bodies                        0.07s
-  link     clang                             1.17s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 8.27s
+  load     180 modules, 1 in package         0.03s
+  check    1 module                          1.48s
+  codegen  4,645 functions                   1.03s
+  borrow   918 bodies                        0.06s
+  link     clang                             0.15s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.73s
 tasks 0.11 (linux, debug build)
 tasks file /tasks.txt, reminders wait 300ms
 ```
@@ -264,28 +264,28 @@ TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks re
 reminder: #2 Write the Silk book
 reminder: #1 Buy milk
 1 cancelled when the time ran out
-time 0.303s
+time 0.302s
 ```
 
 The `where` clause guards values from `silk.toml` too. Change the value to `90000` and check:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.09s
+  load     failed: 1 error                   0.03s
 [x86_64-unknown-linux-gnu]
-src/main.silk:248:43: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
-Failed tasks in 0.09s
+src/main.silk:245:43: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
+Failed tasks in 0.05s
 ```
 
-Line 248 is the `param` declaration, and column 43 is its predicate. The error points at the rule the value broke, not at `silk.toml`.
+Line 245 is the `param` declaration, and column 43 is its predicate. The error points at the rule the value broke, not at `silk.toml`.
 
 A typo in the parameter name is a different mistake, so it points somewhere else. With `main.remindBudget = 300`:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.10s
+  load     failed: 1 error                   0.03s
 /home/you/tasks/silk.toml:7: error[SEM0214] invalid package parameter binding: module `main.silk` declares no package parameter `remindBudget`
-Failed tasks in 0.10s
+Failed tasks in 0.04s
 ```
 
 It is the same code as before, but this time the location is line 7 of `silk.toml`, the line that sets the value, and the message names the module and the name it could not find. Put the value back to `300` and the name to `remindBudgetMs`.
@@ -310,12 +310,12 @@ ls *.txt
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, demo)
-  load     68 modules, 1 in package          0.08s
-  check    1 module                          4.92s
-  codegen  4,312 functions                   1.82s
-  borrow   846 bodies                        0.07s
-  link     clang                             1.17s
-Finished build/llvm/x86_64-unknown-linux-gnu/demo/tasks in 8.21s
+  load     180 modules, 1 in package         0.04s
+  check    1 module                          1.44s
+  codegen  4,645 functions                   1.07s
+  borrow   918 bodies                        0.06s
+  link     clang                             0.71s
+Finished build/llvm/x86_64-unknown-linux-gnu/demo/tasks in 3.29s
 tasks 0.11 (linux, debug build)
 tasks file /demo-tasks.txt, reminders wait 300ms
 added #1
@@ -335,6 +335,23 @@ tasks file /tasks.txt, reminders wait 300ms
 ```
 
 The profile only changed the file name, so the demo binary still says `debug build`: a profile turns on optimization only when it says so, with a line such as `optimization = "speed"`.
+
+There is a third value, `optimization = "size"`, which optimizes for a small program instead of a fast one. It suits a WebAssembly module or a tool you ship to many machines. `Compilation.optimization()` does not know it yet, though: its `Optimization` enum has only `None` and `Speed`. With a `[profiles.small]` that sets `optimization = "size"`, `buildKind` stops the build:
+
+```sh
+silk build --profile small
+```
+
+```
+Compiling tasks (x86_64-unknown-linux-gnu, small)
+  load     180 modules, 1 in package         0.03s
+  check    failed: 1 module, 1 error         1.46s
+[x86_64-unknown-linux-gnu]
+src/main.silk:608:13: error[SEM0177] Unknown Optimization request
+Failed tasks in 1.50s
+```
+
+Until `Optimization` gains a member for it, a program that asks `Compilation.optimization()` can only be built for speed or for debugging.
 
 See **Package parameters** in the reference for every value kind, precedence and `--profile-input`.
 
@@ -389,12 +406,12 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     68 modules, 1 in package          0.08s
-  check    1 module                          4.70s
-  codegen  4,312 functions                   1.93s
-  borrow   846 bodies                        0.07s
-  link     clang                             1.19s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 8.03s
+  load     180 modules, 1 in package         0.04s
+  check    1 module                          0.07s
+  codegen  4,645 functions                   2.00s
+  borrow   829 bodies                        0.04s
+  link     clang                             0.07s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.26s
 [ ] #2 Write the Silk book (high)
 [ ] #1 Buy milk (normal)
 [ ] #3 Water the plants (low)
@@ -406,15 +423,15 @@ One of four done, five of twenty cells. Now make the mistake on purpose: change 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     68 modules, 1 in package          0.08s
-  check    failed: 2 modules, 1 error        5.10s
+  load     180 modules, 1 in package         0.05s
+  check    failed: 2 modules, 1 error        1.47s
 [x86_64-unknown-linux-gnu]
-src/main.silk:561:5: error[SEM0177] a progress bar is 1 to 40 cells wide
-  note: src/main.silk:554:7: related location
-Failed tasks in 5.18s
+src/main.silk:577:5: error[SEM0177] a progress bar is 1 to 40 cells wide
+  note: src/main.silk:568:7: related location
+Failed tasks in 1.56s
 ```
 
-Line 561 is the `compileError` itself, and the message is your own text. The `note:` line is the call that selected the branch: line 554, the `bar(0, done, total)` in `showBoard`. With many call sites, that is the one to fix. Put the width back to 20.
+Line 577 is the `compileError` itself, and the message is your own text. The `note:` line is the call that selected the branch: line 568, the `bar(0, done, total)` in `showBoard`. With many call sites, that is the one to fix. Put the width back to 20.
 
 What if `width` were an ordinary parameter? Try a smaller case in the scratch project:
 
@@ -435,11 +452,11 @@ pub fn main() -> i32 {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:3:13: error[SEM0176] reading the runtime value `verbose` is not available during static evaluation for x86_64-unknown-linux-gnu
-Failed tasks in 0.16s
+Failed tasks in 0.09s
 ```
 
 Column 13 is `verbose`, which is only known when the program runs. Make the parameter static, and each call compiles its own copy:
@@ -578,12 +595,12 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     68 modules, 1 in package          0.08s
-  check    1 module                          4.85s
-  codegen  4,312 functions                   1.95s
-  borrow   846 bodies                        0.07s
-  link     clang                             1.20s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 8.19s
+  load     180 modules, 1 in package         0.08s
+  check    1 module                          1.50s
+  codegen  4,645 functions                   0.93s
+  borrow   918 bodies                        0.06s
+  link     clang                             0.81s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.36s
 id,title,priority,done
 1,Buy milk,normal,no
 2,Write the Silk book,high,no
@@ -597,12 +614,12 @@ Two changes are worth trying here. First, `done` is a yes-or-no value, so `bool`
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     68 modules, 1 in package          0.08s
-  check    1 module                          4.81s
-  codegen  4,312 functions                   1.98s
-  borrow   846 bodies                        0.07s
-  link     clang                             1.18s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 8.15s
+  load     180 modules, 1 in package         0.04s
+  check    1 module                          0.16s
+  codegen  4,675 functions                   2.05s
+  borrow   840 bodies                        0.05s
+  link     clang                             0.44s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.77s
 id,title,priority,done
 1,Buy milk,normal,false
 2,Write the Silk book,high,false
@@ -624,6 +641,49 @@ id,priority,done
 
 `Reflect.fields` lists only `pub` fields, even inside the module that declares the struct. No error warns you, so check the header when an export looks short. Put the `pub` back.
 
+Reflection reads unions too. `Reflect.variants<U>()` is the static sequence of a union's variants, `Reflect.variantLabel` names one, and `Reflect.isVariant` tests whether a value holds it. In the scratch project, a status can name itself:
+
+```silk
+import silk.core.effect { Effect }
+import silk.core.reflect { Reflect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
+
+union Status {
+  Open,
+  Done { at: i64 },
+}
+
+// The label of whichever variant `status` holds, found by walking the variants at compile time.
+fn statusLabel(status: &Status) -> string<'static> {
+  static for variant in Reflect.variants<Status>() {
+    if Reflect.isVariant(status, variant) {
+      return Reflect.variantLabel(variant)
+    }
+  }
+  return "?"
+}
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  let open = Status.Open
+  let done = Status.Done { at: 1000 }
+  run Effect.log("{a} {b}\n", &.{ a: statusLabel(&open), b: statusLabel(&done) })
+    |> Effect.provideMut<Logger>(&mut logger)
+}
+```
+
+```sh
+silk run
+```
+
+```
+Open Done
+```
+
+The loop unrolls into one test per variant. `Reflect.variantFields` lists a variant's fields, and `Reflect.makeVariant` builds one, so a decoder can turn text back into a union value.
+
 ## Run the tests
 
 None of the tests touched the new code paths, but the parameters changed `execute`, so run them anyway:
@@ -634,14 +694,14 @@ silk test
 
 ```
   main::finishingRecordsTheClockTime
-    PASS  117 us
+    PASS  99 us
   main::slowRemindersAreCancelled
-    PASS  189 us
+    PASS  182 us
   main::unknownTaskIsReported
-    PASS  16 us
+    PASS  21 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   441 us
+Time   1 ms
 ```
 
 ## Summary

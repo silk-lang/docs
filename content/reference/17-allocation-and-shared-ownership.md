@@ -47,11 +47,13 @@ AllocatingFunction = 'effect' 'fn' Name Signature ( '!' 'OutOfMemoryError' )? '?
 `List<T>` in `silk/collections/list` is a growable owned sequence.
 
 - `List<T>.make()` does not allocate. The first growth reserves four elements; later growth doubles capacity.
-- Allocating operations: `append`, `insert`, `reserve`, `reserveExact`, `sort`, and for `List<u8>` `appendBytes` and `appendRepeated`.
-- Non-allocating operations: `length`, `capacity`, `asSlice`, `asMutSlice`, `get`, `set`, `pop`, `remove`, `clear`, `truncate`, `binarySearch`.
+- Allocating operations: `makeWithCapacity`, `append`, `insert`, `appendSlice`, `insertSlice`, `appendRepeated`, `insertRepeated`, `reserve`, `reserveExact`, `shrinkToFit`, `sort`, and for `List<u8>` `appendBytes`.
+- Non-allocating operations: `length`, `capacity`, `asSlice`, `asMutSlice`, `get`, `set`, `pop`, `remove`, `clear`, `clearAndFree`, `truncate`, `binarySearch`.
 - `get` requires `T: Copy` and returns a copy. On a non-Copy element it is SEM0121. Borrow move-only elements through `asSlice`.
 - `get`, `set` and `remove` trap on an out-of-range index.
-- Removing, clearing and truncating drop the discarded elements and keep capacity.
+- Removing, clearing and truncating drop the discarded elements and keep capacity. `clearAndFree` drops the elements and returns the buffer to the allocator. `shrinkToFit` moves the elements into a buffer of exactly their length, so it allocates.
+- `List<T>.makeWithCapacity(n)` allocates room for `n` elements up front. `reserve(additional)` makes room for at least that many more and may round up; `reserveExact` asks for exactly that many.
+- `String`, `Bytes`, `HashMap` and `HashSet` have the same capacity operations: `makeWithCapacity` (the hash containers also take a seed), `reserve`, `clear` and `clearAndFree`, and for `String` and `Bytes` also `capacity`, `reserveExact` and `shrinkToFit`.
 
 ## Shared
 

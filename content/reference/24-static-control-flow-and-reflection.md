@@ -1,6 +1,6 @@
 # Static control flow and reflection
 
-`static if` and `static for` choose and repeat code during compilation. `compileError` stops a build from a selected branch. `silk/core/reflect`, `silk/core/target` and `silk/core/compilation` supply the static facts these forms test: aggregate fields, the target machine, and the build request.
+`static if` and `static for` choose and repeat code during compilation. `compileError` stops a build from a selected branch. `silk/core/reflect`, `silk/core/target` and `silk/core/compilation` supply the static facts these forms test: aggregate fields, union variants, the target machine, and the build request.
 
 ## Syntax
 
@@ -47,7 +47,7 @@ ExactType           = 'typeof' '(' Path ')'
 ## `static for`
 
 - `static for name in sequence { ... }` repeats its body once per element, in order, during compilation. No runtime loop remains.
-- The sequence must be a static sequence value: the result of `Reflect.fields<T>()`, or an `Intrinsic.StaticSequence<E>` built with `silk/core/static_sequence`. Anything else, including a fixed array literal, is SEM0176.
+- The sequence must be a static sequence value: the result of `Reflect.fields<T>()`, `Reflect.variants<U>()` or `Reflect.variantFields(variant)`, or an `Intrinsic.StaticSequence<E>` built with `silk/core/static_sequence`. Anything else, including a fixed array literal, is SEM0176.
 - `name` is bound to the current element as a static value. It may appear in `static if` conditions and static arguments.
 - Each repetition is checked separately with that element's types. A body that suits one field's type but not another's fails for that field (SEM0012).
 - `return` and `fail` inside the body leave the enclosing function.
@@ -66,27 +66,36 @@ ExactType           = 'typeof' '(' Path ')'
 
 ## Reflection
 
-`silk/core/reflect` exposes aggregate metadata to static code. Descriptors exist only during static evaluation; they have no runtime representation. Import the owner with `import silk.core.reflect { Reflect }`.
+`silk/core/reflect` exposes the fields of aggregates and the variants of nominal unions to static code. Descriptors exist only during static evaluation; they have no runtime representation. Import the owner with `import silk.core.reflect { Reflect }`.
 
 | Operation | Result |
 | --- | --- |
-| `Reflect.typeOf<T>()` | The type descriptor of aggregate `T` (`Intrinsic.Type<T>`) |
-| `Reflect.typeKind(descriptor)` | A `u8` aggregate-kind code |
+| `Reflect.typeOf<T>()` | The type descriptor of `T` (`Intrinsic.Type<T>`) |
+| `Reflect.typeKind(descriptor)` | A `u8` kind code; every type has one |
 | `Reflect.fields<T>()` | A static sequence of field descriptors (`Intrinsic.Field<T, V>`) in declaration order |
 | `Reflect.fieldKind(field)` | A `u8` field-kind code |
 | `Reflect.fieldLabel(field)` | The source label of a labeled field, as `string<'static>` |
 | `Reflect.fieldOrdinal(field)` | The position of a positional field, as `usize`, counting from 0 |
 | `Reflect.borrowField(owner, field)` | `&V`, a borrow of that field of `owner: &T` |
+| `Reflect.borrowFieldMut(owner, field)` | `&mut V`, a mutable borrow of that field of `owner: &mut T` |
+| `Reflect.variants<U>()` | A static sequence of variant descriptors (`Intrinsic.Variant<U>`) of the nominal union `U`, in declaration order |
+| `Reflect.variantLabel(variant)` | The variant's name, as `string<'static>` |
+| `Reflect.variantFields(variant)` | A static sequence of the variant's field descriptors; empty for a unit variant |
+| `Reflect.makeVariant(variant, fields)` | A `U` built from a tuple of the variant's fields in order, or `()` for a unit variant |
+| `Reflect.isVariant(owner, variant)` | Whether `owner: &U` holds that variant |
 
-- Kind constants in `silk/core/reflect`: `namedKind` (0, a `struct`), `positionalKind` (1, a `tuple` declaration), `anonymousNamedKind` (2, a `.{ ... }` record), `anonymousPositionalKind` (3, a `( ... )` tuple).
-- Field kind constants: `labeledFieldKind` (0) and `positionalFieldKind` (1).
-- Every operation except `borrowField` is a `static fn`. Calling one where a runtime value is needed, as in `let fields = Reflect.fields<P>()` in an ordinary function, is SEM0176.
-- `borrowField` runs at runtime. Its `field` parameter is `static`, so the descriptor must come from static code, usually a `static for` binding. Type arguments may be written (`borrowField<P, i32>`) or inferred.
+- Kind constants in `silk/core/reflect`: `namedKind` (0, a `struct`), `positionalKind` (1, a `tuple` declaration), `anonymousNamedKind` (2, a `.{ ... }` record), `anonymousPositionalKind` (3, a `( ... )` tuple), `arrayKind` (4, a fixed array), `otherKind` (5, any other type, such as `i32`, `string`, a slice, an enum or a structural union `A | B`) and `unionKind` (6, a nominal `union`).
+- Field kind constants: `labeledFieldKind` (0), `positionalFieldKind` (1) and `variantFieldKind` (2, a field of a union variant, which has both a label and an ordinal).
+- Every operation except `borrowField`, `borrowFieldMut`, `makeVariant` and `isVariant` is a `static fn`. Calling one where a runtime value is needed, as in `let fields = Reflect.fields<P>()` in an ordinary function, is SEM0176.
+- `borrowField`, `borrowFieldMut`, `makeVariant` and `isVariant` run at runtime. Their descriptor parameter is `static`, so the descriptor must come from static code, usually a `static for` binding. Type arguments may be written (`borrowField<P, i32>`) or inferred.
+- `borrowFieldMut` lets generic code write each field in place: `let place = Reflect.borrowFieldMut(&mut owner.*, field)` then `place.* = place.* + amount`.
+- At runtime `makeVariant(line, (a, b))` is a plain variant construction and `isVariant` a plain test of the active variant, like a one-arm `match`.
+- A variant's field descriptors cannot be given to `borrowField`.
 - Comparing labels is static: `static if Reflect.fieldLabel(field) == "count"` selects one field.
-- `Reflect.fields<T>()` lists only `pub` fields, even when called in the module that declares `T`. Visibility is that of `silk/core/reflect`.
+- `Reflect.fields<T>()` and `Reflect.variantFields` list only `pub` fields, even when called in the module that declares `T`. Visibility is that of `silk/core/reflect`. For the same reason `makeVariant` needs every field of the variant to be `pub`; a private field is SEM0021 at the call ("Cannot construct main.Shape.Line here because it has fields private to its module").
 - `Intrinsic.reflectFields<T>()` uses the calling module's visibility instead, so it also lists private fields of a local type. See Intrinsics.
-- Listing the fields of a nominal `union` with `Reflect.fields<U>()` is not supported. It is SEM0176 at the `Reflect.fields` call in the user's code. `Reflect.typeOf` of a `union` or of a non-aggregate such as `i32`, and `fieldLabel` of a positional field, are reported as unsupported.
-- A fault or unsupported construct reached while statically evaluating another module's function is reported at the outermost call in the user's module. For example, `static if Reflect.typeKind(Reflect.typeOf<i32>()) == 1` reports "unsupported: this construct is not supported by the native compiler yet" at the `Reflect.typeKind` call, followed by a `note:` line at the same position.
+- A nominal union has no fields of its own: `Reflect.fields<U>()` of a union is SEM0176 at the `Reflect.fields` call. List its variants with `Reflect.variants<U>()`. `fieldLabel` of a positional field is reported as unsupported.
+- A fault or unsupported construct reached while statically evaluating another module's function is reported at the outermost call in the user's module.
 
 ## Target and build queries
 
@@ -115,7 +124,7 @@ All of these are fixed by the build request (`--target`, `--release`, `--profile
 | `Compilation.link()` | `Link`: `Static`, `Dynamic` |
 | `Compilation.codeModel()` | `CodeModel`: `Small`, `Large` |
 | `Compilation.relocation()` | `Relocation`: `Static`, `Pic` |
-| `Compilation.optimization()` | `Optimization`: `None`, `Speed` |
+| `Compilation.optimization()` | `Optimization`: `None`, `Speed`. Under a profile with `optimization = "size"` the call fails with SEM0177 "Unknown Optimization request" |
 | `Compilation.safety()` | `Safety`: `Checked`, `Unchecked` |
 | `Compilation.threading()` | `Threading`: `Single`, `Multi` |
 | `Compilation.unwind()` | `Unwind`: `None`, `Native` |
@@ -277,6 +286,65 @@ src/main.silk:24:5: error[SEM0177] factor must be nonzero
   note: src/main.silk:32:6: related location
 ```
 
+Union variants and a mutable field projection. `build` makes a variant from its descriptor, `label` finds the active one, and `bump` writes every field of a struct:
+
+```silk
+import silk.core.reflect { Reflect, unionKind }
+
+union Shape {
+  Dot,
+  Line { pub length: u32 },
+  Box { pub width: u32, pub height: u32 },
+}
+
+struct Counters {
+  pub hits: i32,
+  pub misses: i32,
+}
+
+// Builds the `Line` variant of `U` from one length.
+fn build<U>(word: string, length: u32) -> U {
+  static for variant in Reflect.variants<U>() {
+    static if Reflect.variantLabel(variant) == "Line" {
+      if word == "Line" {
+        return Reflect.makeVariant(variant, (length,))
+      }
+    }
+  }
+  return Intrinsic.trap("no such variant")
+}
+
+fn label<U>(value: &U) -> string<'static> {
+  static for variant in Reflect.variants<U>() {
+    if Reflect.isVariant(value, variant) {
+      return Reflect.variantLabel(variant)
+    }
+  }
+  return "?"
+}
+
+fn bump<T>(owner: &mut T, amount: i32) -> () {
+  static for field in Reflect.fields<T>() {
+    let place = Reflect.borrowFieldMut(&mut owner.*, field)
+    place.* = place.* + amount
+  }
+  return ()
+}
+
+pub fn main() -> i32 {
+  static if Reflect.typeKind(Reflect.typeOf<Shape>()) != unionKind {
+    return 1
+  }
+  let line: Shape = build<Shape>("Line", 9)
+  if label(&line) != "Line" {
+    return 2
+  }
+  let mut counters = Counters { hits: 1, misses: 2 }
+  bump(&mut counters, 10)
+  return counters.hits + counters.misses - 23
+}
+```
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -302,5 +370,5 @@ Static evaluation · Package parameters · Generics · Intrinsics · Control flo
 
 ## Open questions
 
+- `Compilation.optimization()` has no value for `optimization = "size"` and stops the build with SEM0177 under such a profile.
 - `break` and `continue` in a `static for` body, and `compileError` outside a static context, report `unsupported: this construct is not supported by the native compiler yet` rather than a semantic error code. Whether these become errors or features is not settled.
-- `Reflect.typeOf<U>()` of a union is reported as unsupported rather than with a semantic error code.

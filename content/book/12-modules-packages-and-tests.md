@@ -105,10 +105,10 @@ silk test -p taskcore
 ```
 Package taskcore (/home/you/tasks-workspace/taskcore)
   lib::addsTwoNumbers
-    PASS  1 us
+    PASS  6 us
 
 Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 1 discovered)
-Time   47 us
+Time   10 ms
 Workspace summary: 1 package succeeded, 0 failed
 ```
 
@@ -141,17 +141,18 @@ silk check -p tasks
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     79 modules, 7 in package          0.07s
-  check    failed: 8 modules, 1 error        0.74s
+  load     203 modules, 7 in package         0.02s
+  check    failed: 12 modules, 1 error       0.00s
 [x86_64-unknown-linux-gnu]
 tasks/src/main.silk:21:8: error[MOD0001] Unknown module cli.command
-Failed tasks in 0.81s
-Failed 1 of 1 package in 0.85s
+  note: did you mean `cli.Command`? Module paths match file names exactly, including letter case
+Failed tasks in 0.05s
+Failed 1 of 1 package in 0.06s
 ```
 
 The `load` row counts every module the build read: the seven of `tasks` itself and the standard library modules they import. When a command covers members of a workspace, a last line counts the packages that finished or failed.
 
-MOD0001 says the module does not exist and prints the path it looked for, `cli.command`. Column 8 points at that path, which is the part to fix.
+MOD0001 says the module does not exist and prints the path it looked for, `cli.command`. Column 8 points at that path, which is the part to fix. Because a module with the same letters in another case does exist, the note under the error names it: `cli.Command`.
 
 ## `pub`: what a module shows
 
@@ -218,18 +219,18 @@ silk check -p taskcore
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
-  load     47 modules, 5 in package          0.06s
-  check    failed: 5 modules, 2 errors       0.19s
+  load     130 modules, 5 in package         0.03s
+  check    failed: 5 modules, 2 errors       0.05s
 [x86_64-unknown-linux-gnu]
 taskcore/src/Board.silk:52:23: error[SEM0021] Cannot construct Task.Status.Done here because it has fields private to its module; call a function that module provides to build one
-taskcore/src/Store.silk:119:21: error[SEM0028] Pattern names private field `at` of variant `Done`; skip it with `..`, or mark it `pub at` to use it outside its module
-Failed taskcore in 0.25s
-Failed 1 of 1 package in 0.26s
+taskcore/src/Store.silk:116:21: error[SEM0028] Pattern names private field `at` of variant `Done`; skip it with `..`, or mark it `pub at` to use it outside its module
+Failed taskcore in 0.10s
+Failed 1 of 1 package in 0.11s
 ```
 
 SEM0021, in `Board.silk`, is about building a value: `Status.Done { at: at }` needs every field to be visible, and `at` is not. SEM0028, in `Store.silk`, is about reading: the pattern `Status.Done { at } => at` binds a private field. Put the `pub` back and both go away.
 
-Private is still useful. In `Remind.silk`, the struct `Reminder { id: TaskId delay: u64 }` keeps its fields private. Only `Remind` makes reminders, so no other module needs to see inside one. See **Structs, tuples and arrays** and **Enums and unions** in the reference for the full visibility rules.
+Private is still useful. In `Remind.silk`, the struct `Reminder { id: TaskId, delay: u64 }` keeps its fields private. Only `Remind` makes reminders, so no other module needs to see inside one. See **Structs, tuples and arrays** and **Enums and unions** in the reference for the full visibility rules.
 
 ## A library package
 
@@ -272,12 +273,12 @@ silk check -p taskcore
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
-  load     47 modules, 5 in package          0.05s
-  check    failed: 5 modules, 1 error        0.77s
+  load     130 modules, 5 in package         0.03s
+  check    failed: 5 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
-taskcore/src/Store.silk:187:10: error[SEM0129] Return expected i32 but received bool
-Failed taskcore in 0.83s
-Failed 1 of 1 package in 0.84s
+taskcore/src/Store.silk:184:10: error[SEM0129] Return expected i32 but received bool
+Failed taskcore in 0.12s
+Failed 1 of 1 package in 0.13s
 ```
 
 `silk test` stops on the same line and runs nothing. A mistake in an exported module can't hide, and neither can its tests. Take `broken` out again.
@@ -287,9 +288,9 @@ The list itself has to be right. An entry that names no module is refused before
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
   load     failed: 1 error                   0.00s
-silk: invalid exports of taskcore@0.1.0: Stores is not a module of the package
-Failed taskcore in 0.00s
-Failed 1 of 1 package in 0.00s
+Invalid Silk project manifest /home/you/tasks-workspace/taskcore/silk.toml:6: exports of taskcore@0.1.0: Stores is not a module of the package
+Failed taskcore in 0.01s
+Failed 1 of 1 package in 0.01s
 ```
 
 Fix the spelling. With that in place, build the library on its own:
@@ -301,10 +302,10 @@ silk build
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
-  load     47 modules, 5 in package          0.05s
-  check    5 modules                         0.67s
-  borrow   191 bodies                        0.01s
-Finished taskcore in 0.74s
+  load     130 modules, 5 in package         0.06s
+  check    5 modules                         0.18s
+  borrow   115 bodies                        0.00s
+Finished taskcore in 0.26s
 ```
 
 The first line says `Checking`, not `Compiling`, and no file is made. A `library` is Silk source for other packages, so there is nothing to link: the program that depends on `taskcore` compiles its source along with its own. What the library build tells you is that the package is sound on its own.
@@ -364,11 +365,11 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     78 modules, 7 in package          0.09s
-  check    failed: 8 modules, 1 error        1.67s
+  load     201 modules, 7 in package         0.08s
+  check    failed: 12 modules, 1 error       0.84s
 [x86_64-unknown-linux-gnu]
 tasks/src/main.silk:19:38: error[SEM0015] `fileText` is private to taskcore.Store; mark it `pub` there to use it here
-Failed tasks in 1.76s
+Failed tasks in 0.94s
 ```
 
 Line 19, column 38 is `fileText` in the import of `taskcore.Store`. SEM0015 means the name exists but is private.
@@ -381,11 +382,11 @@ import taskcore.Secret { salt }
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     79 modules, 7 in package          0.07s
-  check    failed: 8 modules, 1 error        5.39s
+  load     203 modules, 7 in package         0.03s
+  check    failed: 13 modules, 1 error       1.41s
 [x86_64-unknown-linux-gnu]
 tasks/src/main.silk:27:8: error[MOD0003] Module Secret is not exported by package taskcore@0.1.0
-Failed tasks in 5.46s
+Failed tasks in 1.47s
 ```
 
 This one has a clear message. `pub` decides what a module shows to other modules. `exports` decides which modules a package shows to other packages. You need both.
@@ -401,15 +402,15 @@ import taskcore.Board { Board, DuplicateTask, NoSuchTask }
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     78 modules, 7 in package          0.09s
-  check    failed: 8 modules, 1 error        1.56s
+  load     201 modules, 7 in package         0.04s
+  check    failed: 12 modules, 1 error       0.10s
 [x86_64-unknown-linux-gnu]
-tasks/src/main.silk:19:25: error[SEM0016] Multiple bindings claim Board
+tasks/src/main.silk:19:25: error[SEM0016] Multiple bindings claim Board; rename one with `as`, as in `import a.b as other` or `import a.b { Board as other }`
   note: tasks/src/main.silk:18:17: related location
-Failed tasks in 1.65s
+Failed tasks in 0.18s
 ```
 
-SEM0016 is a binding conflict: the name `Board` is bound twice, once to the module and once to the struct. The error points at the second binding, the struct in the second import, and the note points at the first, the module. Give the module another name with `as`:
+SEM0016 is a binding conflict: the name `Board` is bound twice, once to the module and once to the struct. The error points at the second binding, the struct in the second import, and the note points at the first, the module. The message also names the fix: give one of them another name with `as`. Rename the module:
 
 ```silk
 import taskcore.Board as Boards
@@ -422,10 +423,10 @@ fn openCount(board: &Board) -> i32 {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     78 modules, 7 in package          0.08s
-  check    8 modules                         5.37s
-  borrow   826 bodies                        0.07s
-Finished tasks in 5.46s
+  load     201 modules, 7 in package         0.03s
+  check    12 modules                        1.15s
+  borrow   589 bodies                        0.04s
+Finished tasks in 1.23s
 ```
 
 `as` works for single names too. You will meet it in the next chapter, where three standard library modules each export a type called `Limits`.
@@ -449,11 +450,11 @@ and draw the bar with `run bar(barWidth, done, total)`:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     78 modules, 7 in package          0.09s
-  check    failed: 8 modules, 1 error        3.50s
+  load     201 modules, 7 in package         0.02s
+  check    failed: 12 modules, 1 error       0.11s
 [x86_64-unknown-linux-gnu]
 tasks/src/cli/Show.silk:11:1: error[SEM0214] Invalid compilation configuration: package parameter `barWidth` is not declared in the root package's root module, the only module that may declare `param`
-Failed tasks in 3.59s
+Failed tasks in 0.18s
 ```
 
 It is the SEM0214 from chapter 11, and this time the message gives the reason: the parameter is outside the root module. Line 11 is the `param` declaration itself, not the line that reads it.
@@ -495,12 +496,12 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     78 modules, 7 in package          0.09s
-  check    7 modules                         4.49s
-  codegen  4,312 functions                   2.06s
-  borrow   845 bodies                        0.08s
-  link     clang                             1.00s
-Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 7.85s
+  load     201 modules, 7 in package         0.10s
+  check    11 modules                        1.19s
+  codegen  4,645 functions                   1.43s
+  borrow   924 bodies                        0.06s
+  link     clang                             0.75s
+Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.50s
 ```
 
 The program now lives in the workspace's shared `build` folder, so from `tasks/` you start it as `../build/...`. The old `tasks/build` folder from earlier chapters is no longer used, and you can delete it.
@@ -576,16 +577,16 @@ silk test
 
 ```
   Board::duplicateTitlesAreRefused
-    PASS  21 us
+    PASS  34 us
   Store::damagedLinesAreReported
-    PASS  5 us
+    PASS  22 us
   Store::fileFormatRoundTrips
-    PASS  27 us
+    PASS  29 us
   Text::partCutsTheTitle
-    PASS  1 us
+    PASS  3 us
 
 Tests  4 passed, 0 failed (0 cached, 4 executed, 4 selected, 4 discovered)
-Time   150 us
+Time   1 ms
 ```
 
 Each test is named after its module. Then the program's tests from `tasks/`:
@@ -597,14 +598,14 @@ silk test
 
 ```
   tests::finishingRecordsTheClockTime
-    PASS  96 us
+    PASS  107 us
   tests::slowRemindersAreCancelled
-    PASS  165 us
+    PASS  217 us
   tests::unknownTaskIsReported
-    PASS  15 us
+    PASS  21 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   384 us
+Time   2 ms
 ```
 
 Notice that the library's tests are not run again here. Each package tests its own modules.
@@ -617,10 +618,10 @@ silk test --filter Reminders
 
 ```
   tests::slowRemindersAreCancelled
-    PASS  231 us
+    PASS  242 us
 
 Tests  1 passed, 0 failed (0 cached, 1 executed, 1 selected, 3 discovered)
-Time   298 us
+Time   1 ms
 ```
 
 The text is matched against the name as it is printed, module included. So from `taskcore/`, `--filter Store::` picks out the tests of one module:
@@ -632,12 +633,12 @@ silk test --filter Store::
 
 ```
   Store::damagedLinesAreReported
-    PASS  8 us
+    PASS  16 us
   Store::fileFormatRoundTrips
-    PASS  36 us
+    PASS  42 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 4 discovered)
-Time   91 us
+Time   1 ms
 ```
 
 ### The whole workspace at once
@@ -652,26 +653,26 @@ silk test --workspace
 ```
 Package taskcore (/home/you/tasks-workspace/taskcore)
   Board::duplicateTitlesAreRefused
-    PASS  15 us
+    PASS  25 us
   Store::damagedLinesAreReported
-    PASS  5 us
+    PASS  11 us
   Store::fileFormatRoundTrips
-    PASS  28 us
+    PASS  34 us
   Text::partCutsTheTitle
-    PASS  1 us
+    PASS  2 us
 
 Tests  4 passed, 0 failed (0 cached, 4 executed, 4 selected, 4 discovered)
-Time   125 us
+Time   2 ms
 Package tasks (/home/you/tasks-workspace/tasks)
   tests::finishingRecordsTheClockTime
-    PASS  83 us
+    PASS  137 us
   tests::slowRemindersAreCancelled
-    PASS  161 us
+    PASS  218 us
   tests::unknownTaskIsReported
-    PASS  14 us
+    PASS  51 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   358 us
+Time   1 ms
 Workspace summary: 2 packages succeeded, 0 failed
 ```
 
@@ -718,18 +719,19 @@ silk test
 
 ```
   tests::finishingRecordsTheClockTime
-    PASS  101 us
+    PASS  150 us
   tests::slowRemindersAreCancelled
     assertion failed: all three reminders went off
-    FAIL  193 us
+      at tests.slowRemindersAreCancelled (tests:84:3)
+    FAIL  211 us
   tests::unknownTaskIsReported
-    PASS  15 us
+    PASS  26 us
 
 Tests  2 passed, 1 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   395 us
+Time   5 ms
 ```
 
-The run exits with status 1. The line under the test's name is the message you passed to `expect`. A failed `Testing.expect` is a typed failure, `AssertionError`, and the message is the whole report, so write it as the fact you expect. Change the 3 back to 2.
+The run exits with status 1. The line under the test's name is the message you passed to `expect`, and the line after it is where the failure came from: line 84 of the `tests` module, the `expect` call. A failed `Testing.expect` is a typed failure, `AssertionError`, and the message is the report, so write it as the fact you expect. Change the 3 back to 2.
 
 ## Formatting
 

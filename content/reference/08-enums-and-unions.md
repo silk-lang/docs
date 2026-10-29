@@ -49,6 +49,7 @@ VariantValue      = TypePath TypeArguments? '.' Identifier ( '{' FieldInit ( ','
 - A union may have an inherent `impl` block and interface impls, like a struct.
 - There is no field access on a union value: `shape.radius` is SEM0027. Read fields by matching.
 - There is no built-in `==` on unions (SEM0135).
+- Static code can list a union's variants with `Reflect.variants<U>()` from `silk/core/reflect`, read each one's label and fields, and build a variant with `Reflect.makeVariant`. See Static control flow and reflection.
 
 ## Constructing variants
 
@@ -97,6 +98,7 @@ pub union Result<A, F> {
 
 - `Option<T>.some(v)`, `Option<T>.none()`, `Result<A, F>.succeed(v)` and `Result<A, F>.failResult(e)` construct values.
 - Both define `map`, `flatMap` and `unwrapOr`. `Result` also defines `mapError`. All of these consume the value.
+- `Option<T>.isSome(&o)` and `Option<T>.isNone(&o)` test the variant through a borrow.
 
 ## Copy and move
 
@@ -236,9 +238,9 @@ pub fn main() -> i32 {
 
 ## See also
 
-Patterns and match · Structs, tuples and arrays · Generics · Interfaces and impls · Ownership and moves · `silk/core/option`, `silk/core/result`
+Patterns and match · Structs, tuples and arrays · Generics · Interfaces and impls · Ownership and moves · `silk/core/option`, `silk/core/result`, `silk/core/reflect`
 
 ## Open questions
 
-- `enum Color<T> { Red, Green }` is accepted, but `Color<i32>.Red` is then SEM0051 ("An application with the wrong number of type arguments"). Generic enums appear unsupported without a declaration-site error.
+- `enum Color<T> { Red, Green }` is accepted, but `Color<i32>.Red` is then SEM0051 ("`Color` takes 0 type arguments, but 1 was written"). Generic enums appear unsupported without a declaration-site error.
 - SEM0168 (variant qualifier that is not a nominal union) has no producer in the compiler. `P.C { … }` on a struct gives SEM0018 ("A type position whose name resolves to something other than a type") instead.

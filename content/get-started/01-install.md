@@ -39,7 +39,7 @@ Add Silk to your PATH by adding this line to ~/.bashrc:
 
 Step by step, the script:
 
-1. Picks a release from GitHub. It prefers the newest stable release. Before the first stable release exists, it takes the newest published dev release.
+1. Picks a release from GitHub. It prefers the newest stable release. Before the first stable release exists, it takes the newest published dev release. No stable release is published yet, so today the script installs the newest dev release, such as `v0.1.0-dev.31+2fc1811f535e`.
 2. Downloads `silk-<version>-<target>.tar.gz` for your host.
 3. Checks the archive's minisign signature, when `minisign` is installed (see below).
 4. Checks that the compiler `bin/silkc` has the SHA-256 the release publishes in `native-seed.json`, that it reports the requested version, and that its bundled change snapshot matches the release's `changes-snapshot.toml`.
@@ -75,18 +75,28 @@ curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | SI
 | --- | --- | --- |
 | `SILK_HOME` | Folder that holds the Silk versions, `bin/silk` and `settings.toml` | `~/.silk` |
 | `SILK_RELEASE` | An exact release tag to install, such as `v0.1.0` | The newest release |
-| `SILK_CHANNEL` | `stable`, `dev` or `auto`. `auto` prefers stable and falls back to dev only before any stable release exists | `auto` |
+| `SILK_CHANNEL` | `stable`, `dev` or `auto`. `auto` prefers stable and falls back to dev only before any stable release exists. `dev` takes the newest published dev release even after a stable one exists | `auto` |
 | `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit, useful on shared CI machines | none |
 
 `SILK_RELEASE` pins a version, which is what you want in CI. A tag that does not exist stops the script with `silk-install: silk-lang/silk has no release v9.9.9`. Dev tags carry a commit, as in `v0.1.0-dev.3+fbd34fb3d0ee`; quote them in the shell.
 
+`SILK_CHANNEL=stable` refuses to fall back while no stable release exists:
+
+```
+silk-install: silk-lang/silk has no stable compiler release yet; use SILK_CHANNEL=dev or SILK_RELEASE
+```
+
+Any other channel name stops with `silk-install: SILK_CHANNEL must be auto, stable, or dev`.
+
 ## Install Clang
 
-Silk compiles your code to LLVM 22 bitcode and hands it to Clang to make the executable, so it needs Clang 22 or newer. An older Clang misreads that bitcode, and `silk build` refuses it before compiling. Install LLVM from your package manager or from llvm.org. The Clang that ships with Xcode ("Apple clang") does not qualify, and the installer warns about it; install LLVM's own Clang on macOS too.
+Silk compiles your code to LLVM 22 bitcode and hands it to Clang to make the executable, so it needs Clang 22 or newer. An older Clang misreads that bitcode, and `silk build` refuses it before handing it anything. Install LLVM from your package manager or from llvm.org. The Clang that ships with Xcode ("Apple clang") does not qualify, and the installer warns about it; install LLVM's own Clang on macOS too.
 
 The compiler uses the Clang named by `--clang <path>` on `silk build`, `silk run` or `silk test`, else the one named by the `SILK_CLANG` environment variable, else the first `clang` on your `PATH`.
 
 The archiver comes from `SILK_LLVM_AR`, or else the `llvm-ar` in the same folder as that Clang.
+
+On Linux, an executable links with the `ld.lld` in Clang's installation directory when there is one, which is faster than the system linker. LLD is optional: without it, Clang uses the system linker. Clang's installation directory is the `InstalledDir` line of `clang --version`, such as `/usr/lib/llvm-22/bin`, so on Debian or Ubuntu install the `lld-22` package next to `clang-22`. The progress row still reads `link     clang` either way.
 
 If your default `clang` is older than 22, point `SILK_CLANG` at a newer one:
 
@@ -97,43 +107,50 @@ export SILK_CLANG=/usr/lib/llvm-22/bin/clang
 The installer checks the Clang it would use. An older Clang, or Apple clang, gets a warning:
 
 ```
-Silk needs Clang 22 or newer, but clang is: Ubuntu clang version 18.1.3
+Silk needs Clang 22 or newer, but clang is: Ubuntu clang version 18.1.3 (1ubuntu1)
 Put LLVM 22 or newer on PATH, or set SILK_CLANG to its clang.
 ```
 
-A build with an older Clang stops before compiling and names the Clang it found:
-
-```
-silk: Silk builds need Clang 22 or newer, but /usr/bin/clang-18 (from SILK_CLANG) is Clang 18; set SILK_CLANG or pass --clang the path of a newer Clang
-```
-
-With no Clang at all, `silk build` and `silk run` stop at the link step:
+A build with an older Clang stops at the link step and names the Clang it found:
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.10s
-  check    1 module                          0.11s
-  codegen  422 functions                     0.28s
-  borrow   137 bodies                        0.01s
+  load     143 modules, 1 in package         0.05s
+  check    1 module                          0.14s
+  codegen  689 functions                     0.13s
+  borrow   229 bodies                        0.01s
+silk: Silk builds need Clang 22 or newer, but /usr/bin/clang-18 (from SILK_CLANG) is Clang 18; set SILK_CLANG or pass --clang the path of a newer Clang
+  link     failed                            0.02s
+Failed hello in 0.37s
+```
+
+With no Clang at all, the installer prints `Silk needs Clang 22 or newer to build programs. Put it on PATH, or set SILK_CLANG to it.`, and `silk build` and `silk run` stop at the link step:
+
+```
+Compiling hello (x86_64-unknown-linux-gnu, debug)
+  load     143 modules, 1 in package         0.06s
+  check    1 module                          0.14s
+  codegen  689 functions                     0.13s
+  borrow   229 bodies                        0.01s
 silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable
   link     failed                            0.00s
-Failed hello in 0.52s
+Failed hello in 0.35s
 ```
 
 If the chosen Clang cannot start, for example because `SILK_CLANG` names a file that does not exist, the message names the path and where it came from: `from SILK_CLANG`, `from --clang` or `found on PATH`.
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.05s
-  check    1 module                          0.06s
-  codegen  422 functions                     0.21s
-  borrow   137 bodies                        0.00s
+  load     143 modules, 1 in package         0.06s
+  check    1 module                          0.14s
+  codegen  689 functions                     0.14s
+  borrow   229 bodies                        0.01s
 silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable
   link     failed                            0.00s
 Failed hello in 0.36s
 ```
 
-Both failures exit with status 2.
+All three failures exit with status 2.
 
 ## Add silk to your PATH
 
@@ -199,7 +216,19 @@ When you save a release asset with `curl -O`, the `+` in a dev version stays enc
 
 ## Upgrade
 
-`silk use latest` installs the newest stable release beside the versions you have and makes it your default; `silk use latest --dev` takes the newest dev release. `silk update self` updates the tool itself. Running the script again does both. Add `SILK_RELEASE` to the script to install a specific version, older or newer. Installing a version you already have again with the script replaces its folder whole, so files from an old standard library do not linger. `silk use list` shows every installed version.
+`silk use latest` installs the newest stable release beside the versions you have and makes it your default; `silk use dev`, or `silk use latest --dev`, takes the newest release of any kind, dev releases included. Until a stable release is published, `silk use latest` stops with exit status 1:
+
+```
+silk: no stable Silk release is published yet; `latest --dev` names the newest dev release
+```
+
+`silk update self` updates the tool itself, to the newest stable release, or to the newest dev release while none is stable; `--dev` always takes the newest dev release. When there is nothing newer it says so:
+
+```
+silk 0.1.0 is up to date (newest release: 0.1.0)
+```
+
+Running the script again does both. Add `SILK_RELEASE` to the script to install a specific version, older or newer. Installing a version you already have again with the script replaces its folder whole, so files from an old standard library do not linger. `silk use list` shows every installed version.
 
 ## Switch versions
 
@@ -213,9 +242,13 @@ silk use
 ```
 
 ```
-Pinned Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/app/silk.toml ([package].silk-version)
+Pinned Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/app/silk.toml ([package].silk-version, was 0.1.0)
+Silk 0.1.0-dev.11+6de14da2a8a6 is not installed yet. Install it with: silk use
+note: Silk 0.1.0-dev.11+6de14da2a8a6 is older than this tool (0.1.0); if it cannot read this silk.toml, pin a newer version or edit the manifest for it
 Installed Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/.silk/toolchains/0.1.0-dev.11+6de14da2a8a6
 ```
+
+`silk set` names the version it replaced, and warns when the new pin is older than the tool, since an older compiler may not read every key of a newer manifest. The last line comes from `silk use`.
 
 After cloning someone's project, `silk use` alone installs the version it pins. When a project pins a version you do not have, its commands stop with exit status 3 and name the fix:
 

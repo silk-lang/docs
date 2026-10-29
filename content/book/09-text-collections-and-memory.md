@@ -29,14 +29,52 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.04s
-  check    failed: 2 modules, 1 error        0.09s
+  load     135 modules, 1 in package         0.05s
+  check    failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
 src/main.silk:2:27: error[SEM0135] Operator + does not join strings; build an owned `String` with `String.copy` and `String.append`, or write the text with a `Format.format` template
 Failed scratch in 0.14s
 ```
 
-The message says it plainly: `+` belongs to an operator interface, and no impl of it accepts two string views. `+` is for numbers. Joining two views means building new text, and new text needs somewhere to live. In Silk you build it with a template that writes into a buffer you own. You will do exactly that for `tasks.txt` later in this chapter.
+The message says it plainly: `+` belongs to an operator interface, and no impl of it accepts two string views. `+` is for numbers. Joining two views means building new text, and new text needs somewhere to live. The message names the two ways to build it.
+
+The first is `String` from `silk/text/string`: UTF-8 text that owns its buffer, the text counterpart of `Bytes`. `String.copy` makes one from a view, `append` adds a view to the end, and `view` borrows the result back as a `string`. Every call that may allocate needs the allocator:
+
+```silk
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.io.logger { Logger, LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.text.string { String }
+
+effect fn greeting() -> ()
+  ! OutOfMemoryError | LogError
+  ? &mut Allocator | &mut Logger {
+  // Room for 16 bytes up front, so the two appends below need no second allocation.
+  let mut text = run String.makeWithCapacity(16)
+  run text.append("tasks ")
+  run text.append("0.9")
+  run Effect.log(
+    "{text} ({bytes} bytes, room for {room})\n",
+    &.{ text: text.view(), bytes: String.byteLength(text.view()), room: text.capacity() },
+  )
+}
+
+pub effect fn main() -> ()
+  ! OutOfMemoryError | LogError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut logger = StdoutLogger.make()
+  run greeting()
+    |> Effect.provideMut<Allocator>(&mut allocator)
+    |> Effect.provideMut<Logger>(&mut logger)
+}
+```
+
+```
+tasks 0.9 (9 bytes, room for 16)
+```
+
+`String.make()` would start empty and grow as you append. `makeWithCapacity` asks for the room up front, and `capacity` reports how much there is. The second way is a template that writes into a buffer you own. You will do exactly that for `tasks.txt` later in this chapter.
 
 ## A board that grows
 
@@ -46,7 +84,7 @@ The message says it plainly: `+` belongs to an operator interface, and no impl o
 // The board grows as needed. It also indexes tasks by title to refuse duplicates.
 struct Board<'text> {
   tasks: List<Task<'text>>,
-  byTitle: HashMap<Title<'text>, TaskId>,
+  byTitle: HashMap<string<'text>, TaskId>,
   nextId: u32,
 }
 ```
@@ -61,11 +99,11 @@ In `Board.make`, you might write `List.make()` and expect the field type to fill
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     61 modules, 1 in package          0.08s
-  check    failed: 2 modules, 1 error        3.30s
+  load     166 modules, 1 in package         0.04s
+  check    failed: 2 modules, 1 error        0.48s
 [x86_64-unknown-linux-gnu]
-src/main.silk:175:14: error[SEM0052] Cannot infer all type arguments for List.make from supplied values
-Failed tasks in 3.39s
+src/main.silk:167:14: error[SEM0052] Cannot infer all type arguments for List.make from supplied values
+Failed tasks in 0.55s
 ```
 
 The message says it plainly. Type arguments are inferred from the arguments you pass, and `make()` has none. The field's type never flows back into the call. That is by design: a call means the same thing wherever you write it. Write the type out:
@@ -75,7 +113,7 @@ impl<'text> Board<'text> {
   fn make() -> Board<'text> {
     return Board {
       tasks: List<Task<'text>>.make(),
-      byTitle: HashMap<Title<'text>, TaskId>.make(Hash.seed(2026)),
+      byTitle: HashMap<string<'text>, TaskId>.make(Hash.seed(2026)),
       nextId: 1,
     }
   }
@@ -130,11 +168,11 @@ pub effect fn main() -> () ! OutOfMemoryError {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:12:15: error[SEM0121] `main.Task: Copy` cannot be proved: the callee requires a `Copy` type argument here, and this type does not implement `Copy`
-Failed scratch in 0.16s
+Failed scratch in 0.12s
 ```
 
 The message names the rule: `get` returns a *copy* of the element, so it only works when the element type is `Copy`. A `Task` owns its status and is not `Copy`, and you would not want silent copies of it anyway. Borrow instead:
@@ -197,11 +235,19 @@ This is the payoff of treating memory as a service. You can see, from a signatur
 
 `BoardFull` is gone. The board only fills when memory does, and that is `OutOfMemoryError`, which `explain` already passes on.
 
+You also decide when memory is requested. A list grows its buffer as needed, but when you know roughly how much it will hold, `List.makeWithCapacity(n)` allocates once up front, and `reserve(n)` makes room for `n` more elements before a burst of appends. `shrinkToFit` gives unused room back, `clear` empties the list but keeps its buffer for reuse, and `clearAndFree` empties it and frees the buffer. `capacity()` says how many elements fit before the next allocation. `Bytes`, `String`, `HashMap` and `HashSet` have the same set, so you can size any of them for the work ahead.
+
 ## Refusing duplicates with a HashMap
 
 Adding `Buy milk` twice should not make two tasks. You could scan the list each time, but a hash map answers "have I seen this title?" directly. `HashMap<K, V>` from `silk/collections/hash_map` maps keys to values. Here the key is a title and the value is the task's id.
 
-A key type must implement `HashKey` from `silk/collections/hash`. A plain `string` does not, so you wrap it. First, see what happens without the impl:
+A key type must implement `HashKey` from `silk/collections/hash`. Strings and the integer types already do, so the board can use the trimmed title itself as the key:
+
+```silk
+  byTitle: HashMap<string<'text>, TaskId>,
+```
+
+A key type of your own needs an impl. Try a `Title` struct as the key in a scratch file, without one:
 
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
@@ -224,22 +270,22 @@ pub effect fn main() -> () ! OutOfMemoryError {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.13s
+  load     139 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:10:12: error[SEM0121] `main.Title: silk.collections.hash.HashKey` cannot be proved: no implementation of `silk.collections.hash.HashKey` exists for `main.Title`
-Failed scratch in 0.19s
+Failed scratch in 0.14s
 ```
 
 `insert` needs `Title` to implement `HashKey`, and there is no such impl. The message names both, with their full module paths, and points at the `insert` call.
 
-`HashKey` has two members. `equals` decides whether two keys are the same entry. `hash` turns a key into a number, mixed with a seed. The one rule: keys that are equal must hash the same. Here is the real `Title`:
+`HashKey` has two members. `equals` decides whether two keys are the same entry. `hash` turns a key into a number, mixed with a seed. The one rule: keys that are equal must hash the same. Here is an impl that makes the scratch `Title` a key:
 
 ```silk
 // A title used as a hash-map key. Two titles are the same key when their bytes are equal.
-struct Title<'text> { text: string<'text> }
+struct Title { text: string<'static> }
 
-impl<'text> Copy for Title<'text> {}
+impl Copy for Title {}
 
 fn sameTitle(left: &Title, right: &Title) -> bool {
   return left.text == right.text
@@ -256,15 +302,15 @@ fn hashTitle(value: &Title, seed: &HashSeed) -> u64 {
   return hashed
 }
 
-impl<'text> HashKey for Title<'text> { equals: sameTitle hash: hashTitle }
+impl HashKey for Title { equals: sameTitle hash: hashTitle }
 ```
 
-`Hash.mix` starts from the seed and the length. `Hash.combine` folds in each byte. Equal bytes give an equal hash, so the rule holds. The map was made with `Hash.seed(2026)`. The seed is part of the map, and every key is hashed with it.
+`Hash.mix` starts from the seed and the length. `Hash.combine` folds in each byte. Equal bytes give an equal hash, so the rule holds. The map is made with a seed, such as `Hash.seed(2026)`. The seed is part of the map, and every key is hashed with it. The impl needs `import silk.num.u64`, `import silk.num.u8` and `import silk.num.usize` for the conversions, and `Hash`, `HashKey` and `HashSeed` from `silk/collections/hash`. With it, the scratch program checks and runs.
 
-`Title` is `Copy` because it is only a view. Copying it copies a pointer and a length, never the text. That matters twice: `add` uses the same key for `get` and `insert`, and `HashMap.get` only works when keys and values are `Copy`. You will need `import silk.num.u64` and `import silk.num.usize` for the conversions, plus these:
+`Title` is `Copy` because it is only a view. Copying it copies a pointer and a length, never the text. That matters because `HashMap.get` only works when keys and values are `Copy`. A `string` is `Copy` for the same reason, so the board needs no wrapper. In `tasks` the map is `HashMap<string<'text>, TaskId>`, and it needs only these imports:
 
 ```silk
-import silk.collections.hash { Hash, HashKey, HashSeed }
+import silk.collections.hash { Hash }
 import silk.collections.hash_map { HashMap }
 ```
 
@@ -275,13 +321,13 @@ Now `add` can check before it appends:
   ! DuplicateTask | OutOfMemoryError
   ? &mut Allocator {
     let Draft { title, priority } = move draft
-    let key = Title { text: String.trim(title) }
-    if let Option<TaskId>.Some { value: existing } = self.byTitle.get(key) {
+    let trimmed = String.trim(title)
+    if let Option<TaskId>.Some { value: existing } = self.byTitle.get(trimmed) {
       fail DuplicateTask { id: existing }
     }
     let id = TaskId(self.nextId)
-    drop run self.byTitle.insert(key, id)
-    run self.tasks.append(Task { id: id, title: key.text, priority: priority, status: Status.Open })
+    drop run self.byTitle.insert(trimmed, id)
+    run self.tasks.append(Task { id: id, title: trimmed, priority: priority, status: Status.Open })
     self.nextId = self.nextId + 1
     return id
   }
@@ -290,9 +336,9 @@ Now `add` can check before it appends:
 A few things to notice:
 
 - `if let` runs its block only when the pattern matches. Here it means "if the map already has this title".
-- `get` returns a copy of the stored id as an `Option<TaskId>`. Like `List.get`, it needs `Copy` types, and `Title` and `TaskId` both are.
+- `get` returns a copy of the stored id as an `Option<TaskId>`. Like `List.get`, it needs `Copy` types, and `string` and `TaskId` both are.
 - `insert` returns the previous value, if any. We know there was none, so `drop` discards it.
-- The task stores `key.text`, the trimmed view. The file and the listing both see the clean title.
+- The task stores `trimmed`, the trimmed view. The file and the listing both see the clean title.
 
 Duplicates get their own typed failure, which replaces `BoardFull`:
 
@@ -356,11 +402,11 @@ Run `silk check`:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     61 modules, 1 in package          0.07s
-  check    failed: 2 modules, 1 error        1.73s
+  load     166 modules, 1 in package         0.05s
+  check    failed: 2 modules, 1 error        0.63s
 [x86_64-unknown-linux-gnu]
-src/main.silk:519:45: error[SEM0012] Expected &main.Board<'_> but received &mut main.Board<'_>
-Failed tasks in 1.81s
+src/main.silk:525:45: error[SEM0012] Expected &main.Board<'_> but received &mut main.Board<'_>
+Failed tasks in 0.73s
 ```
 
 Column 45 is the `board` passed to `count`. `count` wants a `&Board`, and `board` is now a `&mut Board`. Many languages quietly treat a mutable reference as a shared one here. Silk does not; you write the reborrow yourself. `board.*` is the board, and `&board.*` is a fresh shared borrow of it:
@@ -550,12 +596,12 @@ silk test
 
 ```
   main::finishingRecordsTheClockTime
-    PASS  82 us
+    PASS  81 us
   main::unknownTaskIsReported
-    PASS  11 us
+    PASS  13 us
 
 Tests  2 passed, 0 failed (0 cached, 2 executed, 2 selected, 2 discovered)
-Time   144 us
+Time   1 ms
 ```
 
 ## Summary
@@ -563,7 +609,7 @@ Time   144 us
 - A `string<'text>` is a view that never allocates. `Bytes` owns and grows its buffer. `String.trim` returns a smaller view of the same text.
 - `List<T>` grows on demand. Borrow its elements with `asSlice` and `asMutSlice`. `get` is only for `Copy` elements, and out-of-range indexes trap.
 - Allocation is the `Allocator` service. Its requirement and `OutOfMemoryError` show, in every signature, which code may allocate.
-- A `HashMap` key implements `HashKey` with `equals` and a `hash` built from `Hash.mix` and `Hash.combine`.
+- A `HashMap` key implements `HashKey`. Strings and integers already do. Your own key types write `equals` and a `hash` built from `Hash.mix` and `Hash.combine`.
 - `List.sort` uses an `Order` impl, and passing a `&mut` where a `&` is wanted needs an explicit `&value.*`.
 - `Format.format` writes a template to any `Writer`, including one you implement over `Bytes`.
 

@@ -44,10 +44,10 @@ From weakest to strongest:
 
 - Bitwise operators bind tighter than comparisons. `x & 1 == 1` means `(x & 1) == 1`.
 - `<` and `==` levels differ, so `a < b == c` means `(a < b) == c`.
-- Comparisons don't chain. `a < b < c` and `a == b == c` are parse errors: PAR0002 at the second operator, plus a follow-on SEM0087. Combine with `&&` instead.
+- Comparisons don't chain. `let ok = a < b < c` and `a == b == c` are parse errors: PAR0002 at the second operator, plus a follow-on SEM0087. Combine with `&&` instead.
 - A prefix operator applies to a whole postfix chain: `-p.x` is `-(p.x)` and `&a[i]` is `&(a[i])`.
 - `run` takes the whole rest of the expression as its operand: `run f() != 4` means `run (f() != 4)`. Write `(run f()) != 4`.
-- `|>` is weakest, so `x |> f != 3` pipes `x` into `f != 3`. Write `(x |> f) != 3`.
+- `|>` is weakest, so `x |> f != 3` pipes `x` into `f != 3`, which compares a function with a number (SEM0135). Write `(x |> f) != 3`.
 - Parentheses group any expression.
 - Operands, call arguments and a pipeline's input evaluate left to right.
 
@@ -65,7 +65,7 @@ From weakest to strongest:
 - An unannotated literal operand takes the other operand's type: `small + 55` with `small: u8` is `u8`.
 - Integer `+`, `-`, `*` and unary `-` trap on overflow. `/` and `%` trap on a zero divisor and on `MIN / -1`. See Values and primitive types.
 - Unary `-` on an unsigned integer is SEM0135. `char`, `bool` and `string` support no arithmetic.
-- There are no shift operators and no `**`. Use `i32.shiftLeft` and similar std lib functions. `1 << 2` and `x >> 1` are parse errors (PAR0002, plus a follow-on SEM0087).
+- There are no shift operators and no `**`. Use `i32.shiftLeft` and similar std lib functions. `1 << 2` and `x >> 1` are one PAR0010 each: "Silk has no `<<` or `>>`; shift with the functions of the value's type, as in `i32.shiftLeft(value, count)` or `i32.shiftRight(value, count)`".
 
 ## Logical operators
 
@@ -92,7 +92,8 @@ From weakest to strongest:
 - `a + b` means `Add.add(a, b)` for the conformance of `a`'s type. Operands are passed by value.
 - `==` and `!=` use `Equal` from `silk/core/equal`. Ordering operators use `Order` from `silk/core/order`.
 - For a user type, write the comparison operands as references: `&a == &b`. Comparing by value is SEM0135.
-- A conformance must be declared in the module that declares the type, or in the interface's own source. A conformance anywhere else is invalid (SEM0083).
+- A conformance must be declared in the module that declares the type, in the module that declares the interface's first type argument, or in the interface's own source. A conformance anywhere else is invalid (SEM0083).
+- The first-type-argument rule lets a module that declares `Meters` also define `3 * meters`, as `impl Multiply<Meters, Meters> for i32`. See Interfaces and impls.
 - No import activates an operator. The use site needs neither `silk/core/ops` nor the module holding the conformance.
 - With no matching conformance the operator is SEM0135. With two matching conformances it is SEM0136.
 - Concrete primitive operands always use the built-in operator.
@@ -132,8 +133,8 @@ From weakest to strongest:
 
 ## Nesting limits
 
-- An expression may nest at most 256 child expressions deep. Deeper nesting is PAR0005.
-- A separate stack budget can trigger PAR0005 earlier. About 135 chained binary operators, or 134 nested prefix operators, fit.
+- An expression may nest at most 256 child expressions deep: about 256 parentheses or prefix operators. Deeper nesting is PAR0005: "Code nested deeper than the compiler supports; split it into smaller expressions, blocks or types".
+- A flat chain of binary operators such as `1 + 1 + …` fits about 1,000 operators before PAR0005.
 
 ## Examples
 
@@ -248,6 +249,7 @@ pub fn main() -> i32 {
 | --- | --- |
 | PAR0002 | Unexpected tokens, e.g. an unparenthesized struct literal in a condition |
 | PAR0005 | Expression nesting beyond the supported limit |
+| PAR0010 | A habit from another language, e.g. `<<` or `>>` |
 | SEM0011 | Condition is not `bool` |
 | SEM0012 | Argument type does not match the parameter |
 | SEM0033 | Index is not `usize` |
@@ -262,7 +264,3 @@ pub fn main() -> i32 {
 ## See also
 
 Lexical structure · Values and primitive types · Bindings and statements · Control flow · Structs, tuples and arrays · Patterns and match · Functions and methods · Closures and callable types · Generics · Interfaces and impls · Ownership and moves · Borrowing · Unsafe code and C interop · Effects and run · Typed failures · Services and providers · Static evaluation · `silk/core/ops`, `silk/core/equal`, `silk/core/order`, `silk/num/numeric`, `silk/core/bool`
-
-## Open questions
-
-- `x |> f != 3` prints only "unsupported: this construct is not supported by the native compiler yet" instead of a type error.

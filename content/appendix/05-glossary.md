@@ -17,7 +17,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Role | A name declared with `role Name` that distinguishes requirement entries for the same service: `&S at Audit` and `&S` are separate entries with separate providers. A role has no body and no values. | Services and providers |
 | Suspension | A running Effect stopping at a `run` and resuming later. A suspension point is a `run` whose Effect can suspend; parking an `Execution` is the only external suspension. | Suspension and cancellation |
 | Trap | A fatal runtime error, such as arithmetic overflow, division by zero or an out-of-bounds index. It does not unwind and runs no cleanup, finalizers or `Drop` hooks. | Program entry and termination |
-| Profile | A named build configuration, `[profiles.<name>]` in `silk.toml`. It builds for the host unless it sets `target`, and may set `optimization`, `safety`, `debug` and other fields, plus parameter values under `config`. Selected with `--profile` or `[build].profile`. | Package parameters |
+| Profile | A named build configuration, `[profiles.<name>]` in `silk.toml`. It builds for the host unless it sets `target`, and may set `optimization` (`none`, `speed` or `size`), `safety`, `debug` and other fields, plus parameter values under `config`. Selected with `--profile` or `[build].profile`. | Package parameters |
 | Target | The machine a build compiles for, given as a triple such as `x86_64-unknown-linux-gnu` by `--target` or a profile. `silk/core/target` exposes its architecture, operating system and other facts to static code. | Static control flow and reflection |
 
 ## Other terms
@@ -36,6 +36,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Contextual record | `.{ x: 1, y: 2 }`, a record literal whose type comes from where it is used. | Structs, tuples and arrays |
 | `Copy` | The conformance for types that copy implicitly instead of moving: scalars, `string`, shared references, scalar enums and others. | Ownership and moves |
 | Detached | `Intrinsic.Detached`: a sealed property of an executable that retains no external lexical or provider loan. | Suspension and cancellation |
+| Directive | A fixed instruction written on the line before a function or service operation, such as `@inline`, `@cold` or `@features("avx2")`, that says how to build it but not what it means. The set is closed, and arguments are literals. A `with` clause, the older spelling, is PAR0011. | Intrinsics, Unsafe code and C interop |
 | `Drop` | The conformance that gives a type a `fn drop` hook, run when its owner drops it. | Ownership and moves |
 | Effect | A lazy computation value of type `Effect<'env; A ! E ? R>`. Calling an `effect fn` or writing `effect { ... }` builds one; nothing runs until `run`. | Effects and run |
 | Environment | The lifetime a callable's or Effect's captured state lives for, written `fn<'env>` or `Effect<'env; ...>`. | Closures and callable types, Effects and run |
@@ -60,6 +61,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Place | Something that can be assigned, borrowed or moved from: a `mut` local, a field `p.x`, an element `a[i]` or a referent `r.*`. | Bindings and statements, Borrowing |
 | Reborrow | Borrowing again through an existing reference, as in `&mut x.*`. | Borrowing |
 | Referent | The value a reference points to, reached with `.*`. | Borrowing |
+| Role marker | `#Role` after a reference type, as in `&Port #Reader`. The parser accepts it; this compiler reports it as unsupported. Requirement rows name a role with `at` instead. | Services and providers |
 | Root module | The module `[package].main` names below `[package].source`; by default `src/main.silk`, or `src/lib.silk` for a library. | The manifest |
 | `run` | The prefix that executes an Effect and yields its success value. | Effects and run |
 | Row variable | `?R` in a generic list: a parameter that stands for a whole requirement row. | Services and providers |
@@ -75,4 +77,5 @@ Terms the book and the reference use, with the reference page that defines each 
 | Unit | The type `()` and its only value `()`. | Values and primitive types |
 | Unsafe | Code whose memory safety the compiler cannot check: `unsafe` blocks, functions and calls. | Unsafe code and C interop |
 | `Without` | A row operator, `Without<R, S>`: row `R` with the entries of `S` removed. | Typed failures, Services and providers |
+| WASI | The WebAssembly System Interface, the host API a WebAssembly program uses outside a browser. `--target wasm32-wasip1` builds a preview 1 module; `wasm32-wasip2` builds a preview 2 component and needs `wasm-tools`. | Targets and profiles |
 | Witness | The conformance selected to supply an interface operation for one instance. | Generics |

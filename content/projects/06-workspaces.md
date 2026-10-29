@@ -46,7 +46,8 @@ To bring in a package that already exists, move it into the folder and add it to
 | No manifest there | ``workspace.members entry `missing` names a directory without a silk.toml`` |
 | Outside the workspace | ``workspace.members entry `../elsewhere` must name a directory inside the workspace`` |
 | Same package name | ``workspace.members entry `loose/stray2` names a package whose name another member already has`` |
-| Unknown key, such as `ouput-dir` on line 3 | `3: workspace.ouput-dir is not a supported field` |
+| Unknown key, such as `ouput-dir` on line 3 | `3: workspace.ouput-dir is not a supported field; did you mean workspace.output-dir?` |
+| A `silk-version` that is not a version | `workspace.silk-version must be a valid semantic version` |
 
 ## Members still depend explicitly
 
@@ -73,18 +74,18 @@ silk build
 
 ```
 Checking pricing (x86_64-unknown-linux-gnu)
-  load     41 modules, 1 in package          0.05s
-  check    1 module                          0.00s
-  borrow   3 bodies                          0.00s
-Finished pricing in 0.06s
+  load     118 modules, 1 in package         0.15s
+  check    1 module                          0.03s
+  borrow   2 bodies                          0.00s
+Finished pricing in 0.19s
 Compiling store (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.04s
-  check    1 module                          0.00s
-  codegen  364 functions                     0.19s
-  borrow   115 bodies                        0.00s
-  link     clang                             0.19s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s
-Finished 2 packages in 0.55s
+  load     139 modules, 1 in package         0.05s
+  check    2 modules                         0.07s
+  codegen  486 functions                     0.09s
+  borrow   149 bodies                        0.00s
+  link     clang                             0.32s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.55s
+Finished 2 packages in 0.63s
 ```
 
 - Each member reports its own phases and ends with its own `Finished` or `Failed` line. `pricing` is a `library`, so it is checked and makes no file. The path in a member's `Finished` line is relative to the folder you ran the command in. Run from inside a member, it is outside that folder, so it is printed in full: `Finished /home/you/shop/build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s`.
@@ -109,11 +110,11 @@ silk check -p store
 
 ```
 Checking store (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    2 modules                         0.12s
-  borrow   99 bodies                         0.00s
-Finished store in 0.18s
-Finished 1 package in 0.18s
+  load     139 modules, 1 in package         0.02s
+  check    3 modules                         0.07s
+  borrow   89 bodies                         0.00s
+Finished store in 0.12s
+Finished 1 package in 0.14s
 ```
 
 A name that is not a member is refused with the list of members (exit 2):
@@ -145,18 +146,21 @@ silk: `run` runs one package; pass --package <name> to choose a workspace member
 silk run -p tools
 ```
 
-`-p` naming a library is refused: `Cannot run static-library artifact`. The program runs in the current directory, not in the member's folder.
+`-p` naming a library is refused: `Cannot run library artifact` (exit 2). The program runs in the current directory, not in the member's folder.
 
 ## The shared output directory
 
-All members build into the workspace's output directory, so from inside a member the program is at `../build/...`. After `silk build` and `silk test` at the root, `build/` holds, among symbol maps:
+All members build into the workspace's output directory, so from inside a member the program is at `../build/...`. After `silk build` and `silk test` at the root, `build/` holds, besides symbol maps, input records and caches:
 
 ```
-build/llvm/x86_64-unknown-linux-gnu/debug/libpricing.a
+build/cache/pricing/...
+build/cache/store/...
 build/llvm/x86_64-unknown-linux-gnu/debug/store
 build/test/llvm/x86_64-unknown-linux-gnu/debug/pricing
 build/test/llvm/x86_64-unknown-linux-gnu/debug/store
 ```
+
+`pricing` is a `library`, so `silk build` makes no file for it; its test runner is still built.
 
 This holds when you build from inside a member folder too. A member's own `[build].output-dir` is refused:
 

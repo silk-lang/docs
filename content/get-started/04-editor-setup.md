@@ -1,6 +1,6 @@
 # Editor setup
 
-Silk has syntax highlighting for VS Code, Zed, any editor that loads tree-sitter grammars, and web pages. The compiler also has an early language server, `silk lsp`, that shows errors as you type. It does not complete names yet, so keep `silk check` at hand in a terminal next to your editor.
+Silk has syntax highlighting for VS Code, Zed, any editor that loads tree-sitter grammars, and web pages. The compiler also has a language server, `silk lsp`, that shows errors as you type, completes names, and finds definitions and references. It is young, so keep `silk check` at hand in a terminal next to your editor.
 
 | Where | Use | What you get |
 | --- | --- | --- |
@@ -115,26 +115,34 @@ const html = highlighter.highlightToHtml('let mut sum = 0', { lang: 'silk' })
 
 ## The language server
 
-`silk lsp` speaks the Language Server Protocol over standard input and output. The VS Code extension, from version 0.1.0, starts it for Silk files; the `silk.path` setting names the `silk` command it runs, the tool, so each folder gets the version its project pins. It starts one server per workspace folder, in that folder. From version 0.2.0, when the folder's `silk.toml` pins a version that is not installed, the extension offers to install it with `silk use`, or to run your default version, instead of failing. In another editor, register `silk lsp` as the language server command for `.silk` files, with no arguments. When the version the project pins is not installed there, the server starts anyway and shows an error naming the `silk use` command to run, instead of crashing.
+`silk lsp` speaks the Language Server Protocol over standard input and output. The VS Code extension, from version 0.1.0, starts it for Silk files; the `silk.path` setting names the `silk` command it runs, the tool, so each folder gets the version its project pins. It starts one server per workspace folder, in that folder. From version 0.2.0, when the folder's `silk.toml` pins a version that is not installed, the extension offers to install it with `silk use`, or to run your default version, instead of failing. In another editor, register `silk lsp` as the language server command for `.silk` files, with no arguments. When the version the project pins is not installed there, the server starts anyway, offers no features, and shows an error message naming the `silk use` command to run, instead of crashing:
+
+```
+silk: Silk 0.3.0 (package silk-version in /home/you/tour/silk.toml) is not installed.
+Install it with: silk use
+```
+
+The server tells the client where the std lib lives, so a std lib file opened through go to definition gets the same features as your own files.
 
 | Feature | State in this release |
 | --- | --- |
 | Errors as you type | Works: each diagnostic is shown at its code and range |
 | Document outline | Works: the file's declarations |
 | Folding | Works |
-| Format document | Works, with the same layout as `silk format` |
-| Hover, go to definition, signature help | Work for the functions you call, from your package or the std lib: hover shows the signature and the doc comment, and definition opens the declaring file, std lib files included. Hover and definition also work on a local variable where it is used. They show nothing on a type or module name written in a body, such as `Effect` in `Effect.log`, on the name a `let` introduces, on a field name in a record literal, or on a placeholder inside a template string |
+| Format document | Works, with the same layout as `silk format`, including one line per `@` directive before a declaration |
+| Hover, go to definition, signature help | Work on the names you use and the names you declare, from your package or the std lib. Hover shows a function's signature and doc comment, a type's declaration and doc comment, such as `Effect` in `Effect.log`, `name: Type` for a parameter, a `let` binding, a match binder or a record field (`name: string` in `Item { name: "tea", ... }`), and `module silk.collections.list` on an import path. Definition opens the declaring file, std lib files included. Signature help shows the parameters of the call you are typing. A `{placeholder}` inside a template string shows nothing |
 | Inlay hints | Work: the type of each `let` binding, such as `: StdoutLogger` after `let mut logger` |
-| Completion | Works: a name you type completes from the declarations, imports, parameters and bindings in scope, also in a body that does not check yet. After a `.`, it lists the receiver's members, or a type's static members, or a module's public declarations |
+| Completion | Works: a name you type completes from the declarations, imports, parameters and bindings in scope, also in a body that does not check yet. After a `.`, it lists the receiver's members, or a type's static members, or a module's public declarations. Inside an import's `{ ... }` list it offers the public members of that module |
 | Find references, rename | Work over the package for a declaration, an import member, a local variable or a generic parameter: start from any place the name is written |
 | Workspace symbols | Works: search the package's declarations by name |
+| Workspace members | An edit in one member's file is seen by the members that import it, before you save |
 
 ## Errors in the editor
 
 The compiler is still the complete way to find errors. `silk check` is fast because it builds nothing. `silk check --json` prints each diagnostic as one line of JSON on standard error, with no progress rows around it. An editor task or problem matcher can read it:
 
 ```json
-{"target":"x86_64-unknown-linux-gnu","code":"OWN0003","severity":"error","path":"/home/you/tour/src/main.silk","line":76,"column":38,"start":2022,"end":2025,"message":"Moving tea requires an explicit move","notes":[],"related":[]}
+{"target":"x86_64-unknown-linux-gnu","code":"OWN0003","severity":"error","path":"/home/you/tour/src/main.silk","line":84,"column":38,"start":2097,"end":2100,"message":"Moving tea requires an explicit move","notes":[],"related":[]}
 ```
 
 `silk format` formats your files; see Tools.

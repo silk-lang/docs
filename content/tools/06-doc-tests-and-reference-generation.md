@@ -12,13 +12,13 @@ silk doc
 
 ```
 warning: /home/you/shapes/src/Circle.silk:5: documentation link [`lib.area`] names no declaration and stays plain code
-warning: /home/you/shapes/src/Circle.silk:17: documentation link [`Nope`] names no declaration and stays plain code
+warning: /home/you/shapes/src/Circle.silk:15: documentation link [`Nope`] names no declaration and stays plain code
 Documentation: /home/you/shapes/build/documentation.json
 ```
 
 The warnings name links in doc comments that resolve to no declaration; see **Writing documentation**. They go to standard error and do not change the exit status.
 
-The file describes every module of the package and every declaration in it, with its doc comment as Markdown and the links in that comment already resolved. Every module means every module `check` sees: the root and the modules it reaches by imports, plus `exports` for a library (see **Modules and imports**). A new module that nothing imports yet is left out, and `silk doctest` then collects none of its examples. `-o <path>` writes somewhere else; the path is relative to the package directory, not the current directory. `--target <triple>` extracts for another target, which matters when a module's declarations differ by target.
+The file describes every module of the package and every declaration in it, with its doc comment as Markdown and the links in that comment already resolved. Every module means the root and the modules it reaches by imports. Unlike `check`, it does not add a library's `exports` on their own: an exported module that no module imports is left out, and `silk doctest` then collects none of its examples. Import each exported module from the root, or from a module the root imports, to have it documented. A new module that nothing imports yet is left out the same way. `-o <path>` writes somewhere else; the path is relative to the package directory, not the current directory. `--target <triple>` extracts for another target, which matters when a module's declarations differ by target.
 
 At a workspace root, `silk doc` writes one file per member, `build/documentation/<member>.json`, and refuses `-o`. To write one member's file elsewhere, select it with `--manifest-path <member>/silk.toml`.
 
@@ -48,8 +48,8 @@ silk doctest
 ```
 
 ```
-/home/you/shapes/src/lib.silk:39 (byte 977): PASSED
-/home/you/shapes/src/Circle.silk:21 (byte 552): PASSED
+/home/you/shapes/src/lib.silk:35 (byte 818): PASSED
+/home/you/shapes/src/Circle.silk:18 (byte 443): PASSED
 Doctest: 2 collected, 2 passed, 0 skipped, 0 failed.
 ```
 
@@ -66,8 +66,8 @@ What a check does:
 An example that does not type-check prints its diagnostics, located in the example itself as `example:line:column`:
 
 ```
-/home/you/shapes/src/lib.silk:39 (byte 977): PASSED
-/home/you/shapes/src/Circle.silk:21 (byte 552): FAILED
+/home/you/shapes/src/lib.silk:35 (byte 818): PASSED
+/home/you/shapes/src/Circle.silk:18 (byte 443): FAILED
 example:4:27: error[SEM0135] Operator - does not accept (i32, string<'static>)
 Doctest: 2 collected, 1 passed, 0 skipped, 1 failed.
 ```
@@ -75,7 +75,7 @@ Doctest: 2 collected, 1 passed, 0 skipped, 1 failed.
 Line 4 of that example is `return circumference(2) - "12"`. An example whose program returns something other than 0 says so:
 
 ```
-/home/you/shapes/src/lib.silk:39 (byte 977): FAILED: the example exited with status 1
+/home/you/shapes/src/lib.silk:35 (byte 818): FAILED: the example exited with status 1
 ```
 
 An example program is built like any program of the package, into `build/doctest/`, so the first run takes as long as a build. A program that never stops keeps `silk doctest` waiting, so mark it `silk,no_run`.
@@ -97,9 +97,9 @@ An example sees the standard library and your package, by the package's name or 
 The package name makes an example read like code in a package that depends on yours. Unlike a dependent package, an example can also name modules the package does not export, such as `shapes.Circle` here. When you check a JSON file with `-i`, pass `--source-root src` too; the package name then comes from the nearest `silk.toml` above that directory. Without it, neither form resolves, and each failing import is reported once:
 
 ```
-/home/you/shapes/src/lib.silk:39 (byte 977): FAILED
+/home/you/shapes/src/lib.silk:35 (byte 818): FAILED
 example:1:8: error[MOD0001] Unknown module lib
-/home/you/shapes/src/Circle.silk:21 (byte 552): FAILED
+/home/you/shapes/src/Circle.silk:18 (byte 443): FAILED
 example:1:8: error[MOD0001] Unknown module shapes.Circle
 Doctest: 2 collected, 0 passed, 0 skipped, 2 failed.
 ```
@@ -127,7 +127,7 @@ One command is enough:
 silk doctest
 ```
 
-`silk doctest --stdlib` checks the standard library's own examples, with no JSON file needed. It is how the std lib keeps its 73 examples honest, and a quick way to confirm an installation works.
+`silk doctest --stdlib` checks the standard library's own examples, with no JSON file needed. It is how the std lib keeps its 251 examples honest, and a quick way to confirm an installation works.
 
 ## Generate the std lib reference with silk doc-reference
 
@@ -137,7 +137,7 @@ silk doctest
 silk doc-reference -o reference/stdlib
 ```
 
-It extracts the library once per supported profile: Apple Silicon macOS, arm64 and x86\_64 Linux with and without libc, and `wasm32-unknown-unknown`. Each page lists the profiles it applies to. When a module's public surface differs between profiles, each distinct surface gets its own page: `os-filesystem.md` for the hosted targets and `os-filesystem.profile-2.md` for the no-libc and WebAssembly ones. Code links become Markdown links to anchors on the same page or on another module's page. Each page starts with a `Generated by silk doc-reference` comment; edit the doc comments in the source, not the pages.
+It extracts the library once per supported profile, eight in all: Apple Silicon macOS, arm64 and x86\_64 Linux with and without libc, `wasm32-unknown-unknown`, `wasm32-wasip1` and `wasm32-wasip2`. Each page lists the profiles it applies to. When a module's public surface differs between profiles, each distinct surface gets its own page: `system-filesystem-native.md` for macOS, Linux with libc and the two WASI profiles, and `system-filesystem-native.profile-2.md` for the no-libc and `wasm32-unknown-unknown` ones. A module with a third surface gets a `.profile-3.md` page as well. Code links become Markdown links to anchors on the same page or on another module's page. Each page starts with a `Generated by silk doc-reference` comment; edit the doc comments in the source, not the pages.
 
 The std lib comes from the installation unless you pass `--stdlib-root <directory>`, which must hold the library's `manifest.json`. Writing replaces every page and removes `.md` files in the output directory that no longer belong there.
 

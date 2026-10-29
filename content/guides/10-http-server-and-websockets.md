@@ -474,12 +474,12 @@ silk build
 
 ```
 Compiling greeter (x86_64-unknown-linux-gnu, debug)
-  load     75 modules, 1 in package          0.13s
-  check    1 module                          2.24s
-  codegen  2,654 functions                   1.34s
-  borrow   813 bodies                        0.10s
-  link     clang                             1.29s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/greeter in 5.23s
+  load     191 modules, 1 in package         0.13s
+  check    1 module                          1.06s
+  codegen  2,980 functions                   1.00s
+  borrow   915 bodies                        0.07s
+  link     clang                             0.98s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/greeter in 3.21s
 ```
 
 The plain routes, with curl:
@@ -571,6 +571,8 @@ The last request was not a valid handshake, so `withUpgrade` failed with an `Upg
 
 - **One connection at a time.** `serveNext` serves one connection and returns; a slow client makes the next one wait. The Concurrent I/O patterns guide shows how to serve many at once with fibers.
 - **No TLS.** The standard library has TLS for clients only (`silk/tls/client`), so a Silk program cannot serve HTTPS or `wss://`. Keep the server on 127.0.0.1, or put a TLS-terminating proxy in front of it.
+- **HTTP/1.1 only.** `silk/http/server` reads and writes HTTP/1.1. HTTP/2 exists as a lower layer: a `Connection` from `silk/http/http2` made with `Role.Server` decodes requests, with HPACK, from bytes you feed it and queues responses, and `silk/http/http2_connection` drives one over a transport. The HTTP client guide shows a client and a server connection talking in memory. Wiring it into a server loop is up to you.
+- **Native sockets only.** This server listens with `silk/net/socket_native`. A WebAssembly component on `wasm32-wasip2` serves HTTP differently: the host listens, and calls the component's exported `wasi:http/incoming-handler` function for each request. `silk/http/server_wasi` turns the two handles of that call into an `Exchange` with `unsafe Exchange.take(request, response)`; then `metadata` reads the request head, `readBody` the body within a limit, and `respond` sends the one response.
 - **No router or middleware.** Routing is your own code over the method and target bytes. To split a target into path and query, parse it with `UriReference.parse` from `silk/uri/reference` and call `path()` and `query()`.
 - **Deadlines are yours to set.** Every read and write takes an `Option<Instant>` deadline. This example passes `none()` everywhere; a public server should pass a deadline built from `MonotonicClock.now()` and `MonotonicClock.deadlineAfter`, so a silent client cannot hold a connection forever.
 
@@ -585,3 +587,4 @@ The last request was not a valid handshake, so `withUpgrade` failed with an `Upg
 - `silk/http/websocket_upgrade`: `withUpgrade`, `DecisionHandler`, `Decision`, `Offer`, `Outcome`, `inspect`, `reject`, `UpgradeError`
 - `silk/http/websocket_server`: `withServer`, `ServerWebSocket`, `readEvent`, `writeText`, `Event`, `Limits`, `WebSocketError`
 - `silk/net/address`: `Endpoint`, `IpAddress`, `Ipv4Address`, `Port`
+- `silk/http/http2`: `Connection`, `Role`; `silk/http/server_wasi`: `Exchange` (`wasm32-wasip2` only)

@@ -1,6 +1,6 @@
 # Encodings and compression
 
-This guide builds `unpack`, a program that turns bytes into text and back. It Base64-encodes a message, takes a URL apart and puts a relative link together, and decompresses the same text from gzip and from Zstandard. All four modules share one style: they write into buffers you supply, report exactly how much they read and wrote, and never guess.
+This guide builds `unpack`, a program that turns bytes into text and back. It Base64-encodes a message, takes a URL apart and puts a relative link together, decompresses the same text from gzip, Zstandard, XZ and LZMA, compresses with DEFLATE, and makes UUIDs. The modules share one style: they write into buffers you supply, report exactly how much they read and wrote, and never guess.
 
 ## Set up
 
@@ -23,11 +23,20 @@ import silk.core.option { Option }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.result { Result }
 import silk.collections.slice { Slice }
+import silk.text.string { String }
 import silk.uri.uri { Uri }
 import silk.uri.percent { PercentComponent, UriPercent }
 import silk.uri.reference { ParseError, UriReference }
 import silk.io.writer { Writer, WriterError }
 import silk.compress.zstd { Zstd, ZstdError, ZstdLimits, ZstdStatus }
+import silk.compress.deflate { Deflate, EncodeError }
+import silk.compress.limits { DecodeError as LzmaError, DecodeLimits, Decoded }
+import silk.compress.lzma { Lzma }
+import silk.compress.lzma2 { Lzma2 }
+import silk.compress.xz { Xz }
+import silk.encoding.uuid { Uuid }
+import silk.system.random { Random }
+import silk.system.random_native { OsRandom }
 ```
 
 Two modules both export a type called `Format`: `silk/text/format` (text templates) and `silk/compress/inflate` (the compressed container). One file cannot import both under the same name, so the inflate one is renamed with `Format as Container`. `import silk.compress.inflate` on its own line also brings the module name into scope, for its constant `inflate.MEMORY_BOUND`.
@@ -36,18 +45,18 @@ If you import both as `Format`, `silk check` stops at the second import and poin
 
 ```
 Checking unpack (x86_64-unknown-linux-gnu)
-  load     60 modules, 1 in package          0.09s
-  check    failed: 2 modules, 1 error        0.21s
+  load     188 modules, 1 in package         0.08s
+  check    failed: 2 modules, 1 error        0.23s
 [x86_64-unknown-linux-gnu]
-src/main.silk:6:45: error[SEM0016] Multiple bindings claim Format
-  note: src/main.silk:5:22: related location
-Failed unpack in 0.30s
+src/main.silk:6:54: error[SEM0016] Multiple bindings claim Format; rename one with `as`, as in `import a.b as other` or `import a.b { Format as other }`
+  note: src/main.silk:5:27: related location
+Failed unpack in 0.33s
 ```
 
 Writing `inflate.Format.Gzip` through the module name does not work either. A module import names the module's types in type positions, but not their members as values:
 
 ```
-src/main.silk:111:38: error[SEM0238] Format is a type of module silk.compress.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.compress.inflate { Format }`
+src/main.silk:120:38: error[SEM0238] Format is a type of module silk.compress.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.compress.inflate { Format }`
 ```
 
 Here `Format` is already taken, so rename on import instead.
@@ -190,7 +199,7 @@ effect fn gunzip() -> () ! Base64Error | DecodeError | OutOfMemoryError | Writer
 }
 ```
 
-`Decoder.make(format, limits)` from `silk/compress/inflate` allocates the decoder's fixed state, about 64 KiB. You must name the container: `Container.Gzip`, `Container.Zlib` or `Container.Raw` for bare DEFLATE. The module never sniffs the format and never compresses.
+`Decoder.make(format, limits)` from `silk/compress/inflate` allocates the decoder's fixed state, about 64 KiB. You must name the container: `Container.Gzip`, `Container.Zlib` or `Container.Raw` for bare DEFLATE. The module never sniffs the format. It only decodes; compressing is `silk/compress/deflate`, below.
 
 `Limits` is required, and every field counts. Decoding fails with `InputLimit` or `OutputLimit` when the totals pass `maxInputBytes` or `maxOutputBytes`, which is how you stop a small file from expanding into gigabytes. `maxMembers` caps concatenated gzip members, `maxHeaderBytes` caps gzip header extras such as the file name, and `maxMemoryBytes` must be at least `MEMORY_BOUND` (65536) or `make` fails with `MemoryLimit`.
 
@@ -231,10 +240,128 @@ effect fn unzstd() -> () ! Base64Error | ZstdError | OutOfMemoryError | WriterEr
 
 The HTTP client uses both decoders to undo `Content-Encoding: gzip` and `zstd`, so you rarely call them for web traffic. The HTTP client guide covers that.
 
+## Compress with DEFLATE
+
+```silk
+fn sameBytes(left: &[u8], right: &[u8]) -> bool {
+  if left.length != right.length { return false }
+  let mut index: usize = 0
+  while index < left.length {
+    if left[index] != right[index] { return false }
+    index = index + 1
+  }
+  return true
+}
+
+effect fn deflateDemo() -> () ! EncodeError | DecodeError | OutOfMemoryError | WriterError ? &mut Allocator | &mut Writer {
+  let text = b"Silk compresses this line. Silk compresses this line. Silk compresses this line.\n"
+  let mut packed: [u8; 128] = [0; 128]
+  let packedLength = run Deflate.encode(text, &mut packed, Container.Gzip)
+
+  let limits = Limits {
+    maxInputBytes: 4096,
+    maxOutputBytes: 4096,
+    maxMembers: 1,
+    maxHeaderBytes: 1024,
+    maxMemoryBytes: inflate.MEMORY_BOUND,
+  }
+  let mut decoder = run Decoder.make(Container.Gzip, move limits)
+  let mut back: [u8; 128] = [0; 128]
+  let progress = match move decoder.step(Slice.view(&packed, 0, packedLength), &mut back, true) {
+    Result.Success { value } => move value
+    Result.Failure { error } => { fail move error }
+  }
+  let same = progress.status == Status.Finished && sameBytes(Slice.view(&back, 0, progress.written), text)
+  run Format.format("deflate: {n} bytes -> {packed} bytes of gzip, round trip {ok}\n", &.{
+    n: text.length,
+    packed: packedLength,
+    ok: same,
+  })
+}
+```
+
+`Deflate.encode(input, output, format)` from `silk/compress/deflate` compresses a whole buffer at once and returns the encoded length. The container is the same `Format` the decoder takes, so `Container.Gzip`, `Container.Zlib` or `Container.Raw`. The output is deterministic: gzip gets timestamp zero and no file name. The encoder uses fixed Huffman codes and a 32 KiB window, has no compression levels, and allocates a 32768-entry match table through the ambient `Allocator` for the duration of the call. If `output` is too small it fails with `EncodeError`, whose `written` says how far it got; discard that partial stream.
+
+Byte slices have no `==`, so `sameBytes` compares the round trip byte by byte.
+
+## Decompress XZ and LZMA
+
+```silk
+fn xzFixture() -> &'static [u8] {
+  return b"/Td6WFoAAATm1rRGAgAhARYAAAB0L+Wj4AB/AC5dABiLgCU3p25rPY9wc7eLWyljDhLo46NM5pptnztf6X6vml8UYztoicbbqp1XkOAAAAAXlG3dEBbVhwABSoABAAAAICrMZLHEZ/sCAAAAAARZWg=="
+}
+
+fn lzmaFixture() -> &'static [u8] {
+  return b"XQAAgAD//////////wAYi4AlN6duaz2PcHO3i1spYw4S6OOjTOaabZ87X+l+r5pfFGM7aInG26qx9yk///bgQAA="
+}
+
+fn lzma2Fixture() -> &'static [u8] {
+  return b"4AB/AC5dABiLgCU3p25rPY9wc7eLWyljDhLo46NM5pptnztf6X6vml8UYztoicbbqp1XkOAA"
+}
+
+effect fn unxz() -> () ! Base64Error | LzmaError | OutOfMemoryError | WriterError ? &mut Allocator | &mut Writer {
+  let mut packed: [u8; 128] = [0; 128]
+  let mut text: [u8; 256] = [0; 256]
+
+  let xzLength = run fromBase64(xzFixture(), &mut packed)
+  let xz = run Xz.decode(Slice.view(&packed, 0, xzLength), &mut text, DecodeLimits.make())
+  run Format.format("xz: {n} -> {written} bytes\n", &.{ n: xz.consumed, written: xz.written })
+
+  let lzmaLength = run fromBase64(lzmaFixture(), &mut packed)
+  let alone = run Lzma.decode(Slice.view(&packed, 0, lzmaLength), &mut text, DecodeLimits.make())
+  run Format.format("lzma: {n} -> {written} bytes\n", &.{ n: alone.consumed, written: alone.written })
+
+  let rawLength = run fromBase64(lzma2Fixture(), &mut packed)
+  let raw = run Lzma2.decode(Slice.view(&packed, 0, rawLength), &mut text, 65536, DecodeLimits.make())
+  run Format.format("lzma2: {n} -> {written} bytes\n", &.{ n: raw.consumed, written: raw.written })
+  run Writer.writeAll(Slice.view(&text, 0, 32))
+}
+```
+
+Three modules decode the LZMA family, all from a complete buffer in one call:
+
+- `Xz.decode` from `silk/compress/xz` reads `.xz` files. It checks the block, index and footer and the stream's CRC-32, CRC-64 or SHA-256 check. Only blocks with a single LZMA2 filter are supported; others fail with `UnsupportedFilter`.
+- `Lzma.decode` from `silk/compress/lzma` reads `.lzma` (LZMA-alone) files with the 13-byte header. That format has no checksum.
+- `Lzma2.decode` from `silk/compress/lzma2` reads raw LZMA2 chunks. The caller passes the dictionary size, here 65536, because raw LZMA2 does not record it.
+
+They share `silk/compress/limits`: `DecodeLimits.make()` allows 64 MiB of input, 256 MiB of output, a 64 MiB dictionary and 16 MiB of probability tables, which are allocated through the ambient `Allocator`. Each call returns a `Decoded` with `consumed` and `written`, or fails with a `DecodeError` whose `reason` is a `DecodeReason` such as `TruncatedInput`, `ChecksumMismatch` or `OutputLimit`. That type is also called `DecodeError`, so it is imported as `LzmaError`. The output buffer must hold the whole result. All three fixtures decode to the same 128 bytes as the gzip one.
+
+## UUIDs
+
+```silk
+effect fn uuidDemo() -> () ! WriterError ? &mut Random | &mut Writer {
+  let namespace = Uuid.namespaceDns()
+  let named = Uuid.v5(&namespace, "www.example.com")
+  run Format.format("v5: {id}\n", &.{ id: named })
+  match Uuid.parse("2ED6657D-E927-568B-95E1-2665A8AEA6A2") {
+    Result.Success { value } => {
+      run Format.format("parsed equals v5: {same}\n", &.{ same: &value == &named })
+    }
+    Result.Failure { error } => { run Writer.writeAll(b"not a UUID\n") }
+  }
+  let fresh = run Uuid.v4()
+  let mut text: [u8; 45] = [0; 45]
+  match Uuid.formatUrnInto(&fresh, &mut text) {
+    Result.Success { value } => {
+      run Format.format("v4 version {v}, {length} bytes as a URN\n", &.{
+        v: Option<u8>.unwrapOr(fresh.version(), 0),
+        length: String.byteLength(value),
+      })
+    }
+    Result.Failure { error } => { run Writer.writeAll(b"buffer too small\n") }
+  }
+}
+```
+
+`Uuid` from `silk/encoding/uuid` covers versions 1 to 8. `v3` and `v5` hash a name inside a namespace such as `namespaceDns()`, so the same name always gives the same UUID. `v4()` needs a `&mut Random` provider, and `v7(unixMilliseconds)` does too. `parse` accepts the 36-character form in either case, and `parseUrn` accepts the `urn:uuid:` form. `formatInto` and `formatUrnInto` write lowercase text into a buffer of at least 36 or 45 bytes and return it as a `string`, and `Uuid` implements `Display` for `{id}` in templates. Compare UUIDs as shared borrows, `&a == &b`.
+
+`UuidError` does not implement `Debug`, so `main` cannot list it in its error row. This demo handles each `Result` where it happens instead.
+
 ## Run it
 
 ```silk
-pub effect fn main() -> () ! Base64Error | ParseError | DecodeError | ZstdError | OutOfMemoryError | WriterError {
+pub effect fn main() -> () ! Base64Error | ParseError | DecodeError | ZstdError | EncodeError | LzmaError | OutOfMemoryError | WriterError {
+  let mut random = OsRandom.make()
   let mut out = StdoutWriter.make()
   let mut allocator = Allocator.systemAllocatorProvider()
   run base64Demo() |> Effect.provideMut<Writer>(&mut out)
@@ -246,6 +373,15 @@ pub effect fn main() -> () ! Base64Error | ParseError | DecodeError | ZstdError 
     |> Effect.provideMut<Writer>(&mut out)
   run unzstd()
     |> Effect.provideMut<Allocator>(&mut allocator)
+    |> Effect.provideMut<Writer>(&mut out)
+  run deflateDemo()
+    |> Effect.provideMut<Allocator>(&mut allocator)
+    |> Effect.provideMut<Writer>(&mut out)
+  run unxz()
+    |> Effect.provideMut<Allocator>(&mut allocator)
+    |> Effect.provideMut<Writer>(&mut out)
+  run uuidDemo()
+    |> Effect.provideMut<Random>(&mut random)
     |> Effect.provideMut<Writer>(&mut out)
 }
 ```
@@ -273,7 +409,17 @@ resolved: https://example.com:8443/images/logo.png
 4. Silk decompressed this line.
 gzip: 61 compressed bytes, 2 steps
 zstd: 57 compressed bytes -> 128 bytes
+deflate: 81 bytes -> 50 bytes of gzip, round trip true
+xz: 112 -> 128 bytes
+lzma: 65 -> 128 bytes
+lzma2: 54 -> 128 bytes
+1. Silk decompressed this line.
+v5: 2ed6657d-e927-568b-95e1-2665a8aea6a2
+parsed equals v5: true
+v4 version 4, 45 bytes as a URN
 ```
+
+The `v4` UUID is random, so only its version and length are shown.
 
 ## API reference
 
@@ -284,4 +430,8 @@ zstd: 57 compressed bytes -> 128 bytes
 - `silk/uri/components`: `UriComponents`
 - `silk/compress/inflate`: `Decoder`, `Format`, `Limits`, `Progress`, `Status`, `DecodeError`, `ErrorKind`, `MEMORY_BOUND`
 - `silk/compress/zstd`: `Zstd`, `ZstdLimits`, `ZstdProgress`, `ZstdStatus`, `ZstdError`
+- `silk/compress/deflate`: `Deflate`, `EncodeError`
+- `silk/compress/xz`: `Xz`; `silk/compress/lzma`: `Lzma`; `silk/compress/lzma2`: `Lzma2`
+- `silk/compress/limits`: `DecodeLimits`, `Decoded`, `DecodeError`, `DecodeReason`
+- `silk/encoding/uuid`: `Uuid`, `UuidError`, `UuidVariant`
 - `silk/collections/bytes`: `Bytes`; `silk/collections/slice`: `Slice`; `silk/io/writer`: `Writer`

@@ -12,6 +12,8 @@ A view is only safe while the text it points at still exists. So every string ty
 
 You have been using one lifetime all along. `'static` means "valid for the whole program". String literals have type `string<'static>` because they are stored in the program itself and never go away. In chapter 3 you wrote `title: string<'static>` because a field needs to say where its text comes from, and literals were the only source you had.
 
+Constants qualify too. A `const` is built into the program like a literal, so a shared borrow of one, such as `&ESTIMATES` or `&ESTIMATES[1]` for `const ESTIMATES: [u32; 3]`, is a `&'static` borrow, and a function may return it as `&'static u32`.
+
 Now you want titles that point into a block of text the program read at run time. That text lives for a while, not forever. The struct has to say so.
 
 ## Letting a task borrow its title
@@ -33,17 +35,17 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 2 errors       0.14s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 2 errors       0.09s
 [x86_64-unknown-linux-gnu]
-src/main.silk:29:17: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
-src/main.silk:55:16: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
-Failed tasks in 0.20s
+src/main.silk:29:17: error[SEM0210] The result is a borrow, but the function has no borrowed input it could come from; for a literal or other data that lives for the whole program, write `'static`, as in `string<'static>` or `&'static T`
+src/main.silk:55:16: error[SEM0210] The result is a borrow, but the function has no borrowed input it could come from; for a literal or other data that lives for the whole program, write `'static`, as in `string<'static>` or `&'static T`
+Failed tasks in 0.13s
 ```
 
 Two errors from one change. Here is what happened. A field type with no lifetime doesn't mean "no lifetime". It quietly gives the struct a hidden lifetime parameter. `Task` is now really "a task borrowing from *some* text", and `Board`, which holds tasks, picked up a hidden parameter too.
 
-Line 29 is `fn blank() -> Task` and line 55 is `fn make() -> Board`. Each returns a value that borrows from some text, but neither takes any input. The compiler can't guess where the borrow comes from, so it asks you to name it. Methods like `isOpen`, whose `self: &Self` only reads the task, are fine: the hidden parameter rides along with `Self`.
+Line 29 is `fn blank() -> Task` and line 55 is `fn make() -> Board`. Each returns a value that borrows from some text, but neither takes any input. The compiler can't guess where the borrow comes from. Its message offers one answer, `'static`, which would be right if the text lived for the whole program. That is what you had, and it is exactly what you want to get away from. The other answer is to name the borrow. Methods like `isOpen`, whose `self: &Self` only reads the task, are fine: the hidden parameter rides along with `Self`.
 
 The fix is to stop hiding the lifetime. Give it a name, declare it on the struct, and declare it on the impl:
 
@@ -225,8 +227,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.04s
-  check    failed: 2 modules, 1 error        0.09s
+  load     135 modules, 1 in package         0.05s
+  check    failed: 2 modules, 1 error        0.07s
 [x86_64-unknown-linux-gnu]
 src/main.silk:3:43: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
 Failed scratch in 0.14s
@@ -252,11 +254,11 @@ Inside a function body you usually don't write lifetimes; the compiler works the
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.14s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
 src/main.silk:139:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
-Failed tasks in 0.20s
+Failed tasks in 0.24s
 ```
 
 The line numbers here refer to the whole file at the end of the chapter. SEM0012 says an argument's type doesn't match its parameter. Line 139 is `let id = board.add(`, and the argument is the draft. `add` expects a `Draft<'static>`, but the draft borrows from `text`. The `'_` stands for a lifetime that has no name in your code.
@@ -323,14 +325,14 @@ If you leave the lifetime off, elision applies its second rule and ties the resu
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 2 errors       0.14s
+  load     143 modules, 1 in package         0.00s
+  check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:199:3: error[OWN0011] Dropping `board` while a borrow of it is still in use; use that borrow for the last time before this
   note: src/main.silk:198:17: the borrow starts here
 src/main.silk:200:57: error[OWN0019] `longest` is used after `board`, which it borrows, ended or was replaced
   note: src/main.silk:198:17: the borrow starts here
-Failed tasks in 0.20s
+Failed tasks in 0.15s
 ```
 
 Both notes point at `board.longestTitle()` on line 198, where the loan began.
@@ -385,12 +387,12 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.12s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:21:6: error[OWN0019] `board` is used after `buffer`, which it borrows, ended or was replaced
   note: src/main.silk:19:35: the borrow starts here
-Failed scratch in 0.18s
+Failed scratch in 0.11s
 ```
 
 The note points at `&buffer` on line 19, the borrow that outlives `buffer`.
@@ -561,7 +563,7 @@ fn parseBoard<'text>(text: string<'text>) -> Board<'text> {
       // A line is at least "s|p|" plus one title byte.
       if index - start > 4 {
         let id = board.add(
-          Draft { title: part(text, start + 4, index), priority: priorityFrom(bytes[start + 2]) }
+          Draft { title: part(text, start + 4, index), priority: priorityFrom(bytes[start + 2]) },
         )
         if bytes[start] == 'x' {
           drop board.complete(id, 1)
@@ -599,7 +601,7 @@ effect fn show(task: &Task) -> ()
       id: task.id.0,
       title: task.title,
       priority: priorityLabel(task.priority),
-    }
+    },
   )
 }
 

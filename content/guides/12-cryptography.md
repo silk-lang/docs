@@ -16,6 +16,8 @@ The crypto modules are portable and allocate nothing. They work on byte slices (
 | Signature verification | `silk/crypto/ed25519`, `silk/crypto/p256`, `silk/crypto/p384`, `silk/crypto/rsa` | `Ed25519PublicKey`, `EcdsaP256Sha256`, `EcdsaP384Sha384`, `RsaPublicKey` |
 | Secure random bytes | `silk/system/random`, `silk/system/random_native` | `Random`, `OsRandom` |
 
+`silk/crypto/md5` (`Md5`) also exists, for legacy formats that require MD5, such as UUID version 3. MD5 permits deliberate collisions, so never use it to protect data.
+
 There is no signing and no general-purpose public-key encryption. The signature modules verify only: they exist so that TLS and your own code can check signatures made elsewhere. `silk/collections/hash` is a different thing. It hashes collection keys for `HashMap` and is not cryptographic.
 
 ## Set up the project
@@ -349,11 +351,11 @@ silk check
 
 ```
 Checking sealnote (x86_64-unknown-linux-gnu)
-  load     67 modules, 1 in package          0.08s
-  check    failed: 2 modules, 1 error        0.18s
+  load     171 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-src/main.silk:192:3: error[SEM0071] This `run` needs `&mut Random`, which the enclosing function does not provide; add `? &mut Random` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
-Failed sealnote in 0.27s
+src/main.silk:200:3: error[SEM0071] This `run` needs `&mut Random`, which the enclosing function does not provide; add `? &mut Random` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
+Failed sealnote in 0.19s
 ```
 
 `sealNote` still needs `&mut Random`, and `main` neither provides it nor can declare it, so the program does not compile. A program cannot use secure randomness without choosing a source. See **Services and providers** in the reference.
@@ -371,6 +373,7 @@ Failed sealnote in 0.27s
 - `silk/crypto/sha3`: `Sha3_224`, `Sha3_256`, `Sha3_384`, `Sha3_512`
 - `silk/crypto/blake2b`: `Blake2b512`
 - `silk/crypto/sha1`: `Sha1`
+- `silk/crypto/md5`: `Md5` (legacy formats only)
 - `silk/crypto/hmac`: `HmacSha256`, `HmacSha384`
 - `silk/crypto/hkdf`: `HkdfSha256`, `HkdfSha384`, `OutputTooLongError`
 - `silk/crypto/chacha20_poly1305`: `ChaCha20Poly1305`, `AeadError`

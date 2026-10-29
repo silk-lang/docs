@@ -6,7 +6,7 @@ An interface names a set of operations. An `impl` makes a type conform to an int
 
 ```
 InterfaceDecl  = 'pub'? 'interface' Identifier GenericParameters? '{' Operation* '}'
-Operation      = ('effect' Environment?)? 'unsafe'? 'fn' Identifier GenericParameters?
+Operation      = Directive* 'static'? ('effect' Environment?)? 'unsafe'? 'fn' Identifier GenericParameters?
                  '(' Parameters? ')' '->' Type FailureRow? RequirementRow?
 
 ConformanceImpl = 'impl' GenericParameters? InterfaceType 'for' Type '{' ImplMember* '}'
@@ -22,7 +22,9 @@ InterfaceType  = Path TypeArguments?
 - An interface body lists operations only. Stored fields and other members are rejected (SEM0090).
 - An operation may have a body. The body is its default: an impl that leaves the operation out uses it, and one that implements the operation replaces it.
 - `Self` inside the interface stands for the conforming type. Receivers are written as ordinary parameters: `value: Self`, `value: &Self` or `value: &mut Self`. The parameter name is free.
-- An operation may be an `effect fn` or an `unsafe fn`, and may have its own type parameters.
+- An operation may be an `effect fn` or an `unsafe fn`, and may have its own type parameters: `fn conv<U>(value: &Self, u: U) -> U`. A call supplies them like any generic call: `Convert.conv<i32>(item, 7)`, `c.conv(true)`.
+- An operation may be a `static fn`. It answers a question about the conforming type during static evaluation, such as `static fn takesValue() -> bool`. See Static evaluation.
+- An operation parameter may be `static`. A runtime caller supplies it through `Interface.member(...)` or the receiver form, as for an inherent method.
 - An operation parameter cannot be `mut` (SEM0143).
 - An interface may have type parameters: `interface Decoder<T> { ... }`. `Decoder<bool>` and `Decoder<i64>` are separate interfaces for conformance purposes.
 - An interface with no operations is a marker: `interface Marker {}`.
@@ -36,13 +38,16 @@ InterfaceType  = Path TypeArguments?
 - A generic impl declares its parameters after `impl`: `impl<T> Marker for Box<T> {}`.
 - A generic impl may bound its parameters. `impl<T: Size> Size for Box<T>` is a conditional conformance: `Box<T>` conforms only when `T` does.
 - Every impl parameter must occur in the head (SEM0083).
-- A bound in an impl head must move toward a smaller type. A bound that does not descend, such as `impl<T: Eq2<Pair<T, T>>> Eq2<T> for Box<T>`, is SEM0120.
+- A bound in an impl head must bound a part of the provider type, so that each proof moves toward a smaller type. `impl<T: Show> Show for Box<T>` descends. A bound on a parameter that the provider does not contain, such as `impl<T: Show> Pick<T> for Settings`, is SEM0120: "A conformance requirement that does not descend toward a base witness".
+- Only the provider has to descend. The bound may repeat a parameter in its interface arguments: `impl<T: Eq2<Pair<T, T>>> Eq2<T> for Box<T>` is accepted.
+- A `static fn` operation is supplied by a `static fn` member, and a runtime operation by a runtime one. A mismatch, or `static` parameters that differ, is SEM0083: "Invalid conformance: member `takesValue` does not match the operation of `Arg`: one of them is a `static fn` and the other is not, or their `static` parameters differ".
 - An inherent `impl Type { ... }` without an interface defines associated members. See Functions and methods.
 
 ## Where an impl may live
 
-- An impl must be in the module that declares the interface, or in the module that declares the provider type. Otherwise it is SEM0083.
-- Scalar types such as `i32` can therefore only get user conformances in the interface's module.
+- An impl must be in one of these modules: the one that declares the interface, the one that declares the provider type, or the one that declares the interface application's first type argument. Otherwise it is SEM0083, naming the modules that may hold it.
+- The first-type-argument rule lets the module that declares `Vector2` also declare `impl Multiply<Vector2<f64>, Vector2<f64>> for f64`, so `2.0 * vector` works. Without it, scalar types such as `i32` and `f64` could only get user conformances in the interface's module.
+- For the std lib operator interfaces the message names their sealed home, as in ``Invalid conformance: `silk.core.ops.Add<meters.Meters, meters.Meters>` is declared in `intrinsic.operators` and `meters.Meters` is declared in `meters`, so this impl must be in `intrinsic.operators` or `meters` ``.
 - Conformances are found without importing the impl. Importing the interface and the type is enough.
 
 ## Coherence
@@ -63,6 +68,7 @@ InterfaceType  = Path TypeArguments?
 - A receiver call that matches members from two bounds of one parameter (SEM0200) or two conformances (SEM0202) is ambiguous. Call it through the interface name.
 - A member supplied by an interface cannot be taken as a value with `value.member`. Call it.
 - The conformance is chosen per specialization. There is no runtime dispatch.
+- A `static fn` operation is called during static evaluation, as `Arg.takesValue()` in a `static fn` bounded by `T: Arg`. A runtime call is SEM0176: "`Arg.takesValue` runs only during static evaluation, so runtime code cannot call it".
 
 ## Operator interfaces
 
@@ -264,17 +270,85 @@ pub fn main() -> i32 {
 }
 ```
 
+A conformance for a scalar provider, held by the module that declares the first type argument:
+
+```silk
+import silk.core.ops { Multiply }
+
+struct Meters {
+  value: i32,
+}
+
+// This module declares `Meters`, the first type argument, so it may hold
+// the conformance for the scalar `i32`.
+impl Multiply<Meters, Meters> for i32 {
+  fn multiply(left: i32, right: Meters) -> Meters {
+    return Meters { value: left * right.value }
+  }
+}
+
+pub fn main() -> i32 {
+  let length = 3 * Meters { value: 14 }
+  return length.value - 42
+}
+```
+
+A `static fn` operation that picks a branch at compile time:
+
+```silk
+interface Arg {
+  // Answered during static evaluation.
+  static fn takesValue() -> bool
+}
+
+struct Flag {}
+
+struct Text {}
+
+impl Arg for Flag {
+  static fn takesValue() -> bool {
+    return false
+  }
+}
+
+impl Arg for Text {
+  static fn takesValue() -> bool {
+    return true
+  }
+}
+
+static fn takes<T: Arg>() -> bool {
+  return Arg.takesValue()
+}
+
+fn width<T: Arg>() -> i32 {
+  static if takes<T>() {
+    return 40
+  } else {
+    return 2
+  }
+}
+
+pub fn main() -> i32 {
+  if width<Text>() + width<Flag>() != 42 {
+    return 1
+  }
+  return 0
+}
+```
+
 ## Diagnostics
 
 | Code | Meaning |
 | --- | --- |
 | SEM0018 | An interface used where a type is expected |
-| SEM0083 | Invalid conformance: missing, extra or mismatched member, duplicate impl, impl outside the interface's or type's module, unconstrained impl parameter, or `Drop` used as a bound |
+| SEM0083 | Invalid conformance: missing, extra or mismatched member (including a `static fn` mismatch), duplicate impl, impl outside the modules that may hold it, unconstrained impl parameter, or `Drop` used as a bound |
 | SEM0084 | Invalid `Drop` conformance: the impl is not exactly `fn drop(self: &mut Self) -> ()` |
 | SEM0090 | Stored field or another member that is not an operation inside an interface |
 | SEM0119 | Two impl heads may overlap |
-| SEM0120 | Impl bound does not descend toward a smaller type |
+| SEM0120 | Impl bound does not bound a part of the provider type |
 | SEM0121 | Conformance required by a bound cannot be proved |
+| SEM0176 | A runtime call of a `static fn` operation |
 | SEM0135 | No operator conformance accepts the operands |
 | SEM0136 | More than one operator conformance accepts the operands |
 | SEM0143 | `mut` parameter in an interface operation |
@@ -287,8 +361,7 @@ Generics · Functions and methods · Closures and callable types · Ownership an
 
 ## Open questions
 
-- An operation with no `Self` parameter (such as `fn unit() -> Self`) can be declared and implemented, but calling it as `Shape.unit()` reports "not supported by the native compiler yet".
-- Calling a generic interface operation (`fn conv<U>(value: &Self, u: U) -> U`) reports "not supported by the native compiler yet" in both `silk check` and `silk build`.
+- A runtime operation with no `Self` parameter (such as `fn unit() -> Self`) can be declared and implemented, but calling it as `Shape.unit()` reports "unsupported: this construct is not supported by the native compiler yet". A `static fn` operation with no `Self` parameter works.
 - Taking an interface-supplied member as a value, as in `let f = s.area`, reports SEM0027 ("main.Square has no field area"), not SEM0203.
 - `Copy` conformances are checked on demand. An `impl Copy` whose field is not `Copy`, or whose type also has `Drop`, is not reported unless a copy is needed.
 - An impl binding `add: Cell.cellAdd`, where `cellAdd` is a top-level function and not a member of `Cell`, is accepted. Whether this is intended is unclear.

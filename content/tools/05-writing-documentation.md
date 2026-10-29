@@ -24,6 +24,7 @@ The rules for what attaches where are strict:
 
 - A `///` block attaches only to a declaration on the very next line. A blank line between them, or an ordinary `//` comment, detaches it, and the comment documents nothing.
 - Each line of the block must start with `///`, with only spaces before it. A `///` after code on the same line is not a doc comment.
+- On a declaration with directives such as `@inline`, put the `///` block before the directives. The compiler and the editor also accept it between the directives and the declaration, but `silk doc` reads only a block that comes before the first directive.
 - `////` (four or more slashes) is an ordinary comment.
 - The `//!` block must be the first thing in the file, with no line before it. A `//!` further down is not module documentation.
 - One space after `///` or `//!` is removed; the rest of the line is kept exactly, so indentation inside code blocks survives.

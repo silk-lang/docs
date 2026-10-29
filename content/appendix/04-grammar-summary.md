@@ -14,7 +14,7 @@ This is the grammar the compiler's parser accepts, written compactly. It is deri
 | `( ... )` | Grouping. |
 | `{A ','}` | One or more A separated by commas, with an optional trailing comma. |
 
-`Identifier` is an ASCII letter or `_` followed by letters, digits and `_`. Contextual words such as `where`, `in`, `at`, `some`, `place`, `test` and `module` are ordinary identifiers outside the positions shown. See Keywords.
+`Identifier` is an ASCII letter or `_` followed by letters, digits and `_`. Contextual words such as `where`, `in`, `at`, `some`, `place` and `test` are ordinary identifiers outside the positions shown. See Keywords.
 
 ## Lexical
 
@@ -38,9 +38,9 @@ Comment       = '//' ... | '///' ... (doc) | '//!' ... (module doc)        (no b
 
 ```
 SourceFile    = Declaration*
-Declaration   = Import | Const | Param | Struct | Tuple | Enum | Union | TypeAlias
-              | Service | Interface | Role | Impl | Function | ForeignStatic
-              | StaticIfDecl | 'module' PropertyClause
+Declaration   = Import | StaticIfDecl
+              | Directive* ( Const | Param | Struct | Tuple | Enum | Union | TypeAlias
+                           | Service | Interface | Role | Impl | Function | ForeignStatic )
 
 Import        = 'pub'? 'import' ImportPath ( 'as' Identifier )? ImportMembers?
 ImportPath    = Identifier ( '.' Identifier )*
@@ -61,31 +61,36 @@ TypeAlias     = 'pub'? 'type' Identifier GenericParams? '=' Type
 
 Service       = 'pub'? 'service' Identifier GenericParams? '{' Operation* '}'
 Interface     = 'pub'? 'interface' Identifier GenericParams? '{' Operation* '}'
-Operation     = 'pub'? 'static'? 'unsafe'? FunctionName Contract PropertyClause* Block?
+Operation     = Directive* 'pub'? 'static'? 'unsafe'? FunctionName Contract Block?
 Role          = 'pub'? 'role' Identifier GenericParams?
 
 Impl          = 'impl' GenericParams? Type ( 'for' Type )? WhereClause? '{' ImplMember* '}'
 ImplMember    = Identifier ':' TypePath                     (maps an operation to a declaration)
-              | Function                                     ('fn drop' is allowed here)
+              | Directive* Function                          ('fn drop' is allowed here)
 
 Function      = 'pub'? 'test'? 'static'? 'unsafe'? ( ('extern' | 'export') TextLit )?
-                FunctionName Contract ( 'as' TextLit )? PropertyClause* Block
+                FunctionName Contract ( 'as' TextLit )? Block
 FunctionName  = ( 'effect' EffectEnv? )? 'fn' Identifier
 EffectEnv     = '<' Lifetime ( '&' Lifetime )* '>'
 Contract      = GenericParams? ParamList ( '->' ResultType )? FailureRow? RequirementRow? WhereClause?
 ParamList     = '(' { ( 'mut' | 'static' )? Identifier ':' Type ',' }? ( '...' )? ')'
 ResultType    = Type | 'some' GenericParams Type
 
-ForeignStatic = 'unsafe' 'extern' TextLit 'static' Identifier ':' Type ( 'as' TextLit )? PropertyClause*
+ForeignStatic = 'unsafe' 'extern' TextLit 'static' Identifier ':' Type ( 'as' TextLit )?
               | 'export' TextLit 'static' Identifier ':' Type ( 'as' TextLit )? '=' Expression
 StaticIfDecl  = 'static' 'if' Expression '{' Declaration* '}'
                 ( 'else' ( StaticIfDecl | '{' Declaration* '}' ) )?
-PropertyClause = 'with' Identifier '.' Identifier '(' { Identifier ':' Expression ',' }? ')'
+Directive     = '@' Identifier ( '(' { DirectiveArg ',' }? ')' )?
+DirectiveArg  = ( Identifier ':' )? DirectiveLit
+DirectiveLit  = TextLit | '-'? Digits | 'true' | 'false' | '(' { DirectiveLit ',' }? ')'
 ```
 
 - An `extern` function has no body. Every other function has one; a body that can fall off its end gets an implicit `return ()`.
 - `...` ends the parameter list of a foreign function that takes C variadic arguments.
 - `type Both = A + B` is a parse error: an alias names one type.
+- Directives parse before any declaration except an `import` or a `static if`, where the `@` is PAR0002. Which declarations take which directive is checked later (SEM0235, SEM0236); see Intrinsics. A directive argument is a decimal literal, text, `true`, `false` or a tuple of these, never a name or an expression.
+- `with Name.name(...)` after a declaration header or a foreign function type, and `module with ...`, still parse so that the compiler can report them as PAR0011.
+- `'as' TextLit` on a foreign function may be `"module#name"`, a WebAssembly import.
 
 ## Generic parameters, rows and constraints
 
@@ -114,7 +119,7 @@ Constraint    = Type 'in' Type
 Type          = TypePrimary ( '|' TypePrimary )*                 (structural union)
 TypePrimary   = TypePath TypeArgs?
               | ( 'mut' | 'once' ) TypePath TypeArgs?             (mode-qualified, e.g. 'once Effect<...>')
-              | '&' Lifetime? 'mut'? TypePrimary ( '@' Identifier )?
+              | '&' Lifetime? 'mut'? TypePrimary ( '#' Identifier )?        (role marker)
               | '&' Lifetime? 'mut'? '[' Type ']'                 (slice)
               | '[' Type ';' Expression ']'                       (fixed array)
               | '?'? ( '*' | '[' '*' ']' ) ( 'const' | 'mut' ) PtrQualifier* TypePrimary
@@ -125,14 +130,15 @@ TypePrimary   = TypePath TypeArgs?
 TypePath      = Identifier ( '.' Identifier )?                    (at most two segments)
 TypeArgs      = '<' ( Lifetime ( '&' Lifetime )* ';' )? { ( Type | Lifetime ) ',' }? FailureRow? RequirementRow? '>'
 PtrQualifier  = ( 'align' | 'addrspace' ) '(' IntegerLit ')'
-CallableType  = ( 'for' GenericParams )? ( 'extern' TextLit )? 'unsafe'? 'mut'? 'once'? 'fn'
-                ( '<' Lifetime '>' )? '(' { Type ',' }? ')' '->' Type PropertyClause*
+CallableType  = ( 'for' GenericParams )? ( Directive* '?'? 'extern' TextLit )? 'unsafe'? 'mut'? 'once'? 'fn'
+                ( '<' Lifetime '>' )? '(' { Type ',' }? ')' '->' Type
 ```
 
 - `&` and pointer types bind to one primary type. Write `&(A | B)` for a reference to a union.
 - The `;` in type arguments separates an Effect's environment lifetimes from its success type: `Effect<'a; i32 ! E ? R>`.
 - In a `for<...>` binder list, `use 'a` is allowed.
-- `?T` is not a type (PAR0007). Nullable pointers (`?*const T`) are the only `?` prefix in a type.
+- `?T` is not a type (PAR0007). Nullable pointers (`?*const T`) and nullable C function pointers (`?extern "C" fn(i32) -> ()`) are the only `?` prefixes in a type.
+- A directive in a type position must be followed by `extern` or `?extern`; elsewhere the `@` is PAR0002.
 
 ## Statements
 
@@ -145,6 +151,7 @@ Statement     = 'let' ( 'mut' | 'static' )? Identifier ( ':' Type )? '=' Express
               | 'static' 'if' Cond Block ( 'else' Block )?
               | 'static' 'for' Identifier 'in' Cond Block
               | 'while' Cond Block
+              | 'while' 'let' Pattern '=' Cond Block
               | 'break' | 'continue'
               | 'return' Expression?                             (bare only directly before '}')
               | 'fail' 'move'? Expression
@@ -155,7 +162,8 @@ Statement     = 'let' ( 'mut' | 'static' )? Identifier ( ':' Type )? '=' Express
 Cond          = Expression with no bare record literal at its top level
 ```
 
-- `if`, `if let` and `while` are statements, not expressions.
+- `if`, `if let`, `while` and `while let` are statements, not expressions.
+- `while let P = e { ... }` evaluates `e` again before every iteration and leaves the loop at the first value that does not match `P`; `break` and `continue` work as in `while`.
 - A statement `static if` takes only `else Block`; `else static if` is accepted only between declarations.
 - There is no `loop` statement (PAR0006), no `for` loop other than `static for`, and no compound assignment.
 
@@ -189,7 +197,7 @@ MatchArm      = Pattern ( 'if' Expression )? '=>' ( Block | Expression )
 Literal       = IntegerLit | FloatLit | DurationLit | TextLit | ByteStringLit | CharLit | 'true' | 'false'
 ```
 
-- Records are not allowed at the top level of an `if`, `if let` or `while` condition, a `static if` or `static for` operand, or a `match` subject. Parenthesize the record or bind it first. Inside parentheses, brackets or a call's arguments they are allowed.
+- Records are not allowed at the top level of an `if`, `if let`, `while` or `while let` condition, a `static if` or `static for` operand, or a `match` subject. Parenthesize the record or bind it first. Inside parentheses, brackets or a call's arguments they are allowed.
 - `a < b == c` parses as `(a < b) == c`, because the two operators are on different levels. `a == b != c` and `1 < 2 < 3` are parse errors.
 - `x |> f(y)` calls `f(x, y)`. With no further arguments write `x |> f`; `x |> f()` is SEM0078.
 - Match arms take no separator.

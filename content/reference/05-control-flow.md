@@ -1,6 +1,6 @@
 # Control flow
 
-`if`, `if let` and `while` are statements. An `if` or `if let` whose `else` chain ends in a final `else` may also be used as a value. This page covers conditionals, `if` values and value blocks, loops, `break`, `continue`, `return`, the `never` type and short-circuit evaluation.
+`if`, `if let`, `while` and `while let` are statements. An `if` or `if let` whose `else` chain ends in a final `else` may also be used as a value. This page covers conditionals, `if` values and value blocks, loops, `break`, `continue`, `return`, the `never` type and short-circuit evaluation.
 
 ## Syntax
 
@@ -8,6 +8,7 @@
 IfStatement      = 'if' Condition Block ( 'else' ( IfStatement | IfLetStatement | Block ) )?
 IfLetStatement   = 'if' 'let' Pattern '=' Condition Block ( 'else' ( IfStatement | IfLetStatement | Block ) )?
 WhileStatement   = 'while' Condition Block
+WhileLetStatement = 'while' 'let' Pattern '=' Condition Block
 BreakStatement   = 'break'
 ContinueStatement = 'continue'
 ReturnStatement  = 'return' Expression?
@@ -50,6 +51,7 @@ Block            = '{' Statement* '}'
 
 - The `if` produces the value of the branch that runs. Only that branch runs.
 - An `if` without a final `else` is not a value, because the path where every condition is false produces nothing. Using one as a value is PAR0009, which suggests adding `else { ... }`.
+- There is no conditional operator. `c ? a : b` is PAR0010: "Silk has no `c ? a : b`; write an `if` with a final `else` as the value, as in `if c { a } else { b }`".
 - Branch results join like match arms: equal types keep that type, distinct nominal types form a union, and a branch of type `never` adds nothing. Types that cannot join are SEM0049.
 - An expected type, such as a binding annotation or a parameter type, reaches every branch, so `let small: u8 = if flag { 1 } else { 2 }` types both literals as `u8`.
 - An `if` in statement position stays a statement, even with a final `else`. A branch that ends in a non-unit expression there is an ignored result (SEM0087).
@@ -75,9 +77,11 @@ Block            = '{' Statement* '}'
 
 ## Loops
 
-- `while Condition { }` is the only runtime loop. It tests the condition before each iteration.
+- `while Condition { }` and `while let` are the runtime loops. `while` tests the condition before each iteration.
 - There is no `for`, `loop` or `do`/`while`. A statement `loop { }` is PAR0006; write `while true { }`. `loop` is not reserved and may still name a binding. `for` outside `static for` is a parse error.
-- `while let` is planned but not available. Today it is a parse error.
+- `while let Pattern = e { }` evaluates `e` before each iteration and runs the body while the value matches `Pattern`. The first mismatch ends the loop. It behaves as `while true { if let Pattern = e { … } else { break } }`.
+- Its subject follows the `if let` rules. A call result needs no `move`. A named non-Copy subject needs `move`, and the body must give the binding a new value before the next iteration (OWN0005 otherwise). A mismatch consumes it too, so it is moved after the loop (OWN0001).
+- `while let P = &e` and `while let P = &mut e` borrow the subject on each iteration. A binding borrowed this way can't be moved out of the iteration (OWN0006).
 - A `while true` loop with no `break` that targets it never completes. It ends the path like a `never` call: `fn f() -> never { while true { } }` checks, and code after the loop is unreachable.
 - A `break` that leaves the loop, even in a nested `if`, makes it complete. A non-unit function that can then fall off its end is SEM0130. A `break` of an inner loop does not count.
 - Only the literal condition `true` (parentheses allowed) is recognized. `while t { }` with `let t = true` completes as usual.
@@ -85,7 +89,7 @@ Block            = '{' Statement* '}'
 
 ## `break` and `continue`
 
-- `break` leaves the innermost enclosing `while`. `continue` skips to its next condition test.
+- `break` leaves the innermost enclosing `while` or `while let`. `continue` skips to its next condition test, or to the next evaluation of the `while let` subject.
 - Neither takes a label or a value. There are no loop labels. `break 5` is `break` followed by the expression statement `5` (SEM0087).
 - Using either outside a loop is SEM0038.
 - `break` and `continue` may appear in a `match` arm block inside a loop, including a `match` used as a value: `drop match i { 4 => { break } _ => 0 }`.
@@ -221,12 +225,40 @@ pub fn main() -> i32 {
 }
 ```
 
+A `while let` loop that stops at the first `None`:
+
+```silk
+import silk.core.option { Option }
+
+fn next(at: usize, values: &[i32]) -> Option<i32> {
+  if at < values.length {
+    return Option<i32>.Some { value: values[at] }
+  }
+  return Option<i32>.None
+}
+
+pub fn main() -> i32 {
+  let values = [4, 5, 6]
+  let mut at: usize = 0
+  let mut sum = 0
+  while let Option.Some { value } = next(at, &values) {
+    sum = sum + value
+    at = at + 1
+  }
+  if sum != 15 {
+    return 1
+  }
+  return 0
+}
+```
+
 ## Diagnostics
 
 | Code | Meaning |
 | --- | --- |
-| PAR0001 | A required token is missing, for example `if` used as a value |
 | PAR0006 | A statement written `loop { ... }`; use `while true { ... }` |
+| PAR0009 | An `if` used as a value without a final `else` |
+| PAR0010 | The conditional operator `c ? a : b`; write `if c { a } else { b }` |
 | SEM0006 | Unknown value, for example an `if let` binding used outside its block |
 | SEM0011 | Condition is not `bool` |
 | SEM0038 | `break` or `continue` outside a loop |
@@ -238,6 +270,7 @@ pub fn main() -> i32 {
 | OWN0001 | Use of a binding after it was moved |
 | OWN0003 | A non-Copy value is consumed without `move` |
 | OWN0005 | Loop body leaves owned values live differently than the next iteration expects |
+| OWN0006 | A binding borrowed from a `while let` or `if let` subject escapes its block |
 
 ## See also
 

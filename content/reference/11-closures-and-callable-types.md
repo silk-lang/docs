@@ -59,6 +59,7 @@ A callable's invocation mode follows from its captures:
 - `fn(A, B) -> R` describes a callable taking `A` and `B` and returning `R`. `mut` and `once` prefixes select the invocation mode above.
 - Callable types appear as parameter types, as result types, and as bounds on type parameters: `F: fn(i32) -> i32`.
 - A callable parameter type is implicitly generic: each distinct argument callable gets its own instance. Passing a callable whose signature does not match is reported as SEM0052 at the call. A mismatch against a type-parameter bound is SEM0076.
+- A callable parameter may be wider than the type asks for. When it is a closed structural union that holds every member the type passes, the callable fits: `fn score(pet: Cat | Dog) -> i32` is accepted where `fn(Cat) -> i32` is expected, and each call widens its argument into the union. The same holds for a union argument such as `A | B` into `A | B | C`, and for `Effect.catch` and `Effect.catchAll` handlers. A parameter that lacks a member is still a mismatch.
 - A local binding may be annotated with a callable type: `let f: fn(i32) -> i32 = inc`. The initializer may be a named function or a literal whose parameters, result and environment lifetime match. A mismatch is SEM0037.
 - The initializer's invocation mode must be at least as strong as the written one. A `fn` fits `mut fn` and `once fn`, and a `mut fn` fits `once fn`. A `mut fn` for `fn`, or a `once fn` for `mut fn`, is SEM0037.
 - `fn<'static>` in an annotation rejects a literal that borrows a local (SEM0037).
@@ -67,7 +68,7 @@ A callable's invocation mode follows from its captures:
 - A struct may declare a field of bare callable type, such as `struct H { f: fn(i32) -> i32 }`, but constructing a value of it is not supported. Make the struct generic: `struct Holder<F: fn<'static>(i32) -> i32> { step: F }`.
 - Calling a `mut fn` stored in a field needs `&mut` access to the whole aggregate (OWN0014). A `fn` field can be called through `&`.
 - `unsafe fn(A) -> R` is a callable that must be called inside `unsafe` (SEM0082). See Unsafe code and C interop.
-- `extern "C" fn(A) -> R` is a C function pointer type, used for foreign callbacks. See Unsafe code and C interop.
+- `extern "C" fn(A) -> R` is a C function pointer type, used for foreign callbacks. `?extern "C" fn(A) -> R` is one that may be null; it is tested and refined before a call. See Unsafe code and C interop.
 
 ## Environment lifetime
 
@@ -236,6 +237,32 @@ pub fn main() -> i32 {
   }
   if drive(&mut holder) != 10 {
     return 3
+  }
+  return 0
+}
+```
+
+A callable whose parameter is a wider union than the use passes:
+
+```silk
+struct Cat { lives: i32 }
+struct Dog { tricks: i32 }
+
+fn score(pet: Cat | Dog) -> i32 {
+  return match move pet {
+    Cat { lives } => lives
+    Dog { tricks } => tricks * 10
+  }
+}
+
+fn judge(f: fn(Cat) -> i32) -> i32 {
+  return f(Cat { lives: 9 })
+}
+
+pub fn main() -> i32 {
+  // `score` takes `Cat | Dog`, which holds every member of `Cat`.
+  if judge(score) != 9 {
+    return 1
   }
   return 0
 }

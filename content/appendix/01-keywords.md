@@ -1,13 +1,13 @@
 # Keywords
 
-Silk reserves 38 keywords. A keyword cannot name a declaration, binding, parameter or field. Another 16 contextual words have a meaning only in one grammar position and are ordinary identifiers everywhere else. The lists come from the compiler's lexer and parser.
+Silk reserves 38 keywords. A keyword cannot name a declaration, binding, parameter or field. Another 14 contextual words have a meaning only in one grammar position and are ordinary identifiers everywhere else. The lists come from the compiler's lexer and parser.
 
 ## Reserved keywords
 
 | Keyword | Meaning | Reference page |
 | --- | --- | --- |
 | `as` | Renames an import (`import silk.collections.list as L`) or gives a C symbol name (`as "c_name"`). Not a cast. | Lexical structure, Unsafe code and C interop |
-| `break` | Leaves the innermost `while` loop. | Control flow |
+| `break` | Leaves the innermost `while` or `while let` loop. | Control flow |
 | `compileError` | `compileError("text")` stops the build when a static branch selects it (SEM0177). | Static control flow and reflection |
 | `const` | Declares a module-level constant; also `*const T` pointers. | Static evaluation, Unsafe code and C interop |
 | `continue` | Starts the next iteration of the innermost `while` loop. | Control flow |
@@ -25,7 +25,7 @@ Silk reserves 38 keywords. A keyword cannot name a declaration, binding, paramet
 | `impl` | Adds inherent members to a type, or makes a type conform to an interface or service. | Functions and methods, Interfaces and impls, Services and providers |
 | `import` | Imports a module or its members; `pub import` re-exports members. | Lexical structure |
 | `interface` | Declares an interface. | Interfaces and impls |
-| `let` | Declares a local binding; `let mut`, `let static` and pattern lets. | Bindings and statements |
+| `let` | Declares a local binding; `let mut`, `let static` and pattern lets; `if let` and `while let`. | Bindings and statements |
 | `match` | Pattern-matching expression; `match &x`, `match &mut x`, `match move x`, `match place x`. | Patterns and match |
 | `move` | `move x` transfers ownership; `match move`; `fail move e`. | Ownership and moves |
 | `mut` | Mutable binding or parameter, `&mut` borrow, `mut fn` callable type, `*mut T` pointer. | Bindings and statements, Borrowing |
@@ -43,7 +43,7 @@ Silk reserves 38 keywords. A keyword cannot name a declaration, binding, paramet
 | `type` | Declares a type alias: `type Id = u64`. | Generics |
 | `union` | Declares a nominal tagged union. | Enums and unions |
 | `unsafe` | Unsafe blocks, unsafe calls (`unsafe f()`), unsafe functions and C declarations. | Unsafe code and C interop |
-| `while` | The only loop statement. | Control flow |
+| `while` | The only loop statement: `while cond { ... }`, or `while let P = e { ... }` to repeat while `e` matches the pattern `P`. | Control flow |
 
 ## Contextual words
 
@@ -57,7 +57,6 @@ These words are identifiers except in the position shown. `let where = 1` and `f
 | `at` | Requirement rows and call type arguments | `&mut Journal at Audit` selects a role. | Services and providers |
 | `from` | `where` clause | `P provides X from Y`. | Services and providers |
 | `in` | `where` clause, `static for` | `where S in E` membership; `static for f in fields { ... }`. | Typed failures, Services and providers, Static control flow and reflection |
-| `module` | Start of a declaration | `module with Intrinsic.name(...)` attaches a property clause to the module. | Intrinsics |
 | `place` | After `match` | `match place x` matches the storage of `x` directly. | Patterns and match |
 | `provides` | `where` clause | Relates a provider type to the requirement it supplies. | Services and providers |
 | `some` | After `->` | `-> some<F: Bound> F` declares an opaque result. | Generics, Effects and run |
@@ -65,7 +64,6 @@ These words are identifiers except in the position shown. `let where = 1` and `f
 | `typeof` | Type position, before `(` | `typeof(add)` is the exact type of a named function. | Generics |
 | `use` | In a `for<...>` binder list | `for<use 'call>` binds a lifetime fresh for each call. | Lifetimes |
 | `where` | After a signature, an `impl` head or a `param` | Constraint clause; on `param`, a validation predicate. | Generics, Package parameters |
-| `with` | After a function header or a foreign type | Property clause `with Intrinsic.foreign(...)`, `with Intrinsic.nonParking()`. | Intrinsics, Unsafe code and C interop |
 | `Without` | Row position, before `<` | `Without<R, S>` removes `S` from row `R`. | Typed failures, Services and providers |
 
 ## Names that are not keywords
@@ -74,7 +72,9 @@ These words are identifiers except in the position shown. `let where = 1` and `f
 - `Intrinsic` is a namespace visible in every module without an import. See Intrinsics.
 - Primitive type names (`i32`, `bool`, `string`, `never`) are not keywords.
 - `loop` is not a keyword. `loop { ... }` is reported as PAR0006: "`loop` is not a Silk keyword; write an unbounded loop as `while true { ... }`".
-- `x as i64` is not an expression. `as` there is PAR0002 ("Unexpected `as`; expected valid syntax"). Convert with functions such as `i32.toI64`.
+- `x as i64` is not an expression. `as` there is PAR0002: "Silk has no `as` cast; convert with a function of the source type, such as `usize.toI32(count)`, or `usize.checkedToI32(count)` for an `Option` when the value may not fit".
+- `with` and `module` are ordinary identifiers. They used to introduce property clauses (`with Intrinsic.inline()`, `module with ...`); such a clause is now PAR0011, and the compiler names the directive to write instead, such as `@inline`. See Intrinsics.
+- Directive names after `@` (`inline`, `cold`, `nonParking`, `features`, `foreign`, `callbacks` and the rest) are not keywords either. The full list is under Directives in Intrinsics.
 
 ## Keywords in import paths
 
@@ -85,7 +85,7 @@ import silk.core.effect
 ```
 
 ```
-src/main.silk:1:13: error[PAR0004] An import whose reserved final path segment cannot form an implicit binding
+src/main.silk:1:18: error[PAR0004] An import whose reserved final path segment cannot form an implicit binding
 ```
 
 Add an alias (`import silk.core.effect as effects`) or a member list.
