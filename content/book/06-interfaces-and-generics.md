@@ -43,11 +43,11 @@ silk check
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.19s
+  load     143 modules, 1 in package         0.05s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:13:7: error[SEM0121] `main.Status: silk.text.format.Display` cannot be proved: no implementation of `silk.text.format.Display` exists for `main.Status`
-Failed scratch in 0.25s
+Failed scratch in 0.19s
 ```
 
 The error points at the `Effect.log` call. `Effect.log` walks the template at compile time, and for each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface from `silk/text/format`. The message reads as a claim the compiler had to prove, `main.Status: silk.text.format.Display`, "`Status` in module `main` implements `Display`", and the reason it could not: there is no implementation.
@@ -142,11 +142,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.12s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:9:15: error[SEM0157] Enum Priority has no order, so >= does not apply; compare backing values with `Priority.value(...)` instead
-Failed scratch in 0.18s
+Failed scratch in 0.09s
 ```
 
 SEM0157 says that enum values can't be ordered directly. Silk won't guess that the order you declared the members in is an order you meant. Maybe `High` is first for a reason. You decide by implementing the `Order` interface from `silk/core/order`.
@@ -182,11 +182,11 @@ Notice the comment: the operators work on references. `Order.compare` takes `&Se
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.15s
+  load     144 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.26s
 [x86_64-unknown-linux-gnu]
-src/main.silk:122:18: error[SEM0135] Operator == does not accept (main.TaskId, main.TaskId)
-Failed tasks in 0.21s
+src/main.silk:120:18: error[SEM0135] Operator == does not accept (main.TaskId, main.TaskId)
+Failed tasks in 0.30s
 ```
 
 SEM0135 says that `==` is backed by an interface, and no impl of it accepts two `TaskId` values. The `main.` in front is the module that declares the type. Enums get `==` for free, by value. Tuples and structs don't, because "equal" can mean different things for different data. The `Equal` interface from `silk/core/equal` lets you say what it means, and like `Order` it works on references:
@@ -215,6 +215,8 @@ Now `complete` reads the way you would say it:
     return false
   }
 ```
+
+Forget the two `&`s once the impl is in place, and the same SEM0135 ends with a hint: ``compare shared borrows, as in `&a == &b` ``.
 
 Add the imports for the two interfaces and `Ordering`:
 
@@ -281,14 +283,14 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.04s
-  check    failed: 2 modules, 1 error        0.14s
+  load     135 modules, 1 in package         0.01s
+  check    failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:1: error[SEM0083] Invalid conformance: `Filter` requires `keep`, which this implementation does not define
-Failed scratch in 0.19s
+Failed scratch in 0.08s
 ```
 
-SEM0083 is the code for an impl that doesn't fit its interface: a member is missing, extra, repeated or has the wrong signature. The message names the interface and the member. A missing member is reported at the `impl` line. A member with the wrong signature is reported at that member, and the message says what differs, such as ``member `keep` does not match the operation of `Filter`: it returns a different type``.
+SEM0083 is the code for an impl that doesn't fit its interface: a member is missing, extra, repeated or has the wrong signature. The message names the interface and the member. A missing member is reported at the `impl` line. A member with the wrong signature is reported at that member, and the message says what differs, such as ``member `keep` does not match the operation of `Filter`: it returns `i32`, but the operation returns `bool` ``.
 
 ## Generic functions
 
@@ -320,6 +322,34 @@ Why not write `filter: &Filter`? Because an interface is not a type. Silk has no
 ```
 
 `OpenTasks {}` builds an empty struct, and `&` lends it for the call.
+
+### A method for some types only
+
+A bound can also sit on an `impl` block. Then its methods exist only for the type arguments that meet it. In the scratch project:
+
+```silk
+import silk.core.ops { Add }
+import silk.core.ownership { Copy }
+
+struct Pair<T> {
+  first: T,
+  second: T,
+}
+
+// `total` exists only for a Pair whose T copies freely and adds.
+impl<T: Copy + Add<T, T>> Pair<T> {
+  fn total(self: &Self) -> T {
+    return self.first + self.second
+  }
+}
+
+pub fn main() -> i32 {
+  let estimates = Pair<i32> { first: 25, second: 17 }
+  return estimates.total()
+}
+```
+
+This runs and exits with status 42. `Add<T, T>` from `silk/core/ops` is the interface behind `+`. A `Pair<bool>` is still a fine value, but it has no `total`: calling `done.total()` on one is SEM0121 at the call, saying that `bool: silk.core.ops.Add<bool, bool>` cannot be proved. The compiler checks the bound where you call the method, not where you build the pair.
 
 ## Closures
 
@@ -386,11 +416,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.10s
+  load     135 modules, 1 in package         0.01s
+  check    failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:10: error[SEM0077] `next` changes what it captures, so calling it needs a mutable binding; declare it `let mut next`
-Failed scratch in 0.16s
+Failed scratch in 0.08s
 ```
 
 The error is at the call, `next()` on line 7. Because the body assigns to `added`, `next` is a `mut fn`: each call changes state. Silk makes that visible at the binding, the same way it does for a mutable variable. SEM0077 says the call needs more access to `next` than the binding gives. Here, you called a `mut fn` through a binding that isn't `mut`.
