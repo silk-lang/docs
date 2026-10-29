@@ -75,12 +75,12 @@ silk run
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.10s
-  check    1 module                          0.16s
-  codegen  422 functions                     0.40s
-  borrow   137 bodies                        0.01s
-  link     clang                             0.25s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.96s
+  load     143 modules, 1 in package         0.07s
+  check    1 module                          0.13s
+  codegen  689 functions                     0.14s
+  borrow   229 bodies                        0.01s
+  link     clang                             0.38s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.77s
 Hello, world!
 ```
 
@@ -171,10 +171,10 @@ silk check
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.07s
-  check    2 modules                         0.30s
-  borrow   175 bodies                        0.01s
-Finished hello in 0.38s
+  load     143 modules, 1 in package         0.01s
+  check    2 modules                         0.22s
+  borrow   253 bodies                        0.01s
+Finished hello in 0.25s
 ```
 
 While it works, `silk check` reports each phase on standard error: `load` reads your module and the standard library modules it imports, `check` type-checks them, and `borrow` checks ownership in each function body. The last line says the check finished and how long it took. Errors, when there are any, appear between the phase rows and a closing `Failed` line.
@@ -187,12 +187,12 @@ silk build
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     53 modules, 1 in package          0.07s
-  check    1 module                          0.01s
-  codegen  550 functions                     0.48s
-  borrow   186 bodies                        0.01s
-  link     clang                             0.22s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.83s
+  load     143 modules, 1 in package         0.05s
+  check    1 module                          0.18s
+  codegen  803 functions                     0.17s
+  borrow   267 bodies                        0.01s
+  link     clang                             0.41s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.84s
 ```
 
 A build adds two phases: `codegen` generates machine code for the functions the program uses, and `link` runs Clang to produce the executable. The last line names it.
@@ -207,7 +207,7 @@ The executable lands at `build/llvm/<target>/debug/<name>`. It runs on its own, 
 Hello, Grace!
 ```
 
-Next to it is `hello.symbols`, a table that maps machine-level symbol names back to Silk names.
+Next to it are `hello.symbols`, a table that maps machine-level symbol names back to Silk names, and two files the next build reads to skip work: `hello.inputs`, the list of files this build read, and `hello.units`, a folder of compiled code. A build that changes nothing reuses them.
 
 | Command | Output |
 | --- | --- |

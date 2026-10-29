@@ -173,7 +173,7 @@ fn label(payment: &Payment) -> string {
 }
 ```
 
-`match` picks the first arm whose pattern fits, and is an expression, so it can be returned. The arms must cover every variant. Delete the `Voucher` arm and `silk check` reports `error[SEM0044] Match does not cover Voucher`. `{ .. }` ignores the fields. `payment` is a reference, so you match what it points at, `payment.*`, and the leading `&` matches it in place without taking it apart. In `charge`, `Payment.Card { limit, .. }` binds the `limit` field to a name. See **Patterns and match**.
+`match` picks the first arm whose pattern fits, and is an expression, so it can be returned. The arms must cover every variant. Delete the `Voucher` arm and `silk check` reports `error[SEM0044] Match over Payment does not cover Voucher`. `{ .. }` ignores the fields. `payment` is a reference, so you match what it points at, `payment.*`, and the leading `&` matches it in place without taking it apart. In `charge`, `Payment.Card { limit, .. }` binds the `limit` field to a name. See **Patterns and match**.
 
 ## Borrows
 
@@ -194,18 +194,18 @@ silk check
 
 ```
 Checking tour (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.07s
-  check    failed: 2 modules, 1 error        0.13s
+  load     143 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.17s
 [x86_64-unknown-linux-gnu]
-src/main.silk:76:38: error[OWN0003] Moving tea requires an explicit move
-Failed tour in 0.21s
+src/main.silk:84:38: error[OWN0003] Moving tea requires an explicit move
+Failed tour in 0.23s
 ```
 
 After the move, `tea` is gone. Add `let price = tea.cents` on the next line and you get:
 
 ```
-src/main.silk:77:15: error[OWN0001] tea.cents was moved and cannot be used again
-  note: src/main.silk:76:38: related location
+src/main.silk:85:15: error[OWN0001] tea.cents was moved and cannot be used again
+  note: src/main.silk:84:38: related location
 ```
 
 The `note:` line points at the `move tea` that gave it away.
