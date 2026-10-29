@@ -94,14 +94,14 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.12s
+  load     143 modules, 1 in package         0.04s
+  check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-src/main.silk:13:15: error[SEM0135] Operator < does not accept (i32, usize)
-Failed tasks in 0.17s
+src/main.silk:15:15: error[SEM0135] Operator < does not accept (i32, usize)
+Failed tasks in 0.19s
 ```
 
-Line 13, column 15 is the `<` in `while index < estimates.length`. The message names the operator and the two operand types it got. In Silk, an operator such as `<` is backed by an interface, and each number type opts in for its own operands. SEM0135 says none of those versions accepts `(i32, usize)`. Where did the `i32` come from? Without an annotation, `index` became an `i32`. `estimates.length` is a `usize`. Silk never converts between number types on its own, so `i32 < usize` has no meaning. Put the `: usize` back.
+Line 15, column 15 is the `<` in `while index < estimates.length`. The message names the operator and the two operand types it got. In Silk, an operator such as `<` is backed by an interface, and each number type opts in for its own operands. SEM0135 says none of those versions accepts `(i32, usize)`. Where did the `i32` come from? Without an annotation, `index` became an `i32`. `estimates.length` is a `usize`. Silk never converts between number types on its own, so `i32 < usize` has no meaning. Put the `: usize` back.
 
 When you really do need to change type, you call a conversion function. They live in modules named after the source type: `silk/num/usize` has `usize.toI32`, `silk/num/i32` has `i32.toI64`, and so on. You will use one later in this chapter. Each one stops the program if the value does not fit in the new type. See **Values and primitive types** in the reference for every integer type and conversion.
 
@@ -117,14 +117,14 @@ Leave the `mut` off `open` and see what the compiler says:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     143 modules, 1 in package         0.04s
+  check    failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
-src/main.silk:15:7: error[SEM0035] Cannot assign through immutable binding open
-Failed tasks in 0.17s
+src/main.silk:17:7: error[SEM0035] Cannot assign through immutable binding open
+Failed tasks in 0.21s
 ```
 
-This one has a clear message. Line 15 is `open = open + 1`, the first place you try to change `open`. Making mutation visible at the `let` means a reader can trust that every other binding keeps its value. Put the `mut` back.
+This one has a clear message. Line 17 is `open = open + 1`, the first place you try to change `open`. Making mutation visible at the `let` means a reader can trust that every other binding keeps its value. Put the `mut` back.
 
 You may be used to writing `open += 1`. Silk has no compound assignment:
 
@@ -134,14 +134,14 @@ You may be used to writing `open += 1`. Silk has no compound assignment:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     143 modules, 1 in package         0.04s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-src/main.silk:15:12: error[PAR0010] Silk has no compound assignment; write `x = x + 1` instead of `x += 1`
+src/main.silk:17:12: error[PAR0010] Silk has no compound assignment; write `x = x + 1` instead of `x += 1`
 Failed tasks in 0.16s
 ```
 
-PAR codes come from the parser, which reads the shape of your code before any types are checked. PAR0010 is the parser recognizing a habit from another language and naming the Silk spelling. Write `open = open + 1`. The same code covers `x++`, `for ... in`, `var` and `c ? a : b`.
+PAR codes come from the parser, which reads the shape of your code before any types are checked. PAR0010 is the parser recognizing a habit from another language and naming the Silk spelling. Write `open = open + 1`. The same code covers `x++`, `for ... in`, `var`, the shift operators `<<` and `>>`, and `c ? a : b`, for which it suggests an `if` with a final `else` as the value. You meet that form below.
 
 ## Loops and conditions
 
@@ -215,7 +215,7 @@ silk check
 ```
 
 ```
-src/main.silk:2:14: error[PAR0009] An `if` used as a value needs a final `else` branch, so that every path produces a value; add `else { ... }`, or write the `if` as a statement
+src/main.silk:16:14: error[PAR0009] An `if` used as a value needs a final `else` branch, so that every path produces a value; add `else { ... }`, or write the `if` as a statement
 ```
 
 When you only want to do something in one case, write the `if` as a statement, as `percent` does. The `match` expression in chapter 3 produces a value in the same way and chooses among more than two cases.
@@ -280,11 +280,11 @@ effect fn report() -> ()
   let done = total - open
   run Effect.log(
     "{open} of {total} {noun} open, {percent}% done\n",
-    &.{ open: open, total: total, noun: noun(total), percent: percent(done, total) }
+    &.{ open: open, total: total, noun: noun(total), percent: percent(done, total) },
   )
   run Effect.log(
     "time left: {hours}h {minutes}m\n",
-    &.{ hours: minutesLeft / MINUTES_PER_HOUR, minutes: minutesLeft % MINUTES_PER_HOUR }
+    &.{ hours: minutesLeft / MINUTES_PER_HOUR, minutes: minutesLeft % MINUTES_PER_HOUR },
   )
 }
 
@@ -359,11 +359,11 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:2:18: error[SEM0135] Operator + does not accept (i32, i64)
-Failed scratch in 0.17s
+Failed scratch in 0.13s
 ```
 
 It is the same SEM0135 you saw with `index`, this time for `+`: there is no `+` for an `i32` and an `i64`. `drop` in `main` throws away the result of `total`. Silk does not let you ignore a value silently, so a call whose result you do not want is written with `drop`.
@@ -430,7 +430,7 @@ cd ../tasks
 - Integer literals are `i32` unless their context says otherwise. Array indexes and lengths are `usize`.
 - Silk never converts number types for you. Use functions like `usize.toI32` and `i32.toI64`, and annotate bindings like `let mut index: usize = 0`.
 - `let` bindings are fixed. `let mut` ones can change, with `x = x + 1`, since there is no `+=`.
-- `if` and `while` are statements. Choose a value by returning from inside an `if`, or by assigning a `let mut`.
+- `while` is a statement. An `if` is a statement too, unless it has a final `else`: then it is a value, as in `if count == 1 { "task" } else { "tasks" }`.
 - Functions write out parameter and result types and return with `return`. `const` names a fixed value.
 - Overflow, division by zero and out-of-range indexes stop the program with a trap.
 

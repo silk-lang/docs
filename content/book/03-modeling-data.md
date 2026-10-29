@@ -50,14 +50,14 @@ The compiler checks that the arms cover every member. Delete the `Priority.High`
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     143 modules, 1 in package         0.01s
+  check    failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
-src/main.silk:26:10: error[SEM0158] Match over Priority does not cover High
-Failed tasks in 0.17s
+src/main.silk:32:10: error[SEM0158] Match over Priority does not cover High
+Failed tasks in 0.23s
 ```
 
-Line 26 is the `match`. The message names the enum and the member that has no arm: `Priority.High`. This check is what makes adding a fourth priority safe later: every `match` that forgot it becomes an error. Put the arm back.
+Line 32 is the `match`. The line numbers in this chapter's errors are those of the whole file at the end of the chapter. The message names the enum and the member that has no arm: `Priority.High`. This check is what makes adding a fourth priority safe later: every `match` that forgot it becomes an error. Put the arm back.
 
 ## Tuples: a number with a meaning
 
@@ -125,11 +125,11 @@ Every field must be given. The new `TaskId` type earns its keep at once. Write `
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     143 modules, 1 in package         0.01s
+  check    failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
-src/main.silk:51:9: error[SEM0025] Field id expects main.TaskId but received i32
-Failed tasks in 0.17s
+src/main.silk:73:9: error[SEM0025] Field id expects main.TaskId but received i32
+Failed tasks in 0.16s
 ```
 
 A clear message: the field wants a `TaskId`, and you gave it a number. `main.TaskId` is the full name of the type, `TaskId` in the module `main`. Write `TaskId(1)`.
@@ -159,15 +159,14 @@ Why all this, when `priorityLabel` could just write `match priority`? Because a 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 2 errors       0.11s
+  load     143 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.21s
 [x86_64-unknown-linux-gnu]
-src/main.silk:34:16: error[OWN0003] `match status.*` moves `status.*`; write `match move status.*` to take it apart, or `match &status.*` to look at it
-src/main.silk:34:16: error[OWN0012] A non-Copy value cannot be moved out through a borrowed-view place
-Failed tasks in 0.17s
+src/main.silk:40:16: error[OWN0003] `match status.*` would move `status.*` out of a borrow, which cannot give it away; write `match &status.*` to look at it
+Failed tasks in 0.26s
 ```
 
-OWN codes come from the ownership checker. `Copy` is the name for types that copy freely, like numbers and enums, and `Status` is not one of them. So a plain `match` would use up the status itself, and Silk wants you to write `move` when you mean that. But `statusMark` only borrowed the status, and it has no business using it up, which is what OWN0012 adds: nothing can be moved out through a borrow. For a `match`, the answer is almost always `&`: look at the value where it is. Chapter 4 is all about ownership and explains the other options.
+OWN codes come from the ownership checker. `Copy` is the name for types that copy freely, like numbers and enums, and `Status` is not one of them. So a plain `match` would move the status: take it out of where it is and use it up. But `statusMark` only borrowed the status. A borrow lets you look at a value, and it cannot give the value away, so nothing can be moved out through it. The message says exactly that and names the fix: `match &status.*`, which looks at the value where it is. For a `match` on something you borrowed, the answer is always `&`. Chapter 4 is all about ownership and explains moves and borrows in full.
 
 Remember the shape `match &x.*` for references, and `match &x` for a local value you only want to read.
 
@@ -257,10 +256,10 @@ The `'static` on the title says where its text lives. Leave it off, writing `Add
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    2 modules                         0.12s
-  borrow   174 bodies                        0.01s
-Finished tasks in 0.18s
+  load     143 modules, 1 in package         0.02s
+  check    2 modules                         0.20s
+  borrow   225 bodies                        0.01s
+Finished tasks in 0.25s
 ```
 
 It passes, but the meaning changed. `string` takes one argument, the lifetime in angle brackets. A field that leaves it out gives `Command` a hidden lifetime parameter: a command now borrows its title from *some* text, and the type carries that borrow wherever it goes. Chapter 5 is all about such borrows. For now every title is a literal, so say so: write `string<'static>` again.
@@ -269,14 +268,14 @@ Guards are useful, but the compiler cannot see inside them. A guarded arm does n
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     143 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.20s
 [x86_64-unknown-linux-gnu]
-src/main.silk:47:10: error[SEM0044] Match does not cover Done
-Failed tasks in 0.17s
+src/main.silk:47:10: error[SEM0044] Match over Command does not cover Done
+Failed tasks in 0.25s
 ```
 
-SEM0044 is the union version of SEM0158: the `match` on line 47 does not cover every variant, and the message names the one that has no arm, `Done`. Put it back. This is the check that will keep the command handling honest as new commands arrive in later chapters.
+SEM0044 is the union version of SEM0158: the `match` on line 47 does not cover every variant of `Command`, and the message names the one that has no arm, `Done`. Put it back. This is the check that will keep the command handling honest as new commands arrive in later chapters.
 
 Finally, at the end of `report`, describe a command:
 
@@ -364,7 +363,7 @@ effect fn show(task: &Task) -> ()
       id: task.id.0,
       title: task.title,
       priority: priorityLabel(task.priority),
-    }
+    },
   )
 }
 

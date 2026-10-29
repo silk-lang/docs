@@ -132,7 +132,7 @@ effect fn show(task: &Task) -> ()
       id: task.id.0,
       title: task.title,
       priority: priorityLabel(task.priority),
-    }
+    },
   )
 }
 
@@ -213,7 +213,7 @@ At the call site you write the move out:
   let milk = board.add(move draft)
 ```
 
-Silk wants that `move` keyword. Try deleting it, so line 135 reads `let milk = board.add(draft)`, and check:
+Silk wants that `move` keyword. Try deleting it, so line 144 reads `let milk = board.add(draft)`, and check:
 
 ```sh
 silk check
@@ -221,14 +221,14 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.12s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-src/main.silk:135:24: error[OWN0003] Moving draft requires an explicit move
-Failed tasks in 0.17s
+src/main.silk:144:24: error[OWN0003] Moving draft requires an explicit move
+Failed tasks in 0.13s
 ```
 
-This is a rule, not a guess about what you meant. In many languages, `f(x)` might copy `x` or might give it away, and you only find out by reading `f`. In Silk, when a named value leaves its owner, the code says `move` right there. Someone reading `report` can see that `draft` is gone after line 135 without opening `add`.
+This is a rule, not a guess about what you meant. In many languages, `f(x)` might copy `x` or might give it away, and you only find out by reading `f`. In Silk, when a named value leaves its owner, the code says `move` right there. Someone reading `report` can see that `draft` is gone after line 144 without opening `add`.
 
 Notice the next two calls have no `move`:
 
@@ -247,17 +247,17 @@ Put the `move` back. Now try using the draft after it has moved. Add a log line 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.12s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
-src/main.silk:136:48: error[OWN0001] draft.title was moved and cannot be used again
-  note: src/main.silk:135:24: related location
-Failed tasks in 0.17s
+src/main.silk:145:48: error[OWN0001] draft.title was moved and cannot be used again
+  note: src/main.silk:144:24: related location
+Failed tasks in 0.14s
 ```
 
-The indented `note:` line is a related location: here, the `move draft` on line 135 that gave the draft away.
+The indented `note:` line is a related location: here, the `move draft` on line 144 that gave the draft away.
 
-The compiler tracks which bindings have been moved. The message names `draft.title`, the exact thing you tried to read: the whole draft moved on line 135, and its title went with it. After that line, `draft` is empty as far as `report` is concerned. Its title now lives in the board, and the board can change it or drop it whenever it likes. Reading the old binding would mean reading something you no longer own. Remove the log line.
+The compiler tracks which bindings have been moved. The message names `draft.title`, the exact thing you tried to read: the whole draft moved on line 144, and its title went with it. After that line, `draft` is empty as far as `report` is concerned. Its title now lives in the board, and the board can change it or drop it whenever it likes. Reading the old binding would mean reading something you no longer own. Remove the log line.
 
 If you want the title after adding, ask the board for it, or keep what you need before the move.
 
@@ -277,12 +277,12 @@ Structs, unions and tuples are not `Copy` unless you say so. Delete the `impl Co
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 2 errors       0.12s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 2 errors       0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:65:41: error[OWN0003] Moving id requires an explicit move
-src/main.silk:137:21: error[OWN0003] Moving milk requires an explicit move
-Failed tasks in 0.17s
+src/main.silk:146:21: error[OWN0003] Moving milk requires an explicit move
+Failed tasks in 0.13s
 ```
 
 The line numbers are two lower than before because you removed two lines. Without `Copy`, `TaskId` moves like any struct. The first use of `id` in the task literal would move it, and `return id` would then be a use after move. The same goes for `milk`, which is needed by both `complete` and the log line.
@@ -326,14 +326,14 @@ An exclusive borrow needs something that is allowed to change. Change the first 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 4 errors       0.12s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 4 errors       0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:144:20: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
 src/main.silk:145:14: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
 src/main.silk:146:14: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
 src/main.silk:148:12: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
-Failed tasks in 0.17s
+Failed tasks in 0.13s
 ```
 
 Each line points at a call to `add` or `complete`, the methods that take `&mut self`. The message says what went wrong: an exclusive borrow needs a binding declared `mut`. You declared `board` immutable, and then asked to lend it out for writing four times. Put the `mut` back.
@@ -342,11 +342,11 @@ The same rule applies inside methods. Change `complete` to take `self: &Self`, a
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.12s
+  load     143 modules, 1 in package         0.01s
+  check    failed: 2 modules, 1 error        0.20s
 [x86_64-unknown-linux-gnu]
 src/main.silk:76:18: error[SEM0058] `self` is a shared reference, so it cannot lend `&mut` access; take a `&mut` reference where it comes from to change what it points at
-Failed tasks in 0.17s
+Failed tasks in 0.24s
 ```
 
 A shared reference is a promise to every other reader that the value won't change under them. You can't turn it into a writable one halfway through. Change it back to `&mut Self`.
@@ -369,14 +369,14 @@ To see it, keep a reference to the first task while adding more. Change the top 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
+  load     143 modules, 1 in package         0.02s
   check    failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:146:8: error[OWN0010] A mutable borrow of `board` conflicts with an earlier shared borrow of it that is still in use; use that borrow for the last time before this one
   note: src/main.silk:145:15: the earlier borrow starts here
 src/main.silk:147:8: error[OWN0010] A mutable borrow of `board` conflicts with an earlier shared borrow of it that is still in use; use that borrow for the last time before this one
   note: src/main.silk:145:15: the earlier borrow starts here
-Failed tasks in 0.17s
+Failed tasks in 0.15s
 ```
 
 Both notes point at `&board.tasks[0]` on line 145, where the shared loan began.
