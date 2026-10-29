@@ -12,6 +12,15 @@ import * as Search from '../search'
 
 // SIDEBAR
 
+// Module paths such as silk.http.connection_pool_native are wider than the
+// sidebar, so a title may break after each dot, and anywhere as a last resort.
+const sidebarTitle = (title: string, h: HtmlBuilder<Message>) =>
+  title
+    .split('.')
+    .flatMap((segment, index) =>
+      index === 0 ? [segment] : ['.', h.wbr([]), segment],
+    )
+
 const sidebarItem = (
   page: Catalog.DocPage,
   maybeCurrent: Option.Option<Catalog.DocPage>,
@@ -28,11 +37,11 @@ const sidebarItem = (
           ...(isCurrent ? [h.AriaCurrent('page')] : []),
           h.Class(
             isCurrent
-              ? 'block border-l-2 border-ink py-2 pr-3 pl-[11px] text-sm leading-tight font-bold text-ink'
-              : 'block border-l border-rule py-2 pr-3 pl-3 text-sm leading-tight text-muted hover:border-ink hover:text-ink',
+              ? 'block border-l-2 border-ink py-2 pr-3 pl-[11px] text-sm leading-tight font-bold wrap-anywhere text-ink'
+              : 'block border-l border-rule py-2 pr-3 pl-3 text-sm leading-tight wrap-anywhere text-muted hover:border-ink hover:text-ink',
           ),
         ],
-        [page.title],
+        sidebarTitle(page.title, h),
       ),
     ],
   )
