@@ -69,7 +69,11 @@ A target alone does not say how a program starts. The runtime module does that, 
 - `standalone` (`silk/platform/wasm/start`) exports `main` from the WebAssembly module. The host calls it with no arguments and receives an `i32`: an `i32` result passes through, a unit result is 0, and a typed failure is 1. It gives the program no host services.
 - `wasi` (`silk/platform/wasi/start`) exports `_start`, the WASI command entry. `main` may return `i32` or `()`, or be an `effect fn` with either result; it may require `&mut HostInput`, which reads the WASI arguments and environment. A failure exits with status 1. Other services need providers you create in `main`, as on a hosted target.
 
-The `bare` profile selects Linux with `libc = "none"`, `web` selects bare wasm32, and `wasi` selects WASI Preview 1. **Targets and profiles** in the Projects section lists every profile key. Without the composition, `silk check --profile bare` stops with `silk: the build selects no single runtime (ARTIFACT-001)`. Once a composition is present it replaces the catalog, so it must list `wasi` too. If it does not, `silk check --profile wasi` passes but `silk build --profile wasi` fails inside `silk/platform/native/start.silk` with an unrelated-looking SEM0004.
+The `bare` profile selects Linux with `libc = "none"`, `web` selects bare wasm32, and `wasi` selects WASI Preview 1. **Targets and profiles** in the Projects section lists every profile key. Without the composition, `silk check --profile bare` stops with `silk: the build selects no single runtime (ARTIFACT-001)`. Once a composition is present it replaces the catalog, so it must list `wasi` too. If it does not, `silk check --profile wasi` and `silk build --profile wasi` stop before compiling anything. A profile that names the missing `wasi` runtime gets `silk: the build selects no single runtime (ARTIFACT-001)`. A profile with no `runtime` line gets the default, `hosted`, which the catalog refuses for this target:
+
+```
+silk: the runtime module silk/platform/native/start does not support the target wasm32-wasip1; list silk/platform/wasi/start in [unstable.composition].runtimes and select it for this profile with `runtime = { kind = "named", name = ... }` (ARTIFACT-001)
+```
 
 ## The program
 

@@ -284,7 +284,7 @@ src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement
 Failed sync in 0.15s
 ```
 
-A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/platform/linux/start` case.
+A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A std lib runtime selected for a target its catalog entry does not list, such as `silk/platform/native/start` for `wasm32-wasip1`, is refused before anything compiles, and the message names the runtime to use: ``silk: the runtime module silk/platform/native/start does not support the target wasm32-wasip1; list silk/platform/wasi/start in [unstable.composition].runtimes and select it for this profile with `runtime = { kind = "named", name = ... }` (ARTIFACT-001)``. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/platform/linux/start` case.
 
 ## Building without a runtime
 

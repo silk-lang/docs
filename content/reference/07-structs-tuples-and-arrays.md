@@ -92,7 +92,7 @@ UnitType       = '(' ')'
 - With a `count` above 1, the value's type must be `Copy` (SEM0121). Against an annotation, `count` must match the length (SEM0031).
 - `[]` needs an expected array type: `let none: [u8; 0] = []`. Otherwise SEM0029.
 - Arrays nest: `[[1, 2], [3, 4]]`, read with `grid[1][0]`.
-- `.length` is the element count as `usize`. There is no `.len`: `a.len` is SEM0027, "Array<i32, 3> has no field `len`; its element count is `.length`", and the same for a slice.
+- `.length` is the element count as `usize`. There is no `.len`: `a.len` is SEM0027, "[i32; 3] has no field `len`; its element count is `.length`", and the same for a slice.
 - An array of `Copy` elements is copied on assignment. An array with non-`Copy` elements needs `move`.
 
 ## Indexing
@@ -256,4 +256,4 @@ Values and primitive types · Bindings and statements · Enums and unions · Pat
 
 ## Open questions
 
-- The catalog defines SEM0059 (array passed as a slice without a borrow) and SEM0175 (named-field construction of a positional aggregate), but the compiler has no producer for either. It reports SEM0012 ("Expected &[i32] but received Array<i32, 3>") and SEM0018 ("A type position whose name resolves to something other than a type") instead.
+- The catalog defines SEM0059 (array passed as a slice without a borrow) and SEM0175 (named-field construction of a positional aggregate), but the compiler has no producer for either. It reports SEM0012 ("Expected &[i32] but received [i32; 3]") and SEM0018 ("A type position whose name resolves to something other than a type") instead.

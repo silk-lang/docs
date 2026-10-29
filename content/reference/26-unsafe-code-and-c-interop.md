@@ -141,7 +141,7 @@ A C function-pointer parameter, or a field of one inside a by-value `extern "C" 
 
 On `wasm32` targets, `as "module#name"` imports a function from a host module: `unsafe extern "C" fn hostAdd(a: i32, b: i32) -> i32 as "env#host_add"` imports `host_add` from `env`. `"module#"` with nothing after `#` uses the function's own Silk name. Without `#`, the text is a plain symbol name, as on native targets. The WASI modules of the std lib import this way, for example `as "wasi:io/poll@0.2.12#poll"`.
 
-- A `#` import is for WebAssembly only. `silk check` accepts it for any target, but `silk build` for a native target stops with "unsupported[foreign-contract] not supported by the native compiler yet" (exit status 2). Put such declarations under `static if Target.arch() == Arch.Wasm32` when the package also builds natively.
+- A `#` import is for WebAssembly only. For any other target it is SEM0193 at the declaration, in both `silk check` and `silk build`, even when nothing calls it. The example above prints "Foreign function `env#host_add` is unavailable for x86_64-unknown-linux-gnu; guard the declaration with `static if Target.objectFormat() == ObjectFormat.Wasm`". Put such declarations under that `static if`, or under `static if Target.arch() == Arch.Wasm32`, when the package also builds natively.
 
 ## Statics
 
@@ -527,7 +527,7 @@ main returned 0 after 1 tick
 | SEM0190 | Native symbol is not an ASCII identifier |
 | SEM0191 | Native symbol is reserved by the compiler or its runtime |
 | SEM0192 | Claims of one symbol disagree: two exports, a function and a static, or different C types or variadic shape |
-| SEM0193 | Foreign call unavailable on the selected target |
+| SEM0193 | WebAssembly import, `as "module#name"`, declared for a target that is not WebAssembly |
 | SEM0201 | `export "C"` function body may suspend |
 | SEM0205 | C-layout record declares type parameters |
 | SEM0206 | C-layout record field outside the C object subset |
@@ -546,6 +546,6 @@ Values and primitive types (SIMD vectors and masks) · Targets and profiles · B
 
 The rules above come from compiler source and the diagnostic catalog. Several are not enforced as written:
 
-- SEM0207, SEM0193, SEM0208 have no producer in the compiler.
+- SEM0207 and SEM0208 have no producer in the compiler.
 - A direct Silk call to an `export "C"` function needs `unsafe`, like a foreign call, although the body is Silk code the compiler checked.
 - `addrspace(n)` other than `0` may be meant for other targets.

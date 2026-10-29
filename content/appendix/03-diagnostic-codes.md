@@ -16,7 +16,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | PAR | Parsing | PAR0001-PAR0011 |
 | MOD | Module and package resolution | MOD0001-MOD0006 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0249 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0250 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
 
@@ -1704,7 +1704,7 @@ pub fn main() -> i32 {
 src/main.silk:4:12: error[SEM0027] main.Point has no field z
 ```
 
-Two cases get a message that says more. `.len` on an array or slice, such as `values.len` with `values: &[i32]`, prints ``&[i32] has no field `len`; its element count is `.length` ``; an array prints its type as `Array<i32, 3>`. A tuple element past the end, `p.2` for `tuple Pair(i32, i32)`, prints ``main.Pair has no element `.2`; it has 2 elements, `.0` and `.1` ``.
+Two cases get a message that says more. `.len` on an array or slice, such as `values.len` with `values: &[i32]`, prints ``&[i32] has no field `len`; its element count is `.length` ``; an array prints its type as `[i32; 3]`. A tuple element past the end, `p.2` for `tuple Pair(i32, i32)`, prints ``main.Pair has no element `.2`; it has 2 elements, `.0` and `.1` ``.
 
 Fix: Name a declared field. See Enums and unions, Structs, tuples and arrays.
 
@@ -3472,9 +3472,9 @@ src/main.silk:6:14: error[SEM0139] `cleanup` must not park, because this call ne
 src/main.silk:5:8: error[SEM0225] Entry point `main` may park, but the selected runtime starts it without a scheduler, so it must not park
 ```
 
-A service operation written `@nonParking` makes the same demand of every provider. A call to `Port.close()`, declared as `@nonParking effect fn close() -> () ? &mut Port`, from a provider whose `close` calls `Fiber.yieldNow()`, prints ``error[SEM0139] `close` must not park, because this call needs an `Intrinsic.NonParking` value, but running it can park; move work that can suspend, such as `Effect.sleep`, out of it``, at the call. `silk check` accepts both programs; the error comes from `silk build`.
+A service operation written `@nonParking` makes the same demand of every provider. A call to `Port.close()`, declared as `@nonParking effect fn close() -> () ? &mut Port`, from a provider whose `close` calls `Fiber.yieldNow()`, prints ``error[SEM0139] `close` must not park, because this call needs an `Intrinsic.NonParking` value, but running it can park; move work that can suspend, such as `Effect.sleep`, out of it``, at the call. A function written `@nonParking` makes the same demand at each call that enters it: with `@nonParking effect fn settle() -> () { run Fiber.yieldNow() }`, the call `run settle()` prints ``error[SEM0139] `settle` must not park, because this call needs an `Intrinsic.NonParking` value, but running it can park; move work that can suspend, such as `Effect.sleep`, out of it`` at `settle`. `silk check` accepts all three programs; the error comes from `silk build`.
 
-Fix: Give `Effect.ensuringNonParking` a cleanup that never parks, and a `@nonParking` operation a provider that never parks. See Suspension and cancellation.
+Fix: Give `Effect.ensuringNonParking` a cleanup that never parks, a `@nonParking` operation a provider that never parks, and a `@nonParking` function a body that never parks. See Suspension and cancellation.
 
 ### SEM0143
 
@@ -4217,7 +4217,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and directives (SEM0187-SEM0249)
+## SEM: C interop, impls, lifetimes and directives (SEM0187-SEM0250)
 
 ### SEM0185
 
@@ -4408,6 +4408,25 @@ src/main.silk:2:50: error[SEM0192] Two reachable declarations of one symbol with
 Message template, not filled by this compiler: `Foreign symbol {symbol} is declared with a conflicting C signature or behavioral contract`.
 
 Fix: Declare one C signature per symbol. See Unsafe code and C interop.
+
+### SEM0193
+
+A WebAssembly import, `as "module#name"`, declared for a target that is not WebAssembly.
+
+```silk
+unsafe extern "C" fn tick() -> i32 as "env#tick"
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:1:1: error[SEM0193] Foreign function `env#tick` is unavailable for x86_64-unknown-linux-gnu; guard the declaration with `static if Target.objectFormat() == ObjectFormat.Wasm`
+```
+
+The column is the start of the declaration. `silk check` and `silk build` report it whether or not the function is called. The same program checks for `--target wasm32-unknown-unknown`.
+
+Fix: Declare the import inside `static if Target.objectFormat() == ObjectFormat.Wasm { ... }`, with `Target` and `ObjectFormat` imported from `silk.core.target`. See Unsafe code and C interop.
 
 ### SEM0194
 
@@ -5005,9 +5024,9 @@ pub fn main() -> i32 { return plain() }
 src/main.silk:1:1: error[SEM0235] This directive, or one of its arguments, is not one the language defines
 ```
 
-The column is the `@`. A known directive with an argument it does not take is the same error: `@inline(1)`, `@nonParking(strict: true)` or `@foreign(bogus: 1)`. A directive argument must be a literal; a name such as `@features(NAME)` is PAR0002 at the name, and then SEM0235.
+The column is the `@`. A known directive with an argument it does not take is the same error: `@inline(1)`, `@nonParking(strict: true)` or `@foreign(bogus: 1)`. A directive argument must be a literal; a name such as `@inline(N)` is PAR0002 at the name, and the directive is not reported again.
 
-The directives are `@inline`, `@inlineAlways`, `@inlineNever`, `@cold`, `@nonParking`, `@features("...", ...)`, `@foreign(memory:, locality:, noCapture:)`, `@callbacks("...", ...)`, `@threadCallbacks("...", ...)`, `@deferredCallbacks("...", ...)`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn`. The same directive written twice on one function prints `unsupported: this construct is not supported by the native compiler yet` and exits with status 2.
+The directives are `@inline`, `@inlineAlways`, `@inlineNever`, `@cold`, `@nonParking`, `@features("...", ...)`, `@foreign(memory:, locality:, noCapture:)`, `@callbacks("...", ...)`, `@threadCallbacks("...", ...)`, `@deferredCallbacks("...", ...)`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn`. The same directive written twice on one function is SEM0250.
 
 Fix: Use a directive and arguments from that list. See Directives in Intrinsics, and Unsafe code and C interop.
 
@@ -5024,12 +5043,12 @@ pub fn main() -> i32 { return naked() }
 `silk check` prints:
 
 ```text
-src/main.silk:1:1: error[SEM0236] This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions
+src/main.silk:1:1: error[SEM0236] This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@deferredCallbacks`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions
 ```
 
-The column is the directive. The same code covers `@features` on an `extern "C"` function, `@inline` on a `static fn`, any directive on a struct or other declaration that is not a function, and any directive but `@nonParking` on a service or interface operation. An `@` before an `import` is PAR0002 at the `@`, and then this error.
+The column is the directive. The same code covers `@features` on an `extern "C"` function, `@inline` on a `static fn`, any directive on a struct or other declaration that is not a function, and any directive but `@nonParking` on a service or interface operation. An `@` before an `import` or a `static if` is PAR0002 at the `@` alone.
 
-Fix: Put `@foreign`, `@callbacks`, `@threadCallbacks`, `@naked` and `@noReturn` only on `extern "C"` or `export "C"` functions, and `@inline`, `@cold` and `@features` on runtime functions with a Silk body. See Directives in Intrinsics, and Unsafe code and C interop.
+Fix: Put `@foreign`, the callback directives, `@naked` and `@noReturn` only on `extern "C"` or `export "C"` functions, and `@inline`, `@cold` and `@features` on runtime functions with a Silk body. See Directives in Intrinsics, and Unsafe code and C interop.
 
 ### SEM0237
 
@@ -5153,10 +5172,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:16: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `features`
+src/main.silk:3:16: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `@features(...)` directive
 ```
-
-The function's `features` in the message is its `@features` directive.
 
 The default x86-64 profile has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
 
@@ -5385,6 +5402,31 @@ The column is the call. An inherent method called with method syntax prints ``A 
 
 Fix: Make the call from a runtime function. See Static evaluation, Interfaces and impls.
 
+### SEM0250
+
+Two directives on one declaration that cannot be written together: the same directive twice, or two of the inline hints.
+
+```silk
+@inline
+@inline
+fn twice() -> i32 { return 1 }
+@cold
+@inlineNever
+fn giveUp() -> i32 { return -1 }
+pub fn main() -> i32 { return twice() + giveUp() }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:2:1: error[SEM0250] `@inline` is written twice on this declaration; keep one
+src/main.silk:5:1: error[SEM0250] `@inlineNever` cannot be written with `@cold`: a function takes at most one of `@inline`, `@inlineAlways`, `@inlineNever` and `@cold`
+```
+
+The column is the second directive of the pair. Any repeated directive is reported, such as two `@features(...)` lines, or `@nonParking` twice on a service operation. A callback directive repeated on an `extern "C"` function is SEM0187. A repeated `@foreign` there is not reported by `silk check`; see the open questions in Intrinsics.
+
+Fix: Keep one directive of each kind, and at most one of `@inline`, `@inlineAlways`, `@inlineNever` and `@cold`. See Directives in Intrinsics.
+
 ## Codes this compiler does not report
 
 These SEM codes are in the catalog, but no path in this compiler reports them, or the case they describe is refused or accepted another way. The last column says what happened when the case was tried; "Not tried" means no reachable program was found.
@@ -5421,7 +5463,6 @@ These SEM codes are in the catalog, but no path in this compiler reports them, o
 | SEM0174 | Attempting to join distinct anonymous aggregate occurrences. | `Separate anonymous aggregate occurrences do not acquire a common type` |  | Not tried. |
 | SEM0175 | Attempting named-field construction of a positional aggregate. | `{type} is positional and cannot be constructed with named fields` | `Pair { first: 1, second: 2 }` for `tuple Pair(i32, i32)` | SEM0018. |
 | SEM0182 | Exhausting the static evaluator's residual-growth budget. | `Static evaluation exceeded its residual-growth limit of {limit} nodes for {target}` |  | Not tried. |
-| SEM0193 | One reachable foreign call unavailable on the requested execution surface. | `Foreign function {symbol} is unavailable for {surface}` |  | Not tried. |
 | SEM0197 | A selective import naming an inherent member as if it were a root declaration. | `{module} has no root declaration {member}; it is a member of {owner}, so import {owner} and write {owner}.{member}` | `import shapes { area }` for an inherent member | SEM0014. |
 | SEM0203 | Naming a conformance-supplied receiver operation as a value instead of calling it. | `{member} is supplied to {receiver} by an interface and must be called; it has no value form` | `let f = p.name` for an interface method | SEM0027. |
 | SEM0207 | A value that cannot become an exact noncapturing C callback address. | `{name} cannot be used as a C callback: {detail}` |  | Not tried. |

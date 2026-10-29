@@ -336,22 +336,50 @@ tasks file /tasks.txt, reminders wait 300ms
 
 The profile only changed the file name, so the demo binary still says `debug build`: a profile turns on optimization only when it says so, with a line such as `optimization = "speed"`.
 
-There is a third value, `optimization = "size"`, which optimizes for a small program instead of a fast one. It suits a WebAssembly module or a tool you ship to many machines. `Compilation.optimization()` does not know it yet, though: its `Optimization` enum has only `None` and `Speed`. With a `[profiles.small]` that sets `optimization = "size"`, `buildKind` stops the build:
+There is a third value, `optimization = "size"`, which optimizes for a small program instead of a fast one. It suits a WebAssembly module or a tool you ship to many machines. `Compilation.optimization()` reports it as `Optimization.Size`. Add a profile for it:
+
+```toml
+[profiles.small]
+optimization = "size"
+debug = false
+```
+
+`buildKind` tests only for `Speed`, so a size build takes the `else` arm and calls itself a debug build:
 
 ```sh
 silk build --profile small
+./build/llvm/x86_64-unknown-linux-gnu/small/tasks version
 ```
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, small)
-  load     180 modules, 1 in package         0.03s
-  check    failed: 1 module, 1 error         1.46s
-[x86_64-unknown-linux-gnu]
-src/main.silk:608:13: error[SEM0177] Unknown Optimization request
-Failed tasks in 1.50s
+  load     180 modules, 1 in package         0.08s
+  check    1 module                          1.31s
+  codegen  4,645 functions                   1.16s
+  borrow   918 bodies                        0.05s
+  link     clang                             5.30s
+Finished build/llvm/x86_64-unknown-linux-gnu/small/tasks in 7.89s
+tasks 0.11 (linux, debug build)
+tasks file /tasks.txt, reminders wait 300ms
 ```
 
-Until `Optimization` gains a member for it, a program that asks `Compilation.optimization()` can only be built for speed or for debugging.
+To name the third kind, nest a second `static if` inside the `else` block:
+
+```silk
+fn buildKind() -> string<'static> {
+  static if Compilation.optimization() == Optimization.Speed {
+    return "release"
+  } else {
+    static if Compilation.optimization() == Optimization.Size {
+      return "size"
+    } else {
+      return "debug"
+    }
+  }
+}
+```
+
+The `small` binary now prints `tasks 0.11 (linux, size build)`, and the default build still prints `debug build`.
 
 See **Package parameters** in the reference for every value kind, precedence and `--profile-input`.
 

@@ -274,7 +274,7 @@ A profile's `cpu` features apply to the whole program, and the program needs a m
 - Every name in the `cpu.features` table above can be tested, `sha` and `aes` included. The examples in Intrinsics include one that runs `sha256rnds2` only where `detect()` reports `sha`.
 - Detection is not cached. Call `detect()` once at start and keep the value.
 - The directive `@features("avx2")`, on the line before an `unsafe fn`, compiles that function with the listed features, the features they imply and the profile's own. Each call is `unsafe`: the caller has checked the machine. The rules are in Intrinsics, under Functions compiled for CPU features.
-- A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `features` list. The `silk/simd/x86` and `silk/simd/aarch64` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
+- A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `@features` list. The `silk/simd/x86` and `silk/simd/aarch64` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
 
 The same portable loop, compiled twice. In a release build the optimizer inlines `total` into `totalAvx2` and vectorizes it with 32-byte AVX2 registers; the rest of the program stays at the default x86-64 level:
 

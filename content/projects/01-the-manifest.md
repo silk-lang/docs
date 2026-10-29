@@ -259,7 +259,7 @@ Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profile
 
 | Problem | Message after `Invalid Silk project manifest <path>:LINE:` |
 | --- | --- |
-| A key profiles do not have | `profiles.fast.optimisation is not a supported field` |
+| A key profiles do not have | `profiles.fast.optimisation is not a supported field; did you mean optimization?`. The suggestion names the key alone, and only when one is close |
 | `codeModel` or `maxMemory` | `InvalidInput: profiles.fast.codeModel is an earlier spelling; write code-model` |
 | A key `cpu` does not have | `profiles.fast.cpu.modle is not a supported field` |
 | A key `entry` or `runtime` does not have | `profiles.fast.entry.bogus is not a supported field`. `kind = "default"` and `"none"` take only `kind`; `"named"` takes `kind` and `name`. |

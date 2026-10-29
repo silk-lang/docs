@@ -47,7 +47,7 @@ InterfaceType  = Path TypeArguments?
 
 - An impl must be in one of these modules: the one that declares the interface, the one that declares the provider type, or the one that declares the interface application's first type argument. Otherwise it is SEM0083, naming the modules that may hold it.
 - The first-type-argument rule lets the module that declares `Vector2` also declare `impl Multiply<Vector2<f64>, Vector2<f64>> for f64`, so `2.0 * vector` works. Without it, scalar types such as `i32` and `f64` could only get user conformances in the interface's module.
-- For the std lib operator interfaces the message names their sealed home, as in ``Invalid conformance: `silk.core.ops.Add<meters.Meters, meters.Meters>` is declared in `intrinsic.operators` and `meters.Meters` is declared in `meters`, so this impl must be in `intrinsic.operators` or `meters` ``.
+- The std lib operator interfaces live in a sealed module that no package can write to, so the message names only the modules you can use, as in ``Invalid conformance: `silk.core.ops.Add<meters.Meters, meters.Meters>` is a standard operator interface and `meters.Meters` is declared in `meters`, so this impl must be in `meters` ``. For `impl Multiply<Meters, Meters> for i32` outside `meters` it says ``... is a standard operator interface and `i32` is a builtin type, so this impl must be in `meters` ``, the module of the first type argument.
 - Conformances are found without importing the impl. Importing the interface and the type is enough.
 
 ## Coherence
