@@ -17,13 +17,14 @@ Before writing code, it helps to know the limits, because they shape what you ca
 
 - **Client side only.** There is a TLS client and no TLS server. A Silk program can connect to an HTTPS server but cannot accept TLS connections itself. To serve HTTPS today, put a TLS-terminating proxy in front of a plain HTTP server built with `silk/http/server`.
 - **TLS 1.3 only.** The client offers TLS 1.3 and nothing older. It supports the three TLS 1.3 cipher suites (`TLS_AES_128_GCM_SHA256`, `TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`) and two key-exchange groups (X25519 and P-256). A server that only speaks TLS 1.2 fails the handshake.
+- **Three server signature schemes.** The server must prove its key with ECDSA P-256 and SHA-256, ECDSA P-384 and SHA-384, or RSA-PSS with SHA-256. So a server certificate's key can be EC P-256, EC P-384 or RSA; a server with only an Ed25519 key fails the handshake.
 - **Names come from subjectAltName only.** A certificate must list the host in its subjectAltName extension, as a DNS name or an IP address. The common name (CN) is never consulted, which matches what browsers do.
 - **No revocation checks.** Path validation does not consult CRLs or OCSP. A validated path, and the connection's authentication evidence, report `RevocationStatus.NotChecked`.
 - **Trust is explicit.** Nothing reads a trust store behind your back. You load a snapshot of trusted roots and hand it to the connection.
 
 ## Making a test PKI
 
-To see validation fail in each interesting way, you need certificates you control. These `openssl` commands make a private CA and four certificates signed by it. All keys are EC P-256.
+To see validation fail in each interesting way, you need certificates you control. These `openssl` commands make a private CA and four certificates signed by it. All keys are EC P-256. A leaf with an EC P-384 key (`ec_paramgen_curve:P-384`) or an RSA key (`-newkey rsa:2048`), signed the same way, connects just as well.
 
 ```sh
 mkdir -p ~/pki && cd ~/pki
@@ -199,7 +200,7 @@ effect fn identityOf<'a>(host: &'a Host) -> ReferenceIdentity<'a> ! BadHost {
 }
 ```
 
-`Host.parse` (from `silk/net/address`) already tells a domain name from an IP literal, so each case maps straight onto an `OriginHost`. A domain must be ASCII: an internationalized name has to be converted to its `xn--` form first, and a trailing dot is rejected.
+`Host.parseBytes` (from `silk/net/address`) already tells a domain name from an IP literal, so each case maps straight onto an `OriginHost`. A domain must be ASCII: an internationalized name has to be converted to its `xn--` form first, and a trailing dot is rejected.
 
 The **presented identities** are the names in the certificate's subjectAltName extension. `CertificateSan.decode` (from `silk/tls/certificate_identities`) writes them into storage you provide, here room for 16, and `HttpsIdentity.verify` compares the reference against them:
 
@@ -231,7 +232,7 @@ A TLS connection needs four things: a connected transport, a `ClientConfig`, a t
   run Format.format("trust          {count} anchors from {source}\n", &.{ count: trust.anchors().length, source: text(Bytes.asSlice(&choice)) })
 
   // The name the certificate must carry is the host as typed, not the address it resolves to.
-  let host = match move Host.parse(Bytes.asSlice(&name)) {
+  let host = match move Host.parseBytes(Bytes.asSlice(&name)) {
     Result.Success { value } => move value
     Result.Failure { .. } => { fail BadHost {} }
   }
@@ -250,7 +251,7 @@ The transport is an ordinary TCP connection, made the way the Networking guide m
 effect fn connect(name: &[u8], port: u16) -> Connection
 ! BadHost | ResolverError | NativeSocketError | OutOfMemoryError
 ? &mut Resolver | &mut MonotonicClock | &mut Allocator {
-  let host = match move Host.parse(name) {
+  let host = match move Host.parseBytes(name) {
     Result.Success { value } => move value
     Result.Failure { .. } => { fail BadHost {} }
   }
@@ -379,11 +380,11 @@ key exchange   X25519
 trust anchor   #0 in the snapshot
 intermediates  0
 matched name   SAN #0
-leaf expires   2029-01-22
+leaf expires   2029-01-31
 response       HTTP/1.1 200 OK
 ```
 
-The leaf's first subjectAltName entry, `IP:127.0.0.1`, matched. `localhost` would not work here, because the Silk resolver does not resolve it; use `127.0.0.1`.
+The leaf's first subjectAltName entry, `IP:127.0.0.1`, matched. With `localhost` as the host, the name check uses the second entry, `DNS:localhost`, and reports `matched name   SAN #1`.
 
 The server on 8445 presents the leaf and the intermediate. The path now runs through one intermediate to the same root:
 
@@ -394,7 +395,7 @@ key exchange   X25519
 trust anchor   #0 in the snapshot
 intermediates  1
 matched name   SAN #0
-leaf expires   2029-01-22
+leaf expires   2029-01-31
 response       HTTP/1.1 200 OK
 ```
 
@@ -431,7 +432,7 @@ key exchange   X25519
 trust anchor   #118 in the snapshot
 intermediates  1
 matched name   SAN #0
-leaf expires   2026-11-19
+leaf expires   2026-11-28
 response       HTTP/1.1 200 OK
 ```
 
@@ -444,7 +445,7 @@ Now the offline checks. A good chain:
 ```
 
 ```
-chain          1 certificates, leaf expires 2029-01-22
+chain          1 certificates, leaf expires 2029-01-31
 path           valid, to trust anchor #0 through 0 intermediates
 name           127.0.0.1 matches SAN #0
 ```
@@ -452,7 +453,7 @@ name           127.0.0.1 matches SAN #0
 The chain with an intermediate:
 
 ```
-chain          2 certificates, leaf expires 2029-01-22
+chain          2 certificates, leaf expires 2029-01-31
 path           valid, to trust anchor #0 through 1 intermediates
 name           127.0.0.1 matches SAN #0
 ```
@@ -468,7 +469,7 @@ name           127.0.0.1 matches SAN #0
 The certificate for the wrong name. Its path is fine:
 
 ```
-chain          1 certificates, leaf expires 2029-01-22
+chain          1 certificates, leaf expires 2029-01-31
 path           valid, to trust anchor #0 through 0 intermediates
 name           127.0.0.1 is not a name in the certificate
 ```
@@ -476,7 +477,7 @@ name           127.0.0.1 is not a name in the certificate
 And `good.pem` against the system roots:
 
 ```
-chain          1 certificates, leaf expires 2029-01-22
+chain          1 certificates, leaf expires 2029-01-31
 path           rejected: no trusted issuer
 name           127.0.0.1 matches SAN #0
 ```
@@ -490,7 +491,7 @@ $ tlsget 127.0.0.1 8443 ca.pem
 tlsget: a file path is not absolute, or the file could not be read
 $ tlsget 127.0.0.1 8443 /nope/ca.pem
 tlsget: could not load the trust file
-$ tlsget localhost 8443 /home/you/pki/ca.pem
+$ tlsget no-such-host.invalid 8443 /home/you/pki/ca.pem
 trust          1 anchors from /home/you/pki/ca.pem
 tlsget: the host could not be resolved
 ```
