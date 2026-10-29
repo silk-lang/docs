@@ -12,7 +12,7 @@ the type.
 
 Operands move into the member by value. `Right` and `Output` let one type combine with another
 type, as in `Vector * f64`. Concrete scalar operands always use the built-in operators. The
-comparison operators use `silk.equal.Equal` and `silk.order.Order`.
+comparison operators use `silk.core.equal.Equal` and `silk.core.order.Order`.
 
 ## Gotchas
 If two conformances accept the same operand types, the operator is ambiguous and the compiler
@@ -21,7 +21,7 @@ reports an error. The compiler does not use the expected result type to select a
 ## Examples
 ### Give a type the `+` operator
 ```silk
-import silk.ops { Add }
+import silk.core.ops { Add }
 
 struct Meters {
   value: i32,
@@ -44,7 +44,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `Add` with `import silk.ops { Add }`.
+Import as `Add` with `import silk.core.ops { Add }`.
 
 Public declarations: 11.
 

@@ -82,7 +82,7 @@ VariantValue      = TypePath TypeArguments? '.' Identifier ( '{' FieldInit ( ','
 `Option` and `Result` are ordinary unions in the standard library. They are not imported automatically. Their declarations, without doc comments:
 
 ```
-// silk/option
+// silk/core/option
 pub union Option<T> {
   None,
   Some { pub value: T }
@@ -236,7 +236,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Patterns and match · Structs, tuples and arrays · Generics · Interfaces and impls · Ownership and moves · `silk/option`, `silk/core/result`
+Patterns and match · Structs, tuples and arrays · Generics · Interfaces and impls · Ownership and moves · `silk/core/option`, `silk/core/result`
 
 ## Open questions
 

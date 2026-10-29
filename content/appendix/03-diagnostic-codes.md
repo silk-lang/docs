@@ -1351,7 +1351,7 @@ fn secret() -> i32 { return 0 }
 src/main.silk:1:16: error[SEM0015] `secret` is private to helper; mark it `pub` there to use it here
 ```
 
-A name that the module only imports is not its member either. Importing it through that module names the module that declares it, as in ``error[SEM0015] `ParseError` is not declared in silk.num.i64, which only imports it; import it from silk.format``.
+A name that the module only imports is not its member either. Importing it through that module names the module that declares it, as in ``error[SEM0015] `ParseError` is not declared in silk.num.i64, which only imports it; import it from silk.text.format``.
 
 Fix: Mark the member `pub` in its module, or import the name from the module that declares it. See Modules and imports.
 
@@ -1375,7 +1375,7 @@ src/main.silk:2:8: error[SEM0016] Multiple bindings claim List; rename one with 
 The error is at the second binding, here the struct, with a note on the first. Two imports that bind one name are reported the same way, once, at the second import:
 
 ```silk
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.compress.inflate { Format }
 pub fn main() -> i32 { return 0 }
 ```
@@ -2095,7 +2095,7 @@ Fix: Give each type parameter its own name. See Generics.
 An application with the wrong number of type arguments.
 
 ```silk
-import silk.option {Option}
+import silk.core.option {Option}
 pub fn main() -> i32 {
   let o: Option<i32, i32> = Option<i32>.none()
   return 0
@@ -2115,7 +2115,7 @@ Fix: Pass the declared number of type arguments: `Option<i32>`. See Generics.
 A generic call whose type arguments its values do not determine.
 
 ```silk
-import silk.option {Option}
+import silk.core.option {Option}
 pub fn main() -> i32 {
   let o = Option.none()
   return 0
@@ -2789,7 +2789,7 @@ Fix: Keep state in the type that provides the service or implements the interfac
 One named type parameter left undetermined by an explicit prefix and the arguments.
 
 ```silk
-import silk.option {Option}
+import silk.core.option {Option}
 fn convert<A, B>(a: A) -> Option<B> { return Option<B>.none() }
 pub fn main() -> i32 {
   let o = convert<i32>(1)
@@ -3271,7 +3271,7 @@ Fix: Provide with the access the row asks for: `Effect.provideMut(&mut c)` for `
 A refutable pattern in an unconditional local binding.
 
 ```silk
-import silk.option {Option}
+import silk.core.option {Option}
 pub fn main() -> i32 {
   let o = Option<i32>.some(1)
   let Option<i32>.Some {value} = move o
@@ -3315,7 +3315,7 @@ Fix: Convert one operand so both have the same type. See Expressions and operato
 Operator syntax matched by more than one conformance of its operator interface.
 
 ```silk
-import silk.ops {Add}
+import silk.core.ops {Add}
 struct M { v: i32 }
 fn addM(a: M, b: M) -> M { return M { v: a.v + b.v } }
 fn addI(a: M, b: M) -> i32 { return a.v + b.v }
@@ -4981,7 +4981,7 @@ Fix: For a shape, use a numeric lane type and a lane count the message admits, s
 A requirement for an optional service with exclusive access, `&Option<&mut S>`.
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 service Counter {
   effect fn bump() -> i32 ? &mut Counter

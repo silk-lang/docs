@@ -353,7 +353,7 @@ Nothing is saved yet, so `add` and `done` change a board that disappears when th
 A failure can travel all the way out of `main`. Try it:
 
 ```silk
-import silk.format { Debug, Format, Formatter }
+import silk.text.format { Debug, Format, Formatter }
 import silk.io.writer { Writer, WriterError }
 
 pub struct NoSuchTask { pub id: u32 }
@@ -541,12 +541,12 @@ The imports have grown:
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
-import silk.equal { Equal }
-import silk.format { Display, Format, Formatter }
+import silk.core.equal { Equal }
+import silk.text.format { Display, Format, Formatter }
 import silk.system.host_input { HostInput, HostInputError }
 import silk.io.logger { Logger, LogError }
-import silk.option { Option }
-import silk.order { Order, Ordering }
+import silk.core.option { Option }
+import silk.core.order { Order, Ordering }
 import silk.io.logger_native { StdoutLogger }
 import silk.core.ownership { Copy }
 import silk.core.result { Result }

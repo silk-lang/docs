@@ -13,7 +13,7 @@ inputs and return an error value instead of an invalid layout.
 ## Examples
 ### Size storage for repeated values
 ```silk
-import silk.layout { Layout, LayoutOverflow }
+import silk.mem.layout { Layout, LayoutOverflow }
 import silk.num.usize
 
 pub fn main() -> i32 {
@@ -29,7 +29,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Import as `Layout` with `import silk.layout { Layout }`.
+Import as `Layout` with `import silk.mem.layout { Layout }`.
 
 Public declarations: 3.
 

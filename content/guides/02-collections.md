@@ -155,7 +155,7 @@ The function takes the words as `&[string<'text>]`, a borrowed slice, not the `L
 
 ## Sorting with Order
 
-The map keeps its entries in bucket order, which is neither insertion order nor sorted. To print the most frequent words first, copy the entries into a `List` and sort it. `List.sort` needs an element type that implements `Order` from `silk/order`:
+The map keeps its entries in bucket order, which is neither insertion order nor sorted. To print the most frequent words first, copy the entries into a `List` and sort it. `List.sort` needs an element type that implements `Order` from `silk/core/order`:
 
 ```silk
 // One row of the result: a word and how often it appeared.
@@ -188,13 +188,13 @@ Checking wordfreq (x86_64-unknown-linux-gnu)
   load     55 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
-src/main.silk:177:7: error[SEM0121] `main.Count<'_>: silk.order.Order` cannot be proved: no implementation of `silk.order.Order` exists for `main.Count<'_>`
+src/main.silk:177:7: error[SEM0121] `main.Count<'_>: silk.core.order.Order` cannot be proved: no implementation of `silk.core.order.Order` exists for `main.Count<'_>`
 Failed wordfreq in 0.21s
 ```
 
 The requirement it cannot prove is `Count: Order`, which `sort` declares as `sort<T: Order>`. The location is the `run rows.sort()` line.
 
-`Equal` from `silk/equal` works the same way for `==` and `!=`. Strings and numbers already have both operators.
+`Equal` from `silk/core/equal` works the same way for `==` and `!=`. Strings and numbers already have both operators.
 
 ## Putting it together
 
@@ -260,13 +260,13 @@ The imports:
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.collections.hash { Hash, HashKey, HashSeed }
 import silk.collections.hash_map { HashMap }
 import silk.collections.hash_set { HashSet }
 import silk.collections.list { List }
-import silk.option { Option }
-import silk.order { Order, Ordering }
+import silk.core.option { Option }
+import silk.core.order { Order, Ordering }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.ownership { Copy }
 import silk.core.result { Result }
@@ -306,7 +306,7 @@ There are 16 words. After "the", "and" and "on" are dropped, 6 remain. "cat" and
 - `silk/collections/hash_map`: `HashMap`
 - `silk/collections/hash_set`: `HashSet`
 - `silk/collections/hash`: `Hash`, `HashKey`, `HashSeed`, `Word`
-- `silk/order`: `Order`, `Ordering`
-- `silk/equal`: `Equal`
+- `silk/core/order`: `Order`, `Ordering`
+- `silk/core/equal`: `Equal`
 - `silk/core/ownership`: `Copy`
 - `silk/mem/allocator`: `Allocator`, `OutOfMemoryError`

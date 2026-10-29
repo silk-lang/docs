@@ -33,7 +33,7 @@ import silk.crypto.blake2b { Blake2b512 }
 import silk.crypto.chacha20_poly1305 { AeadError, ChaCha20Poly1305 }
 import silk.crypto.ed25519 { Ed25519PublicKey }
 import silk.core.effect { Effect }
-import silk.format { Debug, Format, Formatter }
+import silk.text.format { Debug, Format, Formatter }
 import silk.crypto.hkdf { HkdfSha256 }
 import silk.crypto.hmac { HmacSha256 }
 import silk.io.logger { LogError, Logger }

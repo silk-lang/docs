@@ -46,17 +46,17 @@ Checking scratch (x86_64-unknown-linux-gnu)
   load     53 modules, 1 in package          0.05s
   check    failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
-src/main.silk:13:7: error[SEM0121] `main.Status: silk.format.Display` cannot be proved: no implementation of `silk.format.Display` exists for `main.Status`
+src/main.silk:13:7: error[SEM0121] `main.Status: silk.text.format.Display` cannot be proved: no implementation of `silk.text.format.Display` exists for `main.Status`
 Failed scratch in 0.25s
 ```
 
-The error points at the `Effect.log` call. `Effect.log` walks the template at compile time, and for each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface from `silk/format`. The message reads as a claim the compiler had to prove, `main.Status: silk.format.Display`, "`Status` in module `main` implements `Display`", and the reason it could not: there is no implementation.
+The error points at the `Effect.log` call. `Effect.log` walks the template at compile time, and for each placeholder it calls `Format.display` on the matching field. `Format.display` only accepts types that implement the `Display` interface from `silk/text/format`. The message reads as a claim the compiler had to prove, `main.Status: silk.text.format.Display`, "`Status` in module `main` implements `Display`", and the reason it could not: there is no implementation.
 
 So when a template fails, check two things: the placeholder names, and whether every value you pass has `Display`. Numbers, strings, `bool` and `char` have it. So do your own types once you write an impl.
 
 ## Interfaces and impls
 
-An interface names a set of operations. Here is `Display` from `silk/format`, without its doc comments:
+An interface names a set of operations. Here is `Display` from `silk/text/format`, without its doc comments:
 
 ```silk
 pub interface Display {
@@ -101,7 +101,7 @@ impl Display for TaskId {
 The new names come from three modules. Add these imports:
 
 ```silk
-import silk.format { Display, Format, Formatter }
+import silk.text.format { Display, Format, Formatter }
 import silk.io.writer { Writer, WriterError }
 ```
 
@@ -149,7 +149,7 @@ src/main.silk:9:15: error[SEM0157] Enum Priority has no order, so >= does not ap
 Failed scratch in 0.18s
 ```
 
-SEM0157 says that enum values can't be ordered directly. Silk won't guess that the order you declared the members in is an order you meant. Maybe `High` is first for a reason. You decide by implementing the `Order` interface from `silk/order`.
+SEM0157 says that enum values can't be ordered directly. Silk won't guess that the order you declared the members in is an order you meant. Maybe `High` is first for a reason. You decide by implementing the `Order` interface from `silk/core/order`.
 
 `Order` has one operation, `compare`, which takes two references and returns an `Ordering`: `Less`, `Equal` or `Greater`. Write it as an ordinary function. `Priority.value(p)` gives a member's integer: 0, 1 and 2 here.
 
@@ -189,7 +189,7 @@ src/main.silk:122:18: error[SEM0135] Operator == does not accept (main.TaskId, m
 Failed tasks in 0.21s
 ```
 
-SEM0135 says that `==` is backed by an interface, and no impl of it accepts two `TaskId` values. The `main.` in front is the module that declares the type. Enums get `==` for free, by value. Tuples and structs don't, because "equal" can mean different things for different data. The `Equal` interface from `silk/equal` lets you say what it means, and like `Order` it works on references:
+SEM0135 says that `==` is backed by an interface, and no impl of it accepts two `TaskId` values. The `main.` in front is the module that declares the type. Enums get `==` for free, by value. Tuples and structs don't, because "equal" can mean different things for different data. The `Equal` interface from `silk/core/equal` lets you say what it means, and like `Order` it works on references:
 
 ```silk
 fn sameId(left: &TaskId, right: &TaskId) -> bool {
@@ -219,8 +219,8 @@ Now `complete` reads the way you would say it:
 Add the imports for the two interfaces and `Ordering`:
 
 ```silk
-import silk.equal { Equal }
-import silk.order { Order, Ordering }
+import silk.core.equal { Equal }
+import silk.core.order { Order, Ordering }
 ```
 
 See **Interfaces and impls** in the reference for the full table of operator interfaces, including `Add`, `Multiply` and the rest.
@@ -422,10 +422,10 @@ Here is the top of `src/main.silk` with all its imports:
 
 ```silk
 import silk.core.effect { Effect }
-import silk.equal { Equal }
-import silk.format { Display, Format, Formatter }
+import silk.core.equal { Equal }
+import silk.text.format { Display, Format, Formatter }
 import silk.io.logger { Logger, LogError }
-import silk.order { Order, Ordering }
+import silk.core.order { Order, Ordering }
 import silk.io.logger_native { StdoutLogger }
 import silk.core.ownership { Copy }
 import silk.text.string { String }
@@ -449,7 +449,7 @@ The first five lines match chapter 5 exactly, though the code that prints them c
 
 ## Summary
 
-- You can implement a standard interface such as `Display` so templates print your types, and you know that SEM0121 naming `silk.format.Display` means a value lacks `Display`.
+- You can implement a standard interface such as `Display` so templates print your types, and you know that SEM0121 naming `silk.text.format.Display` means a value lacks `Display`.
 - You can give your types `<`, `>=`, `==` and friends with `Order` and `Equal`, and you compare them through references: `&a >= &b`.
 - You can declare an interface, implement it with full bodies or with `name: function` bindings, and read SEM0083 when an impl doesn't fit.
 - You can write a generic function with a bound, `count<F: Filter>`, which compiles to a direct call for each type.

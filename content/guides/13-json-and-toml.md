@@ -24,14 +24,14 @@ As in the other guides, the code blocks below, in order, make up the whole of `s
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.json.codec { JsonCodec, Serialize }
 import silk.json.output { JsonOptions }
 import silk.json.reflect { JsonReflect }
 import silk.json.scanner { JsonError, JsonReason, JsonScanner, JsonToken }
 import silk.json.value { Json }
 import silk.collections.list { List }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.result { Result }
 import silk.toml.codec { TomlCodec }

@@ -379,7 +379,7 @@ The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` wo
 
 ## See also
 
-Values and primitive types (SIMD vectors and masks) · Targets and profiles · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/mem/pointer`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/layout`
+Values and primitive types (SIMD vectors and masks) · Targets and profiles · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/mem/pointer`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/layout`
 
 ## Open questions
 

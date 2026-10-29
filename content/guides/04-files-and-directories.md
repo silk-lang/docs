@@ -288,7 +288,7 @@ import silk.system.filesystem { AtomicWriteError, DirectoryInfo, FileError, File
 import silk.system.host_input { HostInput, HostInputError }
 import silk.collections.list { List }
 import silk.io.logger { Logger, LogError }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.system.filesystem_native { OsFileSystem }
 import silk.io.logger_native { StdoutLogger }
 import silk.core.result { Result }

@@ -46,7 +46,7 @@ import silk.io.logger { LogError, Logger }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.net.socket_native { Connection, ListenOptions, Listener, listen, withListener }
 import silk.net.address { Endpoint, IpAddress, Ipv4Address, Port }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.io.logger_native { StdoutLogger }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 import silk.core.result { Result }

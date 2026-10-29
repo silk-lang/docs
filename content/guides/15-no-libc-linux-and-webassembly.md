@@ -61,7 +61,7 @@ The `bare` profile selects Linux with `libc = "none"`; `web` selects wasm32. **T
 
 ```silk
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.io.writer { Writer, WriterError }
 import silk.core.compilation { Compilation, Libc }
 import silk.core.target { Arch, Target }
@@ -298,4 +298,4 @@ The compiler cannot generate the raw runtime's entry point yet. Until it can, us
 - `silk/concurrency/thread_native`: `NativeThread` (hosted targets, and wasm32 with `threading = "multi"`)
 - `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`: runs a wasm32 module in Node or a browser
 - `silk/io/writer`: `Writer`, `WriterError`; `silk/io/writer_native`: `StdoutWriter` (hosted only)
-- `silk/format`: `Format`; `silk/collections/slice`: `Slice`
+- `silk/text/format`: `Format`; `silk/collections/slice`: `Slice`

@@ -44,7 +44,7 @@ pub fn main() -> i32 {
 
 ### Count the scalars of a string
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.text.string { String, ScalarStep }
 
 pub fn main() -> i32 {
@@ -639,7 +639,7 @@ time on CPUs with 128-bit vectors and does not allocate.
 ##### Read the value of a setting
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.text.string { String }
 
 pub fn main() -> i32 {
@@ -679,7 +679,7 @@ function does not allocate.
 ##### Take the extension of a file name
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.text.string { String }
 
 pub fn main() -> i32 {
@@ -731,9 +731,9 @@ removes it.
 ##### Add up comma-separated numbers
 
 ```silk
-import silk.format { ParseError }
+import silk.text.format { ParseError }
 import silk.num.i32
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.core.result { Result }
 import silk.text.string { String, Split }
 
@@ -1037,7 +1037,7 @@ the text that was split. This function does not allocate.
 ##### Read the parts of a path
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.text.string { String, Split }
 
 pub fn main() -> i32 {
@@ -1085,7 +1085,7 @@ After `remainder`, [`Split.next`](#Split.impl.next) returns `None`. After the la
 ##### Split a setting at its first `=`
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.text.string { String, Split }
 
 pub fn main() -> i32 {

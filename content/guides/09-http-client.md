@@ -21,11 +21,11 @@ Create a package with `silk init statuscheck` and replace `src/main.silk` with t
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.core.effect { Effect }
-import silk.format { Format }
+import silk.text.format { Format }
 import silk.http.client { Http, HttpError, HttpErrorKind, Request, Response }
 import silk.http.client_native { NativeHttp }
 import silk.json.value { Json }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.result { Result }
 import silk.io.writer { Writer, WriterError }

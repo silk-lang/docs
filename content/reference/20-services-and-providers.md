@@ -140,9 +140,9 @@ These operations live in `Effect` from `silk/core/effect`. Each takes an Effect 
 
 ## Optional services
 
-- `? &Option<&S>` declares an optional service: the effect runs with or without a provider of `S`. `Option` is the one from `silk/option`; the compiler recognizes it in requirement rows, selectors and `Without`.
+- `? &Option<&S>` declares an optional service: the effect runs with or without a provider of `S`. `Option` is the one from `silk/core/option`; the compiler recognizes it in requirement rows, selectors and `Without`.
 - `&Option<&S>` is its own requirement entry, separate from `&S`. A row may hold both.
-- Branch on it with `withSome<&S>(absent, present)` from `silk/option`. Both arguments are Effects. `present` may also require `S`; `absent` may not. The provider decides at run time which branch runs, and the other is dropped. The type argument may be omitted when the arguments determine it.
+- Branch on it with `withSome<&S>(absent, present)` from `silk/core/option`. Both arguments are Effects. `present` may also require `S`; `absent` may not. The provider decides at run time which branch runs, and the other is dropped. The type argument may be omitted when the arguments determine it.
 - Both branches share every other requirement of the row. The rest of the row must not contain `S` (`where R in Without<R, S>`). An `absent` branch that requires `S` is SEM0234.
 - Three providers satisfy `&Option<&S>`:
 
@@ -150,13 +150,13 @@ These operations live in `Effect` from `silk/core/effect`. Each takes an Effect 
 | --- | --- |
 | `Effect.provide(e, &Option<P>.some(p))`, where `&P` provides `S` | `present`, with `p` |
 | `Effect.provide(e, &Option<P>.none())` or `&Option<never>.none()` | `absent` |
-| `provideSome<&S>(e, &p)` from `silk/option` | `present`, with the borrowed `p` |
+| `provideSome<&S>(e, &p)` from `silk/core/option` | `present`, with the borrowed `p` |
 
 - `Option<never>.none()` is the absent provider when no provider type is at hand: `never` serves every service and has no values.
 - A provider of `S` alone does not satisfy `&Option<&S>`. Providing one is SEM0123. Lift it with `provideSome`.
 - A function that declares `? &S` cannot run an Effect that needs `&Option<&S>` without providing it (SEM0071).
 - The optional service must be shared. An `Option` provider lends its service through a shared borrow, so nothing could provide `&Option<&mut S>`, and the requirement itself is SEM0240, reported where the row is written: "An optional service takes shared access only: an `Option` provider lends its service through a shared borrow, so nothing can provide `&Option<&mut S>`; require `&mut S`, or `&Option<&S>`".
-- Diagnostics may name the service the key stands for as `OptionService`, declared in `silk/option`. Code does not name it.
+- Diagnostics may name the service the key stands for as `OptionService`, declared in `silk/core/option`. Code does not name it.
 
 ## What main is given
 
@@ -391,7 +391,7 @@ An optional tracer. `measure` runs `traced` when a `Tracer` is provided and `pla
 
 ```silk
 import silk.core.effect { Effect }
-import silk.option { Option, provideSome, withSome }
+import silk.core.option { Option, provideSome, withSome }
 
 service Tracer {
   effect fn trace(value: i32) -> i32 ? &Tracer
@@ -467,7 +467,7 @@ src/main.silk:33:14: error[SEM0123] The provider matches no compatible requireme
 
 ## See also
 
-Effects and run · Typed failures · Fibers and scheduling · Suspension and cancellation · Interfaces and impls · Generics · Borrowing · Lifetimes · Allocation and shared ownership · Program entry and termination · Intrinsics · `silk/core/effect` · `silk/option` · `silk/system/host_input` · `silk/mem/allocator` · `silk/system/monotonic_clock`
+Effects and run · Typed failures · Fibers and scheduling · Suspension and cancellation · Interfaces and impls · Generics · Borrowing · Lifetimes · Allocation and shared ownership · Program entry and termination · Intrinsics · `silk/core/effect` · `silk/core/option` · `silk/system/host_input` · `silk/mem/allocator` · `silk/system/monotonic_clock`
 
 ## Open questions
 

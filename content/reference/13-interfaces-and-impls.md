@@ -70,19 +70,19 @@ InterfaceType  = Path TypeArguments?
 
 | Interface | Module | Operator | Operation |
 | --- | --- | --- | --- |
-| `Add<Right, Output>` | `silk/ops` | `a + b` | `add(left: Self, right: Right) -> Output` |
-| `Subtract<Right, Output>` | `silk/ops` | `a - b` | `subtract(left: Self, right: Right) -> Output` |
-| `Multiply<Right, Output>` | `silk/ops` | `a * b` | `multiply(left: Self, right: Right) -> Output` |
-| `Divide<Right, Output>` | `silk/ops` | `a / b` | `divide(left: Self, right: Right) -> Output` |
-| `Remainder<Right, Output>` | `silk/ops` | `a % b` | `remainder(left: Self, right: Right) -> Output` |
-| `Negate<Output>` | `silk/ops` | `-a` | `negate(value: Self) -> Output` |
-| `BitAnd<Right, Output>` | `silk/ops` | `a & b` | `bitAnd(left: Self, right: Right) -> Output` |
-| `BitOr<Right, Output>` | `silk/ops` | `a \| b` | `bitOr(left: Self, right: Right) -> Output` |
-| `BitXor<Right, Output>` | `silk/ops` | `a ^ b` | `bitXor(left: Self, right: Right) -> Output` |
-| `BitNot<Output>` | `silk/ops` | `~a` | `bitNot(value: Self) -> Output` |
-| `Not<Output>` | `silk/ops` | `!a` | `not(value: Self) -> Output` |
-| `Equal` | `silk/equal` | `a == b`, `a != b` | `equals(left: &Self, right: &Self) -> bool` |
-| `Order` | `silk/order` | `<`, `<=`, `>`, `>=` | `compare(left: &Self, right: &Self) -> Ordering` |
+| `Add<Right, Output>` | `silk/core/ops` | `a + b` | `add(left: Self, right: Right) -> Output` |
+| `Subtract<Right, Output>` | `silk/core/ops` | `a - b` | `subtract(left: Self, right: Right) -> Output` |
+| `Multiply<Right, Output>` | `silk/core/ops` | `a * b` | `multiply(left: Self, right: Right) -> Output` |
+| `Divide<Right, Output>` | `silk/core/ops` | `a / b` | `divide(left: Self, right: Right) -> Output` |
+| `Remainder<Right, Output>` | `silk/core/ops` | `a % b` | `remainder(left: Self, right: Right) -> Output` |
+| `Negate<Output>` | `silk/core/ops` | `-a` | `negate(value: Self) -> Output` |
+| `BitAnd<Right, Output>` | `silk/core/ops` | `a & b` | `bitAnd(left: Self, right: Right) -> Output` |
+| `BitOr<Right, Output>` | `silk/core/ops` | `a \| b` | `bitOr(left: Self, right: Right) -> Output` |
+| `BitXor<Right, Output>` | `silk/core/ops` | `a ^ b` | `bitXor(left: Self, right: Right) -> Output` |
+| `BitNot<Output>` | `silk/core/ops` | `~a` | `bitNot(value: Self) -> Output` |
+| `Not<Output>` | `silk/core/ops` | `!a` | `not(value: Self) -> Output` |
+| `Equal` | `silk/core/equal` | `a == b`, `a != b` | `equals(left: &Self, right: &Self) -> bool` |
+| `Order` | `silk/core/order` | `<`, `<=`, `>`, `>=` | `compare(left: &Self, right: &Self) -> Ordering` |
 
 - Arithmetic and bitwise operands are taken by value. `Right` and `Output` let a type combine with another type, as in `Vec2 * i32 -> Vec2`.
 - `Equal` and `Order` take references, so compare user values as `&a == &b` and `&a < &b`. Comparing the values directly is SEM0135.
@@ -163,8 +163,8 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.equal { Equal }
-import silk.ops { Multiply, Negate }
+import silk.core.equal { Equal }
+import silk.core.ops { Multiply, Negate }
 
 struct Vec2 {
   x: i32,
@@ -283,7 +283,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Generics · Functions and methods · Closures and callable types · Ownership and moves · Expressions and operators · Effects and run · Typed failures · Services and providers · `silk/ops`, `silk/equal`, `silk/order`, `silk/core/ownership`
+Generics · Functions and methods · Closures and callable types · Ownership and moves · Expressions and operators · Effects and run · Typed failures · Services and providers · `silk/core/ops`, `silk/core/equal`, `silk/core/order`, `silk/core/ownership`
 
 ## Open questions
 

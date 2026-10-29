@@ -52,7 +52,7 @@ pub effect fn main() -> i32
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.core.effect { Effect }
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.num.usize
 import silk.collections.list { List }
 
@@ -243,7 +243,6 @@ slice is live.
 
 ```silk
 pub effect<'env> fn append<'env>(self: &mut Self, value: T) -> () ! OutOfMemoryError ? &mut Allocator
-  with Intrinsic.inlineAlways()
 ```
 
 Adds `value` at the end of the list.
@@ -291,7 +290,6 @@ If `index` is more than [`List.length`](#List.impl.length), the program traps.
 
 ```silk
 pub fn get<T: Copy>(self: &Self, index: usize) -> T
-  with Intrinsic.inlineAlways()
 ```
 
 Returns a copy of the element at position `index`.
@@ -395,7 +393,6 @@ If `length` is more than or equal to the current length, this function does noth
 
 ```silk
 pub fn set(self: &mut Self, index: usize, value: T) -> ()
-  with Intrinsic.inlineAlways()
 ```
 
 Replaces the element at position `index` with `value` and drops the old element.
@@ -412,7 +409,6 @@ If `index` is not less than [`List.length`](#List.impl.length), the program trap
 pub effect fn reserve(self: &mut Self, additional: usize) -> ()
   ! OutOfMemoryError
   ? &mut Allocator
-  with Intrinsic.inlineAlways()
 ```
 
 Makes sure that at least `additional` more elements fit without another allocation.
@@ -440,7 +436,6 @@ capacity by doubling until the elements fit. The length does not change.
 pub effect fn reserveExact(self: &mut Self, additional: usize) -> ()
   ! OutOfMemoryError
   ? &mut Allocator
-  with Intrinsic.inlineAlways()
 ```
 
 Makes sure that at least `additional` more elements fit, with no extra capacity.
@@ -562,7 +557,6 @@ impl<T> List<T>
 pub effect fn appendBytes(self: &mut List<u8>, values: &[u8]) -> ()
   ! OutOfMemoryError
   ? &mut Allocator
-  with Intrinsic.inlineAlways()
 ```
 
 Adds a copy of each byte of `values` at the end of the list, in order.
@@ -586,7 +580,6 @@ faster than one [`List.append`](#List.impl.append) for each byte. [`List.appendS
 pub effect fn appendSlice<T: Copy>(self: &mut Self, values: &[T]) -> ()
   ! OutOfMemoryError
   ? &mut Allocator
-  with Intrinsic.inlineAlways()
 ```
 
 Adds a copy of each element of `values` at the end of the list, in order.
@@ -628,7 +621,6 @@ pub effect fn main() -> i32
 pub effect fn appendRepeated<T: Copy>(self: &mut Self, value: T, count: usize) -> ()
   ! OutOfMemoryError
   ? &mut Allocator
-  with Intrinsic.inlineAlways()
 ```
 
 Adds `count` copies of `value` at the end of the list.

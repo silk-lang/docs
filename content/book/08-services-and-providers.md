@@ -513,7 +513,7 @@ reminder: Call the plumber
 
 The exit status is 2: the second run went to `Counting`, which saw two reminders and printed nothing. `remindAll` never knew the difference.
 
-Some services are optional. Tracing or metrics, for example, should run when a caller provides them and be skipped otherwise. Write such a requirement as `? &Option<&Tracer>` and choose between the two paths with `withSome` from `silk/option`. **Services and providers** in the reference shows how.
+Some services are optional. Tracing or metrics, for example, should run when a caller provides them and be skipped otherwise. Write such a requirement as `? &Option<&Tracer>` and choose between the two paths with `withSome` from `silk/core/option`. **Services and providers** in the reference shows how.
 
 ## Testing with fake providers
 

@@ -29,7 +29,7 @@ reinterprets bits.
 zero, both zero counts return [`BITS`](#BITS).
 
 [`parse`](#parse) reads decimal text. A sign is not valid. To write a value as text, use
-`silk.format.Format.display` or `Format.displayWith` with a `Writer`. Neither needs an
+`silk.text.format.Format.display` or `Format.displayWith` with a `Writer`. Neither needs an
 `Allocator`.
 
 ## Gotchas
@@ -53,7 +53,7 @@ pub fn main() -> i32 {
 
 ### Parse decimal text and reject invalid text
 ```silk
-import silk.format { ParseError }
+import silk.text.format { ParseError }
 import silk.core.result { Result }
 import silk.num.u64
 
@@ -107,7 +107,6 @@ The fixed width of `u64`, in bits.
 
 ```silk
 pub fn toU8(value: u64) -> u8
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `u8`. Traps if `value` is outside the `u8` range. Use
@@ -130,7 +129,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toU16(value: u64) -> u16
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `u16`. Traps if `value` is outside the `u16` range. Use
@@ -153,7 +151,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toU32(value: u64) -> u32
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `u32`. Traps if `value` is outside the `u32` range. Use
@@ -198,7 +195,6 @@ checked-conversion code can select the same source and destination type.
 
 ```silk
 pub fn toUsize(value: u64) -> usize
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `usize`. Traps if `value` is outside the `usize` range. Use
@@ -221,7 +217,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toI8(value: u64) -> i8
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `i8`. Traps if `value` is outside the `i8` range. Use
@@ -244,7 +239,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toI16(value: u64) -> i16
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `i16`. Traps if `value` is outside the `i16` range. Use
@@ -267,7 +261,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toI32(value: u64) -> i32
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `i32`. Traps if `value` is outside the `i32` range. Use
@@ -290,7 +283,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toI64(value: u64) -> i64
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `i64`. Traps if `value` is outside the `i64` range. Use
@@ -313,7 +305,6 @@ range. Use this function when an out-of-range value is input data.
 
 ```silk
 pub fn toIsize(value: u64) -> isize
-with Intrinsic.inlineAlways()
 ```
 
 Converts `value` to `isize`. Traps if `value` is outside the `isize` range. Use
@@ -872,10 +863,10 @@ accept digit separators.
 
 ### Errors
 
-- `ParseError` with reason `silk.format.NotANumber` if `text` is empty, has a sign, contains a
+- `ParseError` with reason `silk.text.format.NotANumber` if `text` is empty, has a sign, contains a
   byte that is not a digit, or has bytes after the number. `offset` gives the byte position
   where the read stopped.
-- `ParseError` with reason `silk.format.OutOfRange` if the number is outside the range of `u64`.
+- `ParseError` with reason `silk.text.format.OutOfRange` if the number is outside the range of `u64`.
 
 Category: Numbers.
 

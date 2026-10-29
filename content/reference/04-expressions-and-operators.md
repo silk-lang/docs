@@ -88,12 +88,12 @@ From weakest to strongest:
 
 ## Operators on user types
 
-- Operators on non-primitive types come from interfaces. `silk/ops` names them: `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder`, `Negate`, `BitAnd`, `BitOr`, `BitXor`, `BitNot`, `Not`.
+- Operators on non-primitive types come from interfaces. `silk/core/ops` names them: `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder`, `Negate`, `BitAnd`, `BitOr`, `BitXor`, `BitNot`, `Not`.
 - `a + b` means `Add.add(a, b)` for the conformance of `a`'s type. Operands are passed by value.
-- `==` and `!=` use `Equal` from `silk/equal`. Ordering operators use `Order` from `silk/order`.
+- `==` and `!=` use `Equal` from `silk/core/equal`. Ordering operators use `Order` from `silk/core/order`.
 - For a user type, write the comparison operands as references: `&a == &b`. Comparing by value is SEM0135.
 - A conformance must be declared in the module that declares the type, or in the interface's own source. A conformance anywhere else is invalid (SEM0083).
-- No import activates an operator. The use site needs neither `silk/ops` nor the module holding the conformance.
+- No import activates an operator. The use site needs neither `silk/core/ops` nor the module holding the conformance.
 - With no matching conformance the operator is SEM0135. With two matching conformances it is SEM0136.
 - Concrete primitive operands always use the built-in operator.
 - Generic code applies an operator to `T` through a bound such as `T: Add<T, T>`. See Interfaces and impls and `silk/num/numeric`.
@@ -175,8 +175,8 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.equal { Equal }
-import silk.ops { Add }
+import silk.core.equal { Equal }
+import silk.core.ops { Add }
 
 struct Meters {
   value: i32,
@@ -261,7 +261,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Lexical structure · Values and primitive types · Bindings and statements · Control flow · Structs, tuples and arrays · Patterns and match · Functions and methods · Closures and callable types · Generics · Interfaces and impls · Ownership and moves · Borrowing · Unsafe code and C interop · Effects and run · Typed failures · Services and providers · Static evaluation · `silk/ops`, `silk/equal`, `silk/order`, `silk/num/numeric`, `silk/core/bool`
+Lexical structure · Values and primitive types · Bindings and statements · Control flow · Structs, tuples and arrays · Patterns and match · Functions and methods · Closures and callable types · Generics · Interfaces and impls · Ownership and moves · Borrowing · Unsafe code and C interop · Effects and run · Typed failures · Services and providers · Static evaluation · `silk/core/ops`, `silk/core/equal`, `silk/core/order`, `silk/num/numeric`, `silk/core/bool`
 
 ## Open questions
 

@@ -204,7 +204,7 @@ To run a faster path on machines that have a feature the build does not select, 
 ```silk
 import silk.num.i32
 import silk.num.i64
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.num.u8
 
 fn widen(value: i64) -> i64 {
@@ -232,7 +232,7 @@ pub fn main() -> i32 {
 
 ```silk
 import silk.num.i32
-import silk.option { Option }
+import silk.core.option { Option }
 import silk.num.u8
 
 pub fn main() -> i32 {
@@ -494,7 +494,7 @@ fatal trap: arithmetic overflow
 
 ## See also
 
-Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · Unsafe code and C interop · `silk/num/i8`, `silk/num/i16`, `silk/num/i32`, `silk/num/i64`, `silk/num/isize`, `silk/num/u8`, `silk/num/u16`, `silk/num/u32`, `silk/num/u64`, `silk/num/usize`, `silk/num/f32`, `silk/num/f64`, `silk/num/numeric`, `silk/core/bool`, `silk/text/char`, `silk/text/string`, `silk/layout`, `silk/simd/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...), `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm`
+Lexical structure · Expressions and operators · Bindings and statements · Structs, tuples and arrays · Intrinsics · Unsafe code and C interop · `silk/num/i8`, `silk/num/i16`, `silk/num/i32`, `silk/num/i64`, `silk/num/isize`, `silk/num/u8`, `silk/num/u16`, `silk/num/u32`, `silk/num/u64`, `silk/num/usize`, `silk/num/f32`, `silk/num/f64`, `silk/num/numeric`, `silk/core/bool`, `silk/text/char`, `silk/text/string`, `silk/mem/layout`, `silk/simd/simd` and its shape modules (`silk/simd/u8x16`, `silk/simd/mask16`, ...), `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm`
 
 ## Open questions
 

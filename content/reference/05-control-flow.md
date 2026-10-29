@@ -164,7 +164,7 @@ pub fn main() -> i32 {
 ```
 
 ```silk
-import silk.option { Option }
+import silk.core.option { Option }
 
 fn find(values: &[i32], wanted: i32) -> Option<usize> {
   let mut index: usize = 0
@@ -241,4 +241,4 @@ pub fn main() -> i32 {
 
 ## See also
 
-Bindings and statements · Expressions and operators · Patterns and match · Ownership and moves · Program entry and termination · Effects and run · Typed failures · Services and providers · Static evaluation · `silk/option`
+Bindings and statements · Expressions and operators · Patterns and match · Ownership and moves · Program entry and termination · Effects and run · Typed failures · Services and providers · Static evaluation · `silk/core/option`
