@@ -4905,7 +4905,7 @@ pub fn main() -> u64 { return 0 }
 src/main.silk:1:8: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` and whose errors all implement `Debug`
 ```
 
-A package with no `main` at all gets the same code, at 1:1 of the entry module: ``Entry point `main` is missing: the entry module must declare `pub fn main`, or a library package sets `kind = "library"` under `[package]` in silk.toml``.
+A package with no `main` at all gets the same code, at `1:1` of the entry module: ``Entry point `main` is missing: the entry module must declare `pub fn main`, or a library package sets `kind = "library"` under `[package]` in silk.toml``.
 
 The message describes the runtime that was selected. For a wasm32 build with `silk/platform/wasm/start`, `pub effect fn main() -> i32` gives ``Entry point `main` has a result the selected runtime `silk/platform/wasm/start` cannot start; it accepts i32, (), or an Effect producing () with no requirements``.
 
