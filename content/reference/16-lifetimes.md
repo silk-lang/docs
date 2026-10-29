@@ -56,6 +56,9 @@ EffectEnvironment  = 'effect' '<' Lifetime '>' 'fn' ...
 - Using such a result after one of its referents ends is OWN0019. Returning it from a function where one referent is local is SEM0212. Returning a borrow at a lifetime the input is not declared to outlive, as in `fn f<'a, 'b>(x: &'a i32) -> &'b i32 { return x }`, is SEM0212 at the returned value.
 - A type takes lifetime arguments the same way: `View<'a>`, `string<'a>`.
 - Writing a lifetime argument pins the call. Its bounds must then hold (SEM0212).
+- A lifetime written inside a type argument pins the call the same way. In `hold<&'s i32>(&local)`, each operand must be valid for `'s`, so a borrow of a local is SEM0212 at the borrow, even when the result is never used.
+- A type argument that leaves a lifetime out, as `&i32` in `first<&i32>(x, &local)`, gets a fresh lifetime that the operands infer, as an omitted lifetime in a body annotation does. This works in a method call's type arguments too: `r.pick<View>(a, b)`. Each omitted lifetime is its own, so two in one argument may infer different regions.
+- Operands of an operation called through a bound, as `p.pick(a, b)` with `P: Picker`, meet the operation's lifetime parameters as at a direct call: two borrows with different lifetimes offered at one lifetime infer their common region.
 
 ## Elision
 
@@ -203,6 +206,76 @@ pub fn main() -> i32 {
 }
 ```
 
+Type arguments that leave lifetimes out, at a function call and a method call. Both calls infer the shorter region of `local`:
+
+```silk
+fn first<T>(a: T, b: T) -> T {
+  drop b
+  return move a
+}
+
+struct Reader<'a> {
+  base: &'a i32,
+}
+
+impl<'a> Reader<'a> {
+  fn pick<T>(self: Self, a: T, b: T) -> T {
+    drop b
+    return move a
+  }
+}
+
+struct View<'v> {
+  value: &'v i32,
+}
+
+fn sum<'s>(x: &'s i32) -> i32 {
+  let local = 5
+  // `&i32` leaves its lifetime out, so the call infers one that both
+  // operands meet, here the shorter one of `local`.
+  let a = first<&i32>(x, &local)
+  let r = Reader { base: x }
+  // A method call's type argument may leave lifetimes out too.
+  let b = r.pick<View>(View { value: x }, View { value: &local })
+  return a.* + b.value.*
+}
+
+pub fn main() -> i32 {
+  let n = 7
+  return sum(&n)
+}
+```
+
+Two borrows with different lifetimes passed to an operation through a bound:
+
+```silk
+interface Picker {
+  fn pick<'v>(self: &Self, first: &'v i32, second: &'v i32) -> &'v i32
+}
+
+struct Larger {}
+
+impl Picker for Larger {
+  fn pick<'v>(self: &Self, first: &'v i32, second: &'v i32) -> &'v i32 {
+    if first.* > second.* {
+      return first
+    }
+    return second
+  }
+}
+
+fn larger<'a, 'b, P: Picker>(p: &P, a: &'a i32, b: &'b i32) -> i32 {
+  let r = p.pick(a, b)
+  return r.*
+}
+
+pub fn main() -> i32 {
+  let x = 3
+  let y = 9
+  return larger(&Larger {}, &x, &y)
+}
+```
+
 ## Errors and fixes
 
 SEM0209, an undeclared lifetime:
@@ -277,6 +350,31 @@ pub fn main() -> i32 {
   return keep(&local)
 }
 ```
+
+SEM0212 for a lifetime written in a type argument. `'s` pins the call, and `local` does not live that long:
+
+```silk
+fn hold<T>(value: T) -> T { return move value }
+
+fn keep<'s>(x: &'s i32) -> &'s i32 {
+  let local = 3
+  let unused = hold<&'s i32>(&local)
+  return hold<&'s i32>(x)
+}
+
+pub fn main() -> i32 {
+  let n = 7
+  return keep(&n).*
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:5:30: error[SEM0212] A lifetime that must outlive another, with no declared bound saying it does
+```
+
+Leave the lifetime out, as in `hold<&i32>(&local)`, so the call infers it, or pass a borrow that lives for `'s`.
 
 SEM0220, a `Drop` head that selects by lifetime:
 

@@ -2879,6 +2879,29 @@ An operation with a body is not this error: the body is the operation's default,
 
 Fix: Keep state in the type that provides the service or implements the interface, not in the contract. A service or interface holds only operations. See Services and providers.
 
+### SEM0095
+
+A float literal that rounds to infinity at its type's width.
+
+```silk
+pub fn main() -> i32 {
+  let big: f32 = 1e39
+  let huge = 1.0e400
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:2:18: error[SEM0095] Float literal 1e39 rounds to infinity as f32, whose largest finite value is 3.4028235e38
+src/main.silk:3:14: error[SEM0095] Float literal 1.0e400 rounds to infinity as f64, whose largest finite value is 1.7976931348623157e308
+```
+
+The column is the literal, or its leading minus sign. The check uses the literal's selected type, so `1e39` is accepted as an `f64` and rejected as an `f32`. A leading minus sign does not help: `-1.0e400` is reported the same way, at the minus sign.
+
+Fix: Write a value no larger than the type's `MAX`. For infinity itself, use `f32.INFINITY` or `f64.INFINITY` from `silk/num/f32` and `silk/num/f64`. See Values and primitive types.
+
 ### SEM0099
 
 One named type parameter left undetermined by an explicit prefix and the arguments.
@@ -2900,7 +2923,26 @@ src/main.silk:4:11: error[SEM0099] One named type parameter left undetermined by
 
 Message template, not filled by this compiler: `Cannot infer type argument {parameter} of {target} from supplied values`.
 
-Fix: Pass all type arguments: `convert<i32, bool>(1)`. See Generics.
+An explicit type argument that leaves a lifetime out, where nothing at the construction determines it, gets a second message at the construction:
+
+```silk
+import silk.core.option {Option}
+fn count(value: Option<&i32>) -> i32 {
+  if let Option<&i32>.Some {value: v} = value { return v.* }
+  return 0
+}
+pub fn main() -> i32 {
+  return count(Option<&i32>.None)
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:7:16: error[SEM0099] Nothing here determines the omitted lifetime in this explicit type argument; write it, as in `&'static T`
+```
+
+Fix: Pass all type arguments: `convert<i32, bool>(1)`. For an omitted lifetime, write it: `Option<&'static i32>.None`. See Generics.
 
 ### SEM0108
 
@@ -3212,7 +3254,23 @@ pub fn main() -> i32 {
 src/main.silk:5:11: error[SEM0121] `main.Token: Copy` cannot be proved: the callee requires a `Copy` type argument here, and this type does not implement `Copy`
 ```
 
-Fix: Pass a type that implements the bound, or implement it. See Generics, Interfaces and impls.
+Inside a generic body, a type parameter conforms only through the bounds it declares. A call that needs a bound the caller does not declare is SEM0121 at the call, and the message names the bound to add:
+
+```silk
+interface Named { fn name(self: &Self) -> i32 }
+interface Sized { fn size(self: &Self) -> i32 }
+fn both<H: Named + Sized>(h: &H) -> i32 { return h.name() + h.size() }
+fn onlySized<H: Sized>(h: &H) -> i32 { return both(h) }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:4:47: error[SEM0121] `H: main.Named` cannot be proved: a type parameter conforms only through its declared bounds; add `main.Named` to the bounds of `H`
+```
+
+Fix: Pass a type that implements the bound, or implement it. In a generic body, add the bound to the type parameter: `fn onlySized<H: Sized + Named>`. See Generics, Interfaces and impls.
 
 ### SEM0123
 
@@ -5439,7 +5497,6 @@ These SEM codes are in the catalog, but no path in this compiler reports them, o
 | SEM0080 | Merging callable values from different construction sites without explicit erasure. | `Cannot merge callable values from different construction sites without explicit erasure` |  | Not tried. |
 | SEM0089 | A failure or requirement row that cannot be finitely decomposed. | `Requirement row does not contain &mut {capability}@{role}` / `Requirement row does not contain &{capability}@{role}` / `Requirement {capability} has role {actual}, expected {expected}` / `Requirement {capability}@{role} has access {actual}, expected {expected}` / `Requirement row remainder is ambiguous across {parameters}` / `Requirement row specialization is not finite and concrete` / `Failure type does not contain selected member {member}` |  | Not tried. |
 | SEM0093 | One reachable intrinsic unavailable on the requested execution target. | `{operation} is unavailable for {target}` |  | Not tried. |
-| SEM0095 | A float literal spelling no floating-point value can represent. | `Invalid float literal: {spelling}` | `let x = 1e999` | Accepted by `check` and `build`, by design: a float literal too large for its type is infinity. |
 | SEM0097 | A bound operation call whose receiver names more than one bounded parameter. | `{spelling} is ambiguous across bounded type parameters {parameters}` |  | Not tried. |
 | SEM0100 | An explicit type argument contradicting the type its value arguments imply. | `Type argument {parameter} of {target} is {written}, but the supplied values imply {implied}` |  | Not tried. |
 | SEM0101 | A bound operation whose selected witness has no lowering. | `{spelling} has no witness that can be lowered for {provider}` |  | Not tried. |

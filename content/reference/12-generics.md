@@ -29,6 +29,7 @@ ExactType         = 'typeof' '(' Path ')'
 - `impl<T> Interface for Type<T> { ... }` and `impl<T> Type<T> { ... }`. See Interfaces and impls.
 - An inherent `impl<T> Type<T>` must list exactly the owner's parameters, in order (SEM0194).
 - Its parameters may take interface, `Copy` and outlives bounds: `impl<T: Copy + Add<T, T>> Pair<T> { fn sum(self: Self) -> T { … } }`. The block's members then exist only where the bounds hold. Each call proves them, and a call for other arguments is SEM0121. A type may have one unbounded block and several bounded ones. A callable bound, such as `impl<F: fn(i32) -> i32> Runner<F>`, is still SEM0194.
+- The members of a bounded block may call the bounds' operations as a bounded generic function does: qualified, as `Zero.zero()` or `Twice.twice(value)`, or as a method, as `value.twice()`.
 - Members of an inherent impl may add their own parameters: `fn map<U>(self: Self, u: U) -> Box<U>`.
 - A parameter name may appear only once in a list (SEM0050). An interface cannot declare `Self` as a parameter, since `Self` is already bound there (SEM0050).
 - Using a parameter of one kind where another kind is expected is SEM0088, for example `Box<'a>` for a type parameter. Leaving out a requirement-row argument, as in `Holder<i32>` for `struct Holder<T, ?R>`, is SEM0088 too; write `Holder<i32 ? never>` for an empty row.
@@ -41,6 +42,7 @@ ExactType         = 'typeof' '(' Path ')'
 - Explicit arguments come in `<...>` after the name: `identity<i32>(42)`.
 - An explicit list may be a prefix; inference fills the rest: `pick<i32>(40, true)`.
 - A parameter left undetermined by both the prefix and the arguments is SEM0099.
+- An explicit type argument may leave its lifetimes out, at a function call and at a method call alike: `first<&i32>(x, &local)`, `r.pick<View>(a, b)`. Each omitted lifetime is inferred from the operands. When nothing determines it, as in `Option<&i32>.None` with no operand, it is SEM0099 at the construction; write the lifetime. See Lifetimes.
 - Too many type arguments is SEM0051.
 - An argument that contradicts an explicit type argument is reported as a type mismatch (SEM0012).
 - A generic type's arguments go on the type: `Box<i32> { v: 1 }`, `Maybe<i32>.None`. They may be inferred in struct literals.
@@ -53,6 +55,8 @@ ExactType         = 'typeof' '(' Path ')'
 - `F: fn(i32) -> i32` bounds a parameter by a callable contract. See Closures and callable types.
 - `T: Copy` uses the sealed property from `silk/core/ownership`. `Drop` is not usable as a bound.
 - A generic body is checked once, against its bounds only. Using an operation the bounds don't provide is an error even before any call (SEM0135 for an operator).
+- Inside the body, a type parameter conforms only through the bounds it declares. Calling a function that needs a bound the parameter lacks is SEM0121 at the call, and the message names the bound to add: "`H: main.Named` cannot be proved: a type parameter conforms only through its declared bounds; add `main.Named` to the bounds of `H`".
+- An operator on a generic type may come from a conditional impl, such as `impl<T: Copy + Multiply<T, T>> Multiply<Point<T>, Point<T>> for Scale<T>`. A generic body may use that operator when its own bounds prove the impl's bounds. When they don't, it is SEM0121 at the operator.
 - At each use, the compiler proves the bounds for the concrete arguments. A missing conformance is SEM0121.
 - Bounds on a generic struct are checked wherever the struct type is named with arguments (SEM0121).
 
@@ -262,6 +266,102 @@ pub fn main() -> i32 {
 }
 ```
 
+A generic body that uses an operator from conditional impls. `mix`'s own bounds prove the bounds of both impls, so `*` and `+` on `Point<T>` are available. Leave `Multiply<T, T>` off `mix` and the first `*` is SEM0121:
+
+```silk
+import silk.core.ownership { Copy }
+import silk.core.ops { Add, Multiply }
+
+struct Point<T> {
+  x: T,
+  y: T,
+}
+
+impl<T: Copy> Copy for Point<T> {}
+
+impl<T: Copy + Add<T, T>> Add<Point<T>, Point<T>> for Point<T> {
+  fn add(left: Self, right: Point<T>) -> Point<T> {
+    return Point<T> { x: left.x + right.x, y: left.y + right.y }
+  }
+}
+
+struct Scale<T> {
+  k: T,
+}
+
+impl<T: Copy> Copy for Scale<T> {}
+
+impl<T: Copy + Multiply<T, T>> Multiply<Point<T>, Point<T>> for Scale<T> {
+  fn multiply(left: Self, right: Point<T>) -> Point<T> {
+    return Point<T> { x: left.k * right.x, y: left.k * right.y }
+  }
+}
+
+// `*` and `+` on `Point<T>` come from the conditional impls above. Their
+// bounds hold because this function declares the same ones on `T`.
+fn mix<T: Copy + Add<T, T> + Multiply<T, T>>(a: Point<T>, b: Point<T>, s: T, t: T) -> Point<T> {
+  return Scale<T> { k: s } * a + Scale<T> { k: t } * b
+}
+
+pub fn main() -> i32 {
+  let p = mix<i32>(Point<i32> { x: 1, y: 2 }, Point<i32> { x: 10, y: 20 }, 2, 3)
+  if p.x != 32 || p.y != 64 {
+    return 1
+  }
+  return 0
+}
+```
+
+With `fn mix<T: Copy + Add<T, T>>`, `silk check` prints:
+
+```text
+src/main.silk:32:28: error[SEM0121] A concrete specialization whose conditional requirements cannot be proved
+```
+
+A bounded inherent block that calls its bounds' operations, qualified and as a method:
+
+```silk
+interface Zero {
+  fn zero() -> Self
+}
+
+impl Zero for i32 {
+  fn zero() -> i32 { return 0 }
+}
+
+interface Twice {
+  fn twice(value: Self) -> Self
+}
+
+impl Twice for i32 {
+  fn twice(value: i32) -> i32 { return value * 2 }
+}
+
+struct Pair<T> {
+  x: T,
+  y: T,
+}
+
+impl<T: Zero + Twice> Pair<T> {
+  fn origin() -> Pair<T> {
+    return Pair<T> { x: Zero.zero(), y: Zero.zero() }
+  }
+
+  fn doubled(self: Self) -> Pair<T> {
+    return Pair<T> { x: Twice.twice(move self.x), y: self.y.twice() }
+  }
+}
+
+pub fn main() -> i32 {
+  let o = Pair<i32>.origin()
+  let d = Pair<i32> { x: 3, y: 4 }.doubled()
+  if o.x != 0 || d.x != 6 || d.y != 8 {
+    return 1
+  }
+  return 0
+}
+```
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -273,7 +373,7 @@ pub fn main() -> i32 {
 | SEM0052 | Cannot infer all type arguments from the supplied values |
 | SEM0053 | Recursive call changes the type arguments (polymorphic recursion) |
 | SEM0088 | Generic parameter used where a different kind is expected |
-| SEM0099 | A type parameter is left undetermined by the explicit prefix and the arguments |
+| SEM0099 | A type parameter, or a lifetime an explicit type argument leaves out, is left undetermined |
 | SEM0108 | `typeof` names nothing in scope |
 | SEM0109 | `typeof` name is ambiguous |
 | SEM0110 | `typeof` names something other than an ordinary function |
@@ -281,7 +381,7 @@ pub fn main() -> i32 {
 | SEM0113 | Opaque result has more than one realization |
 | SEM0116 | Opaque result bound is not a callable or Effect |
 | SEM0129 | Returned function differs from the `typeof` result type |
-| SEM0121 | Bound cannot be proved for the concrete arguments |
+| SEM0121 | Bound cannot be proved for the concrete arguments, or a type parameter lacks a bound its body needs |
 | SEM0135 | Operator not available for the operand types |
 | SEM0194 | Inherent impl head is not exactly the owner's parameters, or bounds one by a callable contract |
 | SEM0221 | Owner type arguments placed on the member instead of the owner |
