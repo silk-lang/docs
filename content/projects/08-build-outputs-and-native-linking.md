@@ -182,7 +182,21 @@ A bad entry stops the build with exit status 1 and names the manifest and the en
 silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: object /tmp/abs.o must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files
 ```
 
-An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. An entry for another platform is refused the same way: `silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: framework Security links only on macOS targets`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
+An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
+
+An entry the target cannot link, such as `{ framework = "Security" }` on Linux, is refused when the build reaches the link. `silk check` accepts it. `silk build` checks and generates code, then fails that package's link and exits 1:
+
+```
+Compiling cmix (x86_64-unknown-linux-gnu, debug)
+  load     135 modules, 1 in package         0.06s
+  check    1 module                          0.09s
+  codegen  484 functions                     0.13s
+  borrow   147 bodies                        0.00s
+[x86_64-unknown-linux-gnu]
+silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: framework Security links only on macOS targets
+  link     failed                            0.02s
+Failed cmix in 0.33s
+```
 
 See **Unsafe code and C interop** in the reference for `extern "C"`.
 

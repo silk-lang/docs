@@ -16,7 +16,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | PAR | Parsing | PAR0001-PAR0011 |
 | MOD | Module and package resolution | MOD0001-MOD0006 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0250 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0251 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
 
@@ -4275,7 +4275,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and directives (SEM0187-SEM0250)
+## SEM: C interop, impls, lifetimes and directives (SEM0187-SEM0251)
 
 ### SEM0185
 
@@ -5082,7 +5082,7 @@ pub fn main() -> i32 { return plain() }
 src/main.silk:1:1: error[SEM0235] This directive, or one of its arguments, is not one the language defines
 ```
 
-The column is the `@`. A known directive with an argument it does not take is the same error: `@inline(1)`, `@nonParking(strict: true)` or `@foreign(bogus: 1)`. A directive argument must be a literal; a name such as `@inline(N)` is PAR0002 at the name, and the directive is not reported again.
+The column is the `@`. A known directive with an argument it does not take is the same error: `@inline(1)`, `@nonParking(strict: true)` or `@foreign(bogus: 1)`. A directive argument must be a literal; a name such as `@inline(N)` is PAR0002 at the name, and a known directive is not reported again. An unknown directive is still reported: `@bogus(N)` prints PAR0002 at `N` and then SEM0235 at the `@`.
 
 The directives are `@inline`, `@inlineAlways`, `@inlineNever`, `@cold`, `@nonParking`, `@features("...", ...)`, `@foreign(memory:, locality:, noCapture:)`, `@callbacks("...", ...)`, `@threadCallbacks("...", ...)`, `@deferredCallbacks("...", ...)`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn`. The same directive written twice on one function is SEM0250.
 
@@ -5484,6 +5484,40 @@ src/main.silk:5:1: error[SEM0250] `@inlineNever` cannot be written with `@cold`:
 The column is the second directive of the pair. Any repeated directive is reported, such as two `@features(...)` lines, or `@nonParking` twice on a service operation. A callback directive repeated on an `extern "C"` function is SEM0187. A repeated `@foreign` there is not reported by `silk check`; see the open questions in Intrinsics.
 
 Fix: Keep one directive of each kind, and at most one of `@inline`, `@inlineAlways`, `@inlineNever` and `@cold`. See Directives in Intrinsics.
+
+### SEM0251
+
+A parameter of a `static fn` written `static` or `mut`. The whole call runs at compile time, so every parameter is already a static value.
+
+```silk
+struct Leaf { value: i32 }
+impl Leaf {
+  static fn scaled(self: &Self, static factor: i32) -> i32 { return self.value * factor }
+}
+static fn bumped(mut count: i32) -> i32 { return count + 1 }
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:3:33: error[SEM0251] A `static fn` runs entirely at compile time, so its parameters are already static; drop `static` from this parameter
+src/main.silk:5:18: error[SEM0251] A `static fn` parameter cannot be `mut`; bind a `let mut` copy in the body instead
+```
+
+The column is the start of the parameter, at `static` or `mut`. Both are reported whether or not the function is called. In an ordinary `fn`, both forms are allowed.
+
+Fix: Drop `static` from the parameter. For `mut`, drop it and copy the parameter into a `let mut` binding in the body:
+
+```silk
+static fn bumped(count: i32) -> i32 {
+  let mut next = count
+  next = next + 1
+  return next
+}
+```
+
+See Static evaluation.
 
 ## Codes this compiler does not report
 

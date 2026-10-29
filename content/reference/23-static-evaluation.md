@@ -84,6 +84,7 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - A `static fn` may be a member of an inherent `impl`.
 - An interface may declare a `static fn` operation. Each conformance supplies it with a `static fn` witness. A witness that is a plain `fn`, or a plain operation given a `static fn` witness, is SEM0083: "one of them is a `static fn` and the other is not, or their `static` parameters differ". The operation runs only in static evaluation, typically from a generic `static fn` with a bound: `static fn takes<T: Arg>() -> bool { return Arg.takesValue() }`. Calling it from runtime code is SEM0176: "`Arg.takesValue` runs only during static evaluation, so runtime code cannot call it". See Interfaces and impls.
 - A `static fn` must have a body.
+- A `static fn` parameter cannot be marked `static` or `mut`: the whole call runs at compile time, so every parameter is already static. `static fn f(static n: i32)` is SEM0251: "A `static fn` runs entirely at compile time, so its parameters are already static; drop `static` from this parameter". `static fn f(mut n: i32)` is SEM0251 too: "A `static fn` parameter cannot be `mut`; bind a `let mut` copy in the body instead".
 - Calling a `static fn` with a runtime argument is SEM0176 at that argument.
 
 ## Static parameters
@@ -377,6 +378,7 @@ pub fn main() -> i32 {
 | SEM0223 | Constants depend on each other in a cycle |
 | SEM0245 | An anonymous function or `effect {}` block in a function with `static` parameters |
 | SEM0249 | A method with `static` parameters called where its static arguments cannot be selected yet, such as in a `static fn` |
+| SEM0251 | A `static fn` parameter marked `static` or `mut` |
 | SEM0083 | A conformance whose witness differs from the operation in being `static fn` or in its `static` parameters |
 
 ## See also
