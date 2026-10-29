@@ -2898,7 +2898,7 @@ src/main.silk:2:18: error[SEM0095] Float literal 1e39 rounds to infinity as f32,
 src/main.silk:3:14: error[SEM0095] Float literal 1.0e400 rounds to infinity as f64, whose largest finite value is 1.7976931348623157e308
 ```
 
-The column is the literal. The check uses the literal's selected type, so `1e39` is accepted as an `f64` and rejected as an `f32`. A leading minus sign does not help: `-1.0e400` is reported the same way.
+The column is the literal, or its leading minus sign. The check uses the literal's selected type, so `1e39` is accepted as an `f64` and rejected as an `f32`. A leading minus sign does not help: `-1.0e400` is reported the same way, at the minus sign.
 
 Fix: Write a value no larger than the type's `MAX`. For infinity itself, use `f32.INFINITY` or `f64.INFINITY` from `silk/num/f32` and `silk/num/f64`. See Values and primitive types.
 

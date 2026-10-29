@@ -266,7 +266,7 @@ pub fn main() -> i32 {
 }
 ```
 
-A generic body that uses an operator from conditional impls. `mix`'s own bounds prove the bounds of both impls, so `*` and `+` on `Point<T>` are available. Leave `Multiply<T, T>` off `mix` and the `*` is SEM0121:
+A generic body that uses an operator from conditional impls. `mix`'s own bounds prove the bounds of both impls, so `*` and `+` on `Point<T>` are available. Leave `Multiply<T, T>` off `mix` and the first `*` is SEM0121:
 
 ```silk
 import silk.core.ownership { Copy }
