@@ -101,7 +101,7 @@ silk add <path> [--name <name>] [--manifest-path <path>]
 silk remove <name> [--manifest-path <path>]
 ```
 
-`add` adds the package at `path` as a path dependency, after checking the dependency graph. The dependency name is the package's name with `-` turned into `_`, or `--name`:
+`add` adds the package at `path` as a path dependency, after checking the dependency graph. It cannot add a git dependency; write that entry by hand. It never fetches, so a manifest whose git dependencies are not fetched yet is refused until `silk check` or a build fetches them. The dependency name is the package's name with `-` turned into `_`, or `--name`:
 
 ```
 Added dependency util = { path = "../util" } to /home/you/ws/app/silk.toml
@@ -439,7 +439,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 
 | Variable | Used for |
 | --- | --- |
-| `PATH` | Finding `clang`, and finding the `silk` tool |
+| `PATH` | Finding `clang`, `git` (to fetch git dependencies) and the `silk` tool |
 | `SILK_CLANG` | The Clang executable, when `--clang` is not given |
 | `SILK_LLVM_AR` | The archiver for static libraries; default is `llvm-ar` beside Clang |
 | `SDKROOT`, `DEVELOPER_DIR` | macOS SDK selection; an invalid `SDKROOT` is an error |
@@ -455,11 +455,12 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_WASI_ADAPTER` | The Preview 1 command adapter, `wasi_snapshot_preview1.command.wasm`, that a `wasm32-wasip2` executable needs |
 | `SILK_WASI_REACTOR_ADAPTER` | The Preview 1 reactor adapter, for a `wasm32-wasip2` component without a `main` |
 | `SSL_CERT_FILE` | The certificate bundle for `silk change since` and `silk use` when they fetch releases over HTTPS |
-| `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path |
+| `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path. For the compiler: git dependencies are checked out in `$SILK_HOME/git`, or `$HOME/.silk/git` when it is unset |
 | `SILK_TOOLCHAIN` | For the tool: the version to run, overriding the project's pin. The tool sets it to the full version it runs |
 | `SILK_AUTO_INSTALL` | For the tool: `1` installs a missing selected version before running the command |
 | `SILK_TOOLCHAIN_MIRROR` | For the tool: an absolute directory of release assets to install from instead of GitHub |
 | `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL`, `LC_CTYPE` | Passed through to Clang; no other variable is |
+| `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY` (and lowercase), `SSH_AUTH_SOCK`, `GIT_SSH_COMMAND`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `GIT_SSL_CAINFO`, `XDG_CONFIG_HOME` | Passed through to `git` when it fetches a git dependency, with `PATH`, `HOME`, `USER`, `TMPDIR`, `LANG` and `LC_ALL`; no other variable is. `GIT_TERMINAL_PROMPT=0` is set, so git never prompts |
 
 The installer reads `SILK_HOME`, `SILK_RELEASE` and `SILK_CHANNEL`; see **Install**. The std lib is found at `lib/silk/stdlib` beside the `bin` directory that holds `silkc`, following symbolic links.
 

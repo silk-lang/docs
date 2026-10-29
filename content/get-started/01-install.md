@@ -61,6 +61,8 @@ What lands in `~/.silk`:
     lib/silk/changes-snapshot.toml          the change history this compiler was built from
 ```
 
+Builds add `~/.silk/git/` later, with one folder per commit of the git dependencies they fetch. See **Dependencies**.
+
 The compiler finds its standard library at `../lib/silk/stdlib`, next to its own `bin` folder, so keep each version's two folders together. `~/.silk/bin/silk` is not a compiler: it runs the `silkc` of the version the directory selects. The compilers stay off your `PATH` on purpose, so that every command goes through the version a project pins.
 
 ## Settings
@@ -73,7 +75,7 @@ curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | SI
 
 | Variable | Meaning | Default |
 | --- | --- | --- |
-| `SILK_HOME` | Folder that holds the Silk versions, `bin/silk` and `settings.toml` | `~/.silk` |
+| `SILK_HOME` | Folder that holds the Silk versions, `bin/silk`, `settings.toml` and the `git` checkouts of git dependencies | `~/.silk` |
 | `SILK_RELEASE` | An exact release tag to install, such as `v0.1.0` | The newest release |
 | `SILK_CHANNEL` | `stable`, `dev` or `auto`. `auto` prefers stable and falls back to dev only before any stable release exists. `dev` takes the newest published dev release even after a stable one exists | `auto` |
 | `GITHUB_TOKEN` | Optional. Raises the GitHub API rate limit, useful on shared CI machines | none |

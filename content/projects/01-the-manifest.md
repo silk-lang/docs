@@ -108,20 +108,23 @@ Build outputs and native linking covers what they do.
 
 ## &#91;dependencies\]
 
-One entry per dependency. The key is the name the package imports it by.
+One entry per dependency. The key is the name the package imports it by. A path dependency names a directory; a git dependency names a repository and a commit.
 
 ```toml
 [dependencies]
 pricing = { path = "../pricing" }
 text_utils = { path = "../text-utils", package = "text-utils" }
+vector = { git = "https://example.com/geometry.git", rev = "fb09a5d023a80e50a973adb896a198ab4daab4db", path = "vector" }
 ```
 
 | Key | Required | Meaning |
 | --- | --- | --- |
-| `path` | yes | Directory of the dependency's `silk.toml`, relative to this manifest. |
+| `path` | yes, without `git` | Path dependency: directory of the dependency's `silk.toml`, relative to this manifest. Git dependency: directory of the package inside the repository, relative to its root. Default: the repository root. |
+| `git` | for a git dependency | The repository: a URL, an scp-style `host:path`, or an absolute path. |
+| `rev` | with `git` | The full commit hash, 40 or 64 lowercase hexadecimal digits. |
 | `package` | no | The dependency's `[package].name`. When given, it must match. |
 
-Only path dependencies exist. The other sources and their settings (`git`, `url`, `version`, `tag`, `rev`, `branch`, `hash`, `optional`, `workspace`) are refused as not supported yet. See **Dependencies** for the naming rules.
+The other sources and their settings (`url`, `version`, `tag`, `branch`, `hash`, `optional`, `workspace`) are refused as not supported yet. A git dependency is pinned with `rev`, never with `tag` or `branch`. See **Dependencies** for git dependencies, fetching and the naming rules.
 
 ## &#91;profiles.\<name>\]
 
@@ -218,7 +221,7 @@ Invalid Silk project manifest /home/you/hello/silk.toml:2: package.nmae is not a
 | Only `[workspace]`, for a command that needs a package | `this manifest only defines a workspace; run the command in one of its member directories` |
 | An earlier spelling, such as `[build].artifact` | `LINE: build.artifact is an earlier spelling; write package.kind` |
 | A reserved table, such as `[dev-dependencies]` | `LINE: dev-dependencies is not supported yet` |
-| A reserved key, such as `package.include` or a `git` dependency | `LINE: package.include is not supported yet` |
+| A reserved key, such as `package.include` or a dependency's `tag` | `LINE: package.include is not supported yet` |
 | Unknown top-level key or table, such as `[packge]` | `LINE: packge is not a supported field; did you mean package?` |
 | Unknown `[package]` key | `LINE: package.<key> is not a supported field`, plus `; did you mean package.<close key>?` when there is one, as for every unknown key below |
 | Unknown key in a dependency entry | `LINE: dependencies.<name>.<key> is not a supported field` |
