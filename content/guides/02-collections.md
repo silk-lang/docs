@@ -1,6 +1,6 @@
 # Collections
 
-This guide builds `wordfreq`, which counts the words in a sentence and prints the most frequent first. It uses the four collections of the std lib: `Bytes` for a buffer you change in place, `List` for a sequence that grows, `HashSet` for "have I seen this?", and `HashMap` for counts. To store a type of your own in a hashed collection you implement `HashKey`, and to sort it you implement `Order`. Both are here.
+This guide builds `wordfreq`, which counts the words in a sentence and prints the most frequent first. It uses the four collections of the std lib: `Bytes` for a buffer you change in place, `List` for a sequence that grows, `HashSet` for "have I seen this?", and `HashMap` for counts. To sort a type of your own you implement `Order`, and to use one as a key in a hashed collection you implement `HashKey`. Both are here.
 
 ```sh
 silk init wordfreq
@@ -19,6 +19,8 @@ cd wordfreq
 | `HashMap<K, V>` | `silk/collections/hash_map` | Looking a value up by key | `insert` |
 
 Every operation that may grow a collection is an `effect fn` that needs `? &mut Allocator` and can fail with `OutOfMemoryError`. `make()` never allocates, so an empty collection costs nothing. A failed growth leaves the collection as it was. You can see from a signature alone which code may allocate.
+
+When you know the size ahead of time, `makeWithCapacity` allocates once up front, and `reserve` makes room in a collection you already have. `List` and `Bytes` also have `reserveExact`, `shrinkToFit` and `capacity`. `clear` empties a collection and keeps its storage for reuse; `clearAndFree` releases the storage too.
 
 ## The text and the words
 
@@ -88,39 +90,60 @@ A `List` hands out its elements three ways:
 - `get(i)` returns a copy, so it only works when the element type is `Copy`.
 - `pop()` and `remove(i)` take an element out and give you ownership.
 
-An index out of range traps with `index out of bounds`. `length()` is a method on the list; `.length` is a field on a slice. Other methods worth knowing: `insert`, `set`, `truncate`, `clear`, `reserve` (allocate ahead of time), and `binarySearch` on a sorted list.
+An index out of range traps with `index out of bounds`. `length()` is a method on the list; `.length` is a field on a slice. Other methods worth knowing: `insert`, `insertSlice` (copy a slice in at an index), `insertRepeated` (insert `count` copies of one value), `set`, `truncate`, `clear`, and `binarySearch` on a sorted list.
 
-## A key type of your own
+## Keys
 
-`HashMap` and `HashSet` need a key type that implements `HashKey` from `silk/collections/hash`. No std lib type but `Word` (one `u64`) has one, not even `string`. So wrap the word in a small struct:
+`HashMap` and `HashSet` need a key type that implements `HashKey` from `silk/collections/hash`. `string` and every integer type implement it, so the words can be keys as they are. `HashMap.get` returns copies of the stored key and value, so it also needs both to be `Copy`. A `string` is a view, and copying it does not copy the text.
+
+`HashKey` has two members. `equals` says when two keys are the same entry. `hash` turns a key into a number under the collection's seed: start with `Hash.mix(seed, first)` and fold in every further value with `Hash.combine`. The rule the collection cannot check for you: keys that are equal must hash the same.
+
+To use a type of your own as a key, implement both. This word type ignores ASCII case, so `"The"` and `"the"` are one entry:
 
 ```silk
-// A word used as a key. It borrows its text, so it is cheap to copy.
-struct Term<'text> { text: string<'text> }
+// A word that compares and hashes without regard to ASCII case.
+struct Folded<'text> { text: string<'text> }
 
-impl<'text> Copy for Term<'text> {}
+impl<'text> Copy for Folded<'text> {}
 
-fn sameTerm(left: &Term, right: &Term) -> bool {
-  return left.text == right.text
+fn lower(byte: u8) -> u8 {
+  if byte >= 'A' && byte <= 'Z' {
+    return byte + 32
+  }
+  return byte
 }
 
-fn hashTerm(value: &Term, seed: &HashSeed) -> u64 {
+fn sameFolded(left: &Folded, right: &Folded) -> bool {
+  let a = String.utf8Bytes(left.text)
+  let b = String.utf8Bytes(right.text)
+  if a.length != b.length {
+    return false
+  }
+  let mut index: usize = 0
+  while index < a.length {
+    if lower(a[index]) != lower(b[index]) {
+      return false
+    }
+    index = index + 1
+  }
+  return true
+}
+
+fn hashFolded(value: &Folded, seed: &HashSeed) -> u64 {
   let bytes = String.utf8Bytes(value.text)
   let mut hashed = Hash.mix(seed, usize.toU64(bytes.length))
   let mut index: usize = 0
   while index < bytes.length {
-    hashed = Hash.combine(hashed, u8.toU64(bytes[index]))
+    hashed = Hash.combine(hashed, u8.toU64(lower(bytes[index])))
     index = index + 1
   }
   return hashed
 }
 
-impl<'text> HashKey for Term<'text> { equals: sameTerm hash: hashTerm }
+impl<'text> HashKey for Folded<'text> { equals: sameFolded hash: hashFolded }
 ```
 
-`HashKey` has two members. `equals` says when two keys are the same entry. `hash` turns a key into a number under the collection's seed: start with `Hash.mix(seed, first)` and fold in every further value with `Hash.combine`. The rule the collection cannot check for you: keys that are equal must hash the same. Here both depend on exactly the same bytes, so the rule holds.
-
-`Copy` comes from `silk/core/ownership`. `Term` is `Copy` because copying it copies a view, not the text. That matters because lookups consume the key you pass, and `HashMap.get` returns copies of stored keys and values, so it needs both to be `Copy`.
+It needs `import silk.collections.hash { Hash, HashKey, HashSeed }`, `silk.core.ownership { Copy }`, `silk.num.u8` and `silk.num.usize`. Both members fold the case of each byte the same way, so the rule holds. With this impl, a `HashSet<Folded>` that holds `Folded { text: "The" }` contains `Folded { text: "the" }`. `Copy` comes from `silk/core/ownership`. `Folded` is `Copy` because copying it copies a view, not the text. `wordfreq` lower-cases its text first, so it can use plain `string` keys.
 
 ## Counting with a HashSet and a HashMap
 
@@ -128,18 +151,18 @@ A set holds the stop words to skip, and a map holds the counts:
 
 ```silk
 // Counts each word that is not a stop word.
-effect fn countWords<'text>(all: &[string<'text>], stop: &HashSet<Term<'text>>) -> HashMap<Term<'text>, u32>
+effect fn countWords<'text>(all: &[string<'text>], stop: &HashSet<string<'text>>) -> HashMap<string<'text>, u32>
 ! OutOfMemoryError ? &mut Allocator {
-  let mut counts = HashMap<Term<'text>, u32>.make(Hash.seed(2026))
+  let mut counts = run HashMap<string<'text>, u32>.makeWithCapacity(Hash.seed(2026), all.length)
   let mut index: usize = 0
   while index < all.length {
-    let term = Term { text: all[index] }
-    if !stop.contains(term) {
-      let seen = match counts.get(term) {
+    let word = all[index]
+    if !stop.contains(word) {
+      let seen = match counts.get(word) {
         Option.Some { value } => value
         Option.None => 0
       }
-      drop run counts.insert(term, seen + 1)
+      drop run counts.insert(word, seen + 1)
     }
     index = index + 1
   }
@@ -147,9 +170,9 @@ effect fn countWords<'text>(all: &[string<'text>], stop: &HashSet<Term<'text>>) 
 }
 ```
 
-Each collection is made with a seed, `Hash.seed(2026)`. The seed belongs to the collection, and every key is hashed with it. The same seed and the same operations give the same layout on every target, so output that depends on bucket order is reproducible.
+Each collection is made with a seed, `Hash.seed(2026)`. `makeWithCapacity` takes the seed and a number of entries, and allocates room for them up front, so the loop never grows the map; a plain `make(seed)` would start empty and grow as it goes. The seed belongs to the collection, and every key is hashed with it. The same seed and the same operations give the same layout on every target, so output that depends on bucket order is reproducible.
 
-`insert` returns the value the key held before, as an `Option`. Here the old count is not needed, so `drop` discards it. For values that are not `Copy`, `get` is not available. Use `withMut(key, callback)` to change a stored value in place, or `remove` to take it out.
+A lookup consumes the key you pass, which costs nothing for a `string`. `insert` returns the value the key held before, as an `Option`. Here the old count is not needed, so `drop` discards it. For values that are not `Copy`, `get` is not available. Use `withMut(key, callback)` to change a stored value in place, or `remove` to take it out.
 
 The function takes the words as `&[string<'text>]`, a borrowed slice, not the `List` itself. A function that only reads a sequence should take a slice: it then works with a list, an array or a part of either.
 
@@ -159,19 +182,19 @@ The map keeps its entries in bucket order, which is neither insertion order nor 
 
 ```silk
 // One row of the result: a word and how often it appeared.
-struct Count<'text> { term: Term<'text>, count: u32 }
+struct Count<'text> { word: string<'text>, count: u32 }
 
 impl<'text> Copy for Count<'text> {}
 
 // Most frequent first; ties in alphabetical order.
-fn compareCounts(left: &Count, right: &Count) -> Ordering {
+fn compareCounts<'text>(left: &Count<'text>, right: &Count<'text>) -> Ordering {
   if left.count > right.count {
     return Ordering.Less
   }
   if left.count < right.count {
     return Ordering.Greater
   }
-  return compareText(left.term.text, right.term.text)
+  return Order.compare(&left.word, &right.word)
 }
 
 impl<'text> Order for Count<'text> { compare: compareCounts }
@@ -179,17 +202,17 @@ impl<'text> Order for Count<'text> { compare: compareCounts }
 
 `compare` returns `Ordering.Less`, `Equal` or `Greater`, and must describe a total order. A larger count sorts as "less" so that it comes first. With the impl in place, `&a < &b` works on `Count` values too.
 
-`<` does not accept two strings (SEM0135), so `compareText` compares them byte by byte. It returns `Less` at the first smaller byte, and a shorter string sorts before a longer one that starts the same way.
+For a tie, `Order.compare` uses the std lib's `Order` for `string`, which compares the UTF-8 bytes: case-sensitive, and a shorter string sorts before a longer one that starts the same way. The integer types, `char`, `f32` and `f64` implement `Order` too, so a `List<string>` or `List<f64>` sorts with no extra code. Two things trip this up in this release. The `<` operator does not accept two strings, not even as `&a < &b` (SEM0135), so call `Order.compare`. And both strings must have the same lifetime, which is why `compareCounts` names `'text` for both parameters. With the elided `&Count` of each, the call is SEM0012, "Expected &string but received &string", with the note "the two types differ only in their lifetimes".
 
 Leave out the `impl Order` and `rows.sort()` stops the build:
 
 ```
 Checking wordfreq (x86_64-unknown-linux-gnu)
-  load     55 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.15s
+  load     147 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
-src/main.silk:177:7: error[SEM0121] `main.Count<'_>: silk.core.order.Order` cannot be proved: no implementation of `silk.core.order.Order` exists for `main.Count<'_>`
-Failed wordfreq in 0.21s
+src/main.silk:129:7: error[SEM0121] `main.Count<'_>: silk.core.order.Order` cannot be proved: no implementation of `silk.core.order.Order` exists for `main.Count<'_>`
+Failed wordfreq in 0.17s
 ```
 
 The requirement it cannot prove is `Count: Order`, which `sort` declares as `sort<T: Order>`. The location is the `run rows.sort()` line.
@@ -210,10 +233,10 @@ effect fn report() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut A
   let all = run words(text)
   run Format.format("{count} words\n", &.{ count: all.length() })
 
-  let mut stop = HashSet<Term>.make(Hash.seed(7))
-  drop run stop.insert(Term { text: "the" })
-  drop run stop.insert(Term { text: "and" })
-  drop run stop.insert(Term { text: "on" })
+  let mut stop = HashSet<string>.make(Hash.seed(7))
+  drop run stop.insert("the")
+  drop run stop.insert("and")
+  drop run stop.insert("on")
 
   let counts = run countWords(all.asSlice(), &stop)
   run Format.format("{count} distinct words after dropping {stop} stop words\n", &.{
@@ -226,7 +249,7 @@ effect fn report() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut A
   let mut bucket: usize = 0
   while bucket < counts.bucketCount() {
     if counts.occupiedAt(bucket) {
-      run rows.append(Count { term: counts.keyAt(bucket), count: counts.valueAt(bucket) })
+      run rows.append(Count { word: counts.keyAt(bucket), count: counts.valueAt(bucket) })
     }
     bucket = bucket + 1
   }
@@ -235,7 +258,7 @@ effect fn report() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut A
   let sorted = rows.asSlice()
   let mut index: usize = 0
   while index < sorted.length {
-    run Format.format("{count} {word}\n", &.{ count: sorted[index].count, word: sorted[index].term.text })
+    run Format.format("{count} {word}\n", &.{ count: sorted[index].count, word: sorted[index].word })
     index = index + 1
   }
 }
@@ -250,7 +273,11 @@ pub effect fn main() -> i32 ! WriterError | OutOfMemoryError {
 }
 ```
 
-The stop set is written `HashSet<Term>`, with no lifetime. The compiler picks one that fits the words it will be compared with. Writing `HashSet<Term<'static>>` is SEM0012 when you pass it to `countWords`, because a set of `'static` terms is a different type from a set of `'text` terms.
+The stop set is written `HashSet<string>`, with no lifetime. The compiler picks one that fits the words it will be compared with. Writing `HashSet<string<'static>>` is SEM0012 when you pass it to `countWords`, because a set of `'static` strings is a different type from a set of `'text` strings:
+
+```
+src/main.silk:115:20: error[SEM0012] Expected &silk.collections.hash_set.HashSet<string> but received &silk.collections.hash_set.HashSet<string<'static>>
+```
 
 `insert` on a set returns `true` when an equal element was already there. Sorting may allocate scratch space, so `sort` needs the allocator too. It is stable: equal elements keep their order.
 
@@ -261,7 +288,7 @@ import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
 import silk.text.format { Format }
-import silk.collections.hash { Hash, HashKey, HashSeed }
+import silk.collections.hash { Hash }
 import silk.collections.hash_map { HashMap }
 import silk.collections.hash_set { HashSet }
 import silk.collections.list { List }
@@ -272,8 +299,6 @@ import silk.core.ownership { Copy }
 import silk.core.result { Result }
 import silk.collections.slice { Slice }
 import silk.text.string { String }
-import silk.num.u8
-import silk.num.usize
 import silk.io.writer { Writer, WriterError }
 ```
 
@@ -305,7 +330,7 @@ There are 16 words. After "the", "and" and "on" are dropped, 6 remain. "cat" and
 - `silk/collections/slice`: `Slice`
 - `silk/collections/hash_map`: `HashMap`
 - `silk/collections/hash_set`: `HashSet`
-- `silk/collections/hash`: `Hash`, `HashKey`, `HashSeed`, `Word`
+- `silk/collections/hash`: `Hash`, `HashKey`, `HashSeed`
 - `silk/core/order`: `Order`, `Ordering`
 - `silk/core/equal`: `Equal`
 - `silk/core/ownership`: `Copy`
