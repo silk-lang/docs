@@ -83,11 +83,11 @@ silk check
 
 ```
 Checking textinfo (x86_64-unknown-linux-gnu)
-  load     52 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.24s
+  load     141 modules, 1 in package         0.06s
+  check    failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:8:7: error[SEM0177] template field {count} not found; available visible fields: name, cuont
-Failed textinfo in 0.31s
+Failed textinfo in 0.20s
 ```
 
 The error points at the call, and the message names the missing placeholder and lists the fields you did pass. A positional template is checked the same way. With `Format.format("{} has {} tasks, {} done\n", &("Julia", 3))` the check reports:
@@ -133,7 +133,7 @@ effect fn options() -> () ! WriterError ? &mut Writer {
 
 The compiler checks the options with the rest of the template. A base type on a float or `e` on an integer stops the build at the call. The width and precision are fixed in the template. To take them from a value, build a `FormatOptions` (it has `width`, `alignment`, `fill`, `sign`, `zeroPad`, `precision` and `style`) and display one value with `Format.displayWith`. `FormatOptions` also has the two settings a template cannot express: `Sign.Space` and `color`.
 
-Checking a template takes compile time, and the time grows faster than the number of placeholders, whether they are named or positional. A template with 8 placeholders takes about half a second of `silk check`, 16 about one second, 24 about two seconds, and 40 about six. For a long line, split it into several `Format.format` calls.
+The compiler checks a template by running the template parser at compile time, and that work has a memory limit. A template with more than 22 placeholders, or a literal of about 900 bytes or more, goes over it and stops the build at the call with SEM0181, "Static evaluation exceeded its limit of 1048576 bytes of retained values". For a long line, split it into several `Format.format` calls.
 
 Precision on a float means exactly that many fractional digits, rounded half to even. Without it, a float prints the shortest decimal that reads back to the same bits.
 
@@ -290,6 +290,47 @@ effect fn normalize() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mu
 
 Normalization returns a new owned `String`, so it needs `? &mut Allocator` and can fail with `OutOfMemoryError`. `String.view` borrows it back as a `string`. `normalizeNfd` gives the decomposed form. The module does canonical forms only: no NFKC or NFKD, no case folding, no locale-aware comparison. Of the Unicode character properties, it exposes only the canonical combining class (`Unicode.canonicalCombiningClass`). There are no queries such as "is this a letter".
 
+## Searching, splitting and trimming
+
+`silk/text/string` can take text apart without copying it. Each of these functions returns a view of the text you pass, with the same lifetime:
+
+```silk
+// Searching, splitting and trimming. Every result is a view of the input; nothing is copied.
+effect fn settings(line: string) -> () ! WriterError ? &mut Writer {
+  let mut pieces = String.split(line, ",")
+  while true {
+    let piece = match Split.next(&mut pieces) {
+      Option.Some { value } => String.trim(value)
+      Option.None => {
+        break
+      }
+    }
+    match String.find(piece, "=") {
+      Option.Some { value } => {
+        let key = String.trimEnd(String.slice(piece, 0, value))
+        let rest = String.slice(piece, value + 1, String.byteLength(piece) - value - 1)
+        run Format.format("[{key}] = [{value}]\n", &.{ key: key, value: String.trimStart(rest) })
+      }
+      Option.None => {
+        run Format.format("[{piece}] has no value\n", &.{ piece: piece })
+      }
+    }
+  }
+  let file = "notes.tar.gz"
+  if let Option.Some { value } = String.findLast(file, ".") {
+    run Format.format("{file}: extension {ext}, archive {tar}\n", &.{
+      file: file,
+      ext: String.slice(file, value + 1, String.byteLength(file) - value - 1),
+      tar: String.contains(file, ".tar"),
+    })
+  }
+}
+```
+
+`String.split` returns a `Split`, and `Split.next` gives one piece at a time until it returns `None`. Two separators in a row give an empty piece. `Split.remainder` takes the rest of the text in one piece, such as everything after the first `=`. `String.trim`, `trimStart` and `trimEnd` drop Unicode whitespace from the ends.
+
+`String.find` and `String.findLast` return the byte offset of the first or last match, and `contains`, `startsWith` and `endsWith` answer yes or no. Every comparison is exact, byte for byte: no case folding and no normalization. `String.slice(text, offset, length)` cuts a view by byte offsets. The offsets from a search always fall at the start of a scalar. An offset inside a scalar, or a range past the end, traps the program, so check an offset from elsewhere with `String.isCharBoundary` first.
+
 ## Building owned text and reading numbers
 
 `+` does not join strings. To build text you own, start a `String` and append to it:
@@ -297,14 +338,15 @@ Normalization returns a new owned `String`, so it needs `? &mut Allocator` and c
 ```silk
 // Owned text: String keeps its own buffer and can grow.
 effect fn greeting(name: string) -> String ! OutOfMemoryError ? &mut Allocator {
-  let mut text = run String.copy("Hello, ")
+  let mut text = run String.makeWithCapacity(8 + String.byteLength(name))
+  run text.append("Hello, ")
   run text.append(name)
   run text.append("!")
   return move text
 }
 ```
 
-If an append cannot get memory, the `String` keeps its old contents. For text with numbers in it, a template written into a `Writer` that collects bytes is usually simpler; chapter 9 of the book builds one.
+`String.makeWithCapacity` allocates room for the whole greeting up front, so the three appends do not allocate again. `String.copy(text)` starts from a copy instead. If an append cannot get memory, the `String` keeps its old contents. `capacity` reports the room left before the next allocation. `reserve` and `reserveExact` make room ahead of time, and `shrinkToFit` gives back what is unused. `clear` empties the text and keeps the storage for reuse, and `clearAndFree` releases the storage too. For text with numbers in it, a template written into a `Writer` that collects bytes is usually simpler; chapter 9 of the book builds one.
 
 The opposite direction is parsing. `Format.i32Value` and its siblings (`u8Value` to `i64Value`, `f64Value`, `f32Value`) read a whole string as a decimal number:
 
@@ -348,6 +390,7 @@ effect fn report() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut A
   let chunks: [&[u8]; 2] = [b"caf\xC3", b"\xA9!"]
   run decodeChunks(&chunks)
   run normalize()
+  run settings(" name = naïve , lang=silk,draft ")
   let hello = run greeting("naïve reader")
   run describe(String.view(&hello))
   run parse("1234")
@@ -380,7 +423,7 @@ import silk.core.option { Option }
 import silk.io.writer_native { StdoutWriter }
 import silk.core.result { Result }
 import silk.collections.slice { Slice }
-import silk.text.string { String }
+import silk.text.string { Split, String }
 import silk.num.u32
 import silk.text.unicode { Unicode }
 import silk.text.utf8_decoder { Utf8Decoder, Utf8Step }
@@ -411,6 +454,10 @@ invalid UTF-8 at byte 3
 U+0063 U+0061 U+0066 (chunk 0 ends mid-scalar) U+00E9 U+0021 done
 raw equal: false
 NFC equal: true (Unicode 17.0.0)
+[name] = [naïve]
+[lang] = [silk]
+[draft] has no value
+notes.tar.gz: extension gz, archive true
 Hello, naïve reader!: 21 bytes, 20 scalars
 1234 -> 1234
 12x: not a number at byte 2
@@ -418,11 +465,11 @@ Hello, naïve reader!: 21 bytes, 20 scalars
 {name} is literal; naïve is 5 scalars
 ```
 
-Read it against the code. The price column pads `2.50` to 8 columns, `{:.3}` cuts `naïve` to three scalars, and `{:05}` puts the zeros after the minus sign. `{:#010b}` counts the `0b` prefix in its width of 10. `ï` takes two bytes, so the offsets jump from 2 to 4. `b"caf\xC3"` stops in the middle of `é`, and the error names byte 3. The decoder sees the same split bytes across two chunks and puts `é` back together.
+Read it against the code. The price column pads `2.50` to 8 columns, `{:.3}` cuts `naïve` to three scalars, and `{:05}` puts the zeros after the minus sign. `{:#010b}` counts the `0b` prefix in its width of 10. `ï` takes two bytes, so the offsets jump from 2 to 4. `b"caf\xC3"` stops in the middle of `é`, and the error names byte 3. The decoder sees the same split bytes across two chunks and puts `é` back together. In the settings line, the spaces around `naïve` and the missing ones around `silk` give the same result once trimmed.
 
 ## API reference
 
-- `silk/text/string`: `String`, `InvalidUtf8`, `ScalarCursor`, `ScalarStep`
+- `silk/text/string`: `String`, `Split`, `InvalidUtf8`, `ScalarCursor`, `ScalarStep`
 - `silk/text/char`: `fromU32`, `toU32`
 - `silk/text/utf8_decoder`: `Utf8Decoder`, `Utf8Step`
 - `silk/text/unicode`: `Unicode`
