@@ -75,14 +75,14 @@ TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     62 modules, 1 in package          0.07s
-  check    1 module                          0.53s
-  codegen  2,188 functions                   0.69s
-  borrow   412 bodies                        0.03s
-  link     clang                             0.52s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.90s
+  load     165 modules, 1 in package         0.07s
+  check    1 module                          0.39s
+  codegen  2,555 functions                   0.46s
+  borrow   484 bodies                        0.02s
+  link     clang                             0.58s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.53s
 115 minutes in total
-time 0.604s
+time 0.603s
 ```
 
 Two lookups of 300 ms, one after the other: 0.6 s. Now start each lookup in its own fiber, then collect both results. Change `total`:
@@ -102,12 +102,12 @@ effect fn total() -> i32
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     62 modules, 1 in package          0.07s
-  check    1 module                          0.56s
-  codegen  2,425 functions                   0.88s
-  borrow   446 bodies                        0.03s
-  link     clang                             0.55s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.16s
+  load     165 modules, 1 in package         0.03s
+  check    1 module                          0.14s
+  codegen  2,792 functions                   0.84s
+  borrow   518 bodies                        0.02s
+  link     clang                             0.20s
+Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.25s
 115 minutes in total
 time 0.303s
 ```
@@ -223,11 +223,11 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     55 modules, 1 in package          0.05s
-  check    failed: 2 modules, 1 error        0.11s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.16s
 [x86_64-unknown-linux-gnu]
 src/main.silk:14:49: error[SEM0076] The Effect passed here also requires &mut Logger, but the expected Effect may only require &mut Scheduler | &mut MonotonicClock; provide &mut Logger inside it, or run that work before passing it
-Failed tasks in 0.17s
+Failed tasks in 0.20s
 ```
 
 Column 49 is the argument to `forkChild`. The message names the problem: `shout()` needs a `Logger`, and a fiber may only ask for the scheduler and the clock. Replace `shout` with a child that borrows a title instead:
@@ -248,14 +248,14 @@ effect fn root<'text>(title: string<'text>) -> () ! OutOfMemoryError | TaskIdExh
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     55 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.12s
+  load     143 modules, 1 in package         0.01s
+  check    failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
-src/main.silk:14:15: error[SEM0212] A lifetime that must outlive another, with no declared bound saying it does
-Failed tasks in 0.19s
+src/main.silk:14:15: error[SEM0212] This value must live for `'static`, but it borrows something that lives only as long as a lifetime of the enclosing function; pass owned data instead of a borrow
+Failed tasks in 0.11s
 ```
 
-Column 15 is the `run` of the fork. SEM0212 means one lifetime has to outlive another and does not. Here the child must be `'static`, but `measure(title)` borrows `title`, which is only valid during `'text`.
+Column 15 is the `run` of the fork. SEM0212 means one lifetime has to outlive another and does not. Here the child must be `'static`, as the message says, but `measure(title)` borrows `title`, which is only valid during `'text`, a lifetime of `root`.
 
 So a failed `forkChild` comes in two kinds. SEM0076 means the child needs a service other than the two allowed. SEM0212 means it borrows something. The fix is always the same shape: give the child owned values, and do the logging or the borrowing in the parent.
 
@@ -337,14 +337,14 @@ The closure receives `state: &mut Fired` and hands it to `record`. Check it:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     67 modules, 1 in package          0.07s
-  check    failed: 2 modules, 1 error        4.11s
+  load     178 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.94s
 [x86_64-unknown-linux-gnu]
-src/main.silk:576:63: error[OWN0003] Moving state requires an explicit move
-Failed tasks in 4.19s
+src/main.silk:590:63: error[OWN0003] `state` is a `&mut` reference: lend it again with `&mut state` (a reborrow), or write `move state` to give it away
+Failed tasks in 1.00s
 ```
 
-A `&mut` is a unique loan, so passing it on moves it, and Silk wants every move written out. Silk does not quietly reborrow a `&mut` for you, as you saw in chapter 9. Write `move state`:
+A `&mut` is a unique loan, so passing it on as it is moves it, and Silk wants every move written out. Silk does not quietly reborrow a `&mut` for you, as you saw in chapter 9. The message offers both ways out: `&mut state` lends it again for the length of the call, and `move state` gives it away. The closure has no further use for `state`, so give it away:
 
 ```silk
   Shared.withMut(&fired, fn(state: &mut Fired) -> () { record(move state, id) })
@@ -437,11 +437,11 @@ pub effect fn main() -> i32 ! OutOfMemoryError | TaskIdExhaustedError | Cancelle
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     55 modules, 1 in package          0.04s
+  load     143 modules, 1 in package         0.02s
   check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:16:10: error[SEM0071] This `run` needs `&mut Scheduler | &mut MonotonicClock`, which the enclosing function does not provide; add `? &mut Scheduler | &mut MonotonicClock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
-Failed tasks in 0.14s
+Failed tasks in 0.13s
 ```
 
 SEM0071 is the "missing provider" error from chapter 8. Line 16 runs `root()`, which needs a `Scheduler` that nothing provides. Wrap the call in `LocalScheduler.execute` and provide a clock, as `runReminders` does.
@@ -507,11 +507,11 @@ effect fn parseMilliseconds(word: string) -> u64 ! UsageError {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     67 modules, 1 in package          0.09s
-  check    failed: 2 modules, 1 error        4.36s
+  load     178 modules, 1 in package         0.03s
+  check    failed: 2 modules, 1 error        0.72s
 [x86_64-unknown-linux-gnu]
-src/main.silk:470:33: error[SEM0009] Unknown name u32; is `import silk.num.u32` missing?
-Failed tasks in 4.46s
+src/main.silk:477:33: error[SEM0009] Unknown name u32; is `import silk.num.u32` missing?
+Failed tasks in 0.78s
 ```
 
 The message names what the compiler could not find and suggests the likely cause. Conversions like `u32.toU64`, `usize.toI32` and `u8.toU64` each need their type's module imported.
@@ -697,17 +697,17 @@ silk test
 
 ```
   main::finishingRecordsTheClockTime
-    PASS  89 us
+    PASS  126 us
   main::slowRemindersAreCancelled
-    PASS  175 us
+    PASS  247 us
   main::unknownTaskIsReported
-    PASS  12 us
+    PASS  46 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   337 us
+Time   1 ms
 ```
 
-A quarter of a virtual second, checked in 175 microseconds. This is the payoff of treating time as a service: the code under test is exactly the code that runs for real. Only the provider changed. See **Fibers and scheduling** in the reference for the full timer rules.
+A quarter of a virtual second, checked in 247 microseconds. This is the payoff of treating time as a service: the code under test is exactly the code that runs for real. Only the provider changed. See **Fibers and scheduling** in the reference for the full timer rules.
 
 ## Summary
 
