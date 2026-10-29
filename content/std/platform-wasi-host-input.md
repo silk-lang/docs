@@ -8,10 +8,89 @@ The WASI runtime supplies this provider to an application that requires `HostInp
 The snapshot owns its bytes. The working directory is `/` in the guest namespace.
 The host grants filesystem access separately through preopened directories.
 
-Public declarations: 0.
+Import as `WasiHostInput` with `import silk.platform.wasi.host_input { WasiHostInput }`.
 
-This module declares no public items.
+Public declarations: 1.
+
+::Anchor{id="WasiHostInput"}
+
+## `WasiHostInput`
+
+```silk
+pub struct WasiHostInput
+```
+
+A WASI `HostInput` provider that owns command arguments and environment bytes.
+The working directory is `/` in the guest namespace.
+
+::Anchor{id="WasiHostInput.impl"}
+
+## Implementation `WasiHostInput`
+
+```silk
+impl WasiHostInput
+```
+
+::Anchor{id="WasiHostInput.impl.capture"}
+
+### Associated function `capture`
+
+```silk
+pub effect fn capture() -> WasiHostInput
+      ! HostInputError | OutOfMemoryError
+      ? &mut Allocator
+```
+
+Copies the host's command arguments and environment into an owned snapshot.
+Fails with `HostInputError` on a host error, or `OutOfMemoryError` on an allocation failure.
+
+::Anchor{id="WasiHostInput.impl.HostInput"}
+
+## Implementation `HostInput for WasiHostInput`
+
+```silk
+impl HostInput for WasiHostInput
+```
+
+::Anchor{id="WasiHostInput.impl.HostInput.argumentCount"}
+
+### Operation `argumentCount`
+
+```silk
+effect fn argumentCount(self: &mut Self) -> usize
+      ! HostInputError
+```
+
+::Anchor{id="WasiHostInput.impl.HostInput.argument"}
+
+### Operation `argument`
+
+```silk
+effect fn argument(self: &mut Self, index: usize) -> Option<Bytes>
+      ! HostInputError | OutOfMemoryError
+      ? &mut Allocator
+```
+
+::Anchor{id="WasiHostInput.impl.HostInput.variable"}
+
+### Operation `variable`
+
+```silk
+effect fn variable(self: &mut Self, name: &[u8]) -> Option<Bytes>
+      ! HostInputError | OutOfMemoryError
+      ? &mut Allocator
+```
+
+::Anchor{id="WasiHostInput.impl.HostInput.workingDirectory"}
+
+### Operation `workingDirectory`
+
+```silk
+effect fn workingDirectory(self: &mut Self) -> Bytes
+      ! HostInputError | OutOfMemoryError
+      ? &mut Allocator
+```
 
 Category: Native platform.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`.
+Profiles: `wasm32-wasip1`, `wasm32-wasip2`.

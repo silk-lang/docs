@@ -9,10 +9,2410 @@ Generated from the pinned interfaces in `stdlib/wit`. Integer pointer arguments 
 linear-memory addresses. Indirect results use the canonical ABI layout of the WIT result type.
 Resource handles belong to the component instance and must be dropped or transferred once.
 
-Public declarations: 0.
+Import as `wasi_preview2` with `import silk.platform.wasi.preview2 as wasi_preview2`.
 
-This module declares no public items.
+Public declarations: 200.
+
+::Anchor{id="io_poll_pollable_ready"}
+
+## `io_poll_pollable_ready`
+
+```silk
+pub unsafe extern "C" fn io_poll_pollable_ready(p0: u32) -> u32
+    as "wasi:io/poll@0.2.12#[method]pollable.ready"
+```
+
+Calls `wasi:io/poll@0.2.12#[method]pollable.ready` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_poll_pollable_block"}
+
+## `io_poll_pollable_block`
+
+```silk
+pub unsafe extern "C" fn io_poll_pollable_block(p0: u32) -> ()
+    as "wasi:io/poll@0.2.12#[method]pollable.block"
+```
+
+Calls `wasi:io/poll@0.2.12#[method]pollable.block` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_poll_poll"}
+
+## `io_poll_poll`
+
+```silk
+pub unsafe extern "C" fn io_poll_poll(p0: u32, p1: u32, p2: u32) -> ()
+    as "wasi:io/poll@0.2.12#poll"
+```
+
+Calls `wasi:io/poll@0.2.12#poll` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_poll_drop_pollable"}
+
+## `io_poll_drop_pollable`
+
+```silk
+pub unsafe extern "C" fn io_poll_drop_pollable(p0: u32) -> ()
+    as "wasi:io/poll@0.2.12#[resource-drop]pollable"
+```
+
+Calls `wasi:io/poll@0.2.12#[resource-drop]pollable` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="clocks_monotonic_clock_now"}
+
+## `clocks_monotonic_clock_now`
+
+```silk
+pub unsafe extern "C" fn clocks_monotonic_clock_now() -> u64
+    as "wasi:clocks/monotonic-clock@0.2.12#now"
+```
+
+Calls `wasi:clocks/monotonic-clock@0.2.12#now` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="clocks_monotonic_clock_resolution"}
+
+## `clocks_monotonic_clock_resolution`
+
+```silk
+pub unsafe extern "C" fn clocks_monotonic_clock_resolution() -> u64
+    as "wasi:clocks/monotonic-clock@0.2.12#resolution"
+```
+
+Calls `wasi:clocks/monotonic-clock@0.2.12#resolution` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="clocks_monotonic_clock_subscribe_instant"}
+
+## `clocks_monotonic_clock_subscribe_instant`
+
+```silk
+pub unsafe extern "C" fn clocks_monotonic_clock_subscribe_instant(p0: u64) -> u32
+    as "wasi:clocks/monotonic-clock@0.2.12#subscribe-instant"
+```
+
+Calls `wasi:clocks/monotonic-clock@0.2.12#subscribe-instant` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="clocks_monotonic_clock_subscribe_duration"}
+
+## `clocks_monotonic_clock_subscribe_duration`
+
+```silk
+pub unsafe extern "C" fn clocks_monotonic_clock_subscribe_duration(p0: u64) -> u32
+    as "wasi:clocks/monotonic-clock@0.2.12#subscribe-duration"
+```
+
+Calls `wasi:clocks/monotonic-clock@0.2.12#subscribe-duration` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_error_error_to_debug_string"}
+
+## `io_error_error_to_debug_string`
+
+```silk
+pub unsafe extern "C" fn io_error_error_to_debug_string(p0: u32, p1: u32) -> ()
+    as "wasi:io/error@0.2.12#[method]error.to-debug-string"
+```
+
+Calls `wasi:io/error@0.2.12#[method]error.to-debug-string` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_error_drop_error"}
+
+## `io_error_drop_error`
+
+```silk
+pub unsafe extern "C" fn io_error_drop_error(p0: u32) -> ()
+    as "wasi:io/error@0.2.12#[resource-drop]error"
+```
+
+Calls `wasi:io/error@0.2.12#[resource-drop]error` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_input_stream_read"}
+
+## `io_streams_input_stream_read`
+
+```silk
+pub unsafe extern "C" fn io_streams_input_stream_read(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]input-stream.read"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]input-stream.read` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_input_stream_blocking_read"}
+
+## `io_streams_input_stream_blocking_read`
+
+```silk
+pub unsafe extern "C" fn io_streams_input_stream_blocking_read(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]input-stream.blocking-read"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]input-stream.blocking-read` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_input_stream_skip"}
+
+## `io_streams_input_stream_skip`
+
+```silk
+pub unsafe extern "C" fn io_streams_input_stream_skip(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]input-stream.skip"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]input-stream.skip` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_input_stream_blocking_skip"}
+
+## `io_streams_input_stream_blocking_skip`
+
+```silk
+pub unsafe extern "C" fn io_streams_input_stream_blocking_skip(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]input-stream.blocking-skip"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]input-stream.blocking-skip` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_input_stream_subscribe"}
+
+## `io_streams_input_stream_subscribe`
+
+```silk
+pub unsafe extern "C" fn io_streams_input_stream_subscribe(p0: u32) -> u32
+    as "wasi:io/streams@0.2.12#[method]input-stream.subscribe"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]input-stream.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_check_write"}
+
+## `io_streams_output_stream_check_write`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_check_write(p0: u32, p1: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.check-write"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.check-write` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_write"}
+
+## `io_streams_output_stream_write`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_write(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.write"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.write` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_blocking_write_and_flush"}
+
+## `io_streams_output_stream_blocking_write_and_flush`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_blocking_write_and_flush(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.blocking-write-and-flush"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.blocking-write-and-flush` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_flush"}
+
+## `io_streams_output_stream_flush`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_flush(p0: u32, p1: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.flush"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.flush` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_blocking_flush"}
+
+## `io_streams_output_stream_blocking_flush`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_blocking_flush(p0: u32, p1: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.blocking-flush"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.blocking-flush` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_subscribe"}
+
+## `io_streams_output_stream_subscribe`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_subscribe(p0: u32) -> u32
+    as "wasi:io/streams@0.2.12#[method]output-stream.subscribe"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_write_zeroes"}
+
+## `io_streams_output_stream_write_zeroes`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_write_zeroes(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.write-zeroes"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.write-zeroes` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_blocking_write_zeroes_and_flush"}
+
+## `io_streams_output_stream_blocking_write_zeroes_and_flush`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_blocking_write_zeroes_and_flush(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.blocking-write-zeroes-and-flush"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.blocking-write-zeroes-and-flush` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_splice"}
+
+## `io_streams_output_stream_splice`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_splice(p0: u32, p1: u32, p2: u64, p3: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.splice"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.splice` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_output_stream_blocking_splice"}
+
+## `io_streams_output_stream_blocking_splice`
+
+```silk
+pub unsafe extern "C" fn io_streams_output_stream_blocking_splice(p0: u32, p1: u32, p2: u64, p3: u32) -> ()
+    as "wasi:io/streams@0.2.12#[method]output-stream.blocking-splice"
+```
+
+Calls `wasi:io/streams@0.2.12#[method]output-stream.blocking-splice` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_drop_input_stream"}
+
+## `io_streams_drop_input_stream`
+
+```silk
+pub unsafe extern "C" fn io_streams_drop_input_stream(p0: u32) -> ()
+    as "wasi:io/streams@0.2.12#[resource-drop]input-stream"
+```
+
+Calls `wasi:io/streams@0.2.12#[resource-drop]input-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="io_streams_drop_output_stream"}
+
+## `io_streams_drop_output_stream`
+
+```silk
+pub unsafe extern "C" fn io_streams_drop_output_stream(p0: u32) -> ()
+    as "wasi:io/streams@0.2.12#[resource-drop]output-stream"
+```
+
+Calls `wasi:io/streams@0.2.12#[resource-drop]output-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_new_fields"}
+
+## `http_types_new_fields`
+
+```silk
+pub unsafe extern "C" fn http_types_new_fields() -> u32
+    as "wasi:http/types@0.2.12#[constructor]fields"
+```
+
+Calls `wasi:http/types@0.2.12#[constructor]fields` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_from_list"}
+
+## `http_types_fields_from_list`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_from_list(p0: u32, p1: u32, p2: u32) -> ()
+    as "wasi:http/types@0.2.12#[static]fields.from-list"
+```
+
+Calls `wasi:http/types@0.2.12#[static]fields.from-list` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_get"}
+
+## `http_types_fields_get`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_get(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]fields.get"
+```
+
+Calls `wasi:http/types@0.2.12#[method]fields.get` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_has"}
+
+## `http_types_fields_has`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_has(p0: u32, p1: u32, p2: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]fields.has"
+```
+
+Calls `wasi:http/types@0.2.12#[method]fields.has` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_set"}
+
+## `http_types_fields_set`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_set(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]fields.set"
+```
+
+Calls `wasi:http/types@0.2.12#[method]fields.set` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_delete"}
+
+## `http_types_fields_delete`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_delete(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]fields.delete"
+```
+
+Calls `wasi:http/types@0.2.12#[method]fields.delete` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_append"}
+
+## `http_types_fields_append`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_append(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]fields.append"
+```
+
+Calls `wasi:http/types@0.2.12#[method]fields.append` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_entries"}
+
+## `http_types_fields_entries`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_entries(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]fields.entries"
+```
+
+Calls `wasi:http/types@0.2.12#[method]fields.entries` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_fields_clone"}
+
+## `http_types_fields_clone`
+
+```silk
+pub unsafe extern "C" fn http_types_fields_clone(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]fields.clone"
+```
+
+Calls `wasi:http/types@0.2.12#[method]fields.clone` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_request_method"}
+
+## `http_types_incoming_request_method`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_request_method(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]incoming-request.method"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-request.method` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_request_path_with_query"}
+
+## `http_types_incoming_request_path_with_query`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_request_path_with_query(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]incoming-request.path-with-query"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-request.path-with-query` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_request_scheme"}
+
+## `http_types_incoming_request_scheme`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_request_scheme(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]incoming-request.scheme"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-request.scheme` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_request_authority"}
+
+## `http_types_incoming_request_authority`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_request_authority(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]incoming-request.authority"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-request.authority` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_request_headers"}
+
+## `http_types_incoming_request_headers`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_request_headers(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]incoming-request.headers"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-request.headers` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_request_consume"}
+
+## `http_types_incoming_request_consume`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_request_consume(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]incoming-request.consume"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-request.consume` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_new_outgoing_request"}
+
+## `http_types_new_outgoing_request`
+
+```silk
+pub unsafe extern "C" fn http_types_new_outgoing_request(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[constructor]outgoing-request"
+```
+
+Calls `wasi:http/types@0.2.12#[constructor]outgoing-request` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_body"}
+
+## `http_types_outgoing_request_body`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_body(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]outgoing-request.body"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.body` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_method"}
+
+## `http_types_outgoing_request_method`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_method(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]outgoing-request.method"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.method` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_set_method"}
+
+## `http_types_outgoing_request_set_method`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_set_method(p0: u32, p1: u32, p2: u32, p3: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-request.set-method"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.set-method` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_path_with_query"}
+
+## `http_types_outgoing_request_path_with_query`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_path_with_query(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]outgoing-request.path-with-query"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.path-with-query` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_set_path_with_query"}
+
+## `http_types_outgoing_request_set_path_with_query`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_set_path_with_query(p0: u32, p1: u32, p2: u32, p3: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-request.set-path-with-query"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.set-path-with-query` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_scheme"}
+
+## `http_types_outgoing_request_scheme`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_scheme(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]outgoing-request.scheme"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.scheme` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_set_scheme"}
+
+## `http_types_outgoing_request_set_scheme`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_set_scheme(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-request.set-scheme"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.set-scheme` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_authority"}
+
+## `http_types_outgoing_request_authority`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_authority(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]outgoing-request.authority"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.authority` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_set_authority"}
+
+## `http_types_outgoing_request_set_authority`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_set_authority(p0: u32, p1: u32, p2: u32, p3: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-request.set-authority"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.set-authority` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_request_headers"}
+
+## `http_types_outgoing_request_headers`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_request_headers(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-request.headers"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-request.headers` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_new_request_options"}
+
+## `http_types_new_request_options`
+
+```silk
+pub unsafe extern "C" fn http_types_new_request_options() -> u32
+    as "wasi:http/types@0.2.12#[constructor]request-options"
+```
+
+Calls `wasi:http/types@0.2.12#[constructor]request-options` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_request_options_connect_timeout"}
+
+## `http_types_request_options_connect_timeout`
+
+```silk
+pub unsafe extern "C" fn http_types_request_options_connect_timeout(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]request-options.connect-timeout"
+```
+
+Calls `wasi:http/types@0.2.12#[method]request-options.connect-timeout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_request_options_set_connect_timeout"}
+
+## `http_types_request_options_set_connect_timeout`
+
+```silk
+pub unsafe extern "C" fn http_types_request_options_set_connect_timeout(p0: u32, p1: u32, p2: u64) -> u32
+    as "wasi:http/types@0.2.12#[method]request-options.set-connect-timeout"
+```
+
+Calls `wasi:http/types@0.2.12#[method]request-options.set-connect-timeout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_request_options_first_byte_timeout"}
+
+## `http_types_request_options_first_byte_timeout`
+
+```silk
+pub unsafe extern "C" fn http_types_request_options_first_byte_timeout(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]request-options.first-byte-timeout"
+```
+
+Calls `wasi:http/types@0.2.12#[method]request-options.first-byte-timeout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_request_options_set_first_byte_timeout"}
+
+## `http_types_request_options_set_first_byte_timeout`
+
+```silk
+pub unsafe extern "C" fn http_types_request_options_set_first_byte_timeout(p0: u32, p1: u32, p2: u64) -> u32
+    as "wasi:http/types@0.2.12#[method]request-options.set-first-byte-timeout"
+```
+
+Calls `wasi:http/types@0.2.12#[method]request-options.set-first-byte-timeout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_request_options_between_bytes_timeout"}
+
+## `http_types_request_options_between_bytes_timeout`
+
+```silk
+pub unsafe extern "C" fn http_types_request_options_between_bytes_timeout(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]request-options.between-bytes-timeout"
+```
+
+Calls `wasi:http/types@0.2.12#[method]request-options.between-bytes-timeout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_request_options_set_between_bytes_timeout"}
+
+## `http_types_request_options_set_between_bytes_timeout`
+
+```silk
+pub unsafe extern "C" fn http_types_request_options_set_between_bytes_timeout(p0: u32, p1: u32, p2: u64) -> u32
+    as "wasi:http/types@0.2.12#[method]request-options.set-between-bytes-timeout"
+```
+
+Calls `wasi:http/types@0.2.12#[method]request-options.set-between-bytes-timeout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_response_outparam_set"}
+
+## `http_types_response_outparam_set`
+
+```silk
+pub unsafe extern "C" fn http_types_response_outparam_set(p0: u32, p1: u32, p2: u32, p3: u32, p4: u64, p5: u32, p6: u32, p7: u32, p8: u32) -> ()
+    as "wasi:http/types@0.2.12#[static]response-outparam.set"
+```
+
+Calls `wasi:http/types@0.2.12#[static]response-outparam.set` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_response_status"}
+
+## `http_types_incoming_response_status`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_response_status(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]incoming-response.status"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-response.status` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_response_headers"}
+
+## `http_types_incoming_response_headers`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_response_headers(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]incoming-response.headers"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-response.headers` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_response_consume"}
+
+## `http_types_incoming_response_consume`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_response_consume(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]incoming-response.consume"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-response.consume` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_body_stream"}
+
+## `http_types_incoming_body_stream`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_body_stream(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]incoming-body.stream"
+```
+
+Calls `wasi:http/types@0.2.12#[method]incoming-body.stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_incoming_body_finish"}
+
+## `http_types_incoming_body_finish`
+
+```silk
+pub unsafe extern "C" fn http_types_incoming_body_finish(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[static]incoming-body.finish"
+```
+
+Calls `wasi:http/types@0.2.12#[static]incoming-body.finish` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_future_trailers_subscribe"}
+
+## `http_types_future_trailers_subscribe`
+
+```silk
+pub unsafe extern "C" fn http_types_future_trailers_subscribe(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]future-trailers.subscribe"
+```
+
+Calls `wasi:http/types@0.2.12#[method]future-trailers.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_future_trailers_get"}
+
+## `http_types_future_trailers_get`
+
+```silk
+pub unsafe extern "C" fn http_types_future_trailers_get(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]future-trailers.get"
+```
+
+Calls `wasi:http/types@0.2.12#[method]future-trailers.get` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_new_outgoing_response"}
+
+## `http_types_new_outgoing_response`
+
+```silk
+pub unsafe extern "C" fn http_types_new_outgoing_response(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[constructor]outgoing-response"
+```
+
+Calls `wasi:http/types@0.2.12#[constructor]outgoing-response` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_response_status_code"}
+
+## `http_types_outgoing_response_status_code`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_response_status_code(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-response.status-code"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-response.status-code` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_response_set_status_code"}
+
+## `http_types_outgoing_response_set_status_code`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_response_set_status_code(p0: u32, p1: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-response.set-status-code"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-response.set-status-code` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_response_headers"}
+
+## `http_types_outgoing_response_headers`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_response_headers(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]outgoing-response.headers"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-response.headers` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_response_body"}
+
+## `http_types_outgoing_response_body`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_response_body(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]outgoing-response.body"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-response.body` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_body_write"}
+
+## `http_types_outgoing_body_write`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_body_write(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]outgoing-body.write"
+```
+
+Calls `wasi:http/types@0.2.12#[method]outgoing-body.write` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_outgoing_body_finish"}
+
+## `http_types_outgoing_body_finish`
+
+```silk
+pub unsafe extern "C" fn http_types_outgoing_body_finish(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:http/types@0.2.12#[static]outgoing-body.finish"
+```
+
+Calls `wasi:http/types@0.2.12#[static]outgoing-body.finish` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_future_incoming_response_subscribe"}
+
+## `http_types_future_incoming_response_subscribe`
+
+```silk
+pub unsafe extern "C" fn http_types_future_incoming_response_subscribe(p0: u32) -> u32
+    as "wasi:http/types@0.2.12#[method]future-incoming-response.subscribe"
+```
+
+Calls `wasi:http/types@0.2.12#[method]future-incoming-response.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_future_incoming_response_get"}
+
+## `http_types_future_incoming_response_get`
+
+```silk
+pub unsafe extern "C" fn http_types_future_incoming_response_get(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#[method]future-incoming-response.get"
+```
+
+Calls `wasi:http/types@0.2.12#[method]future-incoming-response.get` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_http_error_code"}
+
+## `http_types_http_error_code`
+
+```silk
+pub unsafe extern "C" fn http_types_http_error_code(p0: u32, p1: u32) -> ()
+    as "wasi:http/types@0.2.12#http-error-code"
+```
+
+Calls `wasi:http/types@0.2.12#http-error-code` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_fields"}
+
+## `http_types_drop_fields`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_fields(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]fields"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]fields` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_incoming_request"}
+
+## `http_types_drop_incoming_request`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_incoming_request(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]incoming-request"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]incoming-request` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_outgoing_request"}
+
+## `http_types_drop_outgoing_request`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_outgoing_request(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]outgoing-request"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]outgoing-request` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_request_options"}
+
+## `http_types_drop_request_options`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_request_options(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]request-options"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]request-options` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_response_outparam"}
+
+## `http_types_drop_response_outparam`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_response_outparam(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]response-outparam"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]response-outparam` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_incoming_response"}
+
+## `http_types_drop_incoming_response`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_incoming_response(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]incoming-response"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]incoming-response` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_incoming_body"}
+
+## `http_types_drop_incoming_body`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_incoming_body(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]incoming-body"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]incoming-body` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_future_trailers"}
+
+## `http_types_drop_future_trailers`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_future_trailers(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]future-trailers"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]future-trailers` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_outgoing_response"}
+
+## `http_types_drop_outgoing_response`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_outgoing_response(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]outgoing-response"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]outgoing-response` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_outgoing_body"}
+
+## `http_types_drop_outgoing_body`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_outgoing_body(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]outgoing-body"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]outgoing-body` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_types_drop_future_incoming_response"}
+
+## `http_types_drop_future_incoming_response`
+
+```silk
+pub unsafe extern "C" fn http_types_drop_future_incoming_response(p0: u32) -> ()
+    as "wasi:http/types@0.2.12#[resource-drop]future-incoming-response"
+```
+
+Calls `wasi:http/types@0.2.12#[resource-drop]future-incoming-response` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="http_outgoing_handler_handle"}
+
+## `http_outgoing_handler_handle`
+
+```silk
+pub unsafe extern "C" fn http_outgoing_handler_handle(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:http/outgoing-handler@0.2.12#handle"
+```
+
+Calls `wasi:http/outgoing-handler@0.2.12#handle` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_environment_get_environment"}
+
+## `cli_environment_get_environment`
+
+```silk
+pub unsafe extern "C" fn cli_environment_get_environment(p0: u32) -> ()
+    as "wasi:cli/environment@0.2.12#get-environment"
+```
+
+Calls `wasi:cli/environment@0.2.12#get-environment` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_environment_get_arguments"}
+
+## `cli_environment_get_arguments`
+
+```silk
+pub unsafe extern "C" fn cli_environment_get_arguments(p0: u32) -> ()
+    as "wasi:cli/environment@0.2.12#get-arguments"
+```
+
+Calls `wasi:cli/environment@0.2.12#get-arguments` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_environment_initial_cwd"}
+
+## `cli_environment_initial_cwd`
+
+```silk
+pub unsafe extern "C" fn cli_environment_initial_cwd(p0: u32) -> ()
+    as "wasi:cli/environment@0.2.12#initial-cwd"
+```
+
+Calls `wasi:cli/environment@0.2.12#initial-cwd` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_exit_exit"}
+
+## `cli_exit_exit`
+
+```silk
+pub unsafe extern "C" fn cli_exit_exit(p0: u32) -> ()
+    as "wasi:cli/exit@0.2.12#exit"
+```
+
+Calls `wasi:cli/exit@0.2.12#exit` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_exit_exit_with_code"}
+
+## `cli_exit_exit_with_code`
+
+```silk
+pub unsafe extern "C" fn cli_exit_exit_with_code(p0: u32) -> ()
+    as "wasi:cli/exit@0.2.12#exit-with-code"
+```
+
+Calls `wasi:cli/exit@0.2.12#exit-with-code` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_stdin_get_stdin"}
+
+## `cli_stdin_get_stdin`
+
+```silk
+pub unsafe extern "C" fn cli_stdin_get_stdin() -> u32
+    as "wasi:cli/stdin@0.2.12#get-stdin"
+```
+
+Calls `wasi:cli/stdin@0.2.12#get-stdin` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_stdout_get_stdout"}
+
+## `cli_stdout_get_stdout`
+
+```silk
+pub unsafe extern "C" fn cli_stdout_get_stdout() -> u32
+    as "wasi:cli/stdout@0.2.12#get-stdout"
+```
+
+Calls `wasi:cli/stdout@0.2.12#get-stdout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_stderr_get_stderr"}
+
+## `cli_stderr_get_stderr`
+
+```silk
+pub unsafe extern "C" fn cli_stderr_get_stderr() -> u32
+    as "wasi:cli/stderr@0.2.12#get-stderr"
+```
+
+Calls `wasi:cli/stderr@0.2.12#get-stderr` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_terminal_input_drop_terminal_input"}
+
+## `cli_terminal_input_drop_terminal_input`
+
+```silk
+pub unsafe extern "C" fn cli_terminal_input_drop_terminal_input(p0: u32) -> ()
+    as "wasi:cli/terminal-input@0.2.12#[resource-drop]terminal-input"
+```
+
+Calls `wasi:cli/terminal-input@0.2.12#[resource-drop]terminal-input` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_terminal_output_drop_terminal_output"}
+
+## `cli_terminal_output_drop_terminal_output`
+
+```silk
+pub unsafe extern "C" fn cli_terminal_output_drop_terminal_output(p0: u32) -> ()
+    as "wasi:cli/terminal-output@0.2.12#[resource-drop]terminal-output"
+```
+
+Calls `wasi:cli/terminal-output@0.2.12#[resource-drop]terminal-output` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_terminal_stdin_get_terminal_stdin"}
+
+## `cli_terminal_stdin_get_terminal_stdin`
+
+```silk
+pub unsafe extern "C" fn cli_terminal_stdin_get_terminal_stdin(p0: u32) -> ()
+    as "wasi:cli/terminal-stdin@0.2.12#get-terminal-stdin"
+```
+
+Calls `wasi:cli/terminal-stdin@0.2.12#get-terminal-stdin` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_terminal_stdout_get_terminal_stdout"}
+
+## `cli_terminal_stdout_get_terminal_stdout`
+
+```silk
+pub unsafe extern "C" fn cli_terminal_stdout_get_terminal_stdout(p0: u32) -> ()
+    as "wasi:cli/terminal-stdout@0.2.12#get-terminal-stdout"
+```
+
+Calls `wasi:cli/terminal-stdout@0.2.12#get-terminal-stdout` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="cli_terminal_stderr_get_terminal_stderr"}
+
+## `cli_terminal_stderr_get_terminal_stderr`
+
+```silk
+pub unsafe extern "C" fn cli_terminal_stderr_get_terminal_stderr(p0: u32) -> ()
+    as "wasi:cli/terminal-stderr@0.2.12#get-terminal-stderr"
+```
+
+Calls `wasi:cli/terminal-stderr@0.2.12#get-terminal-stderr` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="clocks_wall_clock_now"}
+
+## `clocks_wall_clock_now`
+
+```silk
+pub unsafe extern "C" fn clocks_wall_clock_now(p0: u32) -> ()
+    as "wasi:clocks/wall-clock@0.2.12#now"
+```
+
+Calls `wasi:clocks/wall-clock@0.2.12#now` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="clocks_wall_clock_resolution"}
+
+## `clocks_wall_clock_resolution`
+
+```silk
+pub unsafe extern "C" fn clocks_wall_clock_resolution(p0: u32) -> ()
+    as "wasi:clocks/wall-clock@0.2.12#resolution"
+```
+
+Calls `wasi:clocks/wall-clock@0.2.12#resolution` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_read_via_stream"}
+
+## `filesystem_types_descriptor_read_via_stream`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_read_via_stream(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.read-via-stream"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.read-via-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_write_via_stream"}
+
+## `filesystem_types_descriptor_write_via_stream`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_write_via_stream(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.write-via-stream"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.write-via-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_append_via_stream"}
+
+## `filesystem_types_descriptor_append_via_stream`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_append_via_stream(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.append-via-stream"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.append-via-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_advise"}
+
+## `filesystem_types_descriptor_advise`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_advise(p0: u32, p1: u64, p2: u64, p3: u32, p4: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.advise"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.advise` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_sync_data"}
+
+## `filesystem_types_descriptor_sync_data`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_sync_data(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.sync-data"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.sync-data` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_get_flags"}
+
+## `filesystem_types_descriptor_get_flags`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_get_flags(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.get-flags"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.get-flags` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_get_type"}
+
+## `filesystem_types_descriptor_get_type`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_get_type(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.get-type"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.get-type` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_set_size"}
+
+## `filesystem_types_descriptor_set_size`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_set_size(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.set-size"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.set-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_set_times"}
+
+## `filesystem_types_descriptor_set_times`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_set_times(p0: u32, p1: u32, p2: u64, p3: u32, p4: u32, p5: u64, p6: u32, p7: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.set-times"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.set-times` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_read"}
+
+## `filesystem_types_descriptor_read`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_read(p0: u32, p1: u64, p2: u64, p3: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.read"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.read` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_write"}
+
+## `filesystem_types_descriptor_write`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_write(p0: u32, p1: u32, p2: u32, p3: u64, p4: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.write"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.write` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_read_directory"}
+
+## `filesystem_types_descriptor_read_directory`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_read_directory(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.read-directory"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.read-directory` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_sync"}
+
+## `filesystem_types_descriptor_sync`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_sync(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.sync"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.sync` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_create_directory_at"}
+
+## `filesystem_types_descriptor_create_directory_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_create_directory_at(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.create-directory-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.create-directory-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_stat"}
+
+## `filesystem_types_descriptor_stat`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_stat(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.stat"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.stat` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_stat_at"}
+
+## `filesystem_types_descriptor_stat_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_stat_at(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.stat-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.stat-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_set_times_at"}
+
+## `filesystem_types_descriptor_set_times_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_set_times_at(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u64, p6: u32, p7: u32, p8: u64, p9: u32, p10: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.set-times-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.set-times-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_link_at"}
+
+## `filesystem_types_descriptor_link_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_link_at(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32, p6: u32, p7: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.link-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.link-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_open_at"}
+
+## `filesystem_types_descriptor_open_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_open_at(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32, p6: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.open-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.open-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_readlink_at"}
+
+## `filesystem_types_descriptor_readlink_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_readlink_at(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.readlink-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.readlink-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_remove_directory_at"}
+
+## `filesystem_types_descriptor_remove_directory_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_remove_directory_at(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.remove-directory-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.remove-directory-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_rename_at"}
+
+## `filesystem_types_descriptor_rename_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_rename_at(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32, p6: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.rename-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.rename-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_symlink_at"}
+
+## `filesystem_types_descriptor_symlink_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_symlink_at(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.symlink-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.symlink-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_unlink_file_at"}
+
+## `filesystem_types_descriptor_unlink_file_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_unlink_file_at(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.unlink-file-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.unlink-file-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_is_same_object"}
+
+## `filesystem_types_descriptor_is_same_object`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_is_same_object(p0: u32, p1: u32) -> u32
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.is-same-object"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.is-same-object` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_metadata_hash"}
+
+## `filesystem_types_descriptor_metadata_hash`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_metadata_hash(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.metadata-hash"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.metadata-hash` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_descriptor_metadata_hash_at"}
+
+## `filesystem_types_descriptor_metadata_hash_at`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_descriptor_metadata_hash_at(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]descriptor.metadata-hash-at"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]descriptor.metadata-hash-at` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_directory_entry_stream_read_directory_entry"}
+
+## `filesystem_types_directory_entry_stream_read_directory_entry`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_directory_entry_stream_read_directory_entry(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[method]directory-entry-stream.read-directory-entry"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[method]directory-entry-stream.read-directory-entry` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_filesystem_error_code"}
+
+## `filesystem_types_filesystem_error_code`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_filesystem_error_code(p0: u32, p1: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#filesystem-error-code"
+```
+
+Calls `wasi:filesystem/types@0.2.12#filesystem-error-code` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_drop_descriptor"}
+
+## `filesystem_types_drop_descriptor`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_drop_descriptor(p0: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[resource-drop]descriptor"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[resource-drop]descriptor` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_types_drop_directory_entry_stream"}
+
+## `filesystem_types_drop_directory_entry_stream`
+
+```silk
+pub unsafe extern "C" fn filesystem_types_drop_directory_entry_stream(p0: u32) -> ()
+    as "wasi:filesystem/types@0.2.12#[resource-drop]directory-entry-stream"
+```
+
+Calls `wasi:filesystem/types@0.2.12#[resource-drop]directory-entry-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="filesystem_preopens_get_directories"}
+
+## `filesystem_preopens_get_directories`
+
+```silk
+pub unsafe extern "C" fn filesystem_preopens_get_directories(p0: u32) -> ()
+    as "wasi:filesystem/preopens@0.2.12#get-directories"
+```
+
+Calls `wasi:filesystem/preopens@0.2.12#get-directories` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_network_drop_network"}
+
+## `sockets_network_drop_network`
+
+```silk
+pub unsafe extern "C" fn sockets_network_drop_network(p0: u32) -> ()
+    as "wasi:sockets/network@0.2.12#[resource-drop]network"
+```
+
+Calls `wasi:sockets/network@0.2.12#[resource-drop]network` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_instance_network_instance_network"}
+
+## `sockets_instance_network_instance_network`
+
+```silk
+pub unsafe extern "C" fn sockets_instance_network_instance_network() -> u32
+    as "wasi:sockets/instance-network@0.2.12#instance-network"
+```
+
+Calls `wasi:sockets/instance-network@0.2.12#instance-network` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_start_bind"}
+
+## `sockets_udp_udp_socket_start_bind`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_start_bind(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32, p6: u32, p7: u32, p8: u32, p9: u32, p10: u32, p11: u32, p12: u32, p13: u32, p14: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.start-bind"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.start-bind` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_finish_bind"}
+
+## `sockets_udp_udp_socket_finish_bind`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_finish_bind(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.finish-bind"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.finish-bind` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_stream"}
+
+## `sockets_udp_udp_socket_stream`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_stream(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32, p6: u32, p7: u32, p8: u32, p9: u32, p10: u32, p11: u32, p12: u32, p13: u32, p14: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.stream"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_local_address"}
+
+## `sockets_udp_udp_socket_local_address`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_local_address(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.local-address"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.local-address` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_remote_address"}
+
+## `sockets_udp_udp_socket_remote_address`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_remote_address(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.remote-address"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.remote-address` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_address_family"}
+
+## `sockets_udp_udp_socket_address_family`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_address_family(p0: u32) -> u32
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.address-family"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.address-family` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_unicast_hop_limit"}
+
+## `sockets_udp_udp_socket_unicast_hop_limit`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_unicast_hop_limit(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.unicast-hop-limit"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.unicast-hop-limit` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_set_unicast_hop_limit"}
+
+## `sockets_udp_udp_socket_set_unicast_hop_limit`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_set_unicast_hop_limit(p0: u32, p1: u32, p2: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.set-unicast-hop-limit"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.set-unicast-hop-limit` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_receive_buffer_size"}
+
+## `sockets_udp_udp_socket_receive_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_receive_buffer_size(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.receive-buffer-size"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.receive-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_set_receive_buffer_size"}
+
+## `sockets_udp_udp_socket_set_receive_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_set_receive_buffer_size(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.set-receive-buffer-size"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.set-receive-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_send_buffer_size"}
+
+## `sockets_udp_udp_socket_send_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_send_buffer_size(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.send-buffer-size"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.send-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_set_send_buffer_size"}
+
+## `sockets_udp_udp_socket_set_send_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_set_send_buffer_size(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.set-send-buffer-size"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.set-send-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_udp_socket_subscribe"}
+
+## `sockets_udp_udp_socket_subscribe`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_udp_socket_subscribe(p0: u32) -> u32
+    as "wasi:sockets/udp@0.2.12#[method]udp-socket.subscribe"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]udp-socket.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_incoming_datagram_stream_receive"}
+
+## `sockets_udp_incoming_datagram_stream_receive`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_incoming_datagram_stream_receive(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]incoming-datagram-stream.receive"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]incoming-datagram-stream.receive` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_incoming_datagram_stream_subscribe"}
+
+## `sockets_udp_incoming_datagram_stream_subscribe`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_incoming_datagram_stream_subscribe(p0: u32) -> u32
+    as "wasi:sockets/udp@0.2.12#[method]incoming-datagram-stream.subscribe"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]incoming-datagram-stream.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_outgoing_datagram_stream_check_send"}
+
+## `sockets_udp_outgoing_datagram_stream_check_send`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_outgoing_datagram_stream_check_send(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]outgoing-datagram-stream.check-send"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]outgoing-datagram-stream.check-send` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_outgoing_datagram_stream_send"}
+
+## `sockets_udp_outgoing_datagram_stream_send`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_outgoing_datagram_stream_send(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[method]outgoing-datagram-stream.send"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]outgoing-datagram-stream.send` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_outgoing_datagram_stream_subscribe"}
+
+## `sockets_udp_outgoing_datagram_stream_subscribe`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_outgoing_datagram_stream_subscribe(p0: u32) -> u32
+    as "wasi:sockets/udp@0.2.12#[method]outgoing-datagram-stream.subscribe"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[method]outgoing-datagram-stream.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_drop_udp_socket"}
+
+## `sockets_udp_drop_udp_socket`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_drop_udp_socket(p0: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[resource-drop]udp-socket"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[resource-drop]udp-socket` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_drop_incoming_datagram_stream"}
+
+## `sockets_udp_drop_incoming_datagram_stream`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_drop_incoming_datagram_stream(p0: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[resource-drop]incoming-datagram-stream"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[resource-drop]incoming-datagram-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_drop_outgoing_datagram_stream"}
+
+## `sockets_udp_drop_outgoing_datagram_stream`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_drop_outgoing_datagram_stream(p0: u32) -> ()
+    as "wasi:sockets/udp@0.2.12#[resource-drop]outgoing-datagram-stream"
+```
+
+Calls `wasi:sockets/udp@0.2.12#[resource-drop]outgoing-datagram-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_udp_create_socket_create_udp_socket"}
+
+## `sockets_udp_create_socket_create_udp_socket`
+
+```silk
+pub unsafe extern "C" fn sockets_udp_create_socket_create_udp_socket(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/udp-create-socket@0.2.12#create-udp-socket"
+```
+
+Calls `wasi:sockets/udp-create-socket@0.2.12#create-udp-socket` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_start_bind"}
+
+## `sockets_tcp_tcp_socket_start_bind`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_start_bind(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32, p6: u32, p7: u32, p8: u32, p9: u32, p10: u32, p11: u32, p12: u32, p13: u32, p14: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.start-bind"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.start-bind` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_finish_bind"}
+
+## `sockets_tcp_tcp_socket_finish_bind`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_finish_bind(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.finish-bind"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.finish-bind` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_start_connect"}
+
+## `sockets_tcp_tcp_socket_start_connect`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_start_connect(p0: u32, p1: u32, p2: u32, p3: u32, p4: u32, p5: u32, p6: u32, p7: u32, p8: u32, p9: u32, p10: u32, p11: u32, p12: u32, p13: u32, p14: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.start-connect"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.start-connect` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_finish_connect"}
+
+## `sockets_tcp_tcp_socket_finish_connect`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_finish_connect(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.finish-connect"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.finish-connect` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_start_listen"}
+
+## `sockets_tcp_tcp_socket_start_listen`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_start_listen(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.start-listen"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.start-listen` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_finish_listen"}
+
+## `sockets_tcp_tcp_socket_finish_listen`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_finish_listen(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.finish-listen"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.finish-listen` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_accept"}
+
+## `sockets_tcp_tcp_socket_accept`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_accept(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.accept"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.accept` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_local_address"}
+
+## `sockets_tcp_tcp_socket_local_address`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_local_address(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.local-address"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.local-address` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_remote_address"}
+
+## `sockets_tcp_tcp_socket_remote_address`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_remote_address(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.remote-address"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.remote-address` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_is_listening"}
+
+## `sockets_tcp_tcp_socket_is_listening`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_is_listening(p0: u32) -> u32
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.is-listening"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.is-listening` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_address_family"}
+
+## `sockets_tcp_tcp_socket_address_family`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_address_family(p0: u32) -> u32
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.address-family"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.address-family` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_listen_backlog_size"}
+
+## `sockets_tcp_tcp_socket_set_listen_backlog_size`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_listen_backlog_size(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-listen-backlog-size"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-listen-backlog-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_keep_alive_enabled"}
+
+## `sockets_tcp_tcp_socket_keep_alive_enabled`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_keep_alive_enabled(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-enabled"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-enabled` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_keep_alive_enabled"}
+
+## `sockets_tcp_tcp_socket_set_keep_alive_enabled`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_keep_alive_enabled(p0: u32, p1: u32, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-enabled"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-enabled` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_keep_alive_idle_time"}
+
+## `sockets_tcp_tcp_socket_keep_alive_idle_time`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_keep_alive_idle_time(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-idle-time"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-idle-time` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_keep_alive_idle_time"}
+
+## `sockets_tcp_tcp_socket_set_keep_alive_idle_time`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_keep_alive_idle_time(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-idle-time"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-idle-time` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_keep_alive_interval"}
+
+## `sockets_tcp_tcp_socket_keep_alive_interval`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_keep_alive_interval(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-interval"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-interval` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_keep_alive_interval"}
+
+## `sockets_tcp_tcp_socket_set_keep_alive_interval`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_keep_alive_interval(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-interval"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-interval` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_keep_alive_count"}
+
+## `sockets_tcp_tcp_socket_keep_alive_count`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_keep_alive_count(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-count"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.keep-alive-count` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_keep_alive_count"}
+
+## `sockets_tcp_tcp_socket_set_keep_alive_count`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_keep_alive_count(p0: u32, p1: u32, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-count"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-keep-alive-count` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_hop_limit"}
+
+## `sockets_tcp_tcp_socket_hop_limit`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_hop_limit(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.hop-limit"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.hop-limit` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_hop_limit"}
+
+## `sockets_tcp_tcp_socket_set_hop_limit`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_hop_limit(p0: u32, p1: u32, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-hop-limit"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-hop-limit` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_receive_buffer_size"}
+
+## `sockets_tcp_tcp_socket_receive_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_receive_buffer_size(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.receive-buffer-size"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.receive-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_receive_buffer_size"}
+
+## `sockets_tcp_tcp_socket_set_receive_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_receive_buffer_size(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-receive-buffer-size"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-receive-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_send_buffer_size"}
+
+## `sockets_tcp_tcp_socket_send_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_send_buffer_size(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.send-buffer-size"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.send-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_set_send_buffer_size"}
+
+## `sockets_tcp_tcp_socket_set_send_buffer_size`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_set_send_buffer_size(p0: u32, p1: u64, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-send-buffer-size"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.set-send-buffer-size` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_subscribe"}
+
+## `sockets_tcp_tcp_socket_subscribe`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_subscribe(p0: u32) -> u32
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.subscribe"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_tcp_socket_shutdown"}
+
+## `sockets_tcp_tcp_socket_shutdown`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_tcp_socket_shutdown(p0: u32, p1: u32, p2: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[method]tcp-socket.shutdown"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[method]tcp-socket.shutdown` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_drop_tcp_socket"}
+
+## `sockets_tcp_drop_tcp_socket`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_drop_tcp_socket(p0: u32) -> ()
+    as "wasi:sockets/tcp@0.2.12#[resource-drop]tcp-socket"
+```
+
+Calls `wasi:sockets/tcp@0.2.12#[resource-drop]tcp-socket` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_tcp_create_socket_create_tcp_socket"}
+
+## `sockets_tcp_create_socket_create_tcp_socket`
+
+```silk
+pub unsafe extern "C" fn sockets_tcp_create_socket_create_tcp_socket(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/tcp-create-socket@0.2.12#create-tcp-socket"
+```
+
+Calls `wasi:sockets/tcp-create-socket@0.2.12#create-tcp-socket` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_ip_name_lookup_resolve_address_stream_resolve_next_address"}
+
+## `sockets_ip_name_lookup_resolve_address_stream_resolve_next_address`
+
+```silk
+pub unsafe extern "C" fn sockets_ip_name_lookup_resolve_address_stream_resolve_next_address(p0: u32, p1: u32) -> ()
+    as "wasi:sockets/ip-name-lookup@0.2.12#[method]resolve-address-stream.resolve-next-address"
+```
+
+Calls `wasi:sockets/ip-name-lookup@0.2.12#[method]resolve-address-stream.resolve-next-address` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_ip_name_lookup_resolve_address_stream_subscribe"}
+
+## `sockets_ip_name_lookup_resolve_address_stream_subscribe`
+
+```silk
+pub unsafe extern "C" fn sockets_ip_name_lookup_resolve_address_stream_subscribe(p0: u32) -> u32
+    as "wasi:sockets/ip-name-lookup@0.2.12#[method]resolve-address-stream.subscribe"
+```
+
+Calls `wasi:sockets/ip-name-lookup@0.2.12#[method]resolve-address-stream.subscribe` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_ip_name_lookup_resolve_addresses"}
+
+## `sockets_ip_name_lookup_resolve_addresses`
+
+```silk
+pub unsafe extern "C" fn sockets_ip_name_lookup_resolve_addresses(p0: u32, p1: u32, p2: u32, p3: u32) -> ()
+    as "wasi:sockets/ip-name-lookup@0.2.12#resolve-addresses"
+```
+
+Calls `wasi:sockets/ip-name-lookup@0.2.12#resolve-addresses` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="sockets_ip_name_lookup_drop_resolve_address_stream"}
+
+## `sockets_ip_name_lookup_drop_resolve_address_stream`
+
+```silk
+pub unsafe extern "C" fn sockets_ip_name_lookup_drop_resolve_address_stream(p0: u32) -> ()
+    as "wasi:sockets/ip-name-lookup@0.2.12#[resource-drop]resolve-address-stream"
+```
+
+Calls `wasi:sockets/ip-name-lookup@0.2.12#[resource-drop]resolve-address-stream` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="random_random_get_random_bytes"}
+
+## `random_random_get_random_bytes`
+
+```silk
+pub unsafe extern "C" fn random_random_get_random_bytes(p0: u64, p1: u32) -> ()
+    as "wasi:random/random@0.2.12#get-random-bytes"
+```
+
+Calls `wasi:random/random@0.2.12#get-random-bytes` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="random_random_get_random_u64"}
+
+## `random_random_get_random_u64`
+
+```silk
+pub unsafe extern "C" fn random_random_get_random_u64() -> u64
+    as "wasi:random/random@0.2.12#get-random-u64"
+```
+
+Calls `wasi:random/random@0.2.12#get-random-u64` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="random_insecure_get_insecure_random_bytes"}
+
+## `random_insecure_get_insecure_random_bytes`
+
+```silk
+pub unsafe extern "C" fn random_insecure_get_insecure_random_bytes(p0: u64, p1: u32) -> ()
+    as "wasi:random/insecure@0.2.12#get-insecure-random-bytes"
+```
+
+Calls `wasi:random/insecure@0.2.12#get-insecure-random-bytes` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="random_insecure_get_insecure_random_u64"}
+
+## `random_insecure_get_insecure_random_u64`
+
+```silk
+pub unsafe extern "C" fn random_insecure_get_insecure_random_u64() -> u64
+    as "wasi:random/insecure@0.2.12#get-insecure-random-u64"
+```
+
+Calls `wasi:random/insecure@0.2.12#get-insecure-random-u64` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
+
+::Anchor{id="random_insecure_seed_insecure_seed"}
+
+## `random_insecure_seed_insecure_seed`
+
+```silk
+pub unsafe extern "C" fn random_insecure_seed_insecure_seed(p0: u32) -> ()
+    as "wasi:random/insecure-seed@0.2.12#insecure-seed"
+```
+
+Calls `wasi:random/insecure-seed@0.2.12#insecure-seed` with its canonical ABI.
+The caller supplies valid handles and memory, and honors the WIT ownership contract.
 
 Category: Native platform.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`.
+Profiles: `wasm32-wasip2`.

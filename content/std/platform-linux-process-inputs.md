@@ -1,12 +1,12 @@
 The arguments, environment and page size of a raw Linux process, read from the initial stack.
 
 ## When to use
-Call `ProcessInputs.decode` once at a raw process entry, as `silk.platform.linux.start` does. The
+Call [`ProcessInputs.decode`](#ProcessInputs.impl.decode) once at a raw process entry, as `silk.platform.linux.start` does. The
 application then gets a `&ProcessInputs`.
 
 ## Details
 The kernel puts `argc`, the `argv` and `envp` vectors, and the auxiliary vector on the stack.
-`ProcessInputs.decode` reads them without allocation or copies. Arguments and environment
+[`ProcessInputs.decode`](#ProcessInputs.impl.decode) reads them without allocation or copies. Arguments and environment
 entries stay NUL-terminated byte strings. The page size comes from `AT_PAGESZ`.
 
 ## Errors
@@ -17,10 +17,116 @@ missing, is repeated, or is not a power of two.
 The decoder needs a complete, readable kernel stack image. It does not check arbitrary memory.
 The returned pointers own nothing. They stay valid only while that image is live.
 
-Public declarations: 0.
+Import as `ProcessInputs` with `import silk.platform.linux.process_inputs { ProcessInputs }`.
 
-This module declares no public items.
+Public declarations: 1.
+
+::Anchor{id="ProcessInputs"}
+
+## `ProcessInputs`
+
+```silk
+pub struct ProcessInputs
+```
+
+Borrowed argument and environment vectors, and a checked page size, of a raw Linux process.
+
+### Details
+[`ProcessInputs.decode`](#ProcessInputs.impl.decode) reads them from the initial stack without allocation or copies.
+Arguments and environment entries stay NUL-terminated byte strings. The page size comes from
+`AT_PAGESZ`.
+
+### Gotchas
+The pointers own nothing. They stay valid only while the kernel stack image is live.
+
+::Anchor{id="ProcessInputs.impl"}
+
+## Implementation `ProcessInputs`
+
+```silk
+impl ProcessInputs
+```
+
+::Anchor{id="ProcessInputs.impl.decode"}
+
+### Associated function `decode`
+
+```silk
+pub unsafe fn decode(stack: [*]const usize) -> Result<ProcessInputs, usize>
+```
+
+Decodes one complete kernel stack image. It does not allocate.
+
+#### Details
+Unknown auxiliary-vector keys are ignored. No input is copied or changed.
+
+#### Errors
+Error `22` if `argv` has no terminator, or `AT_PAGESZ` is missing, repeated, or not a power
+of two.
+
+#### Gotchas
+`stack` must point to aligned, readable words up to both vector terminators and `AT_NULL`.
+Each address in `argv` and `envp` that is not zero must point to a live NUL-terminated
+string.
+
+::Anchor{id="ProcessInputs.impl.pageSize"}
+
+### Method `pageSize`
+
+```silk
+pub fn pageSize(self: &ProcessInputs) -> usize
+```
+
+Returns the page size from `AT_PAGESZ`. It is always a power of two.
+
+::Anchor{id="ProcessInputs.impl.argc"}
+
+### Method `argc`
+
+```silk
+pub fn argc(self: &ProcessInputs) -> usize
+```
+
+Returns the number of arguments. The program name is argument `0`.
+
+::Anchor{id="ProcessInputs.impl.envc"}
+
+### Method `envc`
+
+```silk
+pub fn envc(self: &ProcessInputs) -> usize
+```
+
+Returns the number of environment entries.
+
+::Anchor{id="ProcessInputs.impl.argument"}
+
+### Method `argument`
+
+```silk
+pub unsafe fn argument(self: &ProcessInputs, index: usize) -> ?[*]const u8
+```
+
+Returns a pointer to argument `index` as a NUL-terminated string, or null if `index` is not
+less than [`ProcessInputs.argc`](#ProcessInputs.impl.argc).
+
+#### Gotchas
+The original stack and strings must stay live. The pointer owns no storage.
+
+::Anchor{id="ProcessInputs.impl.variable"}
+
+### Method `variable`
+
+```silk
+pub unsafe fn variable(self: &ProcessInputs, index: usize) -> ?[*]const u8
+```
+
+Returns a pointer to environment entry `index` (a `NAME=value` string), or null if `index`
+is not less than [`ProcessInputs.envc`](#ProcessInputs.impl.envc).
+
+#### Gotchas
+The original stack and strings must stay live. The pointer owns no storage.
 
 Category: Native platform.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu-no-libc`.
