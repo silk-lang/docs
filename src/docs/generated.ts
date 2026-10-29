@@ -96,6 +96,12 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'compress-lzma-decode',
+        'silk.compress.lzma_decode',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma-decode.md',
+      ),
+      page(
+        'std',
         'compress-lzma2',
         'silk.compress.lzma2',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma2.md',
@@ -105,12 +111,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'compress-lzma2-decode',
         'silk.compress.lzma2_decode',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma2-decode.md',
-      ),
-      page(
-        'std',
-        'compress-lzma-decode',
-        'silk.compress.lzma_decode',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma-decode.md',
       ),
       page(
         'std',

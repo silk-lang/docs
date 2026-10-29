@@ -212,8 +212,8 @@ const transform = (
 const moduleName = (path: string): string => path.replace(/\//g, '.')
 
 const compareModulePaths = (left: string, right: string): number => {
-  const leftSegments = left.split('.')
-  const rightSegments = right.split('.')
+  const leftSegments = left.split(/[._]/)
+  const rightSegments = right.split(/[._]/)
   for (
     let index = 0;
     index < Math.min(leftSegments.length, rightSegments.length);
@@ -342,10 +342,11 @@ const main = (): void => {
   }
 
   const stdOverview = synced.filter(page => page.slug === 'overview')
-  // The sidebar lists modules by path, one segment at a time, so a module
-  // comes before the modules below it and before its longer-named siblings
-  // (silk.io.logger, silk.io.logger_native, silk.io.reader). File names do
-  // not sort that way: `-` stands for `/` and sorts before `.`.
+  // The sidebar lists modules by path, one word at a time (split at `.` and
+  // `_`), so a module comes before the modules below it and before its
+  // longer-named siblings: silk.compress.lzma, lzma_decode, lzma2, then
+  // lzma2_decode. File names do not sort that way: `-` stands for `/` and
+  // sorts before `.`.
   const stdModules = synced
     .filter(page => page.slug !== 'overview')
     .sort((left, right) => compareModulePaths(left.title, right.title))
