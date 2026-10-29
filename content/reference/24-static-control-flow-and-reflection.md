@@ -124,7 +124,7 @@ All of these are fixed by the build request (`--target`, `--release`, `--profile
 | `Compilation.link()` | `Link`: `Static`, `Dynamic` |
 | `Compilation.codeModel()` | `CodeModel`: `Small`, `Large` |
 | `Compilation.relocation()` | `Relocation`: `Static`, `Pic` |
-| `Compilation.optimization()` | `Optimization`: `None`, `Speed`. Under a profile with `optimization = "size"` the call fails with SEM0177 "Unknown Optimization request" |
+| `Compilation.optimization()` | `Optimization`: `None`, `Speed`, `Size` (a profile with `optimization = "size"`) |
 | `Compilation.safety()` | `Safety`: `Checked`, `Unchecked` |
 | `Compilation.threading()` | `Threading`: `Single`, `Multi` |
 | `Compilation.unwind()` | `Unwind`: `None`, `Native` |
@@ -370,5 +370,4 @@ Static evaluation · Package parameters · Generics · Intrinsics · Control flo
 
 ## Open questions
 
-- `Compilation.optimization()` has no value for `optimization = "size"` and stops the build with SEM0177 under such a profile.
 - `break` and `continue` in a `static for` body, and `compileError` outside a static context, report `unsupported: this construct is not supported by the native compiler yet` rather than a semantic error code. Whether these become errors or features is not settled.
