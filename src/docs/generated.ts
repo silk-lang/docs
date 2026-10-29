@@ -36,6 +36,12 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'collections-hash',
+        'silk.collections.hash',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/collections-hash.md',
+      ),
+      page(
+        'std',
         'collections-hash-map',
         'silk.collections.hash_map',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/collections-hash-map.md',
@@ -45,12 +51,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'collections-hash-set',
         'silk.collections.hash_set',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/collections-hash-set.md',
-      ),
-      page(
-        'std',
-        'collections-hash',
-        'silk.collections.hash',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/collections-hash.md',
       ),
       page(
         'std',
@@ -90,21 +90,9 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'compress-lzma-decode',
-        'silk.compress.lzma_decode',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma-decode.md',
-      ),
-      page(
-        'std',
         'compress-lzma',
         'silk.compress.lzma',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma.md',
-      ),
-      page(
-        'std',
-        'compress-lzma2-decode',
-        'silk.compress.lzma2_decode',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma2-decode.md',
       ),
       page(
         'std',
@@ -114,9 +102,27 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'compress-lzma2-decode',
+        'silk.compress.lzma2_decode',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma2-decode.md',
+      ),
+      page(
+        'std',
+        'compress-lzma-decode',
+        'silk.compress.lzma_decode',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-lzma-decode.md',
+      ),
+      page(
+        'std',
         'compress-xz',
         'silk.compress.xz',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-xz.md',
+      ),
+      page(
+        'std',
+        'compress-zstd',
+        'silk.compress.zstd',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-zstd.md',
       ),
       page(
         'std',
@@ -132,27 +138,21 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'compress-zstd',
-        'silk.compress.zstd',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/compress-zstd.md',
-      ),
-      page(
-        'std',
         'concurrency-atomic',
         'silk.concurrency.atomic',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-atomic.md',
       ),
       page(
         'std',
-        'concurrency-execution-storage',
-        'silk.concurrency.execution_storage',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-execution-storage.md',
-      ),
-      page(
-        'std',
         'concurrency-execution',
         'silk.concurrency.execution',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-execution.md',
+      ),
+      page(
+        'std',
+        'concurrency-execution-storage',
+        'silk.concurrency.execution_storage',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-execution-storage.md',
       ),
       page(
         'std',
@@ -180,6 +180,12 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'concurrency-thread',
+        'silk.concurrency.thread',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-thread.md',
+      ),
+      page(
+        'std',
         'concurrency-thread-native',
         'silk.concurrency.thread_native',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-thread-native.md',
@@ -189,12 +195,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'concurrency-thread-pool',
         'silk.concurrency.thread_pool',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-thread-pool.md',
-      ),
-      page(
-        'std',
-        'concurrency-thread',
-        'silk.concurrency.thread',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/concurrency-thread.md',
       ),
       page(
         'std',
@@ -384,6 +384,12 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'http-client',
+        'silk.http.client',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-client.md',
+      ),
+      page(
+        'std',
         'http-client-native',
         'silk.http.client_native',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-client-native.md',
@@ -396,9 +402,9 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'http-client',
-        'silk.http.client',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-client.md',
+        'http-connection-pool',
+        'silk.http.connection_pool',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-connection-pool.md',
       ),
       page(
         'std',
@@ -408,21 +414,9 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'http-connection-pool',
-        'silk.http.connection_pool',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-connection-pool.md',
-      ),
-      page(
-        'std',
         'http-content',
         'silk.http.content',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-content.md',
-      ),
-      page(
-        'std',
-        'http-exchange-native',
-        'silk.http.exchange_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-exchange-native.md',
       ),
       page(
         'std',
@@ -432,15 +426,21 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'http-fetch-native',
-        'silk.http.fetch_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-fetch-native.md',
+        'http-exchange-native',
+        'silk.http.exchange_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-exchange-native.md',
       ),
       page(
         'std',
         'http-fetch',
         'silk.http.fetch',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-fetch.md',
+      ),
+      page(
+        'std',
+        'http-fetch-native',
+        'silk.http.fetch_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-fetch-native.md',
       ),
       page(
         'std',
@@ -456,15 +456,21 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'http-hpack',
+        'silk.http.hpack',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-hpack.md',
+      ),
+      page(
+        'std',
         'http-hpack-tables',
         'silk.http.hpack_tables',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-hpack-tables.md',
       ),
       page(
         'std',
-        'http-hpack',
-        'silk.http.hpack',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-hpack.md',
+        'http-http2',
+        'silk.http.http2',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-http2.md',
       ),
       page(
         'std',
@@ -483,12 +489,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'http-http2-headers',
         'silk.http.http2_headers',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-http2-headers.md',
-      ),
-      page(
-        'std',
-        'http-http2',
-        'silk.http.http2',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-http2.md',
       ),
       page(
         'std',
@@ -522,6 +522,12 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'http-server',
+        'silk.http.server',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-server.md',
+      ),
+      page(
+        'std',
         'http-server-native',
         'silk.http.server_native',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-server-native.md',
@@ -531,12 +537,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'http-server-wasi',
         'silk.http.server_wasi',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-server-wasi.md',
-      ),
-      page(
-        'std',
-        'http-server',
-        'silk.http.server',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/http-server.md',
       ),
       page(
         'std',
@@ -594,15 +594,15 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'io-logger-native',
-        'silk.io.logger_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-logger-native.md',
-      ),
-      page(
-        'std',
         'io-logger',
         'silk.io.logger',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-logger.md',
+      ),
+      page(
+        'std',
+        'io-logger-native',
+        'silk.io.logger_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-logger-native.md',
       ),
       page(
         'std',
@@ -612,27 +612,27 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'io-standard-input-native',
-        'silk.io.standard_input_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-standard-input-native.md',
-      ),
-      page(
-        'std',
         'io-standard-input',
         'silk.io.standard_input',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-standard-input.md',
       ),
       page(
         'std',
-        'io-writer-native',
-        'silk.io.writer_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-writer-native.md',
+        'io-standard-input-native',
+        'silk.io.standard_input_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-standard-input-native.md',
       ),
       page(
         'std',
         'io-writer',
         'silk.io.writer',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-writer.md',
+      ),
+      page(
+        'std',
+        'io-writer-native',
+        'silk.io.writer_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/io-writer-native.md',
       ),
       page(
         'std',
@@ -768,6 +768,12 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'net-resolver',
+        'silk.net.resolver',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/net-resolver.md',
+      ),
+      page(
+        'std',
         'net-resolver-native',
         'silk.net.resolver_native',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/net-resolver-native.md',
@@ -777,12 +783,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'net-resolver-wasi',
         'silk.net.resolver_wasi',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/net-resolver-wasi.md',
-      ),
-      page(
-        'std',
-        'net-resolver',
-        'silk.net.resolver',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/net-resolver.md',
       ),
       page(
         'std',
@@ -960,15 +960,15 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'platform-native-start-sync',
-        'silk.platform.native.start_sync',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/platform-native-start-sync.md',
-      ),
-      page(
-        'std',
         'platform-native-start',
         'silk.platform.native.start',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/platform-native-start.md',
+      ),
+      page(
+        'std',
+        'platform-native-start-sync',
+        'silk.platform.native.start_sync',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/platform-native-start-sync.md',
       ),
       page(
         'std',
@@ -1254,21 +1254,15 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'system-child-process-native',
-        'silk.system.child_process_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-child-process-native.md',
-      ),
-      page(
-        'std',
         'system-child-process',
         'silk.system.child_process',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-child-process.md',
       ),
       page(
         'std',
-        'system-filesystem-native',
-        'silk.system.filesystem_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-filesystem-native.md',
+        'system-child-process-native',
+        'silk.system.child_process_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-child-process-native.md',
       ),
       page(
         'std',
@@ -1278,15 +1272,21 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'system-host-input-native',
-        'silk.system.host_input_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-host-input-native.md',
+        'system-filesystem-native',
+        'silk.system.filesystem_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-filesystem-native.md',
       ),
       page(
         'std',
         'system-host-input',
         'silk.system.host_input',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-host-input.md',
+      ),
+      page(
+        'std',
+        'system-host-input-native',
+        'silk.system.host_input_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-host-input-native.md',
       ),
       page(
         'std',
@@ -1302,21 +1302,15 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'system-monotonic-clock-native',
-        'silk.system.monotonic_clock_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-monotonic-clock-native.md',
-      ),
-      page(
-        'std',
         'system-monotonic-clock',
         'silk.system.monotonic_clock',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-monotonic-clock.md',
       ),
       page(
         'std',
-        'system-random-native',
-        'silk.system.random_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-random-native.md',
+        'system-monotonic-clock-native',
+        'silk.system.monotonic_clock_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-monotonic-clock-native.md',
       ),
       page(
         'std',
@@ -1326,15 +1320,21 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'system-system-clock-native',
-        'silk.system.system_clock_native',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-system-clock-native.md',
+        'system-random-native',
+        'silk.system.random_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-random-native.md',
       ),
       page(
         'std',
         'system-system-clock',
         'silk.system.system_clock',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-system-clock.md',
+      ),
+      page(
+        'std',
+        'system-system-clock-native',
+        'silk.system.system_clock_native',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/system-system-clock-native.md',
       ),
       page(
         'std',
@@ -1374,21 +1374,27 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
-        'text-unicode-tables',
-        'silk.text.unicode_tables',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/text-unicode-tables.md',
-      ),
-      page(
-        'std',
         'text-unicode',
         'silk.text.unicode',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/text-unicode.md',
       ),
       page(
         'std',
+        'text-unicode-tables',
+        'silk.text.unicode_tables',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/text-unicode-tables.md',
+      ),
+      page(
+        'std',
         'text-utf8-decoder',
         'silk.text.utf8_decoder',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/text-utf8-decoder.md',
+      ),
+      page(
+        'std',
+        'tls-certificate',
+        'silk.tls.certificate',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/tls-certificate.md',
       ),
       page(
         'std',
@@ -1419,12 +1425,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'tls-certificate-profile',
         'silk.tls.certificate_profile',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/tls-certificate-profile.md',
-      ),
-      page(
-        'std',
-        'tls-certificate',
-        'silk.tls.certificate',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/tls-certificate.md',
       ),
       page(
         'std',
@@ -1470,6 +1470,12 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'std',
+        'tls-trust-source',
+        'silk.tls.trust_source',
+        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/tls-trust-source.md',
+      ),
+      page(
+        'std',
         'tls-trust-source-memory',
         'silk.tls.trust_source_memory',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/tls-trust-source-memory.md',
@@ -1479,12 +1485,6 @@ export const generatedGroups: ReadonlyArray<DocGroup> = [
         'tls-trust-source-native',
         'silk.tls.trust_source_native',
         'https://github.com/silk-lang/silk/blob/main/reference/stdlib/tls-trust-source-native.md',
-      ),
-      page(
-        'std',
-        'tls-trust-source',
-        'silk.tls.trust_source',
-        'https://github.com/silk-lang/silk/blob/main/reference/stdlib/tls-trust-source.md',
       ),
       page(
         'std',
