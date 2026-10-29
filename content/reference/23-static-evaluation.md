@@ -12,7 +12,7 @@ Parameter        = ( 'mut' | 'static' )? Identifier ':' Type
 CompileError     = 'compileError' '(' Expression ')'
 ```
 
-- A `static fn` is declared at module level or in an inherent `impl` block.
+- A `static fn` is declared at module level, in an inherent `impl` block, as an interface operation, or as the witness of one in a conformance.
 - `static if` and `static for` are covered in Static control flow and reflection. Package `param` declarations are covered in Package parameters.
 
 ## The static phase
@@ -33,10 +33,11 @@ CompileError     = 'compileError' '(' Expression ')'
 - Calls to other `static fn`, including generic ones and inherent members such as `Units.kilo()`.
 - Construction and field reads of structs without a `Drop` hook, fixed arrays and indexing, scalar enum values and `==` on them, and string values with `==`.
 - `silk/core/static_text`, `silk/core/static_sequence` and reflection operations.
+- Pipelines and receiver calls on static values: `Spec { count: 1 } |> bump |> scaled(3)`, `Spec.make().bump().add(4)`.
 
 The following are SEM0176 during static evaluation:
 
-- A call to an ordinary `fn`, including std lib functions such as `usize.toI32`.
+- A call to an ordinary `fn`, including std lib functions such as `usize.toI32`: "`usize.toI32` is an ordinary fn, so static evaluation cannot call it; mark it `static fn` to call it here".
 - Assignment to a field (`q.x = v`) or an element (`a[i] = v`).
 - A value of a type with a `Drop` hook.
 - References and slices as values.
@@ -61,12 +62,12 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - A `while` loop that never ends stops at the step budget (SEM0179).
 - A call that repeats an active call with the same arguments is a cycle (SEM0178).
 - Two constants whose initializers refer to each other are SEM0223.
-- Retained bytes accumulate over the whole demand. Building a sequence of a few hundred elements by repeated `append` already exceeds the limit.
+- Retained bytes accumulate over the whole demand. Building a sequence of 1000 elements by repeated `append` exceeds the limit: "Static evaluation exceeded its limit of 1048576 bytes of retained values; keep fewer or smaller values alive at once, or do this work at runtime".
 
 ## Constants
 
 - `const NAME: Type = expression` declares a module-level static value. The type annotation is required. Without it, the declaration does not parse.
-- The type must be `bool`, `char`, an integer type, `f32`, `f64` or `string`. Any other type is SEM0086.
+- The type must be `bool`, `char`, an integer or float type, `string`, a fixed array of these, or a struct or enum: `const ORIGIN: Point = Point { x: 0, y: 0 }`, `const SIZES: [u32; 2] = [8, 16]`. The value must be one static evaluation can build, so a struct with a `Drop` hook or a `List` is SEM0176. Any other type, such as a reference, is SEM0086: "Invalid constant: a constant cannot have type `&'static i32`; its type must be `bool`, `char`, an integer or float primitive, `string`, a fixed array of these, or a struct or enum".
 - An omitted `string` lifetime in a constant is `'static`.
 - The initializer may call `static fn` and read other constants.
 - A constant may be read in runtime code, in a `static fn`, as a static argument and as an array length: `[i32; SIZE]`.
@@ -80,7 +81,8 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 ## Static functions
 
 - `static fn` declares a function that runs only in the static phase. It may be `pub` and generic.
-- A `static fn` may be a member of an inherent `impl`. It cannot implement an interface member.
+- A `static fn` may be a member of an inherent `impl`.
+- An interface may declare a `static fn` operation. Each conformance supplies it with a `static fn` witness. A witness that is a plain `fn`, or a plain operation given a `static fn` witness, is SEM0083: "one of them is a `static fn` and the other is not, or their `static` parameters differ". The operation runs only in static evaluation, typically from a generic `static fn` with a bound: `static fn takes<T: Arg>() -> bool { return Arg.takesValue() }`. Calling it from runtime code is SEM0176: "`Arg.takesValue` runs only during static evaluation, so runtime code cannot call it". See Interfaces and impls.
 - A `static fn` must have a body.
 - Calling a `static fn` with a runtime argument is SEM0176 at that argument.
 
@@ -89,6 +91,8 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - `static name: T` marks an ordinary function's parameter as static. Each call must pass a static argument (SEM0176 otherwise).
 - The parameter has no runtime representation. Its value is part of the function's identity: each distinct value produces one instance. Equal values share an instance, however they are written (`2`, `TWO`, `1 + 1`).
 - Inside the function, the parameter is static. It may feed `let static`, `static if` and other static parameters.
+- Methods and interface operations take static parameters too, and method syntax supplies them: `leaf.own(Spec { size: 2 })` and `item.walk(0, spec)` on a `T: Walk` select an instance from the static argument, as `Leaf.own(&leaf, spec)` does.
+- A method with `static` parameters cannot be called from the body of a `static fn` yet. That is SEM0249: "A method with `static` parameters cannot receive its static arguments here yet; call it from the body of a runtime function".
 - Static parameter types include integers, scalar enums, `string`, fixed arrays and structs without `Drop`.
 - Recursion through static parameters must reach a base case. `countdown(n - 1)` guarded by `static if n == 0` is accepted. Recursion whose static argument keeps growing is refused as not supported.
 - An anonymous function or `effect { ... }` block in a function with a `static` parameter is not supported yet: the native compiler does not build it once per static argument. It is SEM0245 at the literal: ``An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled` ``. Put the literal in a named function without `static` parameters and call that.
@@ -113,7 +117,7 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - `StaticSequence.empty<T>()` makes an empty sequence. `StaticSequence.append<T>(move s, value)` returns a new sequence with one more element.
 - Sequences are passed and reassigned with `move`.
 - A `static for` loop walks a sequence. See Static control flow and reflection.
-- `StaticSequence.concat`, `StaticSequence.length` and `StaticSequence.at` are declared but refused as not supported. The refusal is reported at the user's call that reached them, like other static errors in another module. Its related location points into `silk/core/static_sequence.silk`.
+- `StaticSequence.concat<T>(move a, move b)` joins two sequences, `StaticSequence.length<T>(s)` counts the elements, and `StaticSequence.at<T>(s, index)` reads one.
 
 ## Static error reporting
 
@@ -121,11 +125,11 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - A runtime argument is reported at the argument.
 - When the failing operation is in another module, such as `silk/core/static_text` or `silk/core/reflect`, the error is reported at the outermost call in the evaluated module that reached it. `static if StaticText.byteAt("abc", 7) == 0` reports SEM0176 at the `StaticText.byteAt` call. `const B: u8 = pick()`, where the user's `static fn pick` calls `StaticText.byteAt("abc", 7)`, reports it at `pick()`. In both cases a `note: ... related location` line follows at the same position.
 - `compileError(message)` fails the evaluation that reaches it with SEM0177. The diagnostic's message is the `message` text. `message` must be static text, such as a literal or a `string` constant.
-- The SEM0177 is reported at the `compileError`. When a call selected it through a static argument, a note points at that call. In the second example below, changing `scaled(3, 1)` on line 24 to `scaled(-1, 1)` reports:
+- The SEM0177 is reported at the `compileError`. When a call selected it through a static argument, a note points at that call. In the second example below, changing `scaled(3, 1)` on line 34 to `scaled(-1, 1)` reports:
 
   ```
-  src/main.silk:8:26: error[SEM0177] factor must not be negative
-    note: src/main.silk:24:50: related location
+  src/main.silk:14:5: error[SEM0177] factor must not be negative
+    note: src/main.silk:34:50: related location
   ```
 - `compileError` in an untaken branch, or in an unselected `static if` arm, reports nothing. This makes it a static assertion.
 - `compileError` in ordinary runtime code that is not inside a static selection is refused as not supported.
@@ -255,6 +259,65 @@ pub fn main() -> i32 {
 }
 ```
 
+A `static fn` interface operation selected per type, and a static argument passed with method syntax:
+
+```silk
+interface Arg {
+  static fn takesValue() -> bool
+}
+
+struct Flag {}
+
+struct Text {}
+
+impl Arg for Flag {
+  static fn takesValue() -> bool {
+    return false
+  }
+}
+
+impl Arg for Text {
+  static fn takesValue() -> bool {
+    return true
+  }
+}
+
+static fn takes<T: Arg>() -> bool {
+  return Arg.takesValue()
+}
+
+fn width<T: Arg>() -> i32 {
+  static if takes<T>() {
+    return 40
+  } else {
+    return 2
+  }
+}
+
+struct Spec {
+  size: i32,
+}
+
+struct Leaf {
+  value: i32,
+}
+
+impl Leaf {
+  fn grown(self: &Leaf, static spec: Spec) -> i32 {
+    static if spec.size < 0 {
+      compileError("size must not be negative")
+    }
+    return self.value + spec.size
+  }
+}
+
+pub fn main() -> i32 {
+  let leaf = Leaf { value: 3 }
+  let grown = leaf.grown(Spec { size: 2 })
+  return width<Text>() + width<Flag>() + grown - 47
+}
+```
+
 ## Errors and fixes
 
 SEM0176, a runtime value passed to a `static fn`:
@@ -313,6 +376,8 @@ pub fn main() -> i32 {
 | SEM0210 | An omitted result lifetime has no unique input to come from, as in a `static fn` returning bare `string` |
 | SEM0223 | Constants depend on each other in a cycle |
 | SEM0245 | An anonymous function or `effect {}` block in a function with `static` parameters |
+| SEM0249 | A method with `static` parameters called where its static arguments cannot be selected yet, such as in a `static fn` |
+| SEM0083 | A conformance whose witness differs from the operation in being `static fn` or in its `static` parameters |
 
 ## See also
 
@@ -320,9 +385,7 @@ Static control flow and reflection · Package parameters · Functions and method
 
 ## Open questions
 
-- SEM0176 names the runtime value that static evaluation tried to read and the target, as in "reading the runtime value `n` is not available during static evaluation for x86_64-unknown-linux-gnu". Most messages for SEM0178 through SEM0182 are fixed text that does not name the value or call involved.
-- `StaticSequence.concat`, `length` and `at` are refused as not supported, so a sequence can only be built with `append` and consumed with `static for`.
-- The retained-value budget appears to count every intermediate sequence. About 400 `append` calls of `i32` exceed 1 MiB.
-- A constant initializer written as a struct literal, such as `Point { x: 1 }`, fails to parse instead of reporting SEM0086 alone.
+- SEM0176 names the runtime value that static evaluation tried to read and the target, as in "reading the runtime value `x` is not available during static evaluation for x86_64-unknown-linux-gnu". Other SEM0176 cases, such as assignment to a field or element in a `static fn`, print only "Crossing from static evaluation into unavailable runtime work". SEM0179 through SEM0181 state the limit and how to stay under it.
+- The retained-value budget appears to count every intermediate sequence, so 1000 `append` calls of `i32` exceed 1 MiB.
 - `static effect fn`, `static unsafe fn` and a `static fn` with a failure row are refused as not supported rather than reported with a stable code.
 - SEM0182 has a producer in the compiler, but no small program here triggered it before SEM0181.
