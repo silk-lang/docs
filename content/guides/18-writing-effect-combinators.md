@@ -314,11 +314,11 @@ Each successful attempt now reports its own time. The slow station's reads all t
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.08s
-  check    failed: 2 modules, 1 error        0.15s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:126:26: error[SEM0076] Callable value with mode `once` cannot satisfy a parameter with mode `mut`, which may call it more than once
-Failed weather in 0.23s
+Failed weather in 0.14s
 ```
 
 Column 26 is the `withBudget(...)` argument. `withBudget` takes its action as `once Effect` and keeps it, so the effect it returns can run only once, and `retrying` needs one that can run again. `budgetedRead(&mut station.*)` builds a fresh `withBudget` effect each time it runs, and holds only a `&mut` borrow, so it is a `mut Effect`.
@@ -354,11 +354,11 @@ effect fn scaled(static factor: i32) -> i32 {
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     51 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.14s
+  load     135 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:12:23: error[SEM0245] An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled`
-Failed weather in 0.21s
+Failed weather in 0.11s
 ```
 
 Column 23 is the `effect { ... }` block. Do what the message says: move the code that builds and runs the block into a function of its own, and call that from `scaled`:
@@ -389,12 +389,12 @@ An effect that borrows a local keeps the borrow from the moment it is built unti
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.16s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:120:16: error[OWN0011] Reading `station.reads` while a borrow of it is still in use; use that borrow for the last time before this
   note: src/main.silk:119:38: the borrow starts here
-Failed weather in 0.23s
+Failed weather in 0.15s
 ```
 
 `reading` holds `&mut station`, so even reading the station is refused. Read it before you build the effect, or after you run it. The rule is the same whether or not the effect ever runs: building it is enough.
@@ -403,14 +403,51 @@ If `retrying` declared its predicate as a plain `fn(&E) -> bool`, the closure th
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.06s
-  check    failed: 2 modules, 1 error        0.14s
+  load     143 modules, 1 in package         0.02s
+  check    failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:119:55: error[SEM0076] Callable value with mode `mut` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow
-Failed weather in 0.20s
+Failed weather in 0.15s
 ```
 
 When you write a combinator, accept the weakest mode you can use: `once fn` and `once Effect` if you call it once, `mut fn` and `mut Effect` if you call it repeatedly. Plain `fn` and `Effect` are needed only when something must call or run the value through a shared reference.
+
+## One handler for a wider row
+
+A handler may take a wider failure union than the effect it handles can produce. `failureCode` turns every failure a station read can end with, in any of the compositions above, into a code:
+
+```silk
+// One handler for every failure a station read can end with.
+effect fn failureCode(failure: StationDown | LogError | TimedOut) -> i32 {
+  return match move failure {
+    StationDown down => down.code
+    TimedOut late => 504
+    LogError problem => 500
+  }
+}
+
+// `readStation` fails with `StationDown | LogError`; the handler takes a wider union.
+effect fn probe(station: &mut Station) -> i32 ? &mut Logger {
+  return run inVirtualTime(Effect.catchAll(readStation(&mut station.*), failureCode))
+}
+```
+
+`readStation` fails with `StationDown | LogError`, and `failureCode` takes `StationDown | LogError | TimedOut`. `Effect.catchAll` accepts it, because the handler's union holds every member the row can produce. Each failure is widened into the handler's union on the way in. With these lines at the end of `main`:
+
+```silk
+  let mut down = Station { failures: 1, code: 503, latencyMs: 30, reads: 0 }
+  let code = run probe(&mut down) |> Effect.provideMut<Logger>(&mut logger)
+  run Effect.log("probe: {code}\n", &.{ code: code }) |> Effect.provideMut<Logger>(&mut logger)
+```
+
+the program ends with:
+
+```
+  read 1: station down (503)
+probe: 503
+```
+
+So one handler serves every row it covers, with no forwarding closure for each narrower row. The same rule holds for a combinator's own callable parameters: a parameter of type `fn(StationDown) -> i32` accepts a function that takes `StationDown | TimedOut`. See Closures and callable types in the language reference.
 
 ## Logging from a combinator
 
@@ -422,17 +459,17 @@ A combinator can log like any other effect function, type parameters and all. Ad
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     53 modules, 1 in package          0.05s
-  check    2 modules                         1.23s
-  borrow   227 bodies                        0.01s
-Finished weather in 1.28s
+  load     143 modules, 1 in package         0.02s
+  check    2 modules                         0.33s
+  borrow   171 bodies                        0.01s
+Finished weather in 0.37s
 ```
 
 Every caller of `withBudget` now needs a `Logger` in its row, and every caller gets the line whether it wants it or not. Returning what you measured, as `Timed` does, keeps the combinator free of a `Logger` and lets the caller decide how to report it.
 
 ## API reference
 
-- `silk/core/effect`: `Effect.result`, `Effect.sleep`, `Effect.retry`, `Effect.log`, `Effect.provideMut`, `Effect.bindRequirementOwned`
+- `silk/core/effect`: `Effect.result`, `Effect.sleep`, `Effect.retry`, `Effect.catchAll`, `Effect.log`, `Effect.provideMut`, `Effect.bindRequirementOwned`
 - `silk/core/result`: `Result`
 - `silk/system/monotonic_clock`: `MonotonicClock`, `MonotonicClock.deadlineAfter`
 - `silk/system/system_clock`: `SystemClock`, `Instant`
