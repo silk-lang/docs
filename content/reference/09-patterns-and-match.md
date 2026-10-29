@@ -1,6 +1,6 @@
 # Patterns and match
 
-A pattern tests the shape of a value and binds names to its parts. Patterns appear in `match` arms, in `if let` conditions and in destructuring `let` statements.
+A pattern tests the shape of a value and binds names to its parts. Patterns appear in `match` arms, in `if let` and `while let` conditions and in destructuring `let` statements.
 
 ## Syntax
 
@@ -22,7 +22,7 @@ FieldPatterns   = '{' ( FieldPattern ( ',' FieldPattern )* ','? )? '}'
 FieldPattern    = '..' | Identifier ( ':' ( Identifier | Pattern ) )?
 ```
 
-- Arms follow one another with no separator. A comma between arms is a parse error (PAR0002).
+- Arms follow one another with no separator. A comma between arms is PAR0010: "Match arms are not separated by commas; remove the `,`".
 - The subject is parsed without record literals: write `match move (Token { value: 1 }) { … }`, not `match move Token { value: 1 } { … }`.
 - In a field, `name: …` accepts a binding name or a nested variant, enum member or record pattern. It does not accept an integer literal.
 
@@ -48,7 +48,7 @@ FieldPattern    = '..' | Identifier ( ':' ( Identifier | Pattern ) )?
 | `Left held` | A value of struct type `Left` | The whole value as `held` |
 | `i32 n`, `[f64; 2] v` | That member of a structural union, or a scalar subject of that type | The whole value |
 
-- There is no plain identifier pattern. `x => …` is a parse error. Bind a whole value with the binder form `Type name`, or match `_` and use the subject.
+- There is no plain identifier pattern. `x => …` is PAR0010: "A pattern that takes the whole value names its type, as in `i32 value`, or is `_`". Bind a whole value with the binder form `Type name`, or match `_` and use the subject.
 - The binder form works on struct subjects (`Token held`) and union members.
 - On an integer, `bool`, `char`, `f32`/`f64` or scalar enum subject, a binder of the subject's type binds the whole value and covers every case like `_`: `match n { i32 x => x + 1 }`, `char c => …`, `Color v => …`. A binder of another type, such as `i64 x` on an `i32`, is SEM0042.
 - There are no `bool`, `char`, string, range or tuple patterns. Use guards (`_ if c == 'a'`) for those tests.
@@ -94,6 +94,7 @@ The access mode before the subject says how the arms reach it.
 - `match e` on a non-Copy named variable is OWN0003. Use `move` to consume it or `&` to inspect it.
 - A temporary subject, such as a call result, is consumed without `move`, as for `let` and `if let`: `match make() { … }`.
 - A subject of reference type cannot be matched directly (SEM0226). Match its referent: `match &status.*` or `match &mut status.*`. The same holds for `if let`.
+- A plain `match status.*` through a borrow would move the referent out of it. That is one OWN0003, "`match status.*` would move `status.*` out of a borrow, which cannot give it away; write `match &status.*` to look at it". The rest of the `match` is then checked as `match &status.*`, so no further errors follow from it.
 - `match move e` transfers the subject into the selected arm. Use it to take payloads out of an owned value.
 - `match &e` names the parts without a reference type: a bound `i32` field reads as `i32`. If `e` is not a place, it is evaluated into a temporary.
 - Each borrowed binding holds a loan of the subject. The loan ends after the binding's last use, so the arm may assign the owner afterwards.
@@ -112,6 +113,7 @@ The access mode before the subject says how the arms reach it.
 - The initializer chooses the access: `&e` borrows shared, `&mut e` borrows exclusive, `move e` consumes, and a Copy value is copied.
 - A temporary initializer, such as a call result or a constructed value, is consumed without `move`. A non-Copy named variable still needs `move` (OWN0003).
 - An enum member is a pattern too: `if let Color.Green = c { }`.
+- `while let Pattern = e { … }` repeats its block while the pattern matches, with the same access rules. See Control flow.
 
 ## let patterns
 
@@ -302,7 +304,8 @@ pub fn main() -> i32 {
 
 | Code | Meaning |
 | --- | --- |
-| OWN0003 | Plain `match` on a non-Copy named variable; use `move` or a borrow |
+| PAR0010 | A comma between arms, or a plain identifier pattern |
+| OWN0003 | Plain `match` on a non-Copy named variable, or on `r.*` through a borrow; use `move` or a borrow |
 | OWN0006 | Borrowed pattern binding escapes its arm |
 | OWN0007 | `match &mut` on a binding not declared `mut` |
 | OWN0008 | Guard consumes a pattern binding |

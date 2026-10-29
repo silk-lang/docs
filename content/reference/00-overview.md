@@ -4,9 +4,7 @@
 
 This is the reference for the core Silk language: syntax, rules and the diagnostics that enforce them. It is terse on purpose. The Silk book teaches, and this reference is where you look things up.
 
-Every example on these pages was compiled with `silk check` or run with `silk run` on release v0.1.0-dev.8624 (source commit 5081812).
-
-Two later changes on main are already reflected: the std lib collection `Vector` is now `List` (in `silk/collections/list`), and arrays gain the repeat form `[value; count]`. Examples using those were not run, since no release has them yet.
+Every example on these pages was compiled with `silk check` or run with `silk run` on Silk 0.1.0. A program example exits with status 0 when its checks pass, unless the text around it says otherwise. The quoted diagnostics are the compiler's own text.
 
 ## How a page is laid out
 

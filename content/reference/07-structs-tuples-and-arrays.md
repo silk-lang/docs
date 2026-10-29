@@ -28,11 +28,11 @@ UnitType       = '(' ')'
 
 ## Struct declarations
 
-- Fields are separated by commas, usually one per line. A trailing comma is allowed.
+- Fields are separated by commas, usually one per line. A trailing comma is allowed. A missing comma is PAR0001, "Expected `,`".
 - A field name may appear once (SEM0017).
 - A struct may be empty: `struct Marker {}`.
 - `extern "C" struct Name { }` declares a C-layout record. It takes no type parameters (SEM0205), and its fields must be C object types (SEM0206). See Unsafe code and C interop.
-- Generic structs take type parameters: `struct Labeled<T> { label: u8 value: T }`. See Generics.
+- Generic structs take type parameters: `struct Labeled<T> { label: u8, value: T }`. See Generics.
 
 ## Visibility
 
@@ -70,10 +70,10 @@ UnitType       = '(' ')'
 
 ## Tuples
 
-- `tuple Name(A, B)` declares a nominal tuple. Construct it like a call: `Name(a, b)`. The wrong number of elements is SEM0172.
+- `tuple Name(A, B)` declares a nominal tuple. Construct it like a call: `Name(a, b)`. The wrong number of elements is SEM0172, which names the tuple: "main.Pair expects 2 tuple elements but received 3".
 - A literal `(a, b)` also constructs a nominal tuple when the expected type is one: `let r: Range = (0, 1)`.
-- Elements are read and written with `.0`, `.1` and so on. An out-of-range ordinal is SEM0027.
-- `Name { … }` record syntax does not construct a tuple.
+- Elements are read and written with `.0`, `.1` and so on. An out-of-range ordinal is SEM0027. For a nominal tuple it lists the elements: "main.Pair has no element `.2`; it has 2 elements, `.0` and `.1`".
+- `Name { … }` record syntax does not construct a tuple. `Pair { 0: a, 1: b }` is PAR0010: "A tuple's elements have no field names; build it by position, as in `Pair(first, second)`". Other field names are SEM0018.
 - A `(a, b)` literal with no tuple context creates an anonymous tuple. Like anonymous records, each literal is its own type.
 - There is no tuple type syntax. `(T)` in a type is just `T` in parentheses, so `(i32, bool)` is not a type. Declare a `tuple` to name one.
 - `(x)` is a grouped expression. A one-element tuple literal needs a trailing comma: `(x,)`.
@@ -92,7 +92,7 @@ UnitType       = '(' ')'
 - With a `count` above 1, the value's type must be `Copy` (SEM0121). Against an annotation, `count` must match the length (SEM0031).
 - `[]` needs an expected array type: `let none: [u8; 0] = []`. Otherwise SEM0029.
 - Arrays nest: `[[1, 2], [3, 4]]`, read with `grid[1][0]`.
-- `.length` is the element count as `usize`.
+- `.length` is the element count as `usize`. There is no `.len`: `a.len` is SEM0027, "Array<i32, 3> has no field `len`; its element count is `.length`", and the same for a slice.
 - An array of `Copy` elements is copied on assignment. An array with non-`Copy` elements needs `move`.
 
 ## Indexing
@@ -109,7 +109,7 @@ UnitType       = '(' ')'
 - Borrow an array to get a slice: `&a` or `&mut a`, passed where `&[T]` or `&mut [T]` is expected. Passing `a` itself is a type error (SEM0012).
 - `&[T; N]` is a reference to a whole fixed array, keeping its length in the type.
 - Slices support `.length`, indexing and element assignment (for `&mut [T]`).
-- There is no range or slicing syntax such as `a[1..3]`. Use `Slice.view(values, offset, length)` from `silk/collections/slice` for a shared subrange. An invalid range traps with `slice range out of bounds`.
+- There is no range or slicing syntax such as `a[1..3]`. Use `Slice.view(values, offset, length)` from `silk/collections/slice` for a shared subrange, and `Slice.viewMut` for an exclusive one. An invalid range traps with `slice range out of bounds`.
 - See Borrowing and Lifetimes for how long a slice may live.
 
 ## Examples
@@ -223,7 +223,8 @@ pub fn main() -> i32 {
 
 | Code | Meaning |
 | --- | --- |
-| PAR0002 | Unexpected tokens, for example a comma between struct fields |
+| PAR0001 | Missing token, for example no comma between struct fields ("Expected `,`") |
+| PAR0010 | Tuple literal with field names, `Pair { 0: a, 1: b }` |
 | SEM0012 | Argument type mismatch, for example an array passed where a slice is expected |
 | SEM0015 | Import of a private member of another module |
 | SEM0017 | Struct declares a field twice |
@@ -233,7 +234,7 @@ pub fn main() -> i32 {
 | SEM0024 | Record literal omits a field |
 | SEM0025 | Record literal field value has the wrong type |
 | SEM0026 | Field projection on a value that is not a struct |
-| SEM0027 | Unknown field or tuple element |
+| SEM0027 | Unknown field or tuple element, including `.len` for `.length` |
 | SEM0028 | Private field of another module's struct |
 | SEM0029 | Empty array literal without an expected array type |
 | SEM0030 | Array element has the wrong type |
@@ -251,7 +252,7 @@ pub fn main() -> i32 {
 
 ## See also
 
-Values and primitive types · Bindings and statements · Enums and unions · Patterns and match · Generics · Ownership and moves · Borrowing · Lifetimes · Unsafe code and C interop · Program entry and termination · `silk/collections/slice`, `silk/vector`
+Values and primitive types · Bindings and statements · Enums and unions · Patterns and match · Generics · Ownership and moves · Borrowing · Lifetimes · Unsafe code and C interop · Program entry and termination · `silk/collections/slice`, `silk/collections/list`
 
 ## Open questions
 

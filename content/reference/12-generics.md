@@ -27,7 +27,8 @@ ExactType         = 'typeof' '(' Path ')'
 
 - `fn name<T>(...)`, `struct Name<T> { ... }`, `union Name<T> { ... }`, `interface Name<T> { ... }`.
 - `impl<T> Interface for Type<T> { ... }` and `impl<T> Type<T> { ... }`. See Interfaces and impls.
-- An inherent `impl<T> Type<T>` must list exactly the owner's parameters, in order, and cannot bound them (SEM0194).
+- An inherent `impl<T> Type<T>` must list exactly the owner's parameters, in order (SEM0194).
+- Its parameters may take interface, `Copy` and outlives bounds: `impl<T: Copy + Add<T, T>> Pair<T> { fn sum(self: Self) -> T { … } }`. The block's members then exist only where the bounds hold. Each call proves them, and a call for other arguments is SEM0121. A type may have one unbounded block and several bounded ones. A callable bound, such as `impl<F: fn(i32) -> i32> Runner<F>`, is still SEM0194.
 - Members of an inherent impl may add their own parameters: `fn map<U>(self: Self, u: U) -> Box<U>`.
 - A parameter name may appear only once in a list (SEM0050). An interface cannot declare `Self` as a parameter, since `Self` is already bound there (SEM0050).
 - Using a parameter of one kind where another kind is expected is SEM0088, for example `Box<'a>` for a type parameter. Leaving out a requirement-row argument, as in `Holder<i32>` for `struct Holder<T, ?R>`, is SEM0088 too; write `Holder<i32 ? never>` for an empty row.
@@ -219,6 +220,48 @@ pub fn main() -> i32 {
 }
 ```
 
+Two bounded inherent blocks on one generic struct. `Vector2<bool>` would have neither `dot` nor `difference`:
+
+```silk
+import silk.core.ownership { Copy }
+import silk.core.ops { Add, Multiply, Subtract }
+
+struct Vector2<T> {
+  x: T,
+  y: T,
+}
+
+impl<T: Copy> Copy for Vector2<T> {}
+
+// `dot` exists where `T` adds and multiplies.
+impl<T: Copy + Add<T, T> + Multiply<T, T>> Vector2<T> {
+  fn dot(self: Self, other: Self) -> T {
+    return self.x * other.x + self.y * other.y
+  }
+}
+
+// `difference` exists where `T` subtracts.
+impl<T: Copy + Subtract<T, T>> Vector2<T> {
+  fn difference(self: Self, other: Self) -> Self {
+    return Vector2<T> { x: self.x - other.x, y: self.y - other.y }
+  }
+}
+
+pub fn main() -> i32 {
+  let a = Vector2<i32> { x: 3, y: 4 }
+  let b = Vector2<i32> { x: 1, y: 2 }
+  let gap = a.difference(b)
+  if a.dot(b) != 11 || gap.x != 2 {
+    return 1
+  }
+  let f = Vector2<f64> { x: 0.5, y: 2.0 }
+  if f.dot(f) != 4.25 {
+    return 2
+  }
+  return 0
+}
+```
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -240,7 +283,7 @@ pub fn main() -> i32 {
 | SEM0129 | Returned function differs from the `typeof` result type |
 | SEM0121 | Bound cannot be proved for the concrete arguments |
 | SEM0135 | Operator not available for the operand types |
-| SEM0194 | Inherent impl head is not exactly the owner's parameters |
+| SEM0194 | Inherent impl head is not exactly the owner's parameters, or bounds one by a callable contract |
 | SEM0221 | Owner type arguments placed on the member instead of the owner |
 
 ## See also

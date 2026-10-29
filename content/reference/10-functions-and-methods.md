@@ -5,10 +5,12 @@ A function is a named, module-level callable declared with `fn`. A method is a f
 ## Syntax
 
 ```
-FunctionDecl    = 'pub'? 'test'? 'static'? 'unsafe'? ( 'effect' Environment? )? 'fn' Identifier
+FunctionDecl    = Directive* 'pub'? 'test'? 'static'? 'unsafe'? ( 'effect' Environment? )? 'fn' Identifier
                   GenericParameters? '(' Parameters? ')' ( '->' Type )? WhereClause? Block
 Parameters      = Parameter ( ',' Parameter )* ','?
 Parameter       = ( 'mut' | 'static' )? Identifier ':' Type
+
+Directive       = '@' Identifier ( '(' DirectiveArguments ')' )?
 
 InherentImpl    = 'impl' GenericParameters? Type '{' FunctionDecl* '}'
 
@@ -18,6 +20,7 @@ QualifiedCall   = TypePath TypeArguments? '.' Identifier '(' Arguments? ')'
 ```
 
 - Failure and requirement rows (`! E`, `? R`) and `extern`/`export` forms also attach to function headers. They are covered in Typed failures, Services and providers, and Unsafe code and C interop.
+- Directives such as `@inline`, `@inlineNever` or `@cold` go before a function. The formatter puts each on its own line. They tell the compiler how to build the function, not what it means. The full table is in Intrinsics. A leftover `with` clause after the header is PAR0011: "Silk has no `with` clauses; write `@inline` on the line before the declaration".
 
 ## Declarations
 
@@ -47,6 +50,8 @@ QualifiedCall   = TypePath TypeArguments? '.' Identifier '(' Arguments? ')'
 
 - `impl Type { … }` adds associated functions to a struct, union or enum declared in the same module.
 - The head must name the whole type family: `impl<T> Maybe<T>`, not `impl Maybe<i32>`. Built-in types such as `i32` cannot take inherent impls. Both are SEM0194.
+- The head's parameters may carry interface bounds, `Copy` and outlives bounds: `impl<T: Copy + Add<T, T>> Pair<T>`. The members of such a block exist only for type arguments that meet the bounds, and each call proves them. Calling `sum` on a `Pair<bool>` is SEM0121: "`bool: silk.core.ops.Add<bool, bool>` cannot be proved: no implementation of `silk.core.ops.Add<bool, bool>` exists for `bool`". One type may have several inherent blocks with different bounds.
+- A callable bound such as `impl<F: fn(i32) -> i32> Runner<F>` is still SEM0194.
 - Inside the block, `Self` names the owner type with its parameters.
 - Each member name may appear once per owner (SEM0196).
 - A member may not share its name with a field of the owner (SEM0195: "Point.x collides with the field x of Point"). An inherent member may not be named `drop` either; declare `impl Drop for Point` (SEM0195). Mapping a member to another declaration, `origin: make`, works only in a conformance (SEM0195).
@@ -69,6 +74,7 @@ QualifiedCall   = TypePath TypeArguments? '.' Identifier '(' Arguments? ')'
 - A struct field that holds a callable is called with the same spelling: `runner.apply(2)`.
 - Methods supplied by interfaces are also called with the receiver spelling. See Interfaces and impls.
 - `x |> Type.method(args)` passes `x` as the first argument. See Expressions and operators.
+- A method with `static` parameters takes its static arguments through method syntax too, in a runtime body: `leaf.scaled(2)` for `fn scaled(self: &Self, static factor: i32)`. See Static evaluation.
 
 ## Function and method values
 
@@ -187,10 +193,46 @@ pub fn main() -> i32 {
 }
 ```
 
+A bounded inherent block next to an unbounded one:
+
+```silk
+import silk.core.ownership { Copy }
+import silk.core.ops { Add }
+
+struct Pair<T> {
+  left: T,
+  right: T,
+}
+
+impl<T: Copy> Copy for Pair<T> {}
+
+impl<T: Copy> Pair<T> {
+  fn swapped(self: Self) -> Self {
+    return Pair<T> { left: self.right, right: self.left }
+  }
+}
+
+// `sum` exists only for a `T` that adds.
+impl<T: Copy + Add<T, T>> Pair<T> {
+  fn sum(self: Self) -> T {
+    return self.left + self.right
+  }
+}
+
+pub fn main() -> i32 {
+  let pair = Pair<i32> { left: 40, right: 2 }
+  if pair.swapped().sum() != 42 {
+    return 1
+  }
+  return 0
+}
+```
+
 ## Diagnostics
 
 | Code | Meaning |
 | --- | --- |
+| PAR0011 | A `with` clause after a function header; write a directive before it |
 | OWN0001 | Value used after a by-value receiver moved it |
 | SEM0005 | Duplicate parameter name |
 | SEM0007 | Too many arguments |
@@ -201,8 +243,9 @@ pub fn main() -> i32 {
 | SEM0058 | `&mut Self` method called through a shared reference |
 | SEM0077 | Bound `&mut Self` method called through a binding that is not `mut` |
 | SEM0129 | Returned value does not match the result type |
+| SEM0121 | A call to a member of a bounded inherent block whose bound the type arguments don't meet |
 | SEM0130 | Non-unit function can reach its end |
-| SEM0194 | Inherent impl head is not a whole module-local type family |
+| SEM0194 | Inherent impl head is not a whole module-local type family, or has a callable bound |
 | SEM0195 | Inherent member cannot be an associated member, for example it shares a field's name |
 | SEM0196 | Two members of one owner share a name |
 | SEM0198 | Associated function called on a value |
@@ -214,5 +257,5 @@ Closures and callable types · Generics · Interfaces and impls · Ownership and
 
 ## Open questions
 
-- `impl<F: fn(i32) -> i32> Runner<F>` is SEM0194 even when the struct declares the same bound. `impl<F> Runner<F>` is accepted.
+- `impl<F: fn(i32) -> i32> Runner<F>` is SEM0194 even when the struct declares the same bound, while interface and `Copy` bounds are accepted. `impl<F> Runner<F>` is accepted.
 - SEM0143 (`mut` on a parameter without owned storage) applies to interface and service operations. It is not covered here.

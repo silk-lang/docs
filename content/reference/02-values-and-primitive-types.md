@@ -57,6 +57,7 @@ MaskType      = 'mask' '<' Expression '>'
 - `==` and ordering return `false` when either operand is NaN.
 - `%` works on floats.
 - `silk/num/f64` and `silk/num/f32` provide `isNaN`, `isInfinite`, `toBits`, `fromBits`, `sqrt`, `floor`, `round`, `totalOrder` and more.
+- The same modules have the math functions `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `exp`, `log`, `pow`, `cbrt`, `hypot` and `fma`. They give the same result bits on every target. `fma(a, b, c)` computes `a * b + c` with one rounding.
 
 ## bool, char, string
 
@@ -80,7 +81,7 @@ MaskType      = 'mask' '<' Expression '>'
 ## Numeric conversion
 
 - There are no implicit numeric conversions. `i32` and `i64` operands don't mix (SEM0135), and an `i32` value can't initialize an `i64` binding (SEM0037).
-- There is no cast operator. `as` is a keyword, but `x as i64` is not an expression.
+- There is no cast operator. `as` is a keyword, but `x as i64` is not an expression. It is one PAR0002 that points to the conversion functions: "Silk has no `as` cast; convert with a function of the source type, such as `usize.toI32(count)`, or `usize.checkedToI32(count)` for an `Option` when the value may not fit".
 - Convert with std lib functions named after the target type: `i32.toI64(x)`, `u8.toI32(b)`, `usize.toI32(n)`.
 - Each such module must be imported, as in `import silk.num.i32`. Without the import, a call such as `u32.toU64(x)` is SEM0009: "Unknown name u32; is `import silk.num.u32` missing?". A value such as `u32.MAX`, or a bare `u32`, is SEM0006: "Unknown value u32; is `import silk.num.u32` missing?".
 - The hint is left out when the module has syntax errors. The message is then plain, as in "Unknown value i32".
@@ -101,7 +102,8 @@ MaskType      = 'mask' '<' Expression '>'
   - `wrappingAdd`, `wrappingSubtract`, `wrappingMultiply`, `wrappingNegate`: modulo 2^BITS.
   - `saturatingAdd`, `saturatingSubtract`, `saturatingMultiply`, `saturatingNegate`: clamp to `MIN` or `MAX`.
   - `checkedAdd`, `checkedSubtract`, `checkedMultiply`, `checkedDivide`, `checkedRemainder`: return `Option`.
-- There are no shift operators. Use `shiftLeft`, `shiftRight`, `rotateLeft` and `rotateRight`. A shift count that is negative or not less than `BITS` traps.
+- `multiplyHigh(a, b)` returns the high half of the double-width product and never overflows. With `wrappingMultiply`, which gives the low half, it yields the full product: `u64.multiplyHigh(u64.MAX, 2)` is `1`. For signed types the high half carries the sign, so `i32.multiplyHigh(-1, 1)` is `-1`.
+- There are no shift operators. Use `shiftLeft`, `shiftRight`, `rotateLeft` and `rotateRight`. A shift count that is negative or not less than `BITS` traps with `invalid shift count`. The trap names the line of the `shiftLeft` or `shiftRight` call, not a line in the std lib.
 
 ## SIMD vectors and masks
 
@@ -249,6 +251,31 @@ pub fn main() -> i32 {
   }
   let quotient = i32.checkedDivide(i32.MIN, -1) |> Option<i32>.unwrapOr(0)
   return quotient
+}
+```
+
+Float math and the high half of an integer product:
+
+```silk
+import silk.num.f64
+import silk.num.i32
+import silk.num.u64
+
+pub fn main() -> i32 {
+  if f64.pow(2.0, 10.0) != 1024.0 || f64.hypot(3.0, 4.0) != 5.0 || f64.cbrt(27.0) != 3.0 {
+    return 1
+  }
+  if f64.fma(2.0, 3.0, 1.0) != 7.0 || f64.exp(0.0) != 1.0 || f64.log(1.0) != 0.0 {
+    return 2
+  }
+  // The full product of two u64 values: high half, then low half.
+  if u64.multiplyHigh(u64.MAX, 2) != 1 || u64.wrappingMultiply(u64.MAX, 2) != u64.MAX - 1 {
+    return 3
+  }
+  if i32.multiplyHigh(-1, 1) != -1 {
+    return 4
+  }
+  return 0
 }
 ```
 
@@ -480,6 +507,8 @@ fatal trap: arithmetic overflow
 
 | Code | Meaning |
 | --- | --- |
+| PAR0002 | A Rust-style cast `x as T`; the message names the conversion functions |
+| PAR0010 | A shift operator `<<` or `>>`; the message names `shiftLeft` and `shiftRight` |
 | SEM0002 | Integer literal outside the range of its selected type |
 | SEM0006 | Unknown value, such as `u32.MAX` without `import silk.num.u32` |
 | SEM0009 | Unknown name, such as an integer module function called without its `import` |
