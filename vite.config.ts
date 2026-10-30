@@ -5,6 +5,7 @@ import { foldkit } from '@foldkit/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 
 import { llmsTxt } from './scripts/llms-txt.ts'
+import { ogImages } from './scripts/og-images.ts'
 import { releases } from './scripts/releases.ts'
 import { searchIndex } from './scripts/search-index.ts'
 import { islandAttributes } from './src/docs/islands.ts'
@@ -22,6 +23,7 @@ export default defineConfig({
     markdown({ islands: islandAttributes }),
     releases(),
     searchIndex(),
+    ogImages(),
     llmsTxt(),
   ],
   optimizeDeps: {
