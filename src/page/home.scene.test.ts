@@ -24,7 +24,7 @@ describe('landing page', () => {
       { update, view },
       given(homeModel),
       expect(role('heading', { level: 1 })).toHaveText(
-        'Composability,all the way down.',
+        'Built for the waysoftware is written today.',
       ),
       expect(role('link', { name: 'Take the tour' })).toExist(),
       expect(role('link', { name: 'Install' })).toExist(),
@@ -39,12 +39,12 @@ describe('landing page', () => {
       click(first(all.role('button', { name: 'Copy code' }))),
       Command.resolve(
         CopyCode,
-        Message.SucceededCopyCode({ codeId: 'home-hello' }),
+        Message.SucceededCopyCode({ codeId: 'home-hero' }),
       ),
       expect(role('button', { name: 'Copied' })).toExist(),
       Command.resolve(
         WaitBeforeHidingCopied,
-        Message.CompletedWaitBeforeHidingCopied({ codeId: 'home-hello' }),
+        Message.CompletedWaitBeforeHidingCopied({ codeId: 'home-hero' }),
       ),
       expect(role('button', { name: 'Copied' })).not.toExist(),
     )

@@ -8,7 +8,7 @@ export const OG_IMAGE_HEIGHT = 630
 
 export const SITE_NAME = 'Silk'
 export const SITE_DESCRIPTION =
-  'Silk is a systems language where effects, failures, and dependencies compose, and ownership keeps every resource explicit.'
+  'Silk is a systems language where every function states what it returns, how it can fail, and what it needs, and the compiler holds everyone to it.'
 
 export type OgCard = Readonly<{
   path: string
@@ -17,13 +17,13 @@ export type OgCard = Readonly<{
   footer: string
 }>
 
-const TAGLINE = 'Composability, all the way down'
+const TAGLINE = 'Built for the way software is written today'
 
 export const homeCard: OgCard = {
   path: '/og/home.png',
   label: '',
   title: TAGLINE,
-  footer: 'Effects, failures and dependencies that compose',
+  footer: 'Guardrails, not trust',
 }
 
 export const docsCard: OgCard = {
