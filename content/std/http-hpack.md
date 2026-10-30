@@ -145,6 +145,24 @@ pub limit: bool
 
 True for a resource limit, false for invalid compression syntax.
 
+::Anchor{id="HpackError.impl.Debug"}
+
+## Implementation `Debug for HpackError`
+
+```silk
+impl Debug for HpackError
+```
+
+::Anchor{id="HpackError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the fields, as `HpackError { offset: ..., limit: ... }`.
+
 ::Anchor{id="Decoder"}
 
 ## `Decoder`

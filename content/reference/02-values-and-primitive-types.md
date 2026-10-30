@@ -97,7 +97,7 @@ MaskType      = 'mask' '<' Expression '>'
 - Integer division truncates toward zero. `%` takes the sign of the left operand: `-7 / 2` is `-3`, `-7 % 2` is `-1`.
 - Indexing an array out of bounds traps. A constant index that is known out of bounds is a compile error (SEM0034).
 - A failed `toX` conversion traps.
-- A trap ends the process at once. There is no unwinding. On native targets it prints `fatal trap: <kind>` and a source location to standard error. Kinds include `arithmetic overflow`, `division by zero`, `index out of bounds` and `invalid shift count`.
+- A trap ends the process at once. There is no unwinding. On native and WASI targets it prints `fatal trap: <kind>` and a source location to standard error, followed in an unoptimized build by the calling functions. Kinds include `arithmetic overflow`, `division by zero`, `index out of bounds` and `invalid shift count`.
 - Each integer module offers explicit policies for when overflow is expected:
   - `wrappingAdd`, `wrappingSubtract`, `wrappingMultiply`, `wrappingNegate`: modulo 2^BITS.
   - `saturatingAdd`, `saturatingSubtract`, `saturatingMultiply`, `saturatingNegate`: clamp to `MIN` or `MAX`.

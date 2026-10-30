@@ -16,7 +16,7 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 
 - The entry point is the function named `main` in the root module of the package. It must be `pub` and take no parameters.
 - The default hosted runtime is the std lib module `silk/platform/native/start`. It calls `main` and turns its result into the process status.
-- The WebAssembly targets have their own runtimes. `wasm32-wasip1` and `wasm32-wasip2` use `silk/platform/wasi/start`, which accepts the same `main` shapes as the hosted runtime, including `? &mut HostInput`. An uncaught failure there exits with status 1 and writes no report. `wasm32-unknown-unknown` uses `silk/platform/wasm/start`: the host calls the exported `main` with no arguments and no services. On both, `main` must not park.
+- The WebAssembly targets have their own runtimes. `wasm32-wasip1` and `wasm32-wasip2` use `silk/platform/wasi/start`, which accepts the same `main` shapes as the hosted runtime, including `? &mut HostInput`. An uncaught failure there exits with status 1 and writes the same report to standard error as on a native target. `wasm32-unknown-unknown` uses `silk/platform/wasm/start`: the host calls the exported `main` with no arguments and no services, and the module writes its reports into a buffer it exports as `silk_report` and `silk_report_length`, which `host/wasm-runner.mjs` prints. On both, `main` must not park.
 - A package can name other runtimes in `silk.toml`, as `[unstable]` `composition = { runtimes = [{ name = "synchronous", module = "silk/platform/native/start_sync" }], defaults = [] }`. A profile picks one with `runtime = { kind = "named", name = "synchronous" }` beside its `target`, and `silk build --profile <name>` uses it. A name listed in `defaults` is used by a plain `silk build`. `silk/platform/native/start_sync` starts only an `effect fn main() -> i32 ? &HostInput`. It also accepts `? &mut HostInput` and a failure row. A typed failure drops its payload and exits with 1, with no report.
 - Under `silk/platform/native/start_sync`, any other `main`, such as `pub fn main() -> i32` or `pub effect fn main() -> i32` with no requirement, is SEM0225 at `main` in both `silk check` and `silk build`: "Entry point `main` has a result or requirement the selected runtime `silk/platform/native/start_sync` cannot start".
 - Both `silk check` and `silk build` check the entry against the runtime, except for parking: a `main` that may park passes `silk check` and fails only `silk build`. A `main` the runtime cannot start is SEM0225, reported at the name `main`, or at line 1, column 1 when there is none:
@@ -55,7 +55,8 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 ## Uncaught failures
 
 - A failure that escapes an effect `main` ends the program with status 1. The payload is dropped first.
-- The runtime writes a report to standard error. The first line names the failure's type as `module.Type`. Each following line is a frame `at module.function (module:line:column)`, innermost first.
+- The runtime writes a report to standard error, or to the report buffer on `wasm32-unknown-unknown`. The first line names the failure's type as `module.Type`. Each following line is a frame `at module.function (module:line:column)`, innermost first.
+- The failure's type must implement `Debug`, on every target.
 - When a failure escapes from a handler that was handling another failure, the report adds a `while handling:` section for the earlier one.
 - The last line, `unhandled value:`, holds the failure's `Debug` form, written before the payload is dropped. A form longer than 1024 bytes is cut at a character boundary and ends with `[value truncated]`.
 - Typed failures, `fail` and `run` are covered in Effects and run and Typed failures.
@@ -63,7 +64,9 @@ HostRow     = '?' '&' 'mut' 'HostInput'
 ## Traps
 
 - A trap is a fatal runtime error. It does not unwind and runs no cleanup.
-- The runtime writes `fatal trap: <reason>` to standard error, followed by the frame where it happened. The process then stops with an illegal-instruction signal (the shell shows status 132).
+- The runtime writes `fatal trap: <reason>` to standard error, followed by the frame where it happened, `at module.function (module:line:column)`. On native targets the process then stops with an illegal-instruction signal (the shell shows status 132).
+- In an unoptimized build, the report goes on to name the functions that called the trapping one, innermost first, as `at module.function` without a site. When the trap happens after a fiber resumed, the chain includes the suspended functions that were waiting on the resumed one. An optimized build names only the trapping function.
+- On WASI the program writes the report, then the WebAssembly runtime stops the module and prints its own trace. A WebAssembly module cannot walk its own stack, so the report names callers only for a resumed function, and the runtime's trace lists the rest. `silk test` reads them from that trace and prints them under the test with their lines. See **Debugging** in the Tools section.
 - Reasons include `arithmetic overflow`, `division by zero`, `index out of bounds`, `slice range out of bounds` and `invalid shift count`.
 - A trap raised inside a std lib function that checks its arguments, such as `u32.shiftLeft` with a count of 32, is reported at the line of the call into the std lib, not inside it.
 - Arithmetic overflow traps for every integer width, including `u8`. Use the `checked*`, `wrapping*` or `saturating*` functions in `silk/num/i32` and the other integer modules to avoid it.
@@ -167,10 +170,24 @@ Running `printf 'hello there' | ./app world` prints `world` and exits with statu
 
 A trap report, from indexing past the end of a three-element slice in a function `at`:
 
+```silk
+fn at(values: &[i32], index: usize) -> i32 {
+  return values[index]
+}
+
+pub fn main() -> i32 {
+  let values = [1, 2, 3]
+  return at(&values, 3)
+}
+```
+
 ```
 fatal trap: index out of bounds
   at main.at (main:2:10)
+  at main.main
 ```
+
+A `--release` build prints only the first `at` line.
 
 ## Diagnostics
 

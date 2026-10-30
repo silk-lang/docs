@@ -434,6 +434,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Changesets and releases',
         'https://github.com/silk-lang/docs/blob/main/content/tools/07-changesets-and-releases.md',
       ),
+      page(
+        'tools',
+        'debugging',
+        'Debugging',
+        'https://github.com/silk-lang/docs/blob/main/content/tools/08-debugging.md',
+      ),
     ],
   },
   {

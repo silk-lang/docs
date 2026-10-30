@@ -402,7 +402,7 @@ Compiling web (wasm32-unknown-unknown, debug)
 Finished build/llvm/wasm32-unknown-unknown/debug/web in 0.23s
 ```
 
-A host instantiates it with an empty import object and calls `main()` (42) or `add(2, 3)` (5). `node <silk>/lib/silk/stdlib/host/wasm-runner.mjs <module>` runs `main` and exits with its result. On wasm32, a C function takes and returns scalars and pointers only; C statics, variadic functions and callbacks are refused. `kind = "object"` and `"static-library"` build too.
+A host instantiates it with an empty import object and calls `main()` (42) or `add(2, 3)` (5). `node <silk>/lib/silk/stdlib/host/wasm-runner.mjs <module>` runs `main` and exits with its result. The module also exports `silk_report` and `silk_report_length`, a buffer that holds the report of a trap or an unhandled error, which the runner prints. A debug build, like this one, writes `web.debug.wasm` (the module with its DWARF) and `web.map` (a source map) beside the module; see **Debugging**. On wasm32, a C function takes and returns scalars and pointers only; C statics, variadic functions and callbacks are refused. `kind = "object"` and `"static-library"` build too.
 
 A wasm32 profile may set `threading = "multi"`:
 
@@ -437,6 +437,7 @@ Finished build/llvm/wasm32-wasip1/debug/hello in 0.35s
 
 - A `wasm32-wasip1` executable is a core module that exports `memory` and `_start` and imports only `wasi_snapshot_preview1` functions, so any Preview 1 host runs it, Node's `node:wasi` included.
 - `silk run` and `silk test` on a WASI target run the module with `wasmtime run`, giving it the current directory as `/`. `SILK_WASMTIME` names another `wasmtime`. Without one: `silk: running WASI needs wasmtime on PATH or SILK_WASMTIME` (exit 2).
+- A trap or an unhandled error prints the same report as on a native target. A debug build names its wasm functions as the source does, and `silk run` and `silk test` set `WASMTIME_BACKTRACE_DETAILS=1`, so Wasmtime's trace of a trap shows each frame's Silk name and source line. `silk run --coredump <path>` writes a core dump on a trap, and `silk debug` waits for LLDB. See **Debugging**.
 - A `wasm32-wasip2` executable is a component. The compiler links a Preview 1 core module, then turns it into a component with `wasm-tools component new` and the Preview 1 command adapter, `wasi_snapshot_preview1.command.wasm` from the Wasmtime release, which `SILK_WASI_ADAPTER` must name. `SILK_WASM_TOOLS` names another `wasm-tools`. Without them the link fails with `silk: wasm32-wasip2 needs wasm-tools on PATH or SILK_WASM_TOOLS` or `silk: wasm32-wasip2 needs SILK_WASI_ADAPTER pointing to wasi_snapshot_preview1.command.wasm` (exit 2).
 - The component implements the WASI command world in the std lib's `wit/` folder, unless the manifest names its own with `[component]`, `wit` and `world`; see The manifest.
 - Sockets, name resolution and the HTTP client and server exist only on `wasm32-wasip2` (`silk/net/socket_wasi`, `silk/http/client_wasi`, `silk/http/server_wasi`). See The standard library.

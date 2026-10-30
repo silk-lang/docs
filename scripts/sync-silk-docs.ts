@@ -167,6 +167,18 @@ const decodeEntities = (text: string): string =>
 const inlineCode = (html: string): string =>
   `\`${decodeEntities(html).replace(/\|/g, '\\|')}\``
 
+// Directive markdown reads `word:name` in prose, such as `wasi:logging` in a
+// summary whose backticks the generator escaped, as an inline directive, which
+// the site cannot render. Outside code spans such a colon is escaped, which
+// GFM shows as the same colon.
+const escapeTextDirectives = (line: string): string =>
+  line
+    .split(/((?<!\\)`+[^`]*?(?<!\\)`+)/)
+    .map((part, index) =>
+      index % 2 === 1 ? part : part.replace(/(?<=\w):(?=[A-Za-z])/g, '\\:'),
+    )
+    .join('')
+
 const transform = (
   page: SourcePage,
   source: string,
@@ -211,7 +223,7 @@ const transform = (
       .replace(/^(\s*[-*+]) \[[ xX]\] /, '$1 ')
     const condensed = isStdIndex ? condenseModuleTable(rewritten) : rewritten
     if (condensed !== undefined) {
-      lines.push(condensed)
+      lines.push(escapeTextDirectives(condensed))
     }
   }
 

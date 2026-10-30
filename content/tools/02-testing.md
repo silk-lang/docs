@@ -98,18 +98,21 @@ The other tests still run, and the command exits with status 1. When the failure
     FAIL  34 us
 ```
 
-A test that traps, for example on an index out of bounds, stops the runner process. `silk test` shows the trap report under the test's name, marks the test `FAIL  stopped the test process`, and starts the runner again after it, so the remaining tests still run and the command exits with status 1. The `at` line names the function where the trap happened, here a helper `at` that the test called:
+A test that traps, for example on an index out of bounds, stops the runner process. `silk test` shows the trap report under the test's name, marks the test `FAIL  stopped the test process`, and starts the runner again after it, so the remaining tests still run and the command exits with status 1. The first `at` line names the function where the trap happened, here a helper `at`, and the lines below it the functions that called it, here the test:
 
 ```
   faults::readsPastTheEnd
     fatal trap: index out of bounds
       at faults.at (faults:17:10)
+      at faults.readsPastTheEnd
     FAIL  stopped the test process
   faults::sumsTheValues
     PASS  7 us
 ```
 
 Tests run in order of their printed names, not in source order.
+
+On a WASI target the report has the same shape, and each calling function also gets its source line, read from Wasmtime's trace and written as `file:line:column` of the source file. **Debugging** shows both side by side.
 
 Deep recursion fails the same way, with `fatal trap: stack overflow` and no frames, printed at the start of the line because it comes from the process's fault handler on standard error. A test that never finishes is stopped after 60 seconds, and the rest still run. `--timeout <seconds>` changes the limit, and `--timeout 0` removes it:
 

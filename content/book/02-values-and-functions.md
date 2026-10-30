@@ -412,10 +412,11 @@ echo $?
 ```
 fatal trap: arithmetic overflow
   at main.addMinutes (main:2:10)
+  at main.main
 132
 ```
 
-200 plus 90 is 290, which a `u8` cannot hold. Silk does not wrap around to 34 quietly. It stops the program with a trap, names the reason and points at line 2, column 10 of the `main` module, the `+`. The exit status 132 is how the shell reports the signal a trap raises, and your shell may add a line such as `Illegal instruction`.
+200 plus 90 is 290, which a `u8` cannot hold. Silk does not wrap around to 34 quietly. It stops the program with a trap, names the reason and points at line 2, column 10 of the `main` module, the `+`. The line below names the function that called `addMinutes`. The exit status 132 is how the shell reports the signal a trap raises, and your shell may add a line such as `Illegal instruction`.
 
 A trap is for bugs, not for expected situations. When wrapping or clamping is what you want, ask for it by name: `silk/num/u8` and the other integer modules have `wrappingAdd`, `saturatingAdd` and `checkedAdd`. See **Values and primitive types** in the reference.
 

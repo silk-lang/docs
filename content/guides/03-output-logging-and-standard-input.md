@@ -17,7 +17,7 @@ cd numberlines
 
 A `Writer` moves bytes. A `Logger` receives whole events, each with a level. Use a writer for the program's output and a logger for messages about the run. Code that needs one says so with `? &mut Writer`, `? &mut Logger` or `? &mut StandardInput`, and never names a provider. `main` picks the real ones.
 
-The native providers exist on Linux and macOS with libc, and on the WASI targets `wasm32-wasip1` and `wasm32-wasip2`. On `wasm32-unknown-unknown` and Linux without libc the `*_native` modules are empty, and you supply your own provider.
+The native providers exist on Linux and macOS with libc, and on the WASI targets `wasm32-wasip1` and `wasm32-wasip2`. On `wasm32-unknown-unknown` and Linux without libc the `*_native` modules are empty, and you supply your own provider. Two more loggers serve WebAssembly hosts: `ConsoleLogger` for JavaScript hosts and `WasiLogger` for `wasi:logging`; see **Logging on WebAssembly** below.
 
 ## Writing output
 
@@ -56,6 +56,79 @@ What a message looks like is the provider's choice. `silk/io/logger_native` has 
 | `StdoutLogger` | Standard output | The message exactly as formatted. It ignores the level and adds no newline |
 
 Neither adds a timestamp. `StderrLogger` adds the newline itself, so its templates must not end with one. It also holds the standard error lock for the whole line, so lines from different threads never mix. Use `StdoutLogger` only when the log messages are the program's output.
+
+### Logging on WebAssembly
+
+`StderrLogger` works on `wasm32-wasip1` and `wasm32-wasip2` as it does natively, since every WASI runtime has a standard error. Two other providers hand each event to the host with its level:
+
+| Provider | Module | Target | Each message goes to |
+| --- | --- | --- | --- |
+| `ConsoleLogger` | `silk/io/logger_console` | `wasm32-unknown-unknown` | The host's console, through an import `silk.console` |
+| `WasiLogger` | `silk/io/logger_wasi` | `wasm32-wasip2` | `wasi:logging/logging.log`, with the level and a context string |
+
+Each exists only on its target; elsewhere its module declares nothing. Neither allocates, adds a level name, a timestamp or a newline, or can fail.
+
+`ConsoleLogger.make()` takes no arguments. A module imports `silk.console` only when it provides `ConsoleLogger`, so a module that logs some other way still imports nothing. The std lib's runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`, supplies the import and calls the console method of each level: `console.debug` for trace and debug, then `console.info`, `console.warn` and `console.error`. In a package `greeter` with a `web` profile that targets `wasm32-unknown-unknown`:
+
+```silk
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_console { ConsoleLogger }
+
+pub effect fn main() -> () ! LogError {
+  let mut logger = ConsoleLogger.make()
+  let values = .{ name: "silk", count: 3 }
+  run Effect.logInfo("{name} started {count} workers", &values)
+    |> Effect.provideMut<Logger>(&mut logger)
+  run Effect.logWarning("{name} is running low on memory", &values)
+    |> Effect.provideMut<Logger>(&mut logger)
+  return ()
+}
+```
+
+```sh
+silk build --profile web --quiet
+node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/llvm/wasm32-unknown-unknown/web/greeter
+```
+
+```
+silk started 3 workers
+silk is running low on memory
+```
+
+In Node, `console.info` writes to standard output and `console.warn` to standard error. From your own script, `runWasm(bytes, { onLog: (level, text) => ... })` receives each message instead, with `level` one of `trace`, `debug`, `info`, `warning` and `error`. A host that instantiates the module itself must supply `silk.console(level, address, length, more)`: `level` counts from 0 for trace to 4 for error, `address` and `length` name UTF-8 bytes in the module's memory, and `more` is 1 when the next call continues the same message. The logger formats into a 256-byte buffer, so a longer message arrives in parts that the host joins before it decodes them.
+
+`WasiLogger.make(context)` takes the context, a `string<'static>`, that every record carries. It suits platforms that collect `wasi:logging` records, such as Spin or wasmCloud. `wasi:logging` is a draft interface, `wasi:logging/logging@0.1.0-draft`. The std lib's `command` world lists it, and a component imports it only when it provides `WasiLogger`. `wasmtime run` has no implementation, so `silk run` refuses such a component, here in a package `component`, with status 1:
+
+```silk
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_wasi { WasiLogger }
+
+pub effect fn main() -> i32 ! LogError {
+  let mut logger = WasiLogger.make("startup")
+  let values = .{ count: 3 }
+  run Effect.logInfo("started {count} workers", &values)
+    |> Effect.provideMut<Logger>(&mut logger)
+  return 0
+}
+```
+
+```sh
+silk run --target wasm32-wasip2 --quiet
+```
+
+```
+Finished build/llvm/wasm32-wasip2/debug/component in 0.92s
+Error: failed to run main module `/home/you/component/build/llvm/wasm32-wasip2/debug/component`
+
+Caused by:
+    0: component imports instance `wasi:logging/logging@0.1.0-draft`, but a matching implementation was not found in the linker
+    1: instance export `log` has the wrong type
+    2: function implementation is missing
+```
+
+`LogLevel.Warning` becomes `warn`, and `wasi:logging`'s `critical` level has no Silk level. The logger formats into a 512-byte buffer, so a longer message becomes several records, in order, each ending on a whole character. A component with its own `[component].world` imports `wasi:logging/logging@0.1.0-draft` there.
 
 ## Reading standard input
 
@@ -406,6 +479,8 @@ The guide "Testing with providers" goes further with fakes, and chapter 8 of the
 - `silk/io/buffered_output`: `BufferedWriter`; `silk/io/buffered_input`: `BufferError`
 - `silk/io/logger`: `Logger`, `LogLevel`, `LogError`, `InMemoryLogger`
 - `silk/io/logger_native`: `StderrLogger`, `StdoutLogger`
+- `silk/io/logger_console`: `ConsoleLogger` (`wasm32-unknown-unknown` only)
+- `silk/io/logger_wasi`: `WasiLogger` (`wasm32-wasip2` only)
 - `silk/io/standard_input`: `StandardInput`, `ReadOutcome`, `StreamReadError`
 - `silk/io/standard_input_native`: `OsStandardInput`
 - `silk/core/effect`: `Effect` (`log`, `logInfo`, `logWarning`, `provideMut`, `catchAll`)
