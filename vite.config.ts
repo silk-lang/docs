@@ -4,6 +4,7 @@ import { markdown } from '@foldkit/markdown/vite'
 import { foldkit } from '@foldkit/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 
+import { llmsTxt } from './scripts/llms-txt.ts'
 import { ogImages } from './scripts/og-images.ts'
 import { releases } from './scripts/releases.ts'
 import { searchIndex } from './scripts/search-index.ts'
@@ -23,6 +24,7 @@ export default defineConfig({
     releases(),
     searchIndex(),
     ogImages(),
+    llmsTxt(),
   ],
   optimizeDeps: {
     entries: ['src/entry.ts'],

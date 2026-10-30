@@ -3,8 +3,7 @@
 // index becomes its own hashed chunk that downloads the first time a reader
 // opens search and is cached like every other asset after that.
 
-import { readFileSync, readdirSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { type Plugin } from 'vite'
 
 import { parseMarkdown } from '@foldkit/markdown/vite'
@@ -12,31 +11,13 @@ import { parseMarkdown } from '@foldkit/markdown/vite'
 import { allPages, groups, pageKey } from '../src/docs/catalog.ts'
 import { islandAttributes } from '../src/docs/islands.ts'
 import { type SourcePage, buildIndex } from '../src/search/build.ts'
+import { CONTENT_DIR, contentFiles, markdownFiles } from './content-files.ts'
 
 const VIRTUAL_ID = 'virtual:silk-search-index'
 const RESOLVED_ID = `\0${VIRTUAL_ID}`
-const CONTENT_DIR = resolve(import.meta.dirname, '../content')
-
-const markdownFiles = (directory: string): ReadonlyArray<string> =>
-  readdirSync(directory, { withFileTypes: true }).flatMap(entry =>
-    entry.isDirectory()
-      ? markdownFiles(join(directory, entry.name))
-      : entry.name.endsWith('.md')
-        ? [join(directory, entry.name)]
-        : [],
-  )
-
-// The same keys src/docs/content.ts derives: content/book/04-ownership.md is
-// the page book/ownership.
-const keyForFile = (path: string): string =>
-  relative(CONTENT_DIR, path)
-    .replace(/\/\d+-/, '/')
-    .replace(/\.md$/, '')
 
 export const sourcePages = (): ReadonlyArray<SourcePage> => {
-  const files = new Map(
-    markdownFiles(CONTENT_DIR).map(path => [keyForFile(path), path]),
-  )
+  const files = contentFiles()
   return allPages.flatMap(page => {
     const key = pageKey(page)
     const path = files.get(key)

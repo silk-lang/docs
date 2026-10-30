@@ -5,3 +5,16 @@
 
 /fonts/*
   Cache-Control: public, max-age=2592000
+
+# The docs for language models (scripts/llms-txt.ts).
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+
+/llms-full.txt
+  Content-Type: text/plain; charset=utf-8
+
+/llm.txt
+  Content-Type: text/plain; charset=utf-8
+
+/llm-full.txt
+  Content-Type: text/plain; charset=utf-8
