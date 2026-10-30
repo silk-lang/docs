@@ -58,7 +58,7 @@ const FEATURES: ReadonlyArray<Feature> = [
   {
     title: 'I/O',
     question: 'What does this program touch?',
-    text: 'Files, clocks, randomness, the network and child processes are services. The signature of main lists all of them.',
+    text: 'Files, clocks, randomness, HTTP and child processes are services. Code that uses them says so in its signature.',
     snippet: '? &mut FileSystem | &mut SystemClock',
   },
   {
@@ -76,7 +76,7 @@ const FEATURES: ReadonlyArray<Feature> = [
   {
     title: 'Concurrency',
     question: 'What happens when a child task fails?',
-    text: 'A child fiber ends with a typed outcome. join raises its failure, await hands it back as data, and race cancels the loser and cleans up.',
+    text: 'A child fiber ends with a typed outcome. join raises its failure, await hands it back as data, and race cancels the loser.',
     snippet: 'join(move child)',
   },
   {
@@ -129,7 +129,7 @@ const TOOLS: ReadonlyArray<Row> = [
   },
   {
     name: 'Documentation',
-    text: 'Doc comments become reference pages, and their examples run as tests.',
+    text: 'Doc comments become reference pages, and their examples are checked as tests.',
   },
   {
     name: 'Changesets',
@@ -157,7 +157,7 @@ const FAQ: ReadonlyArray<Question> = [
   {
     question: 'How fast is it?',
     answer:
-      'Silk compiles through LLVM to native code, with no garbage collector or runtime. Build speed and small rebuilds come first when we design a feature, so the edit, check, fix loop stays short.',
+      'Silk compiles through LLVM to native code, with no garbage collector and no hidden runtime. Build speed and small rebuilds come first when we design a feature, so the edit, check, fix loop stays short.',
   },
   {
     question: 'Where does it run?',
@@ -401,7 +401,7 @@ const model = (h: HtmlBuilder<Message>): Html =>
           h.div(
             [h.Class('flex flex-col gap-5 lg:pt-10')],
             [
-              label('Guardrails, not trust', h),
+              label('The contract', h),
               h.h3(
                 [h.Class('text-3xl font-bold tracking-tighter md:text-4xl')],
                 [
@@ -413,7 +413,7 @@ const model = (h: HtmlBuilder<Message>): Html =>
               h.p(
                 [h.Class('leading-prose text-muted')],
                 [
-                  'Like Rust, the compiler won’t let code misuse memory, so you don’t have to trust whoever wrote it: a colleague, a dependency, or an agent. Silk goes further. Code can’t allocate, touch the disk, read the clock, or fail in a new way without it showing in its type and in the type of every caller.',
+                  'Like Rust, the compiler won’t let code misuse memory, so you don’t have to trust whoever wrote it: a colleague, a dependency, or an agent. Silk goes further. Library code asks for the services it uses, so allocation, files, clocks and failures show in its type and in the type of every caller. A real file system or clock comes from a provider someone creates by name, usually in main.',
                 ],
               ),
               h.p(
@@ -421,7 +421,7 @@ const model = (h: HtmlBuilder<Message>): Html =>
                 [
                   'The one escape hatch, ',
                   h.strong([], ['unsafe']),
-                  ', is written at the exact spot it is used, so it always shows in a diff. Nothing is hidden.',
+                  ', is written at the exact spot it is used. Like creating a provider, it is one line that is easy to spot in a diff.',
                 ],
               ),
             ],
@@ -624,14 +624,14 @@ const status = (h: HtmlBuilder<Message>): Html =>
     ],
   )
 
-const goalBand = (h: HtmlBuilder<Message>): Html =>
+const writtenInSilk = (h: HtmlBuilder<Message>): Html =>
   h.section(
     [h.Class('bg-ink text-paper')],
     [
       h.div(
         [h.Class(`${sectionClass} flex flex-col gap-7 py-20 lg:py-30`)],
         [
-          h.p([h.Class('label text-rule')], ['No C underneath']),
+          h.p([h.Class('label text-rule')], ['Written in Silk']),
           h.p(
             [
               h.Class(
@@ -639,7 +639,7 @@ const goalBand = (h: HtmlBuilder<Message>): Html =>
               ),
             ],
             [
-              'One toolchain. No dependency for TLS, HTTP/2 or crypto: they are written in Silk, and so is the compiler',
+              'TLS 1.3, HTTP/2, the cryptography under them and the compiler itself are all written in Silk',
               h.span([h.Class('text-signal')], ['.']),
             ],
           ),
@@ -724,7 +724,7 @@ export const view = (
       model(h),
       features(h),
       servicesSpotlight(copiedCodeIds, h),
-      goalBand(h),
+      writtenInSilk(h),
       inTheBox(h),
       status(h),
       faq(h),
