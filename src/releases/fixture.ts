@@ -1,4 +1,4 @@
-import { type Release } from './release'
+import type { Release } from './release'
 
 // Stands in for the GitHub data in tests, and in builds with
 // SILK_RELEASES=fixture when GitHub is out of reach.
