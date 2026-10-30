@@ -269,6 +269,16 @@ Speed
 
 Optimization for speed.
 
+::Anchor{id="Optimization.Size"}
+
+### `Size`
+
+```silk
+Size
+```
+
+Optimization for code size.
+
 ::Anchor{id="Safety"}
 
 ## `Safety`

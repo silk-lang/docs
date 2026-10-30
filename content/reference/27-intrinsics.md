@@ -212,7 +212,7 @@ unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> {
 
 ## Traps, the stack and slice views
 
-- `Intrinsic.trap(reason)` stops the program with a trap, as an overflow does. `reason` is a `string<'static>`, and the result type is `never`, so `return Intrinsic.trap("...")` ends a branch of any function. The runtime prints `fatal trap: <reason>` and the frame, and the process exits with status 132. The std lib uses it for precondition failures, such as `f32.toU8` of NaN.
+- `Intrinsic.trap(reason)` stops the program with a trap, as an overflow does. `reason` is a `string<'static>`, and the result type is `never`, so `return Intrinsic.trap("...")` ends a branch of any function. The runtime prints `fatal trap: <reason>` and the frame, then, in an unoptimized build, the calling functions, and the process exits with status 132. The std lib uses it for precondition failures, such as `f32.toU8` of NaN.
 - `Intrinsic.frameAddress()` returns the address of the running function's stack frame as `[*]const u8`. The stack grows down on every target, so a caller's frame is at the same or a higher address. It is safe to call; reading through the address is not.
 - `unsafe Intrinsic.stackAllocate<T>(count)` returns `[*]mut T` storage for `count` values on the running function's stack. The storage is uninitialized, nothing in it is dropped, and it ends when the function returns or suspends. The caller proves it fits in the stack that is left; the compiler does not check. A byte size that overflows `usize` traps.
 - `silk/mem/stack` wraps both: `Stack.frameAddress()` and `unsafe Stack.withStorage<T, A>(count, use)`, which calls `use` once with the storage.
@@ -537,6 +537,7 @@ silk run; echo "exit $?"
 ```
 fatal trap: checked: the divisor is zero
   at main.checked (main:5:12)
+  at main.main
 exit 132
 ```
 

@@ -12,6 +12,7 @@ Every `silk` command, its options and its exit status. `silk` is the tool you ty
 | `silk check` | Type-check the package for each target, without producing output |
 | `silk build` | Build the package for each target |
 | `silk run [args]` | Build the host executable and run it |
+| `silk debug [args]` | Build the host executable and start it under a debugger |
 | `silk test` | Build the test runner and run the tests |
 | `silk clean` | Delete the build output directory |
 | `silk format [paths]` | Rewrite source files in the standard layout |
@@ -170,7 +171,7 @@ Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.71s
 ## run
 
 ```
-silk run [project options] [--progress <mode>] [--quiet] [arguments...] [-- arguments...]
+silk run [project options] [--progress <mode>] [--quiet] [--coredump <path>] [arguments...] [-- arguments...]
 ```
 
 Builds the executable and runs it in the current directory. On a WASI target it runs the module with `wasmtime`; see **Targets and profiles**. The build prints the same progress output as `silk build`, on standard error, and ends with `Finished` before the program starts or `Failed` when it does not build. Standard output carries only the program's output. `--progress` and `--quiet` work as for `check`.
@@ -188,6 +189,28 @@ At a workspace root, `run` runs the only executable member. With two or more, pa
 ```
 Cannot run library artifact
 ```
+
+On a WASI target, `silk run` sets `WASMTIME_BACKTRACE_DETAILS=1` for Wasmtime, unless the environment already sets it, so a trap's trace shows each frame's source line. `--coredump <path>` has Wasmtime write a core dump to `path` when the program traps. It needs a WASI target, and the path cannot contain a comma; otherwise the command stops before the build with status 2:
+
+```
+silk: `--coredump` needs a WASI target; a native program dumps core as the system configures
+silk: the `--coredump` path cannot contain a comma
+```
+
+See **Debugging**.
+
+## debug
+
+```
+silk debug [project options] [--progress <mode>] [--quiet] [--port <[address:]port>] [arguments...] [-- arguments...]
+```
+
+Builds the executable as `run` does and starts it under a debugger, with the program's arguments read the same way.
+
+- On a native target it replaces itself with LLDB, as `lldb -- <program> [arguments...]`. LLDB is `SILK_LLDB`, else `lldb` on `PATH`. Without one, the build finishes and the command stops with `` silk: `debug` needs lldb on PATH or SILK_LLDB `` (exit 2).
+- On a WASI target it runs `wasmtime run -g <port>`, Wasmtime's debugger stub, which waits for LLDB before the program starts. `--port` takes a port or `address:port`; the default is 1234. Attach from LLDB with `process connect --plugin wasm connect://127.0.0.1:1234`.
+
+`--port` matters only on WASI, and `debug` takes no `--coredump`. Use a profile with debug information, such as the default `debug`, so the debugger sees Silk names, lines and variables. See **Debugging**.
 
 ## test
 
@@ -412,7 +435,7 @@ silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|obje
 silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--timeout <seconds>] [--optimization none|speed|size] [--debug true|false] [--no-cache]
 ```
 
-`--emit` picks the output stage: `llvm-ir` writes LLVM text, the whole-program module the executable would link, and `object` an object file. `--optimization` names the Clang optimization directly: `none` (`-O0`), `speed` (`-O2`) or `size` (`-Oz`). The source file must sit below the package's source root; when that folder does not exist, both forms stop with `silk: invalid source root` (exit 1). `--stats` prints compiler query counters. Diagnostics print the same way as `silk check` prints them, and a successful build prints one `Compiled` line. Paths in that line are relative to the current directory, or absolute when the file is outside it:
+`--emit` picks the output stage: `llvm-ir` writes LLVM text, the whole-program module the executable would link, and `object` an object file. With `--debug true` and `--optimization none`, the LLVM text carries the line tables as `!dbg` metadata and each parameter and `let` binding as a `#dbg_declare` record. `--optimization` names the Clang optimization directly: `none` (`-O0`), `speed` (`-O2`) or `size` (`-Oz`). The source file must sit below the package's source root; when that folder does not exist, both forms stop with `silk: invalid source root` (exit 1). `--stats` prints compiler query counters. Diagnostics print the same way as `silk check` prints them, and a successful build prints one `Compiled` line. Paths in that line are relative to the current directory, or absolute when the file is outside it:
 
 ```
 $ silk build bad.silk -o out
@@ -431,7 +454,7 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, any `silk change` error including a malformed `silk change` command line |
 | 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, a source file or folder named `silk` or `Intrinsic`, a dependency or `exports` problem, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
 | 3, 4, 5 | From the tool: the selected version is not installed, a download failed, or a release failed verification. See "Exit status of the tool" |
-| other | `silk run` only: the program's own status |
+| other | `silk run` only: the program's own status. `silk debug` exits with the debugger's status |
 
 In a workspace, each member gets a status and the command exits with the worst one: 2 over 1 over 0.
 
@@ -450,7 +473,9 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
 | `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and profiles** |
 | `SILK_PROFILE_USE` | A merged `.profdata` file: native builds pass `-fprofile-use=<file>` to Clang |
-| `SILK_WASMTIME` | The `wasmtime` that `silk run` and `silk test` use on a WASI target; default `wasmtime` on `PATH` |
+| `SILK_WASMTIME` | The `wasmtime` that `silk run`, `silk debug` and `silk test` use on a WASI target; default `wasmtime` on `PATH` |
+| `WASMTIME_BACKTRACE_DETAILS` | Passed to Wasmtime by `silk run`, `silk debug` and `silk test` on a WASI target, set to `1` when the environment does not set it, so trap traces show source lines |
+| `SILK_LLDB` | The LLDB that `silk debug` starts for a native program; default `lldb` on `PATH` |
 | `SILK_WASM_TOOLS` | The `wasm-tools` that builds a `wasm32-wasip2` component; default `wasm-tools` on `PATH` |
 | `SILK_WASI_ADAPTER` | The Preview 1 command adapter, `wasi_snapshot_preview1.command.wasm`, that a `wasm32-wasip2` executable needs |
 | `SILK_WASI_REACTOR_ADAPTER` | The Preview 1 reactor adapter, for a `wasm32-wasip2` component without a `main` |

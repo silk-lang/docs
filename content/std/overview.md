@@ -62,6 +62,13 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.crypto.x25519`](/docs/std/crypto-x25519) | Cryptography | `X25519` | Agree on a shared secret with X25519 (RFC 7748) Diffie-Hellman. |
 | [`silk.encoding.base64`](/docs/std/encoding-base64) | Data formats | `Base64` | Encode and decode standard Base64 (RFC 4648, with padding) into byte slices that you supply. |
 | [`silk.encoding.uuid`](/docs/std/encoding-uuid) | Data formats | `Uuid` | UUID values and constructors for versions 1 through 8, with RFC 9562 byte order. |
+| [`silk.geometry.affine`](/docs/std/geometry-affine) | Geometry | `Affine2` | Two-dimensional affine transforms: scale, rotation, skew, and translation in one matrix. |
+| [`silk.geometry.insets`](/docs/std/geometry-insets) | Geometry | `Insets` | Distances inward from the four edges of a box, over any number type. |
+| [`silk.geometry.matrix`](/docs/std/geometry-matrix) | Geometry | `Matrix3` | Square 3x3 and 4x4 matrices for projective and three-dimensional transforms. |
+| [`silk.geometry.point`](/docs/std/geometry-point) | Geometry | `Point2` | Two- and three-dimensional positions over any number type. |
+| [`silk.geometry.rect`](/docs/std/geometry-rect) | Geometry | `Rect` | Axis-aligned rectangles stored as their minimum and maximum corners, over any number type. |
+| [`silk.geometry.size`](/docs/std/geometry-size) | Geometry | `Size2` | Two-dimensional extents over any number type. |
+| [`silk.geometry.vector`](/docs/std/geometry-vector) | Geometry | `Vector2` | Two- and three-dimensional displacements over any number type. |
 | [`silk.http.basic`](/docs/std/http-basic) | HTTP | `HttpBasic` | Make the value of an \`Authorization: Basic\` header from a username and a password. |
 | [`silk.http.body`](/docs/std/http-body) | HTTP | `Decoder` | Read and write the body of an HTTP/1 message: fixed length, chunked, or until the connection closes. |
 | [`silk.http.client`](/docs/std/http-client) | HTTP | `HttpClient` | A simple HTTP client: send a request, and get the whole response in memory. |
@@ -105,8 +112,12 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.io.buffered_transfer`](/docs/std/io-buffered-transfer) | Input and output | `BufferedTransfer` | Copy bytes from one buffered session to another, and consume only what the destination accepts. |
 | [`silk.io.byte_duplex`](/docs/std/io-byte-duplex) | Input and output | `ByteDuplex` | The \`ByteDuplex\` effect: a two-way byte stream, such as a TCP connection, with partial reads and writes and deadlines. |
 | [`silk.io.logger`](/docs/std/io-logger) | Input and output | `Logger` | The \`Logger\` effect: log messages with a level, a template, and values. |
+| [`silk.io.logger_console`](/docs/std/io-logger-console) | Input and output | `ConsoleLogger` | A \`Logger\` provider for browser and JavaScript hosts: \[\`ConsoleLogger\`\] hands each message to the host's console. |
+| [`silk.io.logger_console`](/docs/std/io-logger-console) | Input and output | `ConsoleLogger` | A \`Logger\` provider for browser and JavaScript hosts: \[\`ConsoleLogger\`\] hands each message to the host's console. |
 | [`silk.io.logger_native`](/docs/std/io-logger-native) | Input and output | `StdoutLogger` | Native providers of the \`Logger\` effect: \[\`StderrLogger\`\] writes log lines to standard error, and \[\`StdoutLogger\`\] writes the bare messages to standard output. |
 | [`silk.io.logger_native`](/docs/std/io-logger-native) | Input and output | `StdoutLogger` | Native providers of the \`Logger\` effect: \[\`StderrLogger\`\] writes log lines to standard error, and \[\`StdoutLogger\`\] writes the bare messages to standard output. |
+| [`silk.io.logger_wasi`](/docs/std/io-logger-wasi) | Input and output | `WasiLogger` | A \`Logger\` provider for Preview 2 components whose host offers \`wasi\:logging\`: \[\`WasiLogger\`\] passes each message to \`wasi\:logging/logging.log\`. |
+| [`silk.io.logger_wasi`](/docs/std/io-logger-wasi) | Input and output | `WasiLogger` | A \`Logger\` provider for Preview 2 components whose host offers \`wasi\:logging\`: \[\`WasiLogger\`\] passes each message to \`wasi\:logging/logging.log\`. |
 | [`silk.io.memory_byte_duplex`](/docs/std/io-memory-byte-duplex) | Input and output | `MemoryByteDuplex` | A scripted \`ByteDuplex\` transport in memory, for tests of protocol code. |
 | [`silk.io.standard_input`](/docs/std/io-standard-input) | Input and output | `StandardInput` | The \`StandardInput\` effect: read raw bytes from standard input. |
 | [`silk.io.standard_input_native`](/docs/std/io-standard-input-native) | Input and output | `OsStandardInput` | The native provider of the \`StandardInput\` effect: it reads the standard input of the process. |
@@ -151,7 +162,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.num.i64`](/docs/std/num-i64) | Numbers | `i64` | Sixty-four-bit signed integers for large fixed-width values and exact integer protocols. |
 | [`silk.num.i8`](/docs/std/num-i8) | Numbers | `i8` | Eight-bit signed integers for compact values, byte-level formats, and narrow arithmetic. |
 | [`silk.num.isize`](/docs/std/num-isize) | Numbers | `isize` | Pointer-width signed integers for offsets whose range follows the selected compilation target. |
-| [`silk.num.numeric`](/docs/std/num-numeric) | Numbers | `Numeric` | Generic helpers for algorithms over primitive integers. |
+| [`silk.num.numeric`](/docs/std/num-numeric) | Numbers | `Numeric` | Generic helpers and numeric contracts for algorithms over primitive numbers. |
 | [`silk.num.u16`](/docs/std/num-u16) | Numbers | `u16` | Sixteen-bit unsigned integers with explicit arithmetic and conversion failure policies. |
 | [`silk.num.u32`](/docs/std/num-u32) | Numbers | `u32` | Thirty-two-bit unsigned integers for fixed-width counts, masks, and binary fields. |
 | [`silk.num.u64`](/docs/std/num-u64) | Numbers | `u64` | Sixty-four-bit unsigned integers for wide masks, counters, hashes, and exact interchange values. |
@@ -168,8 +179,8 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.platform.native.descriptor`](/docs/std/platform-native-descriptor) | Native platform | `NativeDescriptor` | Reads and writes on file descriptors that the caller owns, for native providers. |
 | [`silk.platform.native.descriptor`](/docs/std/platform-native-descriptor) | Native platform | `NativeDescriptor` | Reads and writes on file descriptors that the caller owns, for native providers. |
 | [`silk.platform.native.descriptor`](/docs/std/platform-native-descriptor) | Native platform | `NativeDescriptor` | Reads and writes on file descriptors that the caller owns, for native providers. |
-| [`silk.platform.native.diagnostics`](/docs/std/platform-native-diagnostics) | Native platform | `NativeDiagnostics` | The native observer that reports unhandled errors and traps, with their call path. |
-| [`silk.platform.native.diagnostics`](/docs/std/platform-native-diagnostics) | Native platform | `NativeDiagnostics` | The native observer that reports unhandled errors and traps, with their call path. |
+| [`silk.platform.native.diagnostics`](/docs/std/platform-native-diagnostics) | Native platform | `NativeDiagnostics` | The observer of native and wasm programs that reports unhandled errors and traps, with their call path. |
+| [`silk.platform.native.diagnostics`](/docs/std/platform-native-diagnostics) | Native platform | `NativeDiagnostics` | The observer of native and wasm programs that reports unhandled errors and traps, with their call path. |
 | [`silk.platform.native.filesystem`](/docs/std/platform-native-filesystem) | Native platform | `NativeFileSystem` | The system calls for files and directories, for the native \`FileSystem\` provider. |
 | [`silk.platform.native.filesystem`](/docs/std/platform-native-filesystem) | Native platform | `NativeFileSystem` | The system calls for files and directories, for the native \`FileSystem\` provider. |
 | [`silk.platform.native.host_input`](/docs/std/platform-native-host-input) | Native platform | `NativeHostInput` | Owned copies of the command-line arguments and the environment of the process. |

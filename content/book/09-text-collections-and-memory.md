@@ -215,6 +215,7 @@ silk run
 ```
 fatal trap: index out of bounds
   at main.third (main:2:10)
+  at main.main
 ```
 
 The exit status is 132, the same as the overflow trap in chapter 2. A trap is not a typed failure. It is a bug, and no handler can catch it. That is why `complete` loops while `index < tasks.length` and never guesses.

@@ -265,7 +265,7 @@ Compiling squares (wasm32-unknown-unknown, web)
 Finished build/llvm/wasm32-unknown-unknown/web/squares in 0.22s
 ```
 
-The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports two things: its `memory` and `main`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
+The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports its `memory`, `main`, and the report buffer described below, `silk_report` and `silk_report_length`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
 
 Any WebAssembly host can instantiate the module and call `main()`. In Node, save this as `run.mjs`:
 
@@ -296,6 +296,12 @@ echo $?
 129
 ```
 
+### When the module fails
+
+A module has no standard error, so when `main` fails with an unhandled error, or the program traps, the module writes the same report a native program prints into a buffer in its own memory: `silk_report()` returns its address and `silk_report_length()` its length. The runner prints it. For a trap it also prints the engine's stack, whose frames carry Silk names such as `main.pick`, and exits with 134. From a script, `runWasm` from the same file resolves to `main`'s status and rejects a trap with a `SilkError` whose `report` property holds the report. The error type of the Effect that `main` returns must implement `Debug`, as on every other target.
+
+The `web` profile sets no `debug`, so the build has debug information. The module then ships without its DWARF: it is written beside the module as `squares.debug.wasm`, which Chrome's DWARF support reads, with a source map, `squares.map`, for Firefox and Safari. The module names both in custom sections. **Debugging** in the Tools section shows the reports, the runner's API and these files.
+
 An `export "C" fn` in the program is exported from the module under its name, next to `main`, so the host can call it with numbers. Only scalar and pointer arguments cross that boundary on wasm32; C statics, variadic functions and callbacks are refused.
 
 A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory, plus the wasi-threads `thread-spawn` function when it starts threads, and `silk/concurrency/thread_native` runs each thread as a Worker under `wasm-runner.mjs`. `max-memory` in the profile caps the memory, for example `max-memory = "256MiB"`; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit.
@@ -318,7 +324,7 @@ Finished build/llvm/wasm32-wasip1/wasi/squares in 0.49s
 
 This is a WASI Preview 1 command, about 113 KiB. It exports `memory` and `_start`, and imports only what it uses from `wasi_snapshot_preview1`: here `args_get`, `args_sizes_get`, `environ_get`, `environ_sizes_get`, `fd_write` and `proc_exit`. The `StdoutWriter` arm of `main` runs, so the program prints its line itself.
 
-`silk run --profile wasi` builds it and runs it with Wasmtime, giving the program the current directory as `/`. Without Wasmtime it builds and then stops with status 2:
+`silk run --profile wasi` builds it and runs it with Wasmtime, giving the program the current directory as `/`. A trap or an unhandled error prints the same report as on a native target, followed for a trap by Wasmtime's trace with each frame's Silk name and source line; see **Debugging**. Without Wasmtime it builds and then stops with status 2:
 
 ```
 silk: running WASI needs wasmtime on PATH or SILK_WASMTIME
@@ -403,6 +409,7 @@ The compiler cannot generate the raw runtime's entry point yet. Until it can, us
 - `silk/platform/wasi/preview1`, `silk/platform/wasi/preview2`: raw WASI imports, for writing providers
 - `silk/net/socket_wasi`, `silk/net/resolver_wasi`, `silk/net/datagram_wasi`, `silk/http/client_wasi`, `silk/http/server_wasi`: networking and HTTP (`wasm32-wasip2` only)
 - `silk/concurrency/thread_native`: `NativeThread` (hosted targets, and wasm32 with `threading = "multi"`)
-- `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`: runs a wasm32 module in Node or a browser
+- `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`: runs a wasm32 module in Node or a browser, prints its report, and exports `runWasm`, `SilkError` and `LOG_LEVELS`
+- `silk/io/logger_console`: `ConsoleLogger` (`wasm32-unknown-unknown`); `silk/io/logger_wasi`: `WasiLogger` (`wasm32-wasip2`)
 - `silk/io/writer`: `Writer`, `WriterError`; `silk/io/writer_native`: `StdoutWriter` (hosted and WASI)
 - `silk/text/format`: `Format`; `silk/collections/slice`: `Slice`

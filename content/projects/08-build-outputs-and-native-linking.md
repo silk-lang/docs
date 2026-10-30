@@ -6,20 +6,23 @@
 
 ```
 build/
-  llvm/<target>/<profile>/<file>          silk build, silk run
-  llvm/<target>/<profile>/<file>.symbols  symbol map (builds with debug information)
-  llvm/<target>/<profile>/<file>.inputs   the files the build read, to skip an unchanged rebuild
-  llvm/<target>/<profile>/<file>.units/   cached compiled code, reused by the next build
-  test/llvm/<target>/<profile>/<name>     silk test runner
-  cache/<package>/                        the checker's cache, per package
-  documentation.json                      silk doc
-  documentation/<member>.json             silk doc at a workspace root
+  llvm/<target>/<profile>/<file>             silk build, silk run
+  llvm/<target>/<profile>/<file>.symbols     symbol map (builds with debug information)
+  llvm/<target>/<profile>/<file>.debug.wasm  the module with its DWARF (wasm32-unknown-unknown executables with debug information)
+  llvm/<target>/<profile>/<file>.map         source map of that module (the same builds)
+  llvm/<target>/<profile>/<file>.inputs      the files the build read, to skip an unchanged rebuild
+  llvm/<target>/<profile>/<file>.units/      cached compiled code, reused by the next build
+  test/llvm/<target>/<profile>/<name>        silk test runner
+  cache/<package>/                           the checker's cache, per package
+  documentation.json                         silk doc
+  documentation/<member>.json                silk doc at a workspace root
 ```
 
 - `build` is `[build].output-dir`, or `[workspace].output-dir` for workspace members. See **Workspaces**.
 - `<target>` is the full target name, such as `x86_64-unknown-linux-gnu`.
 - `<profile>` is `debug`, `release`, `release-with-debug`, `release-size` or `release-size-with-debug`, or the name of the selected `[profiles.<name>]`. See **Targets and profiles**.
 - The `.inputs`, `.units` and `cache` entries only make the next build faster. Deleting them is safe.
+- A `wasm32-unknown-unknown` executable built with debug information ships without its DWARF. The module names `<file>.debug.wasm` in an `external_debug_info` section and `<file>.map` in a `sourceMappingURL` section, so serve them beside it for a browser's debugger. See **Debugging**.
 - `silk clean` deletes the whole output directory.
 
 ## File names
