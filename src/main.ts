@@ -568,7 +568,7 @@ const SITE_NAME = 'Silk'
 
 const routeTitle = (route: AppRoute): string =>
   AppRoute.match(route, {
-    Home: () => 'Silk: composability, all the way down',
+    Home: () => 'Silk: built for the way software is written today',
     Docs: () => `Docs | ${SITE_NAME}`,
     DocPage: ({ directory, slug }) =>
       Option.match(Catalog.findPage(directory, slug), {

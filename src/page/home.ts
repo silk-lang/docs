@@ -10,15 +10,12 @@ import { docPageRouter, releasesRouter } from '../route'
 
 // CONTENT
 
-const HELLO_CODE = `import silk.core.effect { Effect }
-import silk.io.logger { LogError }
-import silk.io.logger_native { StdoutLogger }
-
-pub effect fn main() -> () ! LogError {
-  let mut logger = StdoutLogger.make()
-
-  run Effect.log("Hello!", &())
-    |> Effect.provideMut(&mut logger)
+const HERO_CODE = `effect fn countBytes(name: string) -> usize
+  ! FileError | OutOfMemoryError
+  ? &mut FileSystem | &mut Allocator {
+  let path = run Path.make(name)
+  let bytes = run FileSystem.readFile(&path)
+  return Bytes.length(&bytes)
 }`
 
 const CLOCK_CODE = `import silk.core.effect { Effect }
@@ -44,38 +41,49 @@ pub fn main() -> i32 {
   return run Effect.provide(readClock(), &clock)
 }`
 
-type Feature = Readonly<{ title: string; text: string; snippet: string }>
+type Feature = Readonly<{
+  title: string
+  question: string
+  text: string
+  snippet: string
+}>
 
 const FEATURES: ReadonlyArray<Feature> = [
   {
-    title: 'Effects',
-    text: 'A computation’s type says what it produces, how it can fail, and what it needs from the world.',
-    snippet: 'Effect<A ! E ? R>',
+    title: 'Allocation',
+    question: 'Where can this run out of memory?',
+    text: 'Anything that allocates asks for an Allocator and can fail with OutOfMemoryError. You choose where memory comes from, for the whole program or one part of it.',
+    snippet: '? &mut Allocator',
   },
   {
-    title: 'Typed failures',
-    text: 'Recoverable failures stay inside the Effect model. Fatal traps stay separate and can’t be caught.',
-    snippet: 'fail NotFoundError { id: id }',
+    title: 'I/O',
+    question: 'What does this program touch?',
+    text: 'Files, clocks, randomness, the network and child processes are services. The signature of main lists all of them.',
+    snippet: '? &mut FileSystem | &mut SystemClock',
   },
   {
-    title: 'Services',
-    text: 'Code asks for a capability, not a concrete implementation. Tests use real in-memory providers, not mocks.',
-    snippet: 'effect fn readClock() -> i32 ? &Clock',
+    title: 'Failures',
+    question: 'How can this fail?',
+    text: 'Failures are values in the type, and they combine as calls combine. A trap is a bug: it ends the program and can’t be caught.',
+    snippet: '! FileError | OutOfMemoryError',
   },
   {
-    title: 'Ownership and lifetimes',
-    text: 'Values are borrowed, borrowed exclusively, or moved, right in the syntax. Allocation is a service the caller configures.',
+    title: 'Ownership',
+    question: 'Who frees this, and when?',
+    text: 'Borrow, borrow exclusively, or move, written at the call site. Lifetimes are checked when you compile.',
     snippet: '&message · &mut message · move message',
   },
   {
-    title: 'Fibers',
-    text: 'Structured, cooperative concurrency. Suspension and cancellation are part of the model, not an afterthought.',
+    title: 'Concurrency',
+    question: 'What happens when a child task fails?',
+    text: 'A child fiber ends with a typed outcome. join raises its failure, await hands it back as data, and race cancels the loser and cleans up.',
     snippet: 'join(move child)',
   },
   {
-    title: 'Compile-time work',
-    text: 'Static evaluation, reflection, and package parameters run in the compiler, written in Silk itself.',
-    snippet: 'static evaluation · reflection',
+    title: 'Compile time',
+    question: 'Can I generate code without macros?',
+    text: 'static if and static for run in the compiler. Reflection visits the fields of a struct and leaves nothing in the binary.',
+    snippet: 'static if · static for · Reflect.fields',
   },
 ]
 
@@ -91,53 +99,70 @@ const STDLIB_TOPICS: ReadonlyArray<string> = [
   'networking',
   'HTTP client',
   'HTTP server',
+  'HTTP/2',
   'WebSockets',
-  'TLS',
+  'TLS 1.3',
+  'X.509',
   'cryptography',
   'JSON',
   'TOML',
   'compression',
+  'zstd',
   'collections',
 ]
 
 type Row = Readonly<{ name: string; text: string }>
 
 const TOOLS: ReadonlyArray<Row> = [
-  { name: 'Formatter', text: 'One style, no configuration debates.' },
+  { name: 'Formatter', text: 'One style, built into the compiler.' },
   {
     name: 'Tests',
-    text: 'Unit tests and doc tests, with real providers instead of mocks.',
+    text: 'Unit tests and doc tests. Swap services for fakes instead of mocking.',
   },
   {
     name: 'silk check',
-    text: 'Diagnostics without a full build, with documented error codes.',
+    text: 'Diagnostics without a full build. Every error code is documented.',
+  },
+  {
+    name: 'Language server',
+    text: 'Diagnostics, hover, completion, go to definition and references in your editor.',
   },
   {
     name: 'Documentation',
-    text: 'Doc comments, doc tests, and generated reference pages.',
+    text: 'Doc comments become reference pages, and their examples run as tests.',
   },
   {
     name: 'Changesets',
     text: 'Versioning and release notes for your own packages.',
   },
+  {
+    name: 'Toolchain versions',
+    text: 'Install and switch Silk versions per project, with no separate version manager.',
+  },
 ]
 
-const ALPHA_NOTES: ReadonlyArray<Row> = [
+type Question = Readonly<{ question: string; answer: string }>
+
+const FAQ: ReadonlyArray<Question> = [
   {
-    name: 'Breaking changes can land',
-    text: 'Until 1.0, APIs may change between releases.',
+    question: 'Is it hard to learn?',
+    answer:
+      'If you know Effect or Rust, half of it will look familiar. The rest (services, providers, run) is what the tour walks through.',
   },
   {
-    name: 'Every release is written down',
-    text: 'Release notes and changesets say what moved and why.',
+    question: 'How does it relate to Effect?',
+    answer:
+      'Same model of a program: typed failures and services in the type. Different runtime story: native code, ownership, no garbage collector.',
   },
   {
-    name: 'Pin your version',
-    text: 'Lock the toolchain in your manifest and upgrade on your schedule.',
+    question: 'How fast is it?',
+    answer:
+      'Silk compiles through LLVM to native code, with no garbage collector or runtime. Build speed and small rebuilds come first when we design a feature, so the edit, check, fix loop stays short.',
   },
   {
-    name: 'Tell us what breaks',
-    text: 'Alpha feedback shapes what 1.0 looks like.',
+    question: 'Where does it run?',
+    answer:
+      'macOS, Linux with or without libc, and WebAssembly (WASI). Windows is coming.',
   },
 ]
 
@@ -190,19 +215,6 @@ export const textLink = (
     [text, Icon.arrowUpRight('size-3', h)],
   )
 
-const anatomyTerm = (
-  symbol: string,
-  text: string,
-  h: HtmlBuilder<Message>,
-): Html =>
-  h.div(
-    [h.Class('flex flex-col gap-1.5')],
-    [
-      h.span([h.Class('text-2xl font-bold leading-none')], [symbol]),
-      h.span([h.Class('text-xs text-muted')], [text]),
-    ],
-  )
-
 const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
   h.section(
     [
@@ -218,10 +230,7 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
             [h.Class('flex flex-wrap items-center gap-3')],
             [
               badge('Alpha', h),
-              h.span(
-                [h.Class('label text-muted')],
-                ['LLVM backend · native and WebAssembly'],
-              ),
+              h.span([h.Class('label text-muted')], ['Guardrails, not trust']),
             ],
           ),
           h.h1(
@@ -231,16 +240,16 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
               ),
             ],
             [
-              'Composability,',
+              'Built for the way',
               h.br([]),
-              'all the way down',
+              'software is written today',
               h.span([h.Class('text-signal')], ['.']),
             ],
           ),
           h.p(
             [h.Class('max-w-[36.25rem] text-lg leading-prose text-muted')],
             [
-              'Silk is a systems language where effects, failures, and dependencies compose, and ownership keeps every resource explicit. Inspired by Effect.',
+              'Every Silk function states what it returns, how it can fail, and what it needs, down to the allocator. Whoever writes the code, a person or an agent, and whoever reviews it work from the same contract, and the compiler holds everyone to it. There is usually one way to write a thing, and builds stay fast enough to keep the edit, check, fix loop short.',
             ],
           ),
           h.div(
@@ -263,29 +272,15 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
               ),
             ],
           ),
-          h.div(
-            [h.Class('flex flex-col gap-4 border-t border-rule pt-6')],
-            [
-              label('Every effect declares', h),
-              h.div(
-                [h.Class('flex flex-wrap gap-x-12 gap-y-6')],
-                [
-                  anatomyTerm('A', 'what it produces', h),
-                  anatomyTerm('!E', 'how it may fail', h),
-                  anatomyTerm('?R', 'what it requires', h),
-                ],
-              ),
-            ],
-          ),
         ],
       ),
       Code.codeBlock(
         {
-          code: HELLO_CODE,
+          code: HERO_CODE,
           lang: 'silk',
-          title: 'main.silk',
+          title: 'count.silk',
           lineNumbers: true,
-          copy: copyButtonFor(copiedCodeIds, 'home-hello', HELLO_CODE),
+          copy: copyButtonFor(copiedCodeIds, 'home-hero', HERO_CODE),
         },
         h,
       ),
@@ -309,9 +304,12 @@ const featureCard = (
         [
           h.span(
             [h.Class('label text-muted')],
-            [`${index + 1}`.padStart(2, '0')],
+            [`${`${index + 1}`.padStart(2, '0')} · ${feature.title}`],
           ),
-          h.h3([h.Class('text-2xl font-bold tracking-tight')], [feature.title]),
+          h.h3(
+            [h.Class('text-2xl font-bold tracking-tight')],
+            [feature.question],
+          ),
           h.p([h.Class('text-sm leading-prose text-muted')], [feature.text]),
         ],
       ),
@@ -344,6 +342,95 @@ const sectionHeader = (
     ],
   )
 
+const modelTerm = (
+  symbol: string,
+  text: string,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.div(
+    [h.Class('grid gap-1 border-b border-rule py-4 sm:grid-cols-[5rem_1fr]')],
+    [
+      h.dt([h.Class('text-2xl font-bold leading-none')], [symbol]),
+      h.dd([h.Class('text-sm leading-normal text-muted')], [text]),
+    ],
+  )
+
+const model = (h: HtmlBuilder<Message>): Html =>
+  h.section(
+    [h.Class('border-t border-rule')],
+    [
+      h.div(
+        [
+          h.Class(
+            `${sectionClass} grid gap-14 py-20 lg:grid-cols-2 lg:gap-20 lg:py-30`,
+          ),
+        ],
+        [
+          h.div(
+            [h.Class('flex flex-col gap-8')],
+            [
+              sectionHeader(
+                'The model',
+                ['Success, failure and', 'requirements in one type.'],
+                h,
+              ),
+              h.dl(
+                [h.Class('flex flex-col border-t border-ink')],
+                [
+                  modelTerm('A', 'What it returns.', h),
+                  modelTerm(
+                    '!E',
+                    'Every typed failure. The union grows as calls combine.',
+                    h,
+                  ),
+                  modelTerm(
+                    '?R',
+                    'Every service it needs. The list shrinks as callers provide them.',
+                    h,
+                  ),
+                ],
+              ),
+              h.p(
+                [h.Class('leading-prose text-muted')],
+                [
+                  'If you know Effect, you already know the model. Silk adds ownership and compiles it to native code.',
+                ],
+              ),
+            ],
+          ),
+          h.div(
+            [h.Class('flex flex-col gap-5 lg:pt-10')],
+            [
+              label('Guardrails, not trust', h),
+              h.h3(
+                [h.Class('text-3xl font-bold tracking-tighter md:text-4xl')],
+                [
+                  'The reviewer checks the signature.',
+                  h.br([]),
+                  'The compiler checks the rest.',
+                ],
+              ),
+              h.p(
+                [h.Class('leading-prose text-muted')],
+                [
+                  'Like Rust, the compiler won’t let code misuse memory, so you don’t have to trust whoever wrote it: a colleague, a dependency, or an agent. Silk goes further. Code can’t allocate, touch the disk, read the clock, or fail in a new way without it showing in its type and in the type of every caller.',
+                ],
+              ),
+              h.p(
+                [h.Class('leading-prose text-muted')],
+                [
+                  'The one escape hatch, ',
+                  h.strong([], ['unsafe']),
+                  ', is written at the exact spot it is used, so it always shows in a diff. Nothing is hidden.',
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    ],
+  )
+
 const features = (h: HtmlBuilder<Message>): Html =>
   h.section(
     [h.Class('border-t border-rule')],
@@ -351,11 +438,7 @@ const features = (h: HtmlBuilder<Message>): Html =>
       h.div(
         [h.Class(`${sectionClass} flex flex-col gap-12 py-20 lg:py-30`)],
         [
-          sectionHeader(
-            'What composes',
-            ['Composition that survives', 'every boundary.'],
-            h,
-          ),
+          sectionHeader('The language', ['What the type', 'tells you.'], h),
           h.div(
             [h.Class('grid gap-7 md:grid-cols-2 xl:grid-cols-3')],
             Array.map(FEATURES, (feature, index) =>
@@ -389,7 +472,7 @@ const servicesSpotlight = (
           h.p(
             [h.Class('leading-prose text-muted')],
             [
-              'A service is the capability. A provider is one implementation of it. Reusable code asks for the service itself, never the concrete type behind it.',
+              'A service is a capability. A provider is one implementation of it. Code asks for the service, and the caller decides which provider to pass.',
             ],
           ),
           h.p(
@@ -469,15 +552,11 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
           h.div(
             [h.Class('flex flex-col gap-4')],
             [
-              sectionHeader(
-                'In the box',
-                ['A standard library and tools', 'that ship together.'],
-                h,
-              ),
+              sectionHeader('In the box', ['Batteries included.'], h),
               h.p(
                 [h.Class('max-w-[40rem] text-lg leading-prose text-muted')],
                 [
-                  'Compile for macOS, Linux, no-libc Linux, or WebAssembly, with the same standard library and the same tools. Windows is on the way.',
+                  'We aim to solve the common cases in the box, so nobody has to find, vet and wire up a package for them. A lot is already here for a young language, and more is coming. Build for macOS, Linux (with or without libc) and WebAssembly from the same code. Windows is coming.',
                 ],
               ),
             ],
@@ -530,50 +609,15 @@ const status = (h: HtmlBuilder<Message>): Html =>
               label('Status', h),
               h.h2(
                 [h.Class('text-3xl font-bold tracking-tighter md:text-4xl')],
-                ['Real, and still in alpha.'],
-              ),
-              h.p(
-                [h.Class('leading-prose text-muted')],
-                [
-                  'Silk is usable today: a full language reference, a documented standard library, and the tools to ship with it. It’s also young, and some edges will move.',
-                ],
-              ),
-              h.p(
-                [
-                  h.Class(
-                    'flex items-center gap-3 rounded-2xl bg-signal-soft px-5 py-4 text-sm leading-normal',
-                  ),
-                ],
-                [
-                  h.span([
-                    h.AriaHidden(true),
-                    h.Class('size-2 shrink-0 rounded-full bg-signal'),
-                  ]),
-                  'Alpha means real, documented, and changing. Build with it, and pin your version.',
-                ],
-              ),
-              h.div(
-                [
-                  h.Class(
-                    'flex items-center justify-between gap-4 rounded-2xl border border-rule px-5 py-4',
-                  ),
-                ],
-                [
-                  h.p(
-                    [h.Class('max-w-[27.5rem] text-sm leading-normal')],
-                    [
-                      h.strong([], ['Windows']),
-                      ' support is still ahead. Today Silk targets macOS, Linux, no-libc Linux, and WebAssembly.',
-                    ],
-                  ),
-                  tag('ahead', h),
-                ],
+                ['Alpha', h.span([h.Class('text-signal')], ['.'])],
               ),
             ],
           ),
-          h.div(
-            [h.Class('flex flex-col gap-2 pt-1.5')],
-            [label('What alpha means', h), rowList(ALPHA_NOTES, 'Stacked', h)],
+          h.p(
+            [h.Class('leading-prose text-muted lg:pt-1.5')],
+            [
+              'Silk works today. The compiler builds itself and the standard library is documented. APIs can still change before 1.0, so pin your toolchain version. Every release lists what changed.',
+            ],
           ),
         ],
       ),
@@ -587,7 +631,7 @@ const goalBand = (h: HtmlBuilder<Message>): Html =>
       h.div(
         [h.Class(`${sectionClass} flex flex-col gap-7 py-20 lg:py-30`)],
         [
-          h.p([h.Class('label text-rule')], ['The goal']),
+          h.p([h.Class('label text-rule')], ['No C underneath']),
           h.p(
             [
               h.Class(
@@ -595,9 +639,34 @@ const goalBand = (h: HtmlBuilder<Message>): Html =>
               ),
             ],
             [
-              'Make the composable program and the honest program the same program',
+              'One toolchain. No dependency for TLS, HTTP/2 or crypto: they are written in Silk, and so is the compiler',
               h.span([h.Class('text-signal')], ['.']),
             ],
+          ),
+        ],
+      ),
+    ],
+  )
+
+const faq = (h: HtmlBuilder<Message>): Html =>
+  h.section(
+    [h.Class('border-t border-rule')],
+    [
+      h.div(
+        [
+          h.Class(
+            `${sectionClass} grid gap-14 py-20 lg:grid-cols-2 lg:gap-20 lg:py-30`,
+          ),
+        ],
+        [
+          sectionHeader('Questions', ['Before you start.'], h),
+          rowList(
+            Array.map(FAQ, ({ question, answer }) => ({
+              name: question,
+              text: answer,
+            })),
+            'Stacked',
+            h,
           ),
         ],
       ),
@@ -625,7 +694,7 @@ const closingCta = (h: HtmlBuilder<Message>): Html =>
           ),
           h.p(
             [h.Class('text-lg leading-prose text-muted')],
-            ['Start with the tour, or go all the way with the book.'],
+            ['Start with the tour, or read the book.'],
           ),
         ],
       ),
@@ -652,11 +721,13 @@ export const view = (
     'Home',
     [
       hero(copiedCodeIds, h),
+      model(h),
       features(h),
       servicesSpotlight(copiedCodeIds, h),
+      goalBand(h),
       inTheBox(h),
       status(h),
-      goalBand(h),
+      faq(h),
       closingCta(h),
     ],
     h,
