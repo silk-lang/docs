@@ -11,9 +11,8 @@ const HEAD = [
   '<meta name="description" content="Silk is a systems language where effects, failures, and dependencies compose, and ownership keeps every resource explicit.">',
   '<meta name="theme-color" media="(prefers-color-scheme: light)" content="#e3e1dc">',
   '<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1e1d1c">',
-  '<link rel="icon" type="image/svg+xml" href="/brand/silk-avatar-light.svg" media="(prefers-color-scheme: light)">',
-  '<link rel="icon" type="image/svg+xml" href="/brand/silk-avatar-dark.svg" media="(prefers-color-scheme: dark)">',
-  '<link rel="apple-touch-icon" href="/brand/silk-avatar-dark.png">',
+  '<link rel="icon" type="image/svg+xml" href="/brand/silk-favicon.svg">',
+  '<link rel="apple-touch-icon" href="/brand/silk-apple-touch-icon.png">',
   '<link rel="preload" href="/fonts/SpaceMono-Regular.woff2" as="font" type="font/woff2" crossorigin>',
   '<link rel="preload" href="/fonts/SpaceMono-Bold.woff2" as="font" type="font/woff2" crossorigin>',
 ].join('')
