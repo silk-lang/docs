@@ -18,6 +18,9 @@ const HERO_CODE = `effect fn countBytes(name: string) -> usize
   return Bytes.length(&bytes)
 }`
 
+const INSTALL_CODE =
+  'curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | sh'
+
 const CLOCK_CODE = `import silk.core.effect { Effect }
 
 service Clock {
@@ -77,7 +80,7 @@ const FEATURES: ReadonlyArray<Feature> = [
     title: 'Concurrency',
     question: 'What happens when a child task fails?',
     text: 'A child fiber ends with a typed outcome. join raises its failure, await hands it back as data, and race cancels the loser.',
-    snippet: 'join(move child)',
+    snippet: 'Fiber.join(move child)',
   },
   {
     title: 'Compile time',
@@ -257,6 +260,16 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
           title: 'count.silk',
           lineNumbers: true,
           copy: copyButtonFor(copiedCodeIds, 'home-hero', HERO_CODE),
+        },
+        h,
+      ),
+      Code.codeBlock(
+        {
+          code: INSTALL_CODE,
+          lang: 'sh',
+          title: 'Install',
+          copy: copyButtonFor(copiedCodeIds, 'home-install', INSTALL_CODE),
+          className: 'lg:col-span-2',
         },
         h,
       ),
