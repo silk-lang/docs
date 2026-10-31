@@ -29,6 +29,9 @@ describe('landing page', () => {
       expect(role('link', { name: 'Take the tour' })).toExist(),
       expect(role('link', { name: 'Install' })).toExist(),
       expect(text('Swap the provider,')).toExist(),
+      expect(
+        text('silk-lang/silk/main/install.sh', { exact: false }),
+      ).toExist(),
     )
   })
 
