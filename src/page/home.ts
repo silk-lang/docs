@@ -581,6 +581,40 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
     ],
   )
 
+const userLand = (h: HtmlBuilder<Message>): Html =>
+  h.section(
+    [h.Class('border-t border-rule')],
+    [
+      h.div(
+        [
+          h.Class(
+            `${sectionClass} grid gap-14 py-20 lg:grid-cols-2 lg:gap-20 lg:py-30`,
+          ),
+        ],
+        [
+          sectionHeader('Design', ['A small compiler.'], h),
+          h.div(
+            [h.Class('flex flex-col gap-5 lg:pt-10')],
+            [
+              h.p(
+                [h.Class('leading-prose text-muted')],
+                [
+                  'The compiler does as little as it can. Option, Result, the Effect combinators such as retry and catch, fibers and their schedulers, and allocators are Silk code in the standard library, built on a small set of compiler intrinsics.',
+                ],
+              ),
+              h.p(
+                [h.Class('leading-prose text-muted')],
+                [
+                  'You can read how they work in the same language you write, and build your own the same way.',
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    ],
+  )
+
 const status = (h: HtmlBuilder<Message>): Html =>
   h.section(
     [h.Class('border-t border-rule')],
@@ -689,6 +723,7 @@ export const view = (
       model(h),
       features(h),
       servicesSpotlight(copiedCodeIds, h),
+      userLand(h),
       inTheBox(h),
       status(h),
       faq(h),
