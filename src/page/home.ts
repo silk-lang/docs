@@ -613,30 +613,6 @@ const status = (h: HtmlBuilder<Message>): Html =>
     ],
   )
 
-const writtenInSilk = (h: HtmlBuilder<Message>): Html =>
-  h.section(
-    [h.Class('bg-ink text-paper')],
-    [
-      h.div(
-        [h.Class(`${sectionClass} flex flex-col gap-7 py-20 lg:py-30`)],
-        [
-          h.p([h.Class('label text-rule')], ['Written in Silk']),
-          h.p(
-            [
-              h.Class(
-                'max-w-[65rem] text-3xl leading-tight font-bold tracking-tighter md:text-5xl',
-              ),
-            ],
-            [
-              'TLS 1.3, HTTP/2, the cryptography under them and the compiler itself are all written in Silk',
-              h.span([h.Class('text-signal')], ['.']),
-            ],
-          ),
-        ],
-      ),
-    ],
-  )
-
 const faq = (h: HtmlBuilder<Message>): Html =>
   h.section(
     [h.Class('border-t border-rule')],
@@ -713,7 +689,6 @@ export const view = (
       model(h),
       features(h),
       servicesSpotlight(copiedCodeIds, h),
-      writtenInSilk(h),
       inTheBox(h),
       status(h),
       faq(h),
