@@ -346,7 +346,7 @@ const modelTerm = (
 
 const model = (h: HtmlBuilder<Message>): Html =>
   h.section(
-    [h.Class('border-t border-rule')],
+    [h.Class('band')],
     [
       h.div(
         [
@@ -420,7 +420,7 @@ const model = (h: HtmlBuilder<Message>): Html =>
 
 const features = (h: HtmlBuilder<Message>): Html =>
   h.section(
-    [h.Class('border-t border-rule')],
+    [],
     [
       h.div(
         [h.Class(`${sectionClass} flex flex-col gap-12 py-20 lg:py-30`)],
@@ -531,7 +531,7 @@ const rowList = (
 
 const inTheBox = (h: HtmlBuilder<Message>): Html =>
   h.section(
-    [h.Class('border-t border-rule')],
+    [],
     [
       h.div(
         [h.Class(`${sectionClass} flex flex-col gap-12 py-20 lg:py-30`)],
@@ -594,7 +594,7 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
 
 const design = (h: HtmlBuilder<Message>): Html =>
   h.section(
-    [h.Class('border-t border-rule')],
+    [h.Class('band')],
     [
       h.div(
         [
@@ -622,7 +622,7 @@ const design = (h: HtmlBuilder<Message>): Html =>
 
 const status = (h: HtmlBuilder<Message>): Html =>
   h.section(
-    [h.Class('border-t border-rule')],
+    [h.Class('band')],
     [
       h.div(
         [
@@ -654,7 +654,7 @@ const status = (h: HtmlBuilder<Message>): Html =>
 
 const faq = (h: HtmlBuilder<Message>): Html =>
   h.section(
-    [h.Class('border-t border-rule')],
+    [],
     [
       h.div(
         [
