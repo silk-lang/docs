@@ -87,30 +87,6 @@ const FEATURES: ReadonlyArray<Feature> = [
   },
 ]
 
-const STDLIB_TOPICS: ReadonlyArray<string> = [
-  'files',
-  'directories',
-  'processes',
-  'logging',
-  'stdin',
-  'time',
-  'randomness',
-  'byte streams',
-  'networking',
-  'HTTP client',
-  'HTTP server',
-  'HTTP/2',
-  'WebSockets',
-  'TLS 1.3',
-  'X.509',
-  'cryptography',
-  'JSON',
-  'TOML',
-  'compression',
-  'zstd',
-  'collections',
-]
-
 type Row = Readonly<{ name: string; text: string }>
 
 const TOOLS: ReadonlyArray<Row> = [
@@ -568,16 +544,29 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
                 [h.Class('flex flex-col gap-5')],
                 [
                   label('Standard library', h),
-                  h.ul(
-                    [h.Class('flex flex-wrap gap-x-2 gap-y-2.5')],
-                    Array.map(STDLIB_TOPICS, topic =>
-                      h.li([], [tag(topic, h)]),
-                    ),
+                  h.p(
+                    [h.Class('leading-prose text-muted')],
+                    [
+                      'An HTTPS request, a JSON or TOML file, a compressed download, a pool of worker threads: none of them needs a package. The standard library covers them, written in Silk with the same failure and service rules as your own code.',
+                    ],
                   ),
-                  textLink(
-                    'Browse the guides',
-                    docPageRouter({ directory: 'guides', slug: 'overview' }),
-                    h,
+                  h.div(
+                    [h.Class('flex flex-wrap gap-x-6 gap-y-3')],
+                    [
+                      textLink(
+                        'Standard library reference',
+                        docPageRouter({ directory: 'std', slug: 'overview' }),
+                        h,
+                      ),
+                      textLink(
+                        'Browse the guides',
+                        docPageRouter({
+                          directory: 'guides',
+                          slug: 'overview',
+                        }),
+                        h,
+                      ),
+                    ],
                   ),
                 ],
               ),
