@@ -52,7 +52,7 @@ const FEATURES: ReadonlyArray<Feature> = [
   {
     title: 'Allocation',
     question: 'Where can this run out of memory?',
-    text: 'Anything that allocates asks for an Allocator and can fail with OutOfMemoryError. You choose where memory comes from.',
+    text: 'Anything that allocates asks for an Allocator and can fail with OutOfMemoryError. You choose where memory comes from, for the whole program or one part.',
     snippet: '? &mut Allocator',
   },
   {
@@ -64,13 +64,13 @@ const FEATURES: ReadonlyArray<Feature> = [
   {
     title: 'Failures',
     question: 'How can this fail?',
-    text: 'Failures are values in the type and combine as calls combine. A trap is a bug: it ends the program and can’t be caught.',
+    text: 'Failures are typed values that combine as calls combine. A trap is a bug: it ends the program and can’t be caught.',
     snippet: '! FileError | OutOfMemoryError',
   },
   {
     title: 'Ownership',
     question: 'Who frees this, and when?',
-    text: 'Borrow, borrow exclusively, or move, written at the call site and checked at compile time.',
+    text: 'Borrow, borrow exclusively, or move, written at the call site. Lifetimes are checked at compile time.',
     snippet: '&message · &mut message · move message',
   },
   {
@@ -93,7 +93,7 @@ const TOOLS: ReadonlyArray<Row> = [
   { name: 'Formatter', text: 'One style, built into the compiler.' },
   {
     name: 'Tests',
-    text: 'Unit tests and doc tests. Swap in fake services instead of mocks.',
+    text: 'Unit tests and doc tests. Pass fake providers instead of mocking.',
   },
   {
     name: 'silk check',
@@ -101,7 +101,7 @@ const TOOLS: ReadonlyArray<Row> = [
   },
   {
     name: 'Language server',
-    text: 'Diagnostics, hover, completion, definitions and references.',
+    text: 'Diagnostics, hover, completion, go to definition and find references.',
   },
   {
     name: 'Documentation',
@@ -113,7 +113,7 @@ const TOOLS: ReadonlyArray<Row> = [
   },
   {
     name: 'Toolchain versions',
-    text: 'Install and switch Silk versions per project.',
+    text: 'Install and switch Silk versions per project, without a separate version manager.',
   },
 ]
 
@@ -128,12 +128,12 @@ const FAQ: ReadonlyArray<Question> = [
   {
     question: 'How does it relate to Effect?',
     answer:
-      'Same model: typed failures and services in the type. Silk adds ownership and native code, with no garbage collector.',
+      'Same model: typed failures and services in the type. Silk adds ownership and compiles to native code with no garbage collector.',
   },
   {
     question: 'How fast is it?',
     answer:
-      'Silk compiles through LLVM to native code, with no garbage collector or hidden runtime. Every feature is designed for fast builds and small rebuilds, so the edit loop stays short.',
+      'Silk compiles through LLVM to native code, with no garbage collector or hidden runtime. Fast builds and small rebuilds come first when we design a feature, so the edit loop stays short.',
   },
   {
     question: 'Where does it run?',
@@ -225,7 +225,7 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
           h.p(
             [h.Class('max-w-[36.25rem] text-lg leading-prose text-muted')],
             [
-              'Every Silk function states what it returns, how it can fail, and what it needs, down to the allocator. A person or an agent writes the code, the reviewer reads the same contract, and the compiler enforces it. There is usually one way to write a thing, and builds stay fast.',
+              'Every Silk function states what it returns, how it can fail, and what it needs, down to the allocator. Whoever writes the code, a person or an agent, works from the same contract as the reviewer, and the compiler checks it. There is usually one way to write a thing, and builds stay fast.',
             ],
           ),
           h.div(
@@ -387,7 +387,7 @@ const model = (h: HtmlBuilder<Message>): Html =>
               h.p(
                 [h.Class('leading-prose text-muted')],
                 [
-                  'Like Rust, the compiler won’t let code misuse memory, so you don’t have to trust whoever wrote it. Silk goes further: library code asks for the services it uses, so allocation, files, clocks and failures show in its type and in every caller’s. Real providers are created by name, usually in main.',
+                  'As in Rust, the compiler won’t let code misuse memory, so you don’t have to trust whoever wrote it. Silk goes further: library code asks for the services it uses instead of creating them, so allocation, files, clocks and failures show in its type and its callers’ types until one provides them. Real providers are created by name, usually in main.',
                 ],
               ),
               h.p(
@@ -530,7 +530,7 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
               h.p(
                 [h.Class('max-w-[40rem] text-lg leading-prose text-muted')],
                 [
-                  'The common cases should be in the box, so you don’t have to find, vet and wire up a package. A lot is already here for a young language, and more is coming.',
+                  'We aim to cover the common cases, so you don’t have to find, vet and wire up a package. A lot is already here for a young language, and more is coming.',
                 ],
               ),
             ],
@@ -545,7 +545,7 @@ const inTheBox = (h: HtmlBuilder<Message>): Html =>
                   h.p(
                     [h.Class('leading-prose text-muted')],
                     [
-                      'HTTPS requests, JSON and TOML, compressed downloads and worker thread pools need no package. The standard library is Silk code with the same failure and service rules as yours.',
+                      'HTTPS requests, JSON and TOML, compressed downloads and worker thread pools need no package. The standard library is Silk, with the same failure and service rules as your code.',
                     ],
                   ),
                   h.div(
@@ -597,7 +597,7 @@ const design = (h: HtmlBuilder<Message>): Html =>
               h.p(
                 [h.Class('leading-prose text-muted')],
                 [
-                  'The compiler provides the core: the Effect type, typed failures and requirements, and ownership. Option, Result, Effect combinators like retry and catch, fibers, schedulers and allocators are standard library Silk over compiler intrinsics. You can read them, and build your own the same way.',
+                  'The compiler provides the core: the Effect type, typed failures and requirements, and ownership. Option, Result, Effect combinators like retry and catch, fibers, schedulers and allocators are Silk code in the standard library, built on compiler intrinsics. You can read them and build your own the same way.',
                 ],
               ),
             ],
