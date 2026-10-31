@@ -145,3 +145,26 @@
     opacity: 0.55;
   }
 }
+
+/* An inverted landing page section: dark on a light page, light on a dark page.
+   Everything inside reads the swapped tokens, so it needs no other classes. */
+@utility band {
+  --silk-paper: #3b3a39;
+  --silk-ink: #e3e1dc;
+  --silk-muted: #a9a6a0;
+  --silk-rule: #57554f;
+  --silk-signal-soft: #5a2e2b;
+  --syntax-surface: #2a2927;
+  background-color: var(--silk-paper);
+  color: var(--silk-ink);
+
+  @media (prefers-color-scheme: dark) {
+    --silk-paper: #e3e1dc;
+    --silk-ink: #3b3a39;
+    --silk-muted: #6b6a67;
+    --silk-rule: #c9c6bf;
+    --silk-signal: #d51c21;
+    --silk-signal-soft: #e2cdc9;
+    --syntax-surface: #3b3a39;
+  }
+}
