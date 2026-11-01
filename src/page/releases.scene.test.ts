@@ -21,6 +21,11 @@ describe('releases page', () => {
           name: 'silk-0.1.0-dev.2+8cd8230a9060-aarch64-apple-darwin.tar.gz',
         }),
       ).toExist(),
+      expect(
+        role('link', {
+          name: 'silk-0.1.0-dev.2+8cd8230a9060-x86_64-pc-windows-msvc.zip',
+        }),
+      ).toExist(),
       expect(text('6.3 MiB')).toExist(),
     )
   })

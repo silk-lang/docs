@@ -9,8 +9,9 @@ const download = (
   arch: string,
   target: string,
   size: number,
+  extension = 'tar.gz',
 ) => {
-  const fileName = `silk-${version}-${target}.tar.gz`
+  const fileName = `silk-${version}-${target}.${extension}`
   const url = `https://github.com/silk-lang/silk/releases/download/v${encodeURIComponent(version)}/${encodeURIComponent(fileName)}`
   return {
     os,
@@ -34,6 +35,14 @@ const release = (version: string, publishedAt: string): Release => ({
     download(version, 'macOS', 'aarch64', 'aarch64-apple-darwin', 6572578),
     download(version, 'Linux', 'x86_64', 'x86_64-unknown-linux-gnu', 5847373),
     download(version, 'Linux', 'aarch64', 'aarch64-unknown-linux-gnu', 5993603),
+    download(
+      version,
+      'Windows',
+      'x86_64',
+      'x86_64-pc-windows-msvc',
+      6214656,
+      'zip',
+    ),
   ],
 })
 

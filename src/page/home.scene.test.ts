@@ -32,6 +32,9 @@ describe('landing page', () => {
       expect(
         text('silk-lang/silk/main/install.sh', { exact: false }),
       ).toExist(),
+      expect(
+        text('silk-lang/silk/main/install.ps1', { exact: false }),
+      ).toExist(),
     )
   })
 

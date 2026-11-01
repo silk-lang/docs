@@ -1,6 +1,6 @@
 # Install
 
-Silk installs with one shell script. It downloads a release of Silk, the `silkc` compiler and its standard library, into `~/.silk`, as one version among any others you install later, and installs `silk`, the command you type. `silk` runs each project with the Silk version it pins. You also need Clang 22 or newer, because Silk builds programs through Clang.
+Silk installs with one script: a shell script on macOS and Linux, and a PowerShell script on Windows (see **Install on Windows**). It downloads a release of Silk, the `silkc` compiler and its standard library, into `~/.silk`, as one version among any others you install later, and installs `silk`, the command you type. `silk` runs each project with the Silk version it pins. You also need Clang 22 or newer, because Silk builds programs through Clang.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | sh
@@ -15,8 +15,11 @@ The script needs `curl`, `tar`, `uname`, `mktemp`, `cmp`, `ln`, and `sha256sum` 
 | macOS on Apple silicon | `aarch64-apple-darwin` |
 | Linux on x86-64 | `x86_64-unknown-linux-gnu` |
 | Linux on ARM64 | `aarch64-unknown-linux-gnu` |
+| Windows on x86-64 | `x86_64-pc-windows-msvc` |
 
 Intel Macs are not supported. On one, the script stops with `silk-install: Silk has no build for Intel Macs yet`. Other systems stop with a similar line. A shell running under Rosetta on an Apple silicon Mac is detected, and gets the Apple silicon build.
+
+Windows builds start with `v0.1.0-dev.41+b10165a17baa` and install with `install.ps1` instead of `install.sh`. Windows on ARM64 is not supported yet; the PowerShell script stops with `This release requires Windows x86_64`.
 
 ## What the script does
 
@@ -216,6 +219,80 @@ Move its `bin/silk` to `~/.silk/bin/silk`, then move the unpacked folder to `~/.
 
 When you save a release asset with `curl -O`, the `+` in a dev version stays encoded as `%2B` in the file name. Use `curl -o <name>` to choose the name yourself.
 
+## Install on Windows
+
+On Windows x86-64, run this in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/silk-lang/silk/main/install.ps1 | iex
+```
+
+The script needs no administrator privileges and no Windows SDK or Visual Studio: Silk programs on Windows call the system DLLs directly, with no C runtime. It installs into `%USERPROFILE%\.silk`, with the same layout as on macOS and Linux:
+
+```
+%USERPROFILE%\.silk\
+  bin\silk.exe                              the silk tool, the command you type
+  settings.toml                             default = "0.1.0-dev.41+b10165a17baa"
+  toolchains\0.1.0-dev.41+b10165a17baa\
+    bin\silkc.exe                           the compiler
+    lib\silk\stdlib\                        the standard library, in source
+```
+
+It picks a release the same way as `install.sh`, and reads the same settings from environment variables. Set them in the session before you run the script:
+
+```powershell
+$env:SILK_HOME = 'D:\silk'
+$env:SILK_RELEASE = 'v0.1.0-dev.41+b10165a17baa'
+irm https://raw.githubusercontent.com/silk-lang/silk/main/install.ps1 | iex
+```
+
+Before it runs anything it downloaded, the script checks the ZIP's SHA-256 against GitHub's asset metadata, and the minisign signature when `minisign` is on `PATH`. Then it checks that `bin\silkc.exe` has the SHA-256 in `native-seed.json`, reports the requested version, and carries the release's change snapshot, as `install.sh` does. A failed check stops the script and installs nothing.
+
+The script does not change your `PATH`. Add `%USERPROFILE%\.silk\bin` (or the `bin` folder of your `SILK_HOME`) to your user `Path` in Windows' Environment Variables settings, then open a new terminal. To try it in the current PowerShell session only:
+
+```powershell
+$env:Path = "$env:USERPROFILE\.silk\bin;$env:Path"
+silk --version
+```
+
+### LLVM on Windows
+
+Building programs needs LLVM 22 or newer: Clang, plus the `lld-link` and `llvm-dlltool` that LLVM installs beside it. Install it with the LLVM Windows installer from [LLVM's releases](https://github.com/llvm/llvm-project/releases), or with winget:
+
+```powershell
+winget install LLVM.LLVM
+```
+
+Put LLVM's `bin` folder, usually `C:\Program Files\LLVM\bin`, on your `PATH`, or point `SILK_CLANG` at `clang.exe`:
+
+```powershell
+$env:SILK_CLANG = 'C:\Program Files\LLVM\bin\clang.exe'
+```
+
+### Scoop and mise
+
+Each release with Windows builds also publishes a Scoop manifest, `silk.json`, made from that release's ZIP and its SHA-256. Install it straight from the release, with the `+` of a dev tag written as `%2B`:
+
+```powershell
+scoop install https://github.com/silk-lang/silk/releases/download/v0.1.0-dev.41%2Bb10165a17baa/silk.json
+```
+
+Scoop exposes both `silk.exe` and `silkc.exe`, and updates through a newer release's manifest. With mise, use its GitHub backend with the Windows ZIP:
+
+```toml
+[tools."github:silk-lang/silk"]
+version = "latest"
+asset_pattern = "silk-{{ version }}-x86_64-pc-windows-msvc.zip"
+strip_components = 1
+bin_path = "bin"
+```
+
+This `asset_pattern` is for Windows only; leave it out on macOS and Linux. Until a stable release exists, add `prerelease = true` so mise sees dev releases.
+
+### By hand on Windows
+
+Each release has `silk-<version>-x86_64-pc-windows-msvc.zip` with a `.minisig` beside it, and the bare compiler as `silk-compiler-x86_64-pc-windows-msvc.exe`. The ZIP holds one folder, `silk-<version>-x86_64-pc-windows-msvc\`, with `bin\silk.exe`, `bin\silkc.exe` and `lib\silk\`. Unpack it, move `bin\silk.exe` to `%USERPROFILE%\.silk\bin\silk.exe`, and move the folder to `%USERPROFILE%\.silk\toolchains\<version>`, as on macOS and Linux. Verify the ZIP first with `minisign -Vm <zip> -P <key>`, using the key under **Verify the signature**.
+
 ## Upgrade
 
 `silk use latest` installs the newest stable release beside the versions you have and makes it your default; `silk use dev`, or `silk use latest --dev`, takes the newest release of any kind, dev releases included. Until a stable release is published, `silk use latest` stops with exit status 1:
@@ -263,7 +340,7 @@ Add `auto-install = true` to `~/.silk/settings.toml`, or set `SILK_AUTO_INSTALL=
 
 ## Uninstall
 
-Remove one version with `silk use uninstall <version>`. To remove Silk entirely, delete the install folder and remove the `PATH` line from your shell profile:
+Remove one version with `silk use uninstall <version>`. To remove Silk entirely, delete the install folder and remove the `PATH` line from your shell profile (on Windows, remove `%USERPROFILE%\.silk` and its `bin` entry from your user `Path`):
 
 ```sh
 rm -rf ~/.silk

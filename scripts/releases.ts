@@ -33,22 +33,48 @@ type GitHubRelease = Readonly<{
 }>
 
 // Toolchain archives only. Releases also carry the bare compiler and build
-// receipts, which stay on the GitHub release page.
+// receipts, which stay on the GitHub release page. Windows ships a ZIP.
 const TARGETS: ReadonlyArray<
-  Readonly<{ target: string; os: string; arch: string }>
+  Readonly<{ target: string; os: string; arch: string; extension: string }>
 > = [
-  { target: 'aarch64-apple-darwin', os: 'macOS', arch: 'aarch64' },
-  { target: 'x86_64-apple-darwin', os: 'macOS', arch: 'x86_64' },
-  { target: 'x86_64-unknown-linux-gnu', os: 'Linux', arch: 'x86_64' },
-  { target: 'aarch64-unknown-linux-gnu', os: 'Linux', arch: 'aarch64' },
+  {
+    target: 'aarch64-apple-darwin',
+    os: 'macOS',
+    arch: 'aarch64',
+    extension: 'tar.gz',
+  },
+  {
+    target: 'x86_64-apple-darwin',
+    os: 'macOS',
+    arch: 'x86_64',
+    extension: 'tar.gz',
+  },
+  {
+    target: 'x86_64-unknown-linux-gnu',
+    os: 'Linux',
+    arch: 'x86_64',
+    extension: 'tar.gz',
+  },
+  {
+    target: 'aarch64-unknown-linux-gnu',
+    os: 'Linux',
+    arch: 'aarch64',
+    extension: 'tar.gz',
+  },
+  {
+    target: 'x86_64-pc-windows-msvc',
+    os: 'Windows',
+    arch: 'x86_64',
+    extension: 'zip',
+  },
 ]
 
 const toDownloads = (
   version: string,
   assets: ReadonlyArray<GitHubAsset>,
 ): ReadonlyArray<Download> =>
-  TARGETS.flatMap(({ target, os, arch }) => {
-    const fileName = `silk-${version}-${target}.tar.gz`
+  TARGETS.flatMap(({ target, os, arch, extension }) => {
+    const fileName = `silk-${version}-${target}.${extension}`
     const archive = assets.find(asset => asset.name === fileName)
     if (archive === undefined) {
       return []
