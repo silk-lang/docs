@@ -86,7 +86,7 @@ const header = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
           h.p(
             [h.Class('max-w-[38.75rem] text-lg leading-prose text-muted')],
             [
-              'Prebuilt toolchains for macOS and Linux, newest first. Windows support is still ahead. Silk is in alpha, so expect APIs to move between versions.',
+              'Prebuilt toolchains for macOS, Linux and Windows, newest first. Silk is in alpha, so expect APIs to move between versions.',
             ],
           ),
         ],
@@ -99,8 +99,8 @@ const header = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
         ],
         [
           note(
-            'Package managers',
-            'Prefer a package manager? The install guide covers Homebrew and mise.',
+            'Install',
+            'Prefer an installer or a package manager? The install guide covers the install scripts for macOS, Linux and Windows, Homebrew, Scoop and mise.',
             textLink(
               'Install guide',
               docPageRouter({ directory: 'get-started', slug: 'install' }),

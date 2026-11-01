@@ -21,6 +21,9 @@ const HERO_CODE = `effect fn countBytes(name: string) -> usize
 const INSTALL_CODE =
   'curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | sh'
 
+const WINDOWS_INSTALL_CODE =
+  'irm https://raw.githubusercontent.com/silk-lang/silk/main/install.ps1 | iex'
+
 const CLOCK_CODE = `import silk.core.effect { Effect }
 
 service Clock {
@@ -141,7 +144,7 @@ const FAQ: ReadonlyArray<Question> = [
   {
     question: 'Where does it run?',
     answer:
-      'macOS, Linux with or without libc, and WebAssembly (WASI). Windows is coming.',
+      'macOS, Linux with or without libc, Windows, and WebAssembly (WASI).',
   },
 ]
 
@@ -263,15 +266,32 @@ const hero = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
         },
         h,
       ),
-      Code.codeBlock(
-        {
-          code: INSTALL_CODE,
-          lang: 'sh',
-          title: 'Install',
-          copy: copyButtonFor(copiedCodeIds, 'home-install', INSTALL_CODE),
-          className: 'lg:col-span-2',
-        },
-        h,
+      h.div(
+        [h.Class('flex min-w-0 flex-col gap-4 lg:col-span-2')],
+        [
+          Code.codeBlock(
+            {
+              code: INSTALL_CODE,
+              lang: 'sh',
+              title: 'Install on macOS and Linux',
+              copy: copyButtonFor(copiedCodeIds, 'home-install', INSTALL_CODE),
+            },
+            h,
+          ),
+          Code.codeBlock(
+            {
+              code: WINDOWS_INSTALL_CODE,
+              lang: 'powershell',
+              title: 'Install on Windows',
+              copy: copyButtonFor(
+                copiedCodeIds,
+                'home-install-windows',
+                WINDOWS_INSTALL_CODE,
+              ),
+            },
+            h,
+          ),
+        ],
       ),
     ],
   )

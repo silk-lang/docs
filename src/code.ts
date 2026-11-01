@@ -44,8 +44,14 @@ export const highlighted = <Message>(
     ),
   )
 
+// Languages shown by name but not highlighted.
+const PLAIN_LANGUAGES: ReadonlySet<string> = new Set(['powershell'])
+
 export const languageLabel = (lang: string): string =>
-  highlighter.normalizeLanguage(lang) === 'plaintext' ? 'TEXT' : lang
+  highlighter.normalizeLanguage(lang) === 'plaintext' &&
+  !PLAIN_LANGUAGES.has(lang)
+    ? 'TEXT'
+    : lang
 
 export type CopyButton<Message> = Readonly<{
   isCopied: boolean
