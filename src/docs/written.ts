@@ -379,6 +379,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Build outputs and native linking',
         'https://github.com/silk-lang/docs/blob/main/content/projects/08-build-outputs-and-native-linking.md',
       ),
+      page(
+        'projects',
+        'build-plans-and-generated-code',
+        'Build plans and generated code',
+        'https://github.com/silk-lang/docs/blob/main/content/projects/09-build-plans-and-generated-code.md',
+      ),
     ],
   },
   {

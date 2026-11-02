@@ -56,6 +56,8 @@ The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, `[co
 | `output-dir` | string | `"build"` | Output directory, relative to the manifest. Must not leave the package. Refused in a workspace member, which uses `workspace.output-dir`. |
 | `targets` | array of strings | `["host"]` | Targets that `build` and `check` cover when no `--target` is given. Each is `"host"` or a target name. |
 | `profile` | string | none | Default named profile, used when no `--target`, `--profile` or `--profile-input` is given. Must name a `[profiles.<name>]` table. |
+| `tools` | array of strings | `[]` | Dependencies, by name, whose `build.silk` tool steps may run. Read from the root manifest only. See Build plans and generated code. |
+| `unsandboxed-tools` | boolean | `false` | Run tool steps on a host with no sandbox, with a warning each build. Read from the root manifest only. |
 
 ## &#91;config\]
 
@@ -76,6 +78,22 @@ An integer, a boolean, a string or an array of them is a value. Every build rece
 | `link` | array of tables | none | Extra objects, archives and libraries for the native link. |
 | `platform-supply` | table | automatic | An explicit SDK or sysroot for the native link. |
 | `function-order` | string | none | A text file of symbol names, one per line, that a Linux or macOS executable places first, in that order. A relative path below the manifest's directory. |
+| `sources` | array of tables | none | C, Objective-C and C++ files the build compiles with Clang, each `{ c = ... }`, `{ objc = ... }`, `{ cpp = ... }` or `{ objcpp = ... }` with optional `include`, `flags` and `os`. |
+| `archive.<name>` | table | none | A prebuilt archive pinned by `url` and `sha256` (optional `strip`, or per target under `targets.<target>`). `<name>:<path>` in `link` and `sources` names a file inside it. |
+| `override.<name>` | table | none | `path = "<directory>"` replaces archive `<name>` with a local directory. Read from the root manifest only. |
+
+Every `link` and `sources` entry takes an optional `os`: `"macos"`, `"linux"`, `"windows"`, `"wasi"` or a list of them. Build outputs and native linking covers all of these keys.
+
+## &#91;&#91;generate\]\]
+
+Generators that `silk generate` runs. Builds never run them; their outputs are committed.
+
+| Key | Value | Meaning |
+| --- | --- | --- |
+| `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the manifest's directory; a bare name is searched on `PATH`. |
+| `outputs` | array of strings | The files it writes, below the manifest's directory. A `*` in the last segment matches any run of bytes. |
+
+A workspace manifest can declare generators too. See Build plans and generated code.
 
 ## &#91;component\]
 
@@ -280,10 +298,10 @@ LINE is the line of the key, or of the table header when the problem is the tabl
 
 ## Keys that are not checked
 
-Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `[native]`, `platform-supply` and its `support` entries, `[component]`, `[unstable]`, `composition` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `descripton` key stops the build, with `did you mean package?` or `did you mean package.description?`.
+Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `[native]` with its `sources`, `archive` and `override` entries, `platform-supply` and its `support` entries, `[[generate]]` entries, `[component]`, `[unstable]`, `composition` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `descripton` key stops the build, with `did you mean package?` or `did you mean package.description?`.
 
 Two tables are not checked: `[release]`, which builds ignore and `silk change` reads, and `[tool.<name>]`, which belongs to other tools.
 
 ## See also
 
-Dependencies, Libraries and exports, Workspaces, Targets and profiles, Build outputs and native linking; **Package parameters** in the reference; chapters 11 and 12 of the book.
+Dependencies, Libraries and exports, Workspaces, Targets and profiles, Build outputs and native linking, Build plans and generated code; **Package parameters** in the reference; chapters 11 and 12 of the book.
