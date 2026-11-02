@@ -12,7 +12,7 @@ describe('releases page', () => {
     scene(
       { update, view },
       given(testModel(AppRoute.Releases())),
-      expect(role('heading', { name: 'Download Silk' })).toExist(),
+      expect(role('heading', { name: 'Download Silk.' })).toExist(),
       expect(role('heading', { name: '0.1.0-dev.2' })).toExist(),
       expect(role('heading', { name: '0.1.0-dev.1' })).toExist(),
       expect(text('Latest')).toExist(),

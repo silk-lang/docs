@@ -3,6 +3,7 @@ import { type Html, type HtmlBuilder } from 'foldkit/html'
 
 import * as Code from '../code'
 import { type CopiedCodeIds, copyButtonFor } from '../copy'
+import * as Icon from '../icon'
 import * as Layout from '../layout'
 import { type Message } from '../message'
 import { releases } from '../releases/data'
@@ -42,8 +43,19 @@ const note = (
   h: HtmlBuilder<Message>,
 ): Html =>
   h.div(
-    [h.Class('flex min-w-0 flex-col gap-2.5 border-t border-ink pt-4')],
-    [label(title, h), h.p([h.Class('text-sm leading-snug')], [body]), extra],
+    [
+      h.Class(
+        'flex min-w-0 flex-col gap-3 border-t-2 border-ink bg-panel p-5 md:p-6',
+      ),
+    ],
+    [
+      h.p([h.Class('label text-signal')], [title]),
+      h.p(
+        [h.Class('text-[0.9375rem] leading-[1.55] text-body md:text-base')],
+        [body],
+      ),
+      extra,
+    ],
   )
 
 const publicKey = (
@@ -54,12 +66,12 @@ const publicKey = (
   return h.div(
     [
       h.Class(
-        'flex items-center justify-between gap-3 rounded-xl bg-code py-1.5 pr-1.5 pl-3.5',
+        'flex items-center justify-between gap-3 rounded border border-rule bg-paper py-1.5 pr-1.5 pl-3',
       ),
     ],
     [
       h.code(
-        [h.Class('min-w-0 text-xs break-all text-code-plain')],
+        [h.Class('min-w-0 text-[0.6875rem] break-all text-ink')],
         [MINISIGN_PUBLIC_KEY],
       ),
       Code.copyButton(copy, h),
@@ -69,22 +81,26 @@ const publicKey = (
 
 const header = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
   h.div(
-    [h.Class('flex flex-col gap-10 px-5 pt-12 md:px-20')],
+    [h.Class('flex flex-col gap-12 pt-12 md:gap-14 md:pt-24')],
     [
       h.div(
-        [h.Class('flex flex-col items-start gap-5')],
+        [h.Class('flex max-w-[54rem] flex-col gap-5 md:gap-6')],
         [
-          badge('Releases', h),
+          label('Releases', h),
           h.h1(
             [
               h.Class(
-                'text-4xl leading-none font-bold tracking-tighter md:text-6xl',
+                'text-[3.25rem] leading-none font-extrabold tracking-display md:text-[7rem] md:leading-[0.93]',
               ),
             ],
-            ['Download Silk'],
+            ['Download Silk', h.span([h.Class('text-signal')], ['.'])],
           ),
           h.p(
-            [h.Class('max-w-[38.75rem] text-lg leading-prose text-muted')],
+            [
+              h.Class(
+                'max-w-[40rem] text-[1.0625rem] leading-[1.6] text-body md:text-xl',
+              ),
+            ],
             [
               'Prebuilt toolchains for macOS, Linux and Windows, newest first. Silk is in alpha, so expect APIs to move between versions.',
             ],
@@ -92,15 +108,11 @@ const header = (copiedCodeIds: CopiedCodeIds, h: HtmlBuilder<Message>): Html =>
         ],
       ),
       h.div(
-        [
-          h.Class(
-            'grid gap-8 md:grid-cols-2 xl:grid-cols-[18.75rem_18.75rem_minmax(0,38.5rem)]',
-          ),
-        ],
+        [h.Class('grid gap-3 md:grid-cols-3 md:gap-6')],
         [
           note(
             'Install',
-            'Prefer an installer or a package manager? The install guide covers the install scripts for macOS, Linux and Windows, Homebrew, Scoop and mise.',
+            'Prefer an installer or a package manager? The install guide covers the install scripts for macOS, Linux and Windows, Scoop and mise.',
             textLink(
               'Install guide',
               docPageRouter({ directory: 'get-started', slug: 'install' }),
@@ -132,7 +144,10 @@ const headerCell = (
   className: string,
   h: HtmlBuilder<Message>,
 ): Html =>
-  h.th([h.Scope('col'), h.Class(`label pb-3 text-muted ${className}`)], [text])
+  h.th(
+    [h.Scope('col'), h.Class(`label py-3 font-medium text-muted ${className}`)],
+    [text],
+  )
 
 const downloadRow = (
   download: Download,
@@ -141,18 +156,42 @@ const downloadRow = (
 ): Html =>
   h.keyed('tr')(
     download.target,
-    [h.Class('border-b border-rule')],
     [
-      h.td([h.Class('py-3.5 pr-4')], [isFirstOfOs ? download.os : '']),
-      h.td([h.Class('py-3.5 pr-4 text-muted')], [download.arch]),
+      h.Class(
+        'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b border-rule py-4 md:table-row md:py-0',
+      ),
+    ],
+    [
       h.td(
-        [h.Class('py-3.5 pr-4')],
+        [h.Class('text-[1.0625rem] font-semibold md:py-4 md:pr-4')],
+        [
+          h.span([h.Class(isFirstOfOs ? '' : 'md:invisible')], [download.os]),
+          h.span(
+            [
+              h.Class(
+                'pl-2.5 font-mono text-xs font-normal text-muted md:hidden',
+              ),
+            ],
+            [download.arch],
+          ),
+        ],
+      ),
+      h.td(
+        [
+          h.Class(
+            'hidden font-mono text-sm text-body md:table-cell md:py-4 md:pr-4',
+          ),
+        ],
+        [download.arch],
+      ),
+      h.td(
+        [h.Class('col-span-2 row-start-2 min-w-0 md:py-4 md:pr-4')],
         [
           h.a(
             [
               h.Href(download.url),
               h.Class(
-                'font-bold break-all hover:underline hover:underline-offset-4',
+                'font-mono text-[0.6875rem] break-all text-body hover:text-ink hover:underline md:text-[0.8125rem]',
               ),
             ],
             [download.fileName],
@@ -160,7 +199,11 @@ const downloadRow = (
         ],
       ),
       h.td(
-        [h.Class('py-3.5 pr-4 text-muted')],
+        [
+          h.Class(
+            'row-start-3 font-mono text-xs text-muted md:py-4 md:pr-4 md:text-[0.8125rem]',
+          ),
+        ],
         [
           download.signatureUrl === null
             ? '-'
@@ -175,8 +218,27 @@ const downloadRow = (
         ],
       ),
       h.td(
-        [h.Class('py-3.5 text-right whitespace-nowrap text-muted')],
+        [
+          h.Class(
+            'col-start-2 row-start-1 text-right font-mono text-xs whitespace-nowrap text-body md:py-4 md:pr-6 md:text-[0.8125rem]',
+          ),
+        ],
         [mebibytes(download.size)],
+      ),
+      h.td(
+        [h.Class('col-start-2 row-start-3 text-right md:py-3')],
+        [
+          h.a(
+            [
+              h.Href(download.url),
+              h.AriaLabel(`Download ${download.fileName}`),
+              h.Class(
+                'inline-flex items-center gap-1.5 rounded bg-ink px-3.5 py-2 text-sm font-semibold whitespace-nowrap text-paper hover:opacity-85',
+              ),
+            ],
+            ['Download', Icon.arrowDown('size-3.5', h)],
+          ),
+        ],
       ),
     ],
   )
@@ -185,41 +247,40 @@ const downloadTable = (
   downloads: ReadonlyArray<Download>,
   h: HtmlBuilder<Message>,
 ): Html =>
-  h.div(
-    [h.Class('min-w-0 flex-1 overflow-x-auto lg:max-w-[58.5rem] lg:pt-2.5')],
+  h.table(
+    [h.Class('block w-full border-collapse text-left md:table')],
     [
-      h.table(
-        [h.Class('w-full min-w-[40rem] border-collapse text-left text-sm')],
+      h.thead(
+        [h.Class('hidden border-b border-rule md:table-header-group')],
         [
-          h.thead(
-            [h.Class('border-b border-ink')],
+          h.tr(
+            [],
             [
-              h.tr(
-                [],
-                [
-                  headerCell('OS', 'w-[7.5rem]', h),
-                  headerCell('Arch', 'w-[7.5rem]', h),
-                  headerCell('Filename', '', h),
-                  headerCell('Signature', 'w-[7.5rem]', h),
-                  headerCell('Size', 'w-[6rem] text-right', h),
-                ],
+              headerCell('OS', 'w-40', h),
+              headerCell('Arch', 'w-32', h),
+              headerCell('Filename', '', h),
+              headerCell('Signature', 'w-32', h),
+              headerCell('Size', 'w-28 pr-6 text-right', h),
+              h.th(
+                [h.Scope('col'), h.Class('w-36')],
+                [h.span([h.Class('sr-only')], ['Download'])],
               ),
             ],
           ),
-          h.tbody(
-            [],
-            Array.map(downloads, (download, index) =>
-              downloadRow(
-                download,
-                !Option.exists(
-                  Array.get(downloads, index - 1),
-                  previous => previous.os === download.os,
-                ),
-                h,
-              ),
-            ),
-          ),
         ],
+      ),
+      h.tbody(
+        [h.Class('block border-t border-rule md:table-row-group md:border-0')],
+        Array.map(downloads, (download, index) =>
+          downloadRow(
+            download,
+            !Option.exists(
+              Array.get(downloads, index - 1),
+              previous => previous.os === download.os,
+            ),
+            h,
+          ),
+        ),
       ),
     ],
   )
@@ -233,32 +294,60 @@ const releaseMeta = (
 ): Html => {
   const { name, build } = splitVersion(release.version)
   return h.div(
-    [h.Class('flex shrink-0 flex-col gap-3.5 lg:w-[17.5rem]')],
     [
-      h.h2(
+      h.Class(
+        'flex flex-col gap-4 md:flex-row md:items-end md:justify-between md:gap-10',
+      ),
+    ],
+    [
+      h.div(
+        [h.Class('flex flex-col gap-3.5')],
         [
-          h.Class(
-            'text-3xl leading-tight font-bold tracking-tighter break-all md:text-4xl',
+          h.div(
+            [h.Class('flex flex-wrap items-center gap-2.5')],
+            [
+              isLatest ? badge('Latest', h) : h.empty,
+              release.isPrerelease ? tag('dev build', h) : h.empty,
+              h.time(
+                [
+                  h.Datetime(release.publishedAt),
+                  h.Class('font-mono text-xs text-muted md:text-[0.8125rem]'),
+                ],
+                [release.publishedAt.slice(0, 10)],
+              ),
+            ],
+          ),
+          h.div(
+            [
+              h.Class(
+                'flex flex-col gap-1 md:flex-row md:items-baseline md:gap-3',
+              ),
+            ],
+            [
+              h.h2(
+                [
+                  h.Class(
+                    'text-[2.25rem] leading-tight font-extrabold tracking-tighter break-all md:text-5xl',
+                  ),
+                ],
+                [name],
+              ),
+              build === ''
+                ? h.empty
+                : h.p(
+                    [
+                      h.Class(
+                        'font-mono text-[0.8125rem] break-all text-muted md:text-lg',
+                      ),
+                    ],
+                    [build],
+                  ),
+            ],
           ),
         ],
-        [name],
-      ),
-      build === ''
-        ? h.empty
-        : h.p([h.Class('text-xs break-all text-muted')], [build]),
-      h.div(
-        [h.Class('flex flex-wrap items-center gap-2.5')],
-        [
-          isLatest ? badge('Latest', h) : h.empty,
-          release.isPrerelease ? tag('dev build', h) : h.empty,
-          h.time(
-            [h.Datetime(release.publishedAt), h.Class('label text-muted')],
-            [release.publishedAt.slice(0, 10)],
-          ),
-        ],
       ),
       h.div(
-        [h.Class('flex flex-col gap-2.5 pt-1.5')],
+        [h.Class('flex flex-wrap gap-x-7 gap-y-2 md:pb-1.5')],
         [
           textLink('Release notes', release.notesUrl, h),
           ...(isLatest
@@ -290,7 +379,9 @@ const releaseSection = (
     release.tag,
     [
       h.AriaLabel(`Silk ${release.version}`),
-      h.Class('flex flex-col gap-6 px-5 pt-8 md:px-20 lg:flex-row lg:gap-16'),
+      h.Class(
+        'flex flex-col gap-6 border-t-2 border-ink pt-7 pb-10 md:pt-10 md:pb-12',
+      ),
     ],
     [releaseMeta(release, isLatest, h), downloadTable(release.downloads, h)],
   )
@@ -298,16 +389,19 @@ const releaseSection = (
 const releaseList = (h: HtmlBuilder<Message>): Html =>
   Array.match(Array.take(releases, SHOWN_RELEASES), {
     onEmpty: () =>
-      h.p(
-        [h.Class('px-5 pt-8 text-muted md:px-20')],
-        ['No releases are published yet.'],
-      ),
+      h.p([h.Class('text-muted')], ['No releases are published yet.']),
     onNonEmpty: shown =>
       h.div(
-        [h.Class('flex flex-col gap-14')],
-        Array.map(shown, (release, index) =>
-          releaseSection(release, index === 0, h),
-        ),
+        [h.Class('flex flex-col')],
+        [
+          h.p(
+            [h.Class('label pb-5 text-muted')],
+            ['All releases · newest first'],
+          ),
+          ...Array.map(shown, (release, index) =>
+            releaseSection(release, index === 0, h),
+          ),
+        ],
       ),
   })
 
@@ -319,18 +413,24 @@ export const view = (
     'Releases',
     [
       h.div(
-        [h.Class('mx-auto flex max-w-[90rem] flex-col gap-14 pb-16')],
+        [
+          h.Class(
+            'mx-auto flex max-w-[90rem] flex-col gap-14 px-5 pb-20 md:gap-20 md:px-16 md:pb-28',
+          ),
+        ],
         [
           header(copiedCodeIds, h),
           releaseList(h),
           h.p(
-            [h.Class('px-5 text-sm text-muted md:px-20')],
+            [h.Class('text-sm text-muted')],
             [
               'Older builds, the bare compiler and build receipts are on ',
               h.a(
                 [
                   h.Href(RELEASES_URL),
-                  h.Class('font-bold text-ink underline underline-offset-4'),
+                  h.Class(
+                    'font-semibold text-ink underline underline-offset-4',
+                  ),
                 ],
                 ['GitHub'],
               ),

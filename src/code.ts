@@ -68,7 +68,7 @@ export const copyButton = <Message>(
       h.OnClick(onCopy),
       h.AriaLabel(isCopied ? 'Copied' : 'Copy code'),
       h.Class(
-        'label flex cursor-pointer items-center gap-1.5 rounded-md border border-code-divider px-2 py-1 text-code-label hover:text-code-plain',
+        'label flex cursor-pointer items-center gap-1.5 rounded border border-code-divider px-2 py-1 text-[0.6875rem] text-code-label hover:text-code-plain',
       ),
     ],
     [Icon.copy('size-3', h), isCopied ? 'Copied' : 'Copy'],
@@ -105,7 +105,7 @@ export const codeBlock = <Message>(
   h.figure(
     [
       h.Class(
-        `flex min-w-0 flex-col overflow-hidden rounded-2xl bg-code text-code-plain ${className ?? ''}`,
+        `flex min-w-0 flex-col overflow-hidden rounded-md bg-code text-code-plain ${className ?? ''}`,
       ),
     ],
     [
@@ -129,7 +129,11 @@ export const codeBlock = <Message>(
         ],
       ),
       h.pre(
-        [h.Class('flex gap-5 overflow-x-auto p-5 text-sm leading-prose')],
+        [
+          h.Class(
+            'flex gap-5 overflow-x-auto p-5 text-[0.8125rem] leading-[1.8]',
+          ),
+        ],
         [
           lineNumbers === true ? lineNumbersView(code, h) : h.empty,
           h.code([h.Class('min-w-0')], highlighted(code, lang, h)),
@@ -145,7 +149,7 @@ export const inlineSnippet = <Message>(
   h.code(
     [
       h.Class(
-        'block overflow-x-auto rounded-xl bg-code px-3.5 py-2.5 text-xs leading-[1.375] whitespace-pre text-code-plain',
+        'block overflow-x-auto rounded bg-code px-3.5 py-2.5 text-xs leading-[1.375] whitespace-pre text-code-plain',
       ),
     ],
     highlighted(code, 'silk', h),

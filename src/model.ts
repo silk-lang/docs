@@ -3,6 +3,7 @@ import { defineTaggedUnion } from 'foldkit/schema'
 
 import * as Markdown from '@foldkit/markdown'
 
+import { DemoTopic, InstallMethod } from './landing'
 import { AppRoute } from './route'
 import * as Search from './search'
 
@@ -26,6 +27,8 @@ export const Model = Schema.Struct({
   documents: Schema.HashMap(Schema.String, Markdown.MarkdownDocument),
   requestedDocumentKeys: Schema.HashSet(Schema.String),
   search: Search.Model,
+  installMethod: InstallMethod,
+  demoTopic: DemoTopic,
 })
 export type Model = typeof Model.Type
 

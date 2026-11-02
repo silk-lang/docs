@@ -24,17 +24,43 @@ describe('landing page', () => {
       { update, view },
       given(homeModel),
       expect(role('heading', { level: 1 })).toHaveText(
-        'Built for the waysoftware is written today.',
+        'Built for the way software is written today.',
       ),
       expect(role('link', { name: 'Take the tour' })).toExist(),
       expect(role('link', { name: 'Install' })).toExist(),
-      expect(text('Swap the provider,')).toExist(),
+      expect(text('One program, annotated.')).toExist(),
       expect(
         text('silk-lang/silk/main/install.sh', { exact: false }),
       ).toExist(),
+    )
+  })
+
+  test('the install tabs switch the command', () => {
+    scene(
+      { update, view },
+      given(homeModel),
+      expect(role('tab', { name: 'macOS · Linux', selected: true })).toExist(),
+      click(role('tab', { name: 'Windows' })),
+      expect(role('tab', { name: 'Windows', selected: true })).toExist(),
       expect(
         text('silk-lang/silk/main/install.ps1', { exact: false }),
       ).toExist(),
+      expect(
+        text('silk-lang/silk/main/install.sh', { exact: false }),
+      ).not.toExist(),
+    )
+  })
+
+  test('the example tabs switch the example', () => {
+    scene(
+      { update, view },
+      given(homeModel),
+      expect(role('heading', { name: 'Fiber.forkChild' })).toExist(),
+      click(role('tab', { name: 'Borrow checker' })),
+      expect(role('heading', { name: 'Conflicting loans' })).toExist(),
+      expect(text('error[OWN0010]')).toExist(),
+      click(role('tab', { name: 'Memory' })),
+      expect(role('heading', { name: 'Arena' })).toExist(),
     )
   })
 

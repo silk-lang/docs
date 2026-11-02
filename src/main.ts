@@ -22,6 +22,7 @@ import {
 import * as Catalog from './docs/catalog'
 import * as Content from './docs/content'
 import * as DocsMarkdown from './docs/markdown'
+import { DemoTopic, InstallMethod } from './landing'
 import * as Layout from './layout'
 import { Message } from './message'
 import { DocState, Flags, Model } from './model'
@@ -112,6 +113,8 @@ export const init: Runtime.RoutingApplicationInit<
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
     search: Search.init().model,
+    installMethod: InstallMethod.Unix(),
+    demoTopic: DemoTopic.Fibers(),
   }
 
   return Option.match(maybePage, {
@@ -439,6 +442,12 @@ export const update = (model: Model, message: Message) =>
         maybeActiveSection: () => Option.some(sectionId),
       }),
     }),
+    SelectedInstallMethod: ({ method }) => ({
+      model: modifyFields(model, { installMethod: () => method }),
+    }),
+    SelectedDemoTopic: ({ topic }) => ({
+      model: modifyFields(model, { demoTopic: () => topic }),
+    }),
   })
 
 // SUBSCRIPTION
@@ -627,7 +636,7 @@ const notFound = (h: HtmlBuilder<Message>): Html =>
 
 const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
   AppRoute.match(model.route, {
-    Home: () => Home.view(model.copiedCodeIds, h),
+    Home: () => Home.view(model, h),
     Docs: () => DocsPage.indexView(model, h),
     DocPage: ({ directory, slug }) =>
       Option.match(Catalog.findPage(directory, slug), {

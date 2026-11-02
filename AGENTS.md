@@ -10,10 +10,10 @@ subtree_prompted: true
 
 ## Project Notes
 
-This is the Silk website: landing page, docs and releases, built from the Elyx design for Silk.
+This is the Silk website: landing page, docs and releases, built from the Paper design for Silk.
 
 - Statically generated (`ssr.build.prerender` in `vite.config.ts`). Every route that should exist as a page has to be listed in `prerenderPaths` in `src/entry.server.ts`.
-- Styling is Tailwind v4. Design tokens (colors, Space Mono, label style) live in `src/styles.css` and follow the design's light and dark token sets through `prefers-color-scheme`. Use the token classes (`bg-paper`, `text-ink`, `text-muted`, `border-rule`, `text-signal`, `bg-code`, `label`) instead of raw colors.
+- Styling is Tailwind v4. Design tokens live in `src/styles.css` and follow light and dark token sets through `prefers-color-scheme`. Type is Inter Tight (sans) and JetBrains Mono (mono), self-hosted through `@fontsource-variable`. The single accent is `--silk-signal`; change it there to recolor the site. Use the token classes (`bg-paper`, `bg-panel`, `text-ink`, `text-body`, `text-muted`, `border-rule`, `text-signal`, `bg-signal`, `text-on-signal`, `bg-code`, `label`) instead of raw colors. `band` makes a dark section and `signal-band` an accent one; everything inside reads the swapped tokens.
 - Icons from the design are inline SVG in `src/icon.ts` and draw with `currentColor`.
 - The devlog pages in the design are intentionally not built yet. Do not add a devlog route or link until its hosting is decided.
 - The Foldkit subtree is not vendored here to keep the repository small. For reference, clone `https://github.com/foldkit/foldkit` at the tag matching the installed `foldkit` version into a scratch directory instead.

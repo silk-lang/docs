@@ -1,5 +1,6 @@
 import { HashMap, HashSet, Option } from 'effect'
 
+import { DemoTopic, InstallMethod } from './landing'
 import { DocState, Model } from './model'
 import { type AppRoute } from './route'
 import * as Search from './search'
@@ -15,4 +16,6 @@ export const testModel = (route: AppRoute): Model =>
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
     search: Search.init().model,
+    installMethod: InstallMethod.Unix(),
+    demoTopic: DemoTopic.Fibers(),
   })
