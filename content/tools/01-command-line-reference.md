@@ -15,6 +15,7 @@ Every `silk` command, its options and its exit status. `silk` is the tool you ty
 | `silk debug [args]` | Build the host executable and start it under a debugger |
 | `silk test` | Build the test runner and run the tests |
 | `silk clean` | Delete the build output directory |
+| `silk generate` | Run the package's generators, or check their committed output |
 | `silk format [paths]` | Rewrite source files in the standard layout |
 | `silk lsp` | Run the language server for an editor |
 | `silk doc` | Write the package's documentation as JSON |
@@ -237,6 +238,16 @@ silk clean [--manifest-path <path>]
 ```
 
 Deletes the build output directory and prints `Removed /home/you/hello/build`. At a workspace root it deletes the shared output directory. When there is nothing to remove, it prints `Nothing to clean: /home/you/hello/build does not exist` and still exits 0.
+
+## generate
+
+```
+silk generate [--check] [--manifest-path <path>]
+```
+
+Runs the `[[generate]]` entries of the located manifest in order, then, at a workspace root, each member's. Each command runs in its manifest's directory with your environment plus `SILK_GENERATE=1`. It prints `Created`, `Updated` or `Removed` for each output that changed, then a summary, as in `Ran 1 generator: 1 changed, 0 unchanged`. An output written with the same bytes keeps its file and modification time.
+
+`--check` leaves the tree as it was and exits 1 naming each output that is stale, would be created or would be removed, ending with `` silk: generated output is stale; run `silk generate` and commit the result ``. A generator that fails, or does not write an output declared without a `*`, leaves every output as it was and exits 1. A manifest it cannot use exits 2. See **Build plans and generated code** in Projects and packages.
 
 ## format
 
@@ -471,6 +482,8 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
 | `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
+| `SILK_OFFLINE` | Set, a build that needs a `[native.archive.<name>]` archive it has not fetched fails instead of downloading it |
+| `SILK_NO_TOOL_SANDBOX` | Set, the host behaves as one with no sandbox for `build.silk` tool steps, so they are refused unless `[build].unsandboxed-tools = true` |
 | `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and profiles** |
 | `SILK_PROFILE_USE` | A merged `.profdata` file: native builds pass `-fprofile-use=<file>` to Clang |
 | `SILK_WASMTIME` | The `wasmtime` that `silk run`, `silk debug` and `silk test` use on a WASI target; default `wasmtime` on `PATH` |
@@ -480,7 +493,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_WASI_ADAPTER` | The Preview 1 command adapter, `wasi_snapshot_preview1.command.wasm`, that a `wasm32-wasip2` executable needs |
 | `SILK_WASI_REACTOR_ADAPTER` | The Preview 1 reactor adapter, for a `wasm32-wasip2` component without a `main` |
 | `SSL_CERT_FILE` | The certificate bundle for `silk change since` and `silk use` when they fetch releases over HTTPS |
-| `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path. For the compiler: git dependencies are checked out in `$SILK_HOME/git`, or `$HOME/.silk/git` when it is unset |
+| `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path. For the compiler: git dependencies are checked out in `$SILK_HOME/git`, or `$HOME/.silk/git` when it is unset, pinned native archives are kept in `$SILK_HOME/archives`, and `$SILK_HOME/native-overrides.toml` overrides archives for the machine |
 | `SILK_TOOLCHAIN` | For the tool: the version to run, overriding the project's pin. The tool sets it to the full version it runs |
 | `SILK_AUTO_INSTALL` | For the tool: `1` installs a missing selected version before running the command |
 | `SILK_TOOLCHAIN_MIRROR` | For the tool: an absolute directory of release assets to install from instead of GitHub |

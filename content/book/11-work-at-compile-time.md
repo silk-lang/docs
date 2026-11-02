@@ -12,7 +12,7 @@ Silk takes that idea much further. Ordinary-looking Silk code can run inside the
 - **`static if`** keeps one branch and throws the other away before type checking.
 - **Reflection** lets a `static for` loop walk a struct's fields.
 
-Everything static is deterministic. The static phase has no I/O and no effects, so the same inputs always give the same program. See **Static evaluation** in the reference for exactly what may run there.
+Everything static is deterministic. The static phase has no effects and no I/O, except reading the package's own files through `silk.build.source`, so the same inputs always give the same program. **Build plans and generated code** in Projects and packages shows that module and the package's `build.silk`. See **Static evaluation** in the reference for exactly what may run there.
 
 ## Package parameters
 
