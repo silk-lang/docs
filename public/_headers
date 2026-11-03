@@ -1,3 +1,12 @@
+# Every page is cross-origin isolated, so the playground's language server can
+# block on shared memory (src/playground/channel.ts). The site loads nothing
+# from other origins. It is every page and not only /playground because the
+# site navigates between pages without reloading, and isolation is set when a
+# document loads.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
 # Vite puts a content hash in every file name under /assets, so a cached copy
 # never goes stale. Everything else keeps Cloudflare's default revalidation.
 /assets/*

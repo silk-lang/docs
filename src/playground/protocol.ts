@@ -6,10 +6,14 @@ export type Target = 'wasm32-wasip1' | 'wasm32-unknown-unknown'
 
 export type Toolchain = Readonly<{ compilerUrl: string; stdlibUrl: string }>
 
+// One file of the program, by its name under the package directory.
+export type ProgramFile = Readonly<{ name: string; source: string }>
+
 export type RunRequest = Readonly<{
   id: number
   toolchain: Toolchain
-  source: string
+  // The program's files; the compiler builds `main.silk`.
+  files: ReadonlyArray<ProgramFile>
   target: Target
 }>
 

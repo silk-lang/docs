@@ -4,12 +4,12 @@
 // page; without one, `startLanguageServer` answers undefined.
 
 import { makeShared, makeWriter } from './channel'
-import { type LanguageResponse, WORK_ROOT, WORK_URI } from './language-protocol'
-import { type Toolchain } from './protocol'
+import { type LanguageResponse, WORK_ROOT, fileUri } from './language-protocol'
+import { type ProgramFile, type Toolchain } from './protocol'
 
-export { WORK_URI }
+export { fileUri }
 
-type Json =
+export type Json =
   | null
   | boolean
   | number
@@ -64,7 +64,7 @@ const concat = (left: Uint8Array, right: Uint8Array): Uint8Array => {
 
 export const startLanguageServer = (
   toolchain: Toolchain,
-  source: string,
+  files: ReadonlyArray<ProgramFile>,
 ): LanguageServer | undefined => {
   if (!globalThis.crossOriginIsolated) {
     return undefined
@@ -166,7 +166,7 @@ export const startLanguageServer = (
   worker.addEventListener('error', event => {
     end(event.message || 'The language server worker stopped.')
   })
-  worker.postMessage({ toolchain, input: shared, source })
+  worker.postMessage({ toolchain, input: shared, files })
 
   const request = (method: string, params: Json): Promise<Json> =>
     new Promise((resolve, reject) => {

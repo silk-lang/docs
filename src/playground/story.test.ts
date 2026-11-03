@@ -1,8 +1,9 @@
 import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
+import { ShowFile } from './editor'
 import { Message } from './message'
-import { HELLO, RunOutcome, RunState } from './model'
+import { BUILT_IN, MAIN_FILE, RunOutcome, RunState, fromArchive } from './model'
 import {
   LoadExamples,
   RunProgram,
@@ -34,20 +35,21 @@ describe('playground', () => {
       given(entered.model),
       message(Message.SucceededLoadExamples({ examples: [sieve] })),
       model(model => {
-        expect(model.examples).toEqual([HELLO, sieve])
+        expect(model.examples).toEqual([...BUILT_IN, fromArchive(sieve)])
         expect(model.examplesState).toBe('Loaded')
       }),
     )
   })
 
-  test('choosing an example replaces the source and target', () => {
+  test('choosing an example replaces the files and target', () => {
     story(
       update,
       given(initModel),
       message(Message.SucceededLoadExamples({ examples: [sieve] })),
       message(Message.SelectedExample({ id: sieve.id })),
       model(model => {
-        expect(model.source).toBe(sieve.source)
+        expect(model.files).toEqual([{ name: MAIN_FILE, source: sieve.source }])
+        expect(model.activeFile).toBe(MAIN_FILE)
         expect(model.exampleId).toBe(sieve.id)
       }),
     )
@@ -81,6 +83,31 @@ describe('playground', () => {
           }),
         )
       }),
+    )
+  })
+
+  test('editing a file keeps the others, and a tab shows its file', () => {
+    const modules = BUILT_IN[1]!
+    story(
+      update,
+      given(initModel),
+      message(Message.SelectedExample({ id: modules.id })),
+      message(
+        Message.ChangedSource({ name: 'shapes.silk', source: '// edited\n' }),
+      ),
+      model(model => {
+        expect(model.files.map(file => file.name)).toEqual([
+          MAIN_FILE,
+          'shapes.silk',
+        ])
+        expect(model.files[0]).toEqual(modules.files[0])
+        expect(model.files[1]?.source).toBe('// edited\n')
+      }),
+      message(Message.SelectedFile({ name: 'shapes.silk' })),
+      model(model => {
+        expect(model.activeFile).toBe('shapes.silk')
+      }),
+      Command.resolve(ShowFile, Message.CompletedShowFile()),
     )
   })
 
