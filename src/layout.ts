@@ -5,7 +5,6 @@ import { Message } from './message'
 import {
   docsRouter,
   homeRouter,
-  playgroundRouter,
   releasesRouter,
 } from './route'
 import * as Search from './search'
@@ -90,12 +89,6 @@ export const siteNav = (current: NavSection, h: HtmlBuilder<Message>): Html =>
             [
               searchButton(h),
               navLink('Docs', docsRouter(), current === 'Docs', h),
-              navLink(
-                'Playground',
-                playgroundRouter(),
-                current === 'Playground',
-                h,
-              ),
               navLink('Releases', releasesRouter(), current === 'Releases', h),
               h.a(
                 [
@@ -147,7 +140,6 @@ export const siteFooter = <Message>(h: HtmlBuilder<Message>): Html =>
             ],
             [
               footerLink('Docs', docsRouter(), h),
-              footerLink('Playground', playgroundRouter(), h),
               footerLink('Releases', releasesRouter(), h),
               footerLink('GitHub', GITHUB_URL, h),
             ],
