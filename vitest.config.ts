@@ -8,7 +8,11 @@ import { islandAttributes } from './src/docs/islands.ts'
 export default defineConfig({
   plugins: [markdown({ islands: islandAttributes }), searchIndex()],
   resolve: {
-    alias: { 'virtual:silk-releases': '/src/releases/fixture.ts' },
+    alias: {
+      'virtual:silk-releases': '/src/releases/fixture.ts',
+      'virtual:silk-playground-examples': '/src/playground/fixture-examples.ts',
+      'virtual:silk-playground': '/src/playground/fixture.ts',
+    },
   },
   test: {
     include: ['src/**/*.{test,spec}.ts'],

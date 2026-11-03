@@ -28,6 +28,7 @@ import { DocState, Flags, Model } from './model'
 import * as DocsPage from './page/docs'
 import * as Home from './page/home'
 import * as Releases from './page/releases'
+import * as Playground from './playground'
 import { AppRoute, homeRouter, urlToAppRoute } from './route'
 import * as Search from './search'
 
@@ -46,6 +47,7 @@ const routePath = (route: AppRoute): string =>
     Docs: () => '/docs',
     DocPage: page => Catalog.pagePath(page),
     Releases: () => '/releases',
+    Playground: () => '/playground',
     NotFound: ({ path }) => path,
   })
 
@@ -92,7 +94,7 @@ export const init: Runtime.RoutingApplicationInit<
   Model,
   Message,
   Flags,
-  Search.SearchIndexService
+  Search.SearchIndexService | Playground.PlaygroundService
 > = (flags, url) => {
   const route = urlToAppRoute(url)
   const maybePage = routePage(route)
@@ -112,10 +114,14 @@ export const init: Runtime.RoutingApplicationInit<
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
     search: Search.init().model,
+    playground: Playground.init().model,
   }
 
   return Option.match(maybePage, {
-    onNone: () => ({ model: baseModel }),
+    onNone: () =>
+      route._tag === 'Playground'
+        ? foldPlaygroundEnter(baseModel)
+        : { model: baseModel },
     onSome: page =>
       Option.match(maybeFlaggedDocument, {
         onSome: ({ key, document }) =>
@@ -202,7 +208,11 @@ export const LoadDocument = Command.define('LoadDocument', {
 
 // UPDATE
 
-type UpdateReturn = Update.Return<Model, Message, Search.SearchIndexService>
+type UpdateReturn = Update.Return<
+  Model,
+  Message,
+  Search.SearchIndexService | Playground.PlaygroundService
+>
 
 const readSearch = (model: Model): Option.Option<Search.Model> =>
   Option.some(model.search)
@@ -225,6 +235,31 @@ const foldSearchOpen = Update.foldChildStep({
   read: readSearch,
   write: writeSearch,
   toParentMessage: toGotSearchMessage,
+})
+
+const readPlayground = (model: Model): Option.Option<Playground.Model> =>
+  Option.some(model.playground)
+
+const writePlayground = (
+  model: Model,
+  nextPlayground: Playground.Model,
+): Model => modifyFields(model, { playground: () => nextPlayground })
+
+const toGotPlaygroundMessage = (message: Playground.Message): Message =>
+  Message.GotPlaygroundMessage({ message })
+
+const foldPlayground = Update.foldChild({
+  update: Playground.update,
+  read: readPlayground,
+  write: writePlayground,
+  toParentMessage: toGotPlaygroundMessage,
+})
+
+const foldPlaygroundEnter = Update.foldChildStep({
+  update: Playground.enter,
+  read: readPlayground,
+  write: writePlayground,
+  toParentMessage: toGotPlaygroundMessage,
 })
 
 const foldSearchRouteChanged = Update.foldChildStep({
@@ -319,10 +354,17 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
           ),
       })
     },
-    onNone: () => ({
-      model: nextModel,
-      commands: scrollCommands(url, isSamePath),
-    }),
+    onNone: () =>
+      Update.combine(nextModel, [
+        stepModel =>
+          nextRoute._tag === 'Playground'
+            ? foldPlaygroundEnter(stepModel)
+            : { model: stepModel },
+        stepModel => ({
+          model: stepModel,
+          commands: scrollCommands(url, isSamePath),
+        }),
+      ]),
   })
 }
 
@@ -434,6 +476,7 @@ export const update = (model: Model, message: Message) =>
     PressedSearchShortcut: () => foldSearchOpen(model),
     ClickedOpenSearch: () => foldSearchOpen(model),
     GotSearchMessage: ({ message }) => foldSearch(model, message),
+    GotPlaygroundMessage: ({ message }) => foldPlayground(model, message),
     ChangedActiveSection: ({ sectionId }) => ({
       model: modifyFields(model, {
         maybeActiveSection: () => Option.some(sectionId),
@@ -576,6 +619,7 @@ const routeTitle = (route: AppRoute): string =>
         onSome: page => `${page.title} | ${SITE_NAME} docs`,
       }),
     Releases: () => `Download Silk | ${SITE_NAME}`,
+    Playground: () => `Playground | ${SITE_NAME}`,
     NotFound: () => `Not found | ${SITE_NAME}`,
   })
 
@@ -635,6 +679,19 @@ const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
         onSome: page => DocsPage.pageView(model, page, h),
       }),
     Releases: () => Releases.view(model.copiedCodeIds, h),
+    Playground: () =>
+      Layout.page(
+        'Playground',
+        [
+          h.submodel({
+            slotId: 'playground',
+            model: model.playground,
+            view: Playground.view,
+            toParentMessage: toGotPlaygroundMessage,
+          }),
+        ],
+        h,
+      ),
     NotFound: () => notFound(h),
   })
 

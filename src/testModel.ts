@@ -1,6 +1,7 @@
 import { HashMap, HashSet, Option } from 'effect'
 
 import { DocState, Model } from './model'
+import * as Playground from './playground'
 import { type AppRoute } from './route'
 import * as Search from './search'
 
@@ -15,4 +16,5 @@ export const testModel = (route: AppRoute): Model =>
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
     search: Search.init().model,
+    playground: Playground.init().model,
   })
