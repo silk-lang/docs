@@ -1,12 +1,17 @@
 import { Context, Effect, Layer } from 'effect'
 
-import { type RunResponse, type Target, type Toolchain } from './protocol'
+import {
+  type ProgramFile,
+  type RunResponse,
+  type Target,
+  type Toolchain,
+} from './protocol'
 
 type PlaygroundApi = Readonly<{
-  // Compiles and runs `source` in the playground worker.
+  // Compiles and runs the program in `files` in the playground worker.
   run: (
     toolchain: Toolchain,
-    source: string,
+    files: ReadonlyArray<ProgramFile>,
     target: Target,
   ) => Effect.Effect<RunResponse>
   // Stops the running program, which then ends as `Stopped`. The next run
@@ -82,12 +87,12 @@ const makePlayground = (): PlaygroundApi => {
   }
 
   return {
-    run: (toolchain, source, target) =>
+    run: (toolchain, files, target) =>
       Effect.callback<RunResponse>(resume => {
         const id = state.nextId
         state.nextId += 1
         pending.set(id, response => resume(Effect.succeed(response)))
-        worker().postMessage({ id, toolchain, source, target })
+        worker().postMessage({ id, toolchain, files, target })
       }),
     stop: Effect.sync(() => {
       stopWorker()

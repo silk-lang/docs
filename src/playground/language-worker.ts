@@ -7,7 +7,6 @@ import { makeReader } from './channel'
 import {
   type LanguageRequest,
   type LanguageResponse,
-  WORK_FILE,
   WORK_MANIFEST,
   WORK_ROOT,
 } from './language-protocol'
@@ -27,8 +26,8 @@ const isRequest = (value: unknown): value is LanguageRequest =>
   value !== null &&
   'toolchain' in value &&
   'input' in value &&
-  'source' in value &&
-  typeof value.source === 'string'
+  'files' in value &&
+  Array.isArray(value.files)
 
 const serve = async (
   scope: WorkerScope,
@@ -38,7 +37,9 @@ const serve = async (
   const root = fork(toolchain.base)
   const encoder = new TextEncoder()
   writeFile(root, `${WORK_ROOT}/silk.toml`, encoder.encode(WORK_MANIFEST))
-  writeFile(root, WORK_FILE, encoder.encode(request.source))
+  request.files.forEach(file =>
+    writeFile(root, `${WORK_ROOT}/${file.name}`, encoder.encode(file.source)),
+  )
   const decoder = new TextDecoder()
   const wasi = makeWasi({
     args: ['silkc', 'lsp', '--stdlib', '/stdlib'],

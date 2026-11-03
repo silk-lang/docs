@@ -1,12 +1,18 @@
-import { Array, Option } from 'effect'
+import { Array } from 'effect'
 import { Submodel } from 'foldkit'
 import { type Html, type HtmlBuilder } from 'foldkit/html'
 import toolchain from 'virtual:silk-playground'
 
+import { EDITOR_ELEMENT_ID, MountEditor } from './editor'
 import { Message } from './message'
-import { type Model, type RunChunk, RunOutcome, RunState } from './model'
+import {
+  type Model,
+  type RunChunk,
+  RunOutcome,
+  RunState,
+  type SourceFile,
+} from './model'
 
-const EDITOR_ID = 'playground-source'
 const EXAMPLE_ID = 'playground-example'
 
 const label = (text: string, h: HtmlBuilder<Message>): Html =>
@@ -110,30 +116,58 @@ const toolbar = (model: Model, h: HtmlBuilder<Message>): Html =>
     ],
   )
 
+const fileTab = (
+  model: Model,
+  file: SourceFile,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.keyed('button')(
+    file.name,
+    [
+      h.Type('button'),
+      h.Role('tab'),
+      h.AriaSelected(file.name === model.activeFile),
+      h.OnClick(Message.SelectedFile({ name: file.name })),
+      h.Class(
+        file.name === model.activeFile
+          ? 'label cursor-pointer rounded-full bg-ink px-3 py-1 text-paper'
+          : 'label cursor-pointer rounded-full px-3 py-1 text-muted hover:text-ink',
+      ),
+    ],
+    [file.name],
+  )
+
 const editor = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex min-w-0 flex-col gap-2')],
     [
-      h.label([h.For(EDITOR_ID), h.Class('label text-muted')], ['main.silk']),
-      h.textarea([
-        h.Id(EDITOR_ID),
-        h.Value(model.source),
-        h.Spellcheck(false),
-        h.Wrap('off'),
-        h.Rows(24),
-        h.OnInput(source => Message.ChangedSource({ source })),
-        h.OnKeyDownPreventDefault((key, modifiers) =>
-          key === 'Enter' && (modifiers.metaKey || modifiers.ctrlKey)
-            ? Option.some(Message.PressedRunShortcut())
-            : Option.none(),
+      h.div(
+        [
+          h.Role('tablist'),
+          h.AriaLabel('Files'),
+          h.Class('flex flex-wrap items-center gap-1'),
+        ],
+        Array.map(model.files, file => fileTab(model, file, h)),
+      ),
+      // Monaco owns this element's content. A new example remounts it.
+      h.keyed('div')(model.exampleId, [
+        h.Id(EDITOR_ELEMENT_ID),
+        h.AriaLabel('Source code'),
+        h.OnMount(
+          MountEditor({
+            initialFiles: model.files,
+            initialFile: model.activeFile,
+          }),
         ),
         h.Class(
-          'h-[36rem] w-full resize-y rounded-xl bg-code p-4 font-mono text-sm leading-relaxed text-code-plain outline-none focus-visible:ring-2 focus-visible:ring-ink',
+          'h-[36rem] w-full overflow-hidden rounded-xl bg-code font-mono text-sm',
         ),
       ]),
       h.span(
         [h.Class('text-xs text-muted')],
-        ['Ctrl+Enter or Cmd+Enter runs the program.'],
+        [
+          'Ctrl+Enter or Cmd+Enter runs the program. Hover a name for its type; type a dot for completions.',
+        ],
       ),
     ],
   )

@@ -207,7 +207,9 @@ const run = async (
   }
   const root = fork(toolchain.base)
   const encoder = new TextEncoder()
-  writeFile(root, WORK_FILE, encoder.encode(request.source))
+  request.files.forEach(file =>
+    writeFile(root, `${WORK_ROOT}/${file.name}`, encoder.encode(file.source)),
+  )
   writeFile(root, `${WORK_ROOT}/silk.toml`, encoder.encode(WORK_MANIFEST))
   const compileStart = performance.now()
   const status = (() => {
@@ -270,8 +272,8 @@ const isRequest = (value: unknown): value is RunRequest =>
   value !== null &&
   'id' in value &&
   typeof value.id === 'number' &&
-  'source' in value &&
-  typeof value.source === 'string' &&
+  'files' in value &&
+  Array.isArray(value.files) &&
   'target' in value &&
   isTarget(value.target) &&
   'toolchain' in value &&

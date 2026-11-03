@@ -3,14 +3,19 @@ import { Command, type Update } from 'foldkit'
 import { modifyFields } from 'foldkit/struct'
 import toolchain from 'virtual:silk-playground'
 
+import { ShowFile } from './editor'
 import { Message } from './message'
 import {
-  Example,
+  ArchiveExample,
+  BUILT_IN,
   HELLO,
+  MAIN_FILE,
   type Model,
   RunOutcome,
   RunState,
+  SourceFile,
   Target,
+  fromArchive,
 } from './model'
 import { type Outcome } from './protocol'
 import { PlaygroundService } from './service'
@@ -21,10 +26,11 @@ type UpdateReturn = Update.Return<Model, Message, PlaygroundService>
 
 export const init = (): Update.Return<Model, Message> => ({
   model: {
-    examples: [HELLO],
+    examples: BUILT_IN,
     examplesState: 'Idle',
     exampleId: HELLO.id,
-    source: HELLO.source,
+    files: HELLO.files,
+    activeFile: MAIN_FILE,
     target: HELLO.target,
     runState: RunState.Idle(),
   },
@@ -38,7 +44,7 @@ export const LoadExamples = Command.define('LoadExamples', {
     () => import('virtual:silk-playground-examples'),
   ).pipe(
     Effect.flatMap(module =>
-      Schema.decodeUnknownEffect(Schema.Array(Example))(module.default),
+      Schema.decodeUnknownEffect(Schema.Array(ArchiveExample))(module.default),
     ),
     Effect.map(examples => Message.SucceededLoadExamples({ examples })),
     Effect.catch(() => Effect.succeed(Message.FailedLoadExamples())),
@@ -61,9 +67,9 @@ const toRunOutcome = (outcome: Outcome): RunOutcome => {
 }
 
 export const RunProgram = Command.define('RunProgram', {
-  args: { source: Schema.String, target: Target },
+  args: { files: Schema.Array(SourceFile), target: Target },
   messages: [Message.CompletedRun],
-  execute: ({ source, target }) =>
+  execute: ({ files, target }) =>
     Effect.gen(function* () {
       const playground = yield* PlaygroundService
       if (toolchain === null) {
@@ -76,7 +82,7 @@ export const RunProgram = Command.define('RunProgram', {
           runMilliseconds: 0,
         })
       }
-      const response = yield* playground.run(toolchain, source, target)
+      const response = yield* playground.run(toolchain, files, target)
       return Message.CompletedRun({
         output: response.output,
         outcome: toRunOutcome(response.outcome),
@@ -111,14 +117,27 @@ const startRun = (model: Model): UpdateReturn =>
     ? { model }
     : {
         model: modifyFields(model, { runState: () => RunState.Running() }),
-        commands: [RunProgram({ source: model.source, target: model.target })],
+        commands: [RunProgram({ files: model.files, target: model.target })],
       }
 
 export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
-    ChangedSource: ({ source }) => ({
-      model: modifyFields(model, { source: () => source }),
+    ChangedSource: ({ name, source }) => ({
+      model: modifyFields(model, {
+        files: () =>
+          Array.map(model.files, file =>
+            file.name === name ? { name, source } : file,
+          ),
+      }),
     }),
+    SelectedFile: ({ name }) =>
+      Array.some(model.files, file => file.name === name)
+        ? {
+            model: modifyFields(model, { activeFile: () => name }),
+            commands: [ShowFile({ name })],
+          }
+        : { model },
+    CompletedShowFile: () => ({ model }),
     SelectedExample: ({ id }) =>
       pipe(
         Array.findFirst(model.examples, example => example.id === id),
@@ -127,7 +146,8 @@ export const update = (model: Model, message: Message) =>
           onSome: example => ({
             model: modifyFields(model, {
               exampleId: () => example.id,
-              source: () => example.source,
+              files: () => example.files,
+              activeFile: () => MAIN_FILE,
               target: () => example.target,
             }),
           }),
@@ -153,7 +173,7 @@ export const update = (model: Model, message: Message) =>
     CompletedStop: () => ({ model }),
     SucceededLoadExamples: ({ examples }) => ({
       model: modifyFields(model, {
-        examples: () => [HELLO, ...examples],
+        examples: () => [...BUILT_IN, ...Array.map(examples, fromArchive)],
         examplesState: () => 'Loaded',
       }),
     }),

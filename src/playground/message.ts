@@ -1,11 +1,14 @@
 import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
-import { Example, RunChunk, RunOutcome } from './model'
+import { ArchiveExample, RunChunk, RunOutcome } from './model'
 
 export const Message = defineMessageUnion({
-  ChangedSource: { source: Schema.String },
+  // The editor's text of the file `name` changed.
+  ChangedSource: { name: Schema.String, source: Schema.String },
   SelectedExample: { id: Schema.String },
+  SelectedFile: { name: Schema.String },
+  CompletedShowFile: {},
   ClickedRun: {},
   PressedRunShortcut: {},
   ClickedStop: {},
@@ -16,7 +19,7 @@ export const Message = defineMessageUnion({
     runMilliseconds: Schema.Number,
   },
   CompletedStop: {},
-  SucceededLoadExamples: { examples: Schema.Array(Example) },
+  SucceededLoadExamples: { examples: Schema.Array(ArchiveExample) },
   FailedLoadExamples: {},
 })
 export type Message = typeof Message.Type
