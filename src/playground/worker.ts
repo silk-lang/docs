@@ -2,6 +2,7 @@
 // wasm32-wasip1 module, and runs what it builds. Everything happens here, off
 // the page's thread, and nothing goes to a server.
 
+import { WORK_FILE, WORK_MANIFEST, WORK_ROOT } from './language-protocol'
 import {
   type Chunk,
   type Outcome,
@@ -9,8 +10,8 @@ import {
   type RunResponse,
   type Stream,
   type Target,
-  type Toolchain,
 } from './protocol'
+import { type Loaded, loadToolchain } from './toolchain'
 import {
   type DirectoryNode,
   Exit,
@@ -21,60 +22,8 @@ import {
   writeFile,
 } from './wasi'
 
-const MANIFEST = `[package]
-name = "playground"
-version = "0.0.0"
-source = "."
-`
-
 // A program can print without end, so the page gets at most this much.
 const OUTPUT_LIMIT = 256 * 1024
-
-type Loaded = Readonly<{ compiler: WebAssembly.Module; base: DirectoryNode }>
-
-// The toolchain files are gzipped. A server that labels them as gzip lets the
-// browser unpack them on the way, so only bytes that still start with the gzip
-// magic number are unpacked here.
-const download = async (url: string): Promise<Uint8Array<ArrayBuffer>> => {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Downloading ${url} failed with HTTP ${response.status}.`)
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) {
-    return bytes
-  }
-  const stream = new Blob([bytes])
-    .stream()
-    .pipeThrough(new DecompressionStream('gzip'))
-  return new Uint8Array(await new Response(stream).arrayBuffer())
-}
-
-// The standard library pack: a path length, the path, a contents length and
-// the contents for each file, every length a little-endian u32.
-const unpack = (pack: Uint8Array, root: DirectoryNode): void => {
-  const view = new DataView(pack.buffer, pack.byteOffset, pack.byteLength)
-  const decoder = new TextDecoder()
-  let at = 0
-  while (at < pack.length) {
-    const nameLength = view.getUint32(at, true)
-    const name = decoder.decode(pack.subarray(at + 4, at + 4 + nameLength))
-    at += 4 + nameLength
-    const size = view.getUint32(at, true)
-    writeFile(root, `/stdlib/${name}`, pack.subarray(at + 4, at + 4 + size))
-    at += 4 + size
-  }
-}
-
-const loadToolchain = async (toolchain: Toolchain): Promise<Loaded> => {
-  const [compilerBytes, stdlib] = await Promise.all([
-    download(toolchain.compilerUrl),
-    download(toolchain.stdlibUrl),
-  ])
-  const base = directory()
-  unpack(stdlib, base)
-  return { compiler: await WebAssembly.compile(compilerBytes), base }
-}
 
 // Terminal control sequences, such as colors.
 const ANSI_ESCAPE = /\u001b\[[0-9;?]*[A-Za-z]/g
@@ -258,8 +207,8 @@ const run = async (
   }
   const root = fork(toolchain.base)
   const encoder = new TextEncoder()
-  writeFile(root, '/work/main.silk', encoder.encode(request.source))
-  writeFile(root, '/work/silk.toml', encoder.encode(MANIFEST))
+  writeFile(root, WORK_FILE, encoder.encode(request.source))
+  writeFile(root, `${WORK_ROOT}/silk.toml`, encoder.encode(WORK_MANIFEST))
   const compileStart = performance.now()
   const status = (() => {
     try {
@@ -268,7 +217,7 @@ const run = async (
         [
           'silkc',
           'build',
-          '/work/main.silk',
+          WORK_FILE,
           '-o',
           '/work/main.wasm',
           '--target',

@@ -138,6 +138,10 @@ export type WasiOptions = Readonly<{
   root: DirectoryNode
   stdout: (bytes: Uint8Array) => void
   stderr: (bytes: Uint8Array) => void
+  // Fills a prefix of `into` from standard input and answers how many bytes
+  // it wrote, 0 at the end of the input. It may block. Without it, standard
+  // input is empty.
+  stdin?: (into: Uint8Array) => number
 }>
 
 export type Wasi = Readonly<{
@@ -421,7 +425,15 @@ export const makeWasi = (options: WasiOptions): Wasi => {
       readAddress: number,
     ) => {
       if (fd === 0) {
-        view().setUint32(readAddress, 0, true)
+        const read = options.stdin
+        // One vector at a time, so a read never waits for more input once it
+        // has some.
+        const first = iovecs(vectors, count).find(({ length }) => length > 0)
+        const total =
+          read === undefined || first === undefined
+            ? 0
+            : read(bytes(first.base, first.length))
+        view().setUint32(readAddress, total, true)
         return SUCCESS
       }
       const descriptor = descriptors.get(fd)
