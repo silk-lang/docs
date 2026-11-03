@@ -6,6 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 import { llmsTxt } from './scripts/llms-txt.ts'
 import { ogImages } from './scripts/og-images.ts'
+import { playground } from './scripts/playground.ts'
 import { releases } from './scripts/releases.ts'
 import { searchIndex } from './scripts/search-index.ts'
 import { islandAttributes } from './src/docs/islands.ts'
@@ -22,6 +23,7 @@ export default defineConfig({
     }),
     markdown({ islands: islandAttributes }),
     releases(),
+    playground(),
     searchIndex(),
     ogImages(),
     llmsTxt(),

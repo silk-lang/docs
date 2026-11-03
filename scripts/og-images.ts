@@ -19,6 +19,7 @@ import {
   docsCard,
   homeCard,
   pageCard,
+  playgroundCard,
   releasesCard,
 } from '../src/og.ts'
 
@@ -168,6 +169,7 @@ export const allCards = (): ReadonlyArray<OgCard> => [
   homeCard,
   docsCard,
   releasesCard,
+  playgroundCard,
   ...groups.flatMap(group =>
     group.pages.map(page => pageCard(page, group.title)),
   ),
