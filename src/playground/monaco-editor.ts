@@ -90,15 +90,33 @@ const tokens: monaco.languages.IMonarchLanguage = {
   },
 }
 
-// The design's syntax colors, read from the page's tokens. Code always sits
-// on the dark code surface, in both color schemes.
+// The design's syntax colors, read from the page's tokens. Code sits on the
+// light code surface, and the hover and suggestion widgets use the page's
+// paper and rule colors so code inside them stays readable.
+// Monaco reads only hex colors, and some tokens are oklch, so each one is
+// painted on a pixel and read back.
+const pixel = document.createElement('canvas').getContext('2d', {
+  willReadFrequently: true,
+})
+
+const toHex = (value: string): string => {
+  if (pixel === null) {
+    return value
+  }
+  pixel.clearRect(0, 0, 1, 1)
+  pixel.fillStyle = value
+  pixel.fillRect(0, 0, 1, 1)
+  const [red = 0, green = 0, blue = 0] = pixel.getImageData(0, 0, 1, 1).data
+  return `#${[red, green, blue].map(part => part.toString(16).padStart(2, '0')).join('')}`
+}
+
 const color = (element: Element, name: string): string =>
-  getComputedStyle(element).getPropertyValue(name).trim() || '#e3e1dc'
+  toHex(getComputedStyle(element).getPropertyValue(name).trim() || '#e3e1dc')
 
 const defineTheme = (element: Element): void => {
   const hex = (name: string) => color(element, name).replace('#', '')
   monaco.editor.defineTheme(THEME, {
-    base: 'vs-dark',
+    base: 'vs',
     inherit: true,
     rules: [
       { token: '', foreground: hex('--syntax-plain') },
@@ -121,6 +139,44 @@ const defineTheme = (element: Element): void => {
       'editorLineNumber.activeForeground': color(element, '--syntax-label'),
       'editor.lineHighlightBackground': '#00000000',
       'editor.lineHighlightBorder': color(element, '--syntax-divider'),
+      'editor.selectionBackground': color(element, '--silk-signal-soft'),
+      'editor.inactiveSelectionBackground': color(
+        element,
+        '--silk-signal-soft',
+      ),
+      'editor.wordHighlightBackground': '#0b0b0c14',
+      'editor.wordHighlightStrongBackground': '#0b0b0c14',
+      // Monaco colors brackets by depth even with pair colorization off;
+      // the design keeps them the color of operators.
+      ...Object.fromEntries(
+        [1, 2, 3, 4, 5, 6].map(depth => [
+          `editorBracketHighlight.foreground${depth}`,
+          color(element, '--syntax-operator'),
+        ]),
+      ),
+      'editorBracketMatch.background': '#0b0b0c0f',
+      'editorBracketMatch.border': color(element, '--syntax-gutter'),
+      'editorWidget.background': color(element, '--silk-paper'),
+      'editorWidget.foreground': color(element, '--silk-body'),
+      'editorWidget.border': color(element, '--silk-rule'),
+      'editorHoverWidget.background': color(element, '--silk-paper'),
+      'editorHoverWidget.foreground': color(element, '--silk-body'),
+      'editorHoverWidget.border': color(element, '--silk-rule'),
+      'editorHoverWidget.statusBarBackground': color(element, '--silk-panel'),
+      'editorSuggestWidget.background': color(element, '--silk-paper'),
+      'editorSuggestWidget.foreground': color(element, '--silk-body'),
+      'editorSuggestWidget.border': color(element, '--silk-rule'),
+      'editorSuggestWidget.selectedBackground': color(
+        element,
+        '--silk-signal-soft',
+      ),
+      'editorSuggestWidget.highlightForeground': color(
+        element,
+        '--silk-signal',
+      ),
+      'textCodeBlock.background': color(element, '--syntax-surface'),
+      'textLink.foreground': color(element, '--silk-signal'),
+      'textLink.activeForeground': color(element, '--silk-signal'),
     },
   })
 }
