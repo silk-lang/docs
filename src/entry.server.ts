@@ -10,12 +10,9 @@ import * as Og from './og'
 import { AppRoute, urlToAppRoute } from './route'
 
 const HEAD = [
-  '<meta name="theme-color" media="(prefers-color-scheme: light)" content="#e3e1dc">',
-  '<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1e1d1c">',
+  '<meta name="theme-color" content="#ffffff">',
   '<link rel="icon" type="image/svg+xml" href="/brand/silk-favicon.svg">',
   '<link rel="apple-touch-icon" href="/brand/silk-apple-touch-icon.png">',
-  '<link rel="preload" href="/fonts/SpaceMono-Regular.woff2" as="font" type="font/woff2" crossorigin>',
-  '<link rel="preload" href="/fonts/SpaceMono-Bold.woff2" as="font" type="font/woff2" crossorigin>',
 ].join('')
 
 // Link previews need absolute URLs. The deploy workflow sets SILK_SITE_URL to

@@ -37,8 +37,8 @@ const sidebarItem = (
           ...(isCurrent ? [h.AriaCurrent('page')] : []),
           h.Class(
             isCurrent
-              ? 'block border-l-2 border-ink py-2 pr-3 pl-[11px] text-sm leading-tight font-bold wrap-anywhere text-ink'
-              : 'block border-l border-rule py-2 pr-3 pl-3 text-sm leading-tight wrap-anywhere text-muted hover:border-ink hover:text-ink',
+              ? 'block border-l-2 border-signal py-1.5 pr-3 pl-[13px] text-[0.9375rem] leading-snug font-semibold wrap-anywhere text-ink'
+              : 'block border-l border-rule py-1.5 pr-3 pl-3.5 text-[0.9375rem] leading-snug wrap-anywhere text-body hover:border-ink hover:text-ink',
           ),
         ],
         sidebarTitle(page.title, h),
@@ -56,7 +56,7 @@ const sidebarGroup = (
 ): Html =>
   h.keyed('li')(
     group.key,
-    [h.Class(isOpen ? 'pb-3' : '')],
+    [h.Class(`border-t border-rule first:border-t-0 ${isOpen ? 'pb-4' : ''}`)],
     [
       h.button(
         [
@@ -65,13 +65,17 @@ const sidebarGroup = (
           h.AriaExpanded(isOpen),
           h.AriaControls(`docs-group-${group.key}`),
           h.Class(
-            'flex w-full cursor-pointer items-center justify-between py-2.5 text-left text-sm leading-tight font-bold',
+            'flex w-full cursor-pointer items-center justify-between py-2.5 text-left text-[0.9375rem] leading-tight font-semibold text-ink',
           ),
         ],
         [
           group.title,
           h.span(
-            [h.Class('flex items-center gap-2 text-xs font-normal text-muted')],
+            [
+              h.Class(
+                'flex items-center gap-2 font-mono text-[0.6875rem] font-normal text-muted',
+              ),
+            ],
             [
               group.showCount ? `${pages.length}` : '',
               isOpen
@@ -102,7 +106,7 @@ export const searchTrigger = (h: HtmlBuilder<Message>): Html =>
         focusSelector: `#${Search.KEYBOARD_WARMUP_INPUT_ID}`,
       }),
       h.Class(
-        'flex w-full cursor-pointer items-center gap-3 rounded-full border border-rule px-3.5 py-2.5 text-left text-sm leading-tight text-muted hover:border-ink hover:text-ink',
+        'flex w-full cursor-pointer items-center gap-2.5 rounded-md border border-rule bg-paper px-3 py-2.5 text-left text-[0.9375rem] leading-tight text-muted hover:border-ink hover:text-ink',
       ),
     ],
     [
@@ -112,7 +116,7 @@ export const searchTrigger = (h: HtmlBuilder<Message>): Html =>
         [
           h.AriaHidden(true),
           h.Class(
-            'rounded-md border border-rule px-2 py-px text-xs font-bold text-muted',
+            'rounded border border-rule px-1.5 py-px font-mono text-[0.6875rem] text-muted',
           ),
         ],
         ['/'],
@@ -128,7 +132,7 @@ const sidebar = (
   h.nav(
     [
       h.AriaLabel('Documentation'),
-      h.Class('flex flex-col gap-5 md:max-h-screen md:py-1'),
+      h.Class('flex flex-col gap-6 md:max-h-screen md:py-8'),
     ],
     [
       // Only the page list scrolls, so the search stays put above it.
@@ -136,7 +140,7 @@ const sidebar = (
       h.ul(
         [
           h.Class(
-            'flex flex-col border-t border-rule pt-2 md:min-h-0 md:scrollbar-none md:overflow-y-auto md:overscroll-contain',
+            'flex flex-col md:min-h-0 md:scrollbar-none md:overflow-y-auto md:overscroll-contain',
           ),
         ],
         Array.map(Catalog.groups, group =>
@@ -167,11 +171,11 @@ const onThisPage = (
         () => Array.headNonEmpty(nonEmptyEntries).id,
       )
       return h.nav(
-        [h.AriaLabel('On this page'), h.Class('flex flex-col gap-3.5 pt-1')],
+        [h.AriaLabel('On this page'), h.Class('flex flex-col gap-4 pt-2')],
         [
           h.p([h.Class('label text-muted')], ['On this page']),
           h.ul(
-            [h.Class('flex flex-col gap-3.5')],
+            [h.Class('flex flex-col border-l border-rule')],
             Array.map(nonEmptyEntries, entry => {
               const isActive = entry.id === activeId
               return h.keyed('li')(
@@ -182,18 +186,10 @@ const onThisPage = (
                     [
                       h.Href(`#${entry.id}`),
                       h.Class(
-                        `flex items-baseline gap-2.5 text-sm leading-tight ${isActive ? 'font-bold text-ink' : 'text-muted hover:text-ink'}`,
+                        `-ml-px block border-l-2 py-1.5 pl-3.5 text-sm leading-snug ${isActive ? 'border-signal font-semibold text-ink' : 'border-transparent text-muted hover:text-ink'}`,
                       ),
                     ],
-                    [
-                      h.span([
-                        h.AriaHidden(true),
-                        h.Class(
-                          `size-2 shrink-0 translate-y-[-1px] rounded-full ${isActive ? 'bg-signal' : 'bg-rule'}`,
-                        ),
-                      ]),
-                      entry.text,
-                    ],
+                    [entry.text],
                   ),
                 ],
               )
@@ -235,13 +231,13 @@ const pagerCard = (
       h.Href(Catalog.pagePath(page)),
       h.Rel(direction === 'Previous' ? 'prev' : 'next'),
       h.Class(
-        `flex flex-1 flex-col gap-1.5 rounded-2xl border p-5 hover:border-ink ${direction === 'Next' ? 'items-end border-ink text-right' : 'border-rule'}`,
+        `flex flex-1 flex-col gap-1.5 rounded-md border px-5 py-4.5 hover:border-ink ${direction === 'Next' ? 'items-end border-ink text-right' : 'border-rule'}`,
       ),
     ],
     [
       h.span([h.Class('label text-muted')], [label]),
       h.span(
-        [h.Class('flex items-center gap-2 font-bold')],
+        [h.Class('flex items-center gap-2 text-xl font-bold tracking-tight')],
         direction === 'Next'
           ? [page.title, Icon.arrowRight('size-4 shrink-0', h)]
           : [page.title],
@@ -299,7 +295,7 @@ const loadingSkeleton = (h: HtmlBuilder<Message>): Html =>
           skeletonLines(['w-full', 'w-full', 'w-4/5'], 'h-3.5', h),
           h.div([h.Class('h-6 w-2/5 rounded-full bg-rule')]),
           skeletonLines(['w-full', 'w-10/12'], 'h-3.5', h),
-          h.div([h.Class('h-44 rounded-2xl bg-rule/60')]),
+          h.div([h.Class('h-44 rounded-md bg-rule/60')]),
           skeletonLines(['w-full', 'w-full', 'w-2/3'], 'h-3.5', h),
         ],
       ),
@@ -371,7 +367,7 @@ const docsLayout = (
       h.div(
         [
           h.Class(
-            'mx-auto grid w-full max-w-[90rem] flex-1 gap-10 px-5 pt-8 pb-20 md:grid-cols-[13.75rem_minmax(0,1fr)] md:px-10 md:pt-12 lg:gap-14 lg:pb-30 xl:grid-cols-[16.25rem_minmax(0,44.25rem)_12.5rem] xl:px-20',
+            'grid w-full flex-1 md:grid-cols-[16.5rem_minmax(0,1fr)] xl:grid-cols-[18rem_minmax(0,1fr)]',
           ),
         ],
         [
@@ -379,29 +375,50 @@ const docsLayout = (
             [
               h.Open(true),
               h.Class(
-                'group md:sticky md:top-0 md:self-start [&>summary]:md:hidden',
+                'group border-b border-rule bg-panel px-5 md:border-r md:border-b-0 md:px-6 [&>summary]:md:hidden',
               ),
             ],
             [
               h.summary(
                 [
                   h.Class(
-                    'label mb-4 flex cursor-pointer list-none items-center justify-between border-b border-rule pb-3 text-muted',
+                    'flex cursor-pointer list-none items-center justify-between py-3.5 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden',
                   ),
                 ],
-                ['Browse the docs', Icon.chevronDown('size-3.5', h)],
+                [
+                  h.span(
+                    [h.Class('flex items-center gap-2.5')],
+                    [Icon.menu('size-4', h), 'Browse the docs'],
+                  ),
+                  Icon.chevronDown(
+                    'size-3.5 transition-transform group-open:rotate-180',
+                    h,
+                  ),
+                ],
               ),
-              sidebar(model, maybeCurrent, h),
+              h.div(
+                [h.Class('pb-5 md:sticky md:top-0 md:self-start md:pb-0')],
+                [sidebar(model, maybeCurrent, h)],
+              ),
             ],
           ),
-          h.main([h.Class('min-w-0')], [article]),
-          h.aside(
+          h.div(
             [
               h.Class(
-                'hidden xl:sticky xl:top-0 xl:block xl:max-h-screen xl:self-start xl:scrollbar-none xl:overflow-y-auto xl:overscroll-contain xl:py-1',
+                'flex min-w-0 justify-center gap-16 px-5 pt-8 pb-20 md:px-10 md:pt-14 lg:pb-28 xl:px-16',
               ),
             ],
-            [aside],
+            [
+              h.main([h.Class('w-full min-w-0 max-w-[45rem]')], [article]),
+              h.aside(
+                [
+                  h.Class(
+                    'hidden w-56 shrink-0 xl:sticky xl:top-0 xl:block xl:max-h-screen xl:self-start xl:scrollbar-none xl:overflow-y-auto xl:overscroll-contain xl:py-2',
+                  ),
+                ],
+                [aside],
+              ),
+            ],
           ),
         ],
       ),
@@ -424,10 +441,10 @@ export const pageView = (
         h.h1(
           [
             h.Class(
-              'text-3xl leading-tight font-bold tracking-tighter break-words md:text-5xl',
+              'text-[2.75rem] leading-none font-extrabold tracking-tighter break-words md:text-[4rem]',
             ),
           ],
-          [page.title],
+          [page.title, h.span([h.Class('text-signal')], ['.'])],
         ),
         articleBody(model, page, h),
         Option.match(page.maybeSourceUrl, {
@@ -472,13 +489,13 @@ export const indexView = (model: Model, h: HtmlBuilder<Message>): Html =>
             h.h1(
               [
                 h.Class(
-                  'text-3xl leading-tight font-bold tracking-tighter md:text-5xl',
+                  'text-[2.75rem] leading-none font-extrabold tracking-tighter md:text-[4rem]',
                 ),
               ],
-              ['Silk documentation'],
+              ['Silk documentation', h.span([h.Class('text-signal')], ['.'])],
             ),
             h.p(
-              [h.Class('text-lg leading-prose text-muted')],
+              [h.Class('text-lg leading-[1.65] text-body md:text-xl')],
               [
                 'New to Silk? Install it and take the tour, then read the book. The language reference, the guides and the standard library are here when you need the details.',
               ],
@@ -490,11 +507,7 @@ export const indexView = (model: Model, h: HtmlBuilder<Message>): Html =>
           Array.map(Catalog.groups, group =>
             h.keyed('section')(
               group.key,
-              [
-                h.Class(
-                  'flex flex-col gap-3 rounded-2xl border border-rule p-6',
-                ),
-              ],
+              [h.Class('flex flex-col gap-3 border-t-2 border-ink pt-5')],
               [
                 h.h2(
                   [

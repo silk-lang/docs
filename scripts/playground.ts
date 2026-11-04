@@ -1,13 +1,11 @@
 // A Vite plugin that gives the playground its toolchain: the Silk compiler
-// built for wasm32-wasip1, the standard library, and the examples, all from the
-// playground archive a Silk release publishes
-// (`silk-<version>-playground.tar.gz`).
+// built for wasm32-wasip1 and the standard library, both from the playground
+// archive a Silk release publishes (`silk-<version>-playground.tar.gz`). The
+// examples are the site's own, in demos/playground.
 //
 // The compiler and the standard library become two gzipped assets with hashed
 // names, which the playground worker downloads and unpacks the first time a
-// reader runs a program. `virtual:silk-playground` names them and the release;
-// `virtual:silk-playground-examples` holds the example sources and loads
-// lazily, like the search index.
+// reader runs a program. `virtual:silk-playground` names them and the release.
 //
 // SILK_PLAYGROUND=<directory> uses an unpacked archive instead of the network.
 // Without either, or with SILK_RELEASES=fixture, the playground page says it is
@@ -19,34 +17,19 @@ import { gunzipSync, gzipSync } from 'node:zlib'
 import { type Plugin } from 'vite'
 
 const INFO_ID = 'virtual:silk-playground'
-const EXAMPLES_ID = 'virtual:silk-playground-examples'
 const RESOLVED_INFO_ID = `\0${INFO_ID}`
-const RESOLVED_EXAMPLES_ID = `\0${EXAMPLES_ID}`
 const DEV_PREFIX = '/@silk-playground/'
 
 const API_URL =
   'https://api.github.com/repos/silk-lang/silk/releases?per_page=30'
 
-type Example = Readonly<{
-  id: string
-  title: string
-  target: string
-  source: string
-}>
-
 type Toolchain = Readonly<{
   version: string
   compiler: Buffer
   stdlib: Buffer
-  examples: ReadonlyArray<Example>
 }>
 
-type Manifest = Readonly<{
-  version: string
-  examples: ReadonlyArray<
-    Readonly<{ id: string; title: string; target: string; path: string }>
-  >
-}>
+type Manifest = Readonly<{ version: string }>
 
 // FILES
 
@@ -142,12 +125,6 @@ const toToolchain = (inside: Map<string, Buffer>): Toolchain => {
     version: manifest.version,
     compiler: gzipSync(compiler, { level: 9 }),
     stdlib: packStandardLibrary(inside),
-    examples: manifest.examples.map(({ id, title, target, path }) => ({
-      id,
-      title,
-      target,
-      source: inside.get(path)?.toString('utf8') ?? '',
-    })),
   }
 }
 
@@ -217,18 +194,8 @@ export const playground = (): Plugin => {
     configResolved: config => {
       isServe = config.command === 'serve'
     },
-    resolveId: id =>
-      id === INFO_ID
-        ? RESOLVED_INFO_ID
-        : id === EXAMPLES_ID
-          ? RESOLVED_EXAMPLES_ID
-          : null,
+    resolveId: id => (id === INFO_ID ? RESOLVED_INFO_ID : null),
     load: async function (id) {
-      if (id === RESOLVED_EXAMPLES_ID) {
-        const toolchain = await load()
-        const json = JSON.stringify(toolchain?.examples ?? [])
-        return `export default JSON.parse(${JSON.stringify(json)})`
-      }
       if (id !== RESOLVED_INFO_ID) {
         return null
       }

@@ -1,5 +1,5 @@
 export { Message } from './message'
 export { Model } from './model'
 export { PlaygroundService } from './service'
-export { enter, init, update } from './update'
+export { init, update } from './update'
 export { view } from './view'

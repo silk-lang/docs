@@ -1,0 +1,45 @@
+//! The sieve of Eratosthenes: cross out the multiples of each prime, and the
+//! numbers left standing are the primes.
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_native { StdoutLogger }
+
+const LIMIT: usize = 100
+
+effect fn printPrimes() -> ()
+  ! LogError
+  ? &mut Logger {
+  let mut composite = [false; LIMIT]
+  let mut number: usize = 2
+  while number * number < LIMIT {
+    if !composite[number] {
+      let mut multiple = number * number
+      while multiple < LIMIT {
+        composite[multiple] = true
+        multiple = multiple + number
+      }
+    }
+    number = number + 1
+  }
+
+  run Effect.log("The primes below {}:\n", &.(LIMIT))
+  let mut count = 0
+  let mut candidate: usize = 2
+  while candidate < LIMIT {
+    if !composite[candidate] {
+      run Effect.log("{:>3}", &.(candidate))
+      count = count + 1
+      if count % 10 == 0 {
+        run Effect.log("\n", &())
+      }
+    }
+    candidate = candidate + 1
+  }
+  run Effect.log("\n{} primes in all.\n", &.(count))
+}
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  run printPrimes() |> Effect.provideMut(&mut logger)
+}

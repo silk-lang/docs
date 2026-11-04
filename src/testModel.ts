@@ -1,5 +1,6 @@
 import { HashMap, HashSet, Option } from 'effect'
 
+import { DemoTopic, FibersRun, InstallMethod } from './landing'
 import { DocState, Model } from './model'
 import * as Playground from './playground'
 import { type AppRoute } from './route'
@@ -16,5 +17,8 @@ export const testModel = (route: AppRoute): Model =>
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
     search: Search.init().model,
+    installMethod: InstallMethod.Unix(),
+    demoTopic: DemoTopic.Fibers(),
+    fibersRun: FibersRun.Idle(),
     playground: Playground.init().model,
   })

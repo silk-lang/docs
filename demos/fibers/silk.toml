@@ -1,0 +1,4 @@
+[package]
+name = "fibers"
+version = "0.1.0"
+silk-version = "0.1.0-dev.45+256a8b0335d5"

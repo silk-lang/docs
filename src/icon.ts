@@ -32,6 +32,11 @@ export const arrowRight = <Message>(
   h: HtmlBuilder<Message>,
 ): Html => strokeIcon('M2 8h11M9 4l4 4-4 4', className, h)
 
+export const arrowDown = <Message>(
+  className: string,
+  h: HtmlBuilder<Message>,
+): Html => strokeIcon('M8 2v11M4 9l4 4 4-4', className, h)
+
 export const arrowUpRight = <Message>(
   className: string,
   h: HtmlBuilder<Message>,
@@ -45,6 +50,31 @@ export const search = <Message>(
     'M7 12.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM14.5 14.5l-3.6-3.6',
     className,
     h,
+  )
+
+export const menu = <Message>(
+  className: string,
+  h: HtmlBuilder<Message>,
+): Html => strokeIcon('M2 4h12M2 8h12M2 12h12', className, h)
+
+export const play = <Message>(
+  className: string,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.svg(
+    [
+      h.ViewBox('0 0 14 16'),
+      h.Fill('currentColor'),
+      h.AriaHidden(true),
+      h.Class(className),
+    ],
+    [
+      h.path([
+        h.D(
+          'M1 1.5v13a.8.8 0 0 0 1.2.7l11-6.5a.8.8 0 0 0 0-1.4l-11-6.5A.8.8 0 0 0 1 1.5z',
+        ),
+      ]),
+    ],
   )
 
 export const chevronDown = <Message>(

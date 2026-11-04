@@ -22,6 +22,7 @@ import {
 import * as Catalog from './docs/catalog'
 import * as Content from './docs/content'
 import * as DocsMarkdown from './docs/markdown'
+import { DemoTopic, FibersRun, InstallMethod } from './landing'
 import * as Layout from './layout'
 import { Message } from './message'
 import { DocState, Flags, Model } from './model'
@@ -114,14 +115,14 @@ export const init: Runtime.RoutingApplicationInit<
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
     search: Search.init().model,
+    installMethod: InstallMethod.Unix(),
+    demoTopic: DemoTopic.Fibers(),
+    fibersRun: FibersRun.Idle(),
     playground: Playground.init().model,
   }
 
   return Option.match(maybePage, {
-    onNone: () =>
-      route._tag === 'Playground'
-        ? foldPlaygroundEnter(baseModel)
-        : { model: baseModel },
+    onNone: () => ({ model: baseModel }),
     onSome: page =>
       Option.match(maybeFlaggedDocument, {
         onSome: ({ key, document }) =>
@@ -206,6 +207,28 @@ export const LoadDocument = Command.define('LoadDocument', {
     ),
 })
 
+const FibersResult = Schema.Struct({
+  value: Schema.Number,
+  milliseconds: Schema.Number,
+})
+
+export const RunFibers = Command.define('RunFibers', {
+  messages: [Message.SucceededRunFibers, Message.FailedRunFibers],
+  execute: Effect.callback<unknown, Error>(resume => {
+    const worker = new Worker(
+      new URL('./demo/fibers.worker.ts', import.meta.url),
+      { type: 'module' },
+    )
+    worker.onmessage = event => resume(Effect.succeed(event.data))
+    worker.onerror = event => resume(Effect.fail(new Error(event.message)))
+    return Effect.sync(() => worker.terminate())
+  }).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(FibersResult)),
+    Effect.map(Message.SucceededRunFibers),
+    Effect.catch(() => Effect.succeed(Message.FailedRunFibers())),
+  ),
+})
+
 // UPDATE
 
 type UpdateReturn = Update.Return<
@@ -250,13 +273,6 @@ const toGotPlaygroundMessage = (message: Playground.Message): Message =>
 
 const foldPlayground = Update.foldChild({
   update: Playground.update,
-  read: readPlayground,
-  write: writePlayground,
-  toParentMessage: toGotPlaygroundMessage,
-})
-
-const foldPlaygroundEnter = Update.foldChildStep({
-  update: Playground.enter,
   read: readPlayground,
   write: writePlayground,
   toParentMessage: toGotPlaygroundMessage,
@@ -354,17 +370,10 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
           ),
       })
     },
-    onNone: () =>
-      Update.combine(nextModel, [
-        stepModel =>
-          nextRoute._tag === 'Playground'
-            ? foldPlaygroundEnter(stepModel)
-            : { model: stepModel },
-        stepModel => ({
-          model: stepModel,
-          commands: scrollCommands(url, isSamePath),
-        }),
-      ]),
+    onNone: () => ({
+      model: nextModel,
+      commands: scrollCommands(url, isSamePath),
+    }),
   })
 }
 
@@ -481,6 +490,24 @@ export const update = (model: Model, message: Message) =>
       model: modifyFields(model, {
         maybeActiveSection: () => Option.some(sectionId),
       }),
+    }),
+    SelectedInstallMethod: ({ method }) => ({
+      model: modifyFields(model, { installMethod: () => method }),
+    }),
+    SelectedDemoTopic: ({ topic }) => ({
+      model: modifyFields(model, { demoTopic: () => topic }),
+    }),
+    ClickedRunFibers: () => ({
+      model: modifyFields(model, { fibersRun: () => FibersRun.Running() }),
+      commands: [RunFibers()],
+    }),
+    SucceededRunFibers: ({ value, milliseconds }) => ({
+      model: modifyFields(model, {
+        fibersRun: () => FibersRun.Finished({ value, milliseconds }),
+      }),
+    }),
+    FailedRunFibers: () => ({
+      model: modifyFields(model, { fibersRun: () => FibersRun.Failed() }),
     }),
   })
 
@@ -671,7 +698,7 @@ const notFound = (h: HtmlBuilder<Message>): Html =>
 
 const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
   AppRoute.match(model.route, {
-    Home: () => Home.view(model.copiedCodeIds, h),
+    Home: () => Home.view(model, h),
     Docs: () => DocsPage.indexView(model, h),
     DocPage: ({ directory, slug }) =>
       Option.match(Catalog.findPage(directory, slug), {

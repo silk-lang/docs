@@ -1,3 +1,4 @@
+import { type HtmlBuilder } from 'foldkit/html'
 import {
   Command,
   all,
@@ -9,14 +10,29 @@ import {
   scene,
   text,
 } from 'foldkit/scene'
-import { describe, test } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { describe, expect as expectValue, test } from 'vitest'
 
-import { CopyCode, WaitBeforeHidingCopied, update, view } from '../main'
+import {
+  CopyCode,
+  RunFibers,
+  WaitBeforeHidingCopied,
+  update,
+  view,
+} from '../main'
 import { Message } from '../message'
+import { type Model } from '../model'
 import { AppRoute } from '../route'
 import { testModel } from '../testModel'
+import { FIBERS_CODE, seeItRun } from './home'
 
 const homeModel = testModel(AppRoute.Home())
+
+// The examples section is hidden from the page, so its tests render it alone.
+const demoView = (model: Model, h: HtmlBuilder<Message>) => ({
+  title: 'See it run',
+  body: seeItRun(model, h),
+})
 
 describe('landing page', () => {
   test('shows the hero and the calls to action', () => {
@@ -24,17 +40,51 @@ describe('landing page', () => {
       { update, view },
       given(homeModel),
       expect(role('heading', { level: 1 })).toHaveText(
-        'Built for the waysoftware is written today.',
+        'Built for the way software is written today.',
       ),
       expect(role('link', { name: 'Take the tour' })).toExist(),
       expect(role('link', { name: 'Install' })).toExist(),
-      expect(text('Swap the provider,')).toExist(),
+      expect(text('One program, annotated.')).toExist(),
       expect(
         text('silk-lang/silk/main/install.sh', { exact: false }),
       ).toExist(),
+    )
+  })
+
+  test('the install tabs switch the command', () => {
+    scene(
+      { update, view },
+      given(homeModel),
+      expect(role('tab', { name: 'macOS · Linux', selected: true })).toExist(),
+      click(role('tab', { name: 'Windows' })),
+      expect(role('tab', { name: 'Windows', selected: true })).toExist(),
       expect(
         text('silk-lang/silk/main/install.ps1', { exact: false }),
       ).toExist(),
+      expect(
+        text('silk-lang/silk/main/install.sh', { exact: false }),
+      ).not.toExist(),
+    )
+  })
+
+  test('hides the examples section', () => {
+    scene(
+      { update, view },
+      given(homeModel),
+      expect(role('heading', { name: 'See it run' })).not.toExist(),
+    )
+  })
+
+  test('the example tabs switch the example', () => {
+    scene(
+      { update, view: demoView },
+      given(homeModel),
+      expect(role('heading', { name: 'Fiber.forkChild' })).toExist(),
+      click(role('tab', { name: 'Borrow checker' })),
+      expect(role('heading', { name: 'Conflicting loans' })).toExist(),
+      expect(text('error[OWN0010]')).toExist(),
+      click(role('tab', { name: 'Memory' })),
+      expect(role('heading', { name: 'Arena' })).toExist(),
     )
   })
 
@@ -54,5 +104,26 @@ describe('landing page', () => {
       ),
       expect(role('button', { name: 'Copied' })).not.toExist(),
     )
+  })
+
+  test('running the fibers example shows what it returned', () => {
+    scene(
+      { update, view: demoView },
+      given(homeModel),
+      click(role('button', { name: 'Run' })),
+      expect(role('button', { name: 'Running' })).toBeDisabled(),
+      Command.resolve(
+        RunFibers,
+        Message.SucceededRunFibers({ value: 42, milliseconds: 2004 }),
+      ),
+      expect(text('in 2.00s', { exact: false })).toExist(),
+      expect(role('button', { name: 'Run again' })).toExist(),
+    )
+  })
+
+  // The page shows the example; demos/fibers compiles the same code to wasm.
+  test('the fibers example matches the program that runs', () => {
+    const source = readFileSync('demos/fibers/src/main.silk', 'utf8')
+    expectValue(source).toContain(FIBERS_CODE)
   })
 })

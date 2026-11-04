@@ -10,7 +10,6 @@ export default defineConfig({
   resolve: {
     alias: {
       'virtual:silk-releases': '/src/releases/fixture.ts',
-      'virtual:silk-playground-examples': '/src/playground/fixture-examples.ts',
       'virtual:silk-playground': '/src/playground/fixture.ts',
     },
   },

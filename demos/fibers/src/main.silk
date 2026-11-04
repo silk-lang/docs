@@ -1,0 +1,82 @@
+// The fibers example on the landing page, built for the browser with
+// `pnpm build:demos`. `after` and `root` are the code the page shows; the rest
+// is the harness that runs them there.
+
+import silk.mem.allocator { OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.system_clock { Instant, SystemClock }
+import silk.num.u64
+
+effect fn after(delay: u64, value: i32) -> i32
+  ? &mut MonotonicClock {
+  run Effect.sleep(delay)
+  return value
+}
+
+effect fn root() -> i32
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
+  let slow = run Fiber.forkChild(after(2s, 20))
+  let fast = run Fiber.forkChild(after(1s, 22))
+  let x = run Fiber.join(move slow)
+  let y = run Fiber.join(move fast)
+  return x + y
+}
+
+// The standard library has no browser clock, so the page provides one: `now`
+// reads performance.now() in nanoseconds and `wait` blocks the worker until a
+// time on that clock.
+unsafe extern "C" fn page_clock_now() -> i64 as "page#now"
+
+unsafe extern "C" fn page_clock_wait(nanoseconds: i64) -> () as "page#wait"
+
+struct PageClock {}
+
+fn toInstant(nanoseconds: i64) -> Instant {
+  return SystemClock.make(nanoseconds / 1000000000, nanoseconds % 1000000000)
+}
+
+fn toNanoseconds(when: &Instant) -> i64 {
+  return SystemClock.seconds(when) * 1000000000 + SystemClock.nanoseconds(when)
+}
+
+impl MonotonicClock for PageClock {
+  effect fn now(self: &mut Self) -> Instant {
+    return toInstant(unsafe page_clock_now())
+  }
+
+  effect fn getResolution(self: &mut Self) -> u64 {
+    return 1000
+  }
+
+  effect fn waitUntil(self: &mut Self, when: Instant) -> () {
+    unsafe page_clock_wait(toNanoseconds(&when))
+    return ()
+  }
+
+  effect fn waitFor(self: &mut Self, howLong: u64) -> () {
+    unsafe page_clock_wait(unsafe page_clock_now() + u64.toI64(howLong))
+    return ()
+  }
+}
+
+effect fn program() -> i32
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  let mut scheduler = LocalScheduler.make()
+  let mut clock = PageClock {}
+  return run LocalScheduler.execute(&mut scheduler, root())
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+}
+
+effect fn failed(error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError) -> i32 {
+  return -1
+}
+
+// The page shows the value `main` returns, 42, and how long it took.
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}

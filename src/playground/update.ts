@@ -6,16 +6,13 @@ import toolchain from 'virtual:silk-playground'
 import { ShowFile } from './editor'
 import { Message } from './message'
 import {
-  ArchiveExample,
-  BUILT_IN,
-  HELLO,
+  EXAMPLES,
   MAIN_FILE,
   type Model,
   RunOutcome,
   RunState,
   SourceFile,
   Target,
-  fromArchive,
 } from './model'
 import { type Outcome } from './protocol'
 import { PlaygroundService } from './service'
@@ -24,32 +21,21 @@ type UpdateReturn = Update.Return<Model, Message, PlaygroundService>
 
 // INIT
 
-export const init = (): Update.Return<Model, Message> => ({
-  model: {
-    examples: BUILT_IN,
-    examplesState: 'Idle',
-    exampleId: HELLO.id,
-    files: HELLO.files,
-    activeFile: MAIN_FILE,
-    target: HELLO.target,
-    runState: RunState.Idle(),
-  },
-})
+export const init = (): Update.Return<Model, Message> => {
+  const [first] = EXAMPLES
+  return {
+    model: {
+      examples: EXAMPLES,
+      exampleId: first.id,
+      files: first.files,
+      activeFile: MAIN_FILE,
+      target: first.target,
+      runState: RunState.Idle(),
+    },
+  }
+}
 
 // COMMAND
-
-export const LoadExamples = Command.define('LoadExamples', {
-  messages: [Message.SucceededLoadExamples, Message.FailedLoadExamples],
-  execute: Effect.tryPromise(
-    () => import('virtual:silk-playground-examples'),
-  ).pipe(
-    Effect.flatMap(module =>
-      Schema.decodeUnknownEffect(Schema.Array(ArchiveExample))(module.default),
-    ),
-    Effect.map(examples => Message.SucceededLoadExamples({ examples })),
-    Effect.catch(() => Effect.succeed(Message.FailedLoadExamples())),
-  ),
-})
 
 const toRunOutcome = (outcome: Outcome): RunOutcome => {
   switch (outcome.tag) {
@@ -102,15 +88,6 @@ export const StopProgram = Command.define('StopProgram', {
 })
 
 // UPDATE
-
-// Called when the reader opens the playground: the examples download once.
-export const enter = (model: Model): UpdateReturn =>
-  model.examplesState === 'Idle'
-    ? {
-        model: modifyFields(model, { examplesState: () => 'Loading' }),
-        commands: [LoadExamples()],
-      }
-    : { model }
 
 const startRun = (model: Model): UpdateReturn =>
   model.runState._tag === 'Running' || toolchain === null
@@ -171,13 +148,4 @@ export const update = (model: Model, message: Message) =>
       }),
     }),
     CompletedStop: () => ({ model }),
-    SucceededLoadExamples: ({ examples }) => ({
-      model: modifyFields(model, {
-        examples: () => [...BUILT_IN, ...Array.map(examples, fromArchive)],
-        examplesState: () => 'Loaded',
-      }),
-    }),
-    FailedLoadExamples: () => ({
-      model: modifyFields(model, { examplesState: () => 'Failed' }),
-    }),
   })

@@ -1,65 +1,45 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/inter-tight';
+@import '@fontsource-variable/jetbrains-mono';
 
-@font-face {
-  font-family: 'Space Mono';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/SpaceMono-Regular.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Space Mono';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/SpaceMono-Bold.woff2') format('woff2');
-}
-
-/* Design tokens from the Elyx design (tokens/colors.elyx and colors-dark.elyx). */
+/* Design tokens from the Paper design for Silk. One accent color, used for
+   heading periods, labels, code highlights and the closing band. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  --silk-paper: #e3e1dc;
-  --silk-ink: #3b3a39;
-  --silk-muted: #6b6a67;
-  --silk-rule: #c9c6bf;
-  --silk-signal: #d51c21;
-  --silk-signal-soft: #e2cdc9;
+  --silk-paper: #ffffff;
+  --silk-panel: #fafaf9;
+  --silk-ink: #0b0b0c;
+  --silk-body: #2a2a2e;
+  --silk-muted: #6b6b70;
+  --silk-rule: #e4e4e1;
+  --silk-signal: oklch(60% 0.118 184.7);
+  --silk-signal-soft: oklch(94% 0.03 184.7);
+  --silk-on-signal: #ffffff;
 
-  --syntax-surface: #3b3a39;
-  --syntax-plain: #e3e1dc;
-  --syntax-label: #e3e1dc73;
-  --syntax-gutter: #e3e1dc40;
-  --syntax-divider: #e3e1dc1f;
-  --syntax-comment: #8a8884;
-  --syntax-keyword: #f0726a;
-  --syntax-type: #e3b98b;
-  --syntax-function: #e3e1dc;
-  --syntax-operator: #a9a6a0;
-  --syntax-string: #bcc79f;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --silk-paper: #1e1d1c;
-    --silk-ink: #e3e1dc;
-    --silk-muted: #9c9993;
-    --silk-rule: #42403d;
-    --silk-signal: #e8443f;
-    --silk-signal-soft: #3c2321;
-
-    --syntax-surface: #2a2927;
-  }
+  --syntax-surface: #f3f3f1;
+  --syntax-plain: #0b0b0c;
+  --syntax-label: #6b6b70;
+  --syntax-gutter: #b4b4b9;
+  --syntax-divider: #e4e4e1;
+  --syntax-comment: #8a8a90;
+  --syntax-keyword: #6b6b70;
+  --syntax-type: #0b0b0c;
+  --syntax-function: #0b0b0c;
+  --syntax-operator: #6b6b70;
+  --syntax-string: #44444a;
 }
 
 @theme inline {
   --color-paper: var(--silk-paper);
+  --color-panel: var(--silk-panel);
   --color-ink: var(--silk-ink);
+  --color-body: var(--silk-body);
   --color-muted: var(--silk-muted);
   --color-rule: var(--silk-rule);
   --color-signal: var(--silk-signal);
   --color-signal-soft: var(--silk-signal-soft);
+  --color-on-signal: var(--silk-on-signal);
 
   --color-code: var(--syntax-surface);
   --color-code-plain: var(--syntax-plain);
@@ -75,14 +55,16 @@
 }
 
 @theme {
-  --font-mono: 'Space Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-sans: var(--font-mono);
+  --font-sans: 'Inter Tight Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --tracking-label: 0.1em;
-  --tracking-tight: -0.025em;
-  --tracking-tighter: -0.05em;
+  --tracking-label: 0.12em;
+  --tracking-tight: -0.02em;
+  --tracking-tighter: -0.035em;
+  --tracking-display: -0.045em;
 
-  --leading-prose: 1.62;
+  --leading-prose: 1.6;
 }
 
 @layer base {
@@ -92,8 +74,18 @@
     font-size: 87.5%;
     background-color: var(--color-paper);
     color: var(--color-ink);
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+
+  code,
+  kbd,
+  pre {
+    font-family: var(--font-mono);
+    font-variant-ligatures: none;
+    font-feature-settings:
+      'liga' 0,
+      'calt' 0;
   }
 
   ::selection {
@@ -101,10 +93,11 @@
   }
 }
 
-/* The small bold uppercase caption used for section labels, badges and table headers. */
+/* The small uppercase monospace caption used for section labels, badges and table headers. */
 @utility label {
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.25;
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
@@ -146,25 +139,52 @@
   }
 }
 
-/* An inverted landing page section: dark on a light page, light on a dark page.
-   Everything inside reads the swapped tokens, so it needs no other classes. */
+/* A dark landing page section. Everything inside reads the swapped tokens, so
+   it needs no other classes. */
 @utility band {
-  --silk-paper: #3b3a39;
-  --silk-ink: #e3e1dc;
-  --silk-muted: #a9a6a0;
-  --silk-rule: #57554f;
-  --silk-signal-soft: #5a2e2b;
-  --syntax-surface: #2a2927;
+  --silk-paper: #0b0b0c;
+  --silk-panel: #161618;
+  --silk-ink: #ffffff;
+  --silk-body: #c9c9cc;
+  --silk-muted: #8a8a90;
+  --silk-rule: #2a2a2e;
+  --silk-signal-soft: oklch(30% 0.05 184.7);
+  --syntax-surface: #161618;
+  --syntax-plain: #f3f3f1;
+  --syntax-label: #8a8a90;
+  --syntax-gutter: #4a4a50;
+  --syntax-divider: #2a2a2e;
+  --syntax-comment: #6b6b70;
+  --syntax-keyword: #8a8a90;
+  --syntax-type: #f3f3f1;
+  --syntax-function: #ffffff;
+  --syntax-operator: #8a8a90;
+  --syntax-string: #b4b4b9;
   background-color: var(--silk-paper);
   color: var(--silk-ink);
+}
 
-  @media (prefers-color-scheme: dark) {
-    --silk-paper: #e3e1dc;
-    --silk-ink: #3b3a39;
-    --silk-muted: #6b6a67;
-    --silk-rule: #c9c6bf;
-    --silk-signal: #d51c21;
-    --silk-signal-soft: #e2cdc9;
-    --syntax-surface: #3b3a39;
+/* The closing call to action: the accent color as the background. */
+@utility signal-band {
+  --silk-ink: #0b0b0c;
+  --silk-body: #0b0b0c;
+  --silk-muted: #0b0b0c;
+  --silk-rule: #0b0b0c;
+  background-color: var(--silk-signal);
+  color: var(--silk-ink);
+}
+
+/* Fills a sleep in the fibers timeline while the example runs. The view sets
+   the duration to the length of the sleep. */
+@utility sleep-progress {
+  animation: sleep-progress linear both;
+}
+
+@keyframes sleep-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
   }
 }
