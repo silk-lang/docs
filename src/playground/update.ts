@@ -9,6 +9,7 @@ import {
   EXAMPLES,
   MAIN_FILE,
   type Model,
+  type RunChunk,
   RunOutcome,
   RunState,
   SourceFile,
@@ -89,11 +90,43 @@ export const StopProgram = Command.define('StopProgram', {
 
 // UPDATE
 
+// Joins a piece to the last one when both come from the same stream, as the
+// worker does.
+const appendOutput = (
+  output: ReadonlyArray<RunChunk>,
+  more: ReadonlyArray<RunChunk>,
+): ReadonlyArray<RunChunk> =>
+  Array.reduce(more, output, (joined, chunk) =>
+    pipe(
+      Array.last(joined),
+      Option.filter(last => last.stream === chunk.stream),
+      Option.match({
+        onNone: () => [...joined, chunk],
+        onSome: last => [
+          ...joined.slice(0, -1),
+          { stream: chunk.stream, text: last.text + chunk.text },
+        ],
+      }),
+    ),
+  )
+
+// A stopped program never sends its output, so the page keeps what it
+// streamed, such as the last frame of an animation.
+const finalOutput = (
+  runState: RunState,
+  result: Readonly<{ output: ReadonlyArray<RunChunk>; outcome: RunOutcome }>,
+): ReadonlyArray<RunChunk> =>
+  result.outcome._tag === 'Stopped' && runState._tag === 'Running'
+    ? runState.output
+    : result.output
+
 const startRun = (model: Model): UpdateReturn =>
   model.runState._tag === 'Running' || toolchain === null
     ? { model }
     : {
-        model: modifyFields(model, { runState: () => RunState.Running() }),
+        model: modifyFields(model, {
+          runState: () => RunState.Running({ output: [] }),
+        }),
         commands: [RunProgram({ files: model.files, target: model.target })],
       }
 
@@ -136,11 +169,32 @@ export const update = (model: Model, message: Message) =>
       model.runState._tag === 'Running'
         ? { model, commands: [StopProgram()] }
         : { model },
+    ReceivedRunOutput: ({ clear, output }) =>
+      RunState.match(model.runState, {
+        Idle: () => ({ model }),
+        Running: running => ({
+          model: modifyFields(model, {
+            runState: () =>
+              RunState.Running({
+                output: appendOutput(
+                  clear
+                    ? Array.filter(
+                        running.output,
+                        chunk => chunk.stream === 'compiler',
+                      )
+                    : running.output,
+                  output,
+                ),
+              }),
+          }),
+        }),
+        Finished: () => ({ model }),
+      }),
     CompletedRun: result => ({
       model: modifyFields(model, {
         runState: () =>
           RunState.Finished({
-            output: result.output,
+            output: finalOutput(model.runState, result),
             outcome: result.outcome,
             compileMilliseconds: result.compileMilliseconds,
             runMilliseconds: result.runMilliseconds,

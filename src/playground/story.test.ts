@@ -38,7 +38,7 @@ describe('playground', () => {
       given(initModel),
       message(Message.ClickedRun()),
       model(model => {
-        expect(model.runState).toEqual(RunState.Running())
+        expect(model.runState).toEqual(RunState.Running({ output: [] }))
       }),
       Command.resolve(
         RunProgram,
@@ -56,6 +56,100 @@ describe('playground', () => {
             outcome: RunOutcome.Exited({ code: 0 }),
             compileMilliseconds: 900,
             runMilliseconds: 10,
+          }),
+        )
+      }),
+    )
+  })
+
+  test('output shows while the program runs, joined by stream', () => {
+    const running = { ...initModel, runState: RunState.Running({ output: [] }) }
+    story(
+      update,
+      given(running),
+      message(
+        Message.ReceivedRunOutput({
+          clear: false,
+          output: [{ stream: 'stdout', text: 'download started\n' }],
+        }),
+      ),
+      message(
+        Message.ReceivedRunOutput({
+          clear: false,
+          output: [
+            { stream: 'stdout', text: 'resize finished\n' },
+            { stream: 'stderr', text: 'warning\n' },
+          ],
+        }),
+      ),
+      model(model => {
+        expect(model.runState).toEqual(
+          RunState.Running({
+            output: [
+              {
+                stream: 'stdout',
+                text: 'download started\nresize finished\n',
+              },
+              { stream: 'stderr', text: 'warning\n' },
+            ],
+          }),
+        )
+      }),
+    )
+  })
+
+  test('a program that clears the screen keeps only the new frame', () => {
+    const running = {
+      ...initModel,
+      runState: RunState.Running({
+        output: [
+          { stream: 'compiler', text: 'Compiled work/main.silk\n' },
+          { stream: 'stdout', text: 'Generation 0\n' },
+        ],
+      }),
+    }
+    story(
+      update,
+      given(running),
+      message(
+        Message.ReceivedRunOutput({
+          clear: true,
+          output: [{ stream: 'stdout', text: 'Generation 1\n' }],
+        }),
+      ),
+      model(model => {
+        expect(model.runState).toEqual(
+          RunState.Running({
+            output: [
+              { stream: 'compiler', text: 'Compiled work/main.silk\n' },
+              { stream: 'stdout', text: 'Generation 1\n' },
+            ],
+          }),
+        )
+      }),
+    )
+  })
+
+  test('stopping a program keeps the output it streamed', () => {
+    const frame = [{ stream: 'stdout' as const, text: 'Generation 7\n' }]
+    story(
+      update,
+      given({ ...initModel, runState: RunState.Running({ output: frame }) }),
+      message(
+        Message.CompletedRun({
+          output: [],
+          outcome: RunOutcome.Stopped(),
+          compileMilliseconds: 0,
+          runMilliseconds: 0,
+        }),
+      ),
+      model(model => {
+        expect(model.runState).toEqual(
+          RunState.Finished({
+            output: frame,
+            outcome: RunOutcome.Stopped(),
+            compileMilliseconds: 0,
+            runMilliseconds: 0,
           }),
         )
       }),

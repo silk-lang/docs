@@ -6,6 +6,7 @@ import { WORK_FILE, WORK_MANIFEST, WORK_ROOT } from './language-protocol'
 import {
   type Chunk,
   type Outcome,
+  type RunProgress,
   type RunRequest,
   type RunResponse,
   type Stream,
@@ -25,17 +26,61 @@ import {
 // A program can print without end, so the page gets at most this much.
 const OUTPUT_LIMIT = 256 * 1024
 
+// How often a running program's output goes to the page, at most.
+const PROGRESS_INTERVAL = 50
+
 // Terminal control sequences, such as colors.
 const ANSI_ESCAPE = /\u001b\[[0-9;?]*[A-Za-z]/g
 
+// The sequences that clear a terminal's screen: erase it, or reset it. A
+// program that redraws in place, such as an animation, writes one per frame.
+const CLEAR_SCREEN = /\u001b\[[23]J|\u001bc/g
+
+// Where the text after the last clear starts, if the text clears the screen.
+const afterLastClear = (text: string): number | undefined => {
+  const last = [...text.matchAll(CLEAR_SCREEN)].at(-1)
+  return last === undefined ? undefined : last.index + last[0].length
+}
+
+const append = (chunks: Array<Chunk>, chunk: Chunk): void => {
+  const last = chunks.at(-1)
+  if (last !== undefined && last.stream === chunk.stream) {
+    chunks[chunks.length - 1] = {
+      stream: chunk.stream,
+      text: last.text + chunk.text,
+    }
+  } else {
+    chunks.push(chunk)
+  }
+}
+
 // Collects output in order, joining neighboring pieces of the same stream and
-// stopping at OUTPUT_LIMIT.
-const makeOutput = () => {
+// stopping at OUTPUT_LIMIT. `unsent` holds what came since the last `flush`;
+// `onAdd` runs after each piece and `onClear` when the program clears the
+// screen, which drops its output so far, frees its room under the limit and
+// tells the page to drop it too.
+const makeOutput = (onAdd: () => void, onClear: () => void) => {
   const chunks: Array<Chunk> = []
+  const unsent: Array<Chunk> = []
   const decoders = new Map<Stream, TextDecoder>()
   let size = 0
   let isTruncated = false
-  const add = (stream: Stream, raw: string): void => {
+  let isCleared = false
+  const clear = (): void => {
+    const compiler = chunks.filter(chunk => chunk.stream === 'compiler')
+    chunks.splice(0, chunks.length, ...compiler)
+    unsent.splice(0, unsent.length)
+    size = compiler.reduce((total, chunk) => total + chunk.text.length, 0)
+    isTruncated = false
+    isCleared = true
+    onClear()
+  }
+  const add = (stream: Stream, written: string): void => {
+    const start = stream === 'compiler' ? undefined : afterLastClear(written)
+    if (start !== undefined) {
+      clear()
+    }
+    const raw = start === undefined ? written : written.slice(start)
     // The page shows plain text, so terminal colors are dropped.
     const text = raw.replace(ANSI_ESCAPE, '')
     if (isTruncated || text === '') {
@@ -44,22 +89,29 @@ const makeOutput = () => {
     const room = OUTPUT_LIMIT - size
     const kept = text.length > room ? text.slice(0, room) : text
     size += kept.length
-    const last = chunks.at(-1)
-    if (last !== undefined && last.stream === stream) {
-      chunks[chunks.length - 1] = { stream, text: last.text + kept }
-    } else {
-      chunks.push({ stream, text: kept })
-    }
-    if (kept.length < text.length) {
-      isTruncated = true
-      chunks.push({
-        stream: 'stderr',
-        text: '\n[The playground stopped showing output here.]\n',
-      })
-    }
+    isTruncated = kept.length < text.length
+    const pieces: ReadonlyArray<Chunk> = isTruncated
+      ? [
+          { stream, text: kept },
+          {
+            stream: 'stderr',
+            text: '\n[The playground stopped showing output here.]\n',
+          },
+        ]
+      : [{ stream, text: kept }]
+    pieces.forEach(piece => {
+      append(chunks, piece)
+      append(unsent, piece)
+    })
+    onAdd()
   }
   return {
     chunks,
+    flush: (): Readonly<{ clear: boolean; progress: ReadonlyArray<Chunk> }> => {
+      const flushed = { clear: isCleared, progress: unsent.splice(0) }
+      isCleared = false
+      return flushed
+    },
     write: (stream: Stream) => (bytes: Uint8Array) => {
       const decoder = decoders.get(stream) ?? new TextDecoder()
       decoders.set(stream, decoder)
@@ -81,8 +133,9 @@ const runCommand = (
   root: DirectoryNode,
   stdout: (bytes: Uint8Array) => void,
   stderr: (bytes: Uint8Array) => void,
+  onWait: () => void = () => undefined,
 ): number => {
-  const wasi = makeWasi({ args, root, stdout, stderr })
+  const wasi = makeWasi({ args, root, stdout, stderr, onWait })
   const instance = new WebAssembly.Instance(module, {
     wasi_snapshot_preview1: wasi.imports,
   })
@@ -188,8 +241,28 @@ const elapsed = (start: number) => Math.round(performance.now() - start)
 const run = async (
   loaded: Promise<Loaded>,
   request: RunRequest,
+  report: (progress: RunProgress) => void,
 ): Promise<RunResponse> => {
-  const output = makeOutput()
+  const sent = { at: performance.now() }
+  const sendProgress = (): void => {
+    const { clear, progress } = output.flush()
+    if (clear || progress.length > 0) {
+      sent.at = performance.now()
+      report({ id: request.id, clear, progress })
+    }
+  }
+  const output = makeOutput(
+    () => {
+      if (performance.now() - sent.at >= PROGRESS_INTERVAL) {
+        sendProgress()
+      }
+    },
+    // A clear starts a new frame, which goes to the page whole when the
+    // program next waits, rather than half drawn.
+    () => {
+      sent.at = performance.now()
+    },
+  )
   const timings = { compile: 0, run: 0 }
   const finish = (outcome: Outcome): RunResponse => ({
     id: request.id,
@@ -254,6 +327,7 @@ const run = async (
             fork(directory()),
             output.write('stdout'),
             output.write('stderr'),
+            sendProgress,
           )
         : runBare(module, output)
     timings.run = elapsed(runStart)
@@ -287,7 +361,7 @@ type WorkerScope = Readonly<{
     type: 'message',
     listener: (event: MessageEvent) => void,
   ) => void
-  postMessage: (message: RunResponse) => void
+  postMessage: (message: RunResponse | RunProgress) => void
 }>
 
 const start = (scope: WorkerScope): void => {
@@ -309,7 +383,9 @@ const start = (scope: WorkerScope): void => {
     )
     const loaded = cache.loaded
     queue.tail = queue.tail.then(async () => {
-      scope.postMessage(await run(loaded, request))
+      scope.postMessage(
+        await run(loaded, request, progress => scope.postMessage(progress)),
+      )
     })
   })
 }

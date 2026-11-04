@@ -212,7 +212,7 @@ const statusLine = (model: Model): string =>
 const shownOutput = (model: Model): ReadonlyArray<RunChunk> =>
   RunState.match(model.runState, {
     Idle: () => [],
-    Running: () => [],
+    Running: ({ output }) => output,
     Finished: ({ output }) => output,
   })
 
@@ -234,7 +234,7 @@ const outputPanel = (model: Model, h: HtmlBuilder<Message>): Html =>
           h.pre(
             [
               h.Class(
-                'rounded-lg bg-code p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words empty:hidden',
+                'rounded-lg bg-code p-3 font-mono text-sm leading-[1.2] whitespace-pre-wrap break-words empty:hidden',
               ),
             ],
             Array.map(shownOutput(model), chunk =>

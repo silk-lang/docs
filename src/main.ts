@@ -522,7 +522,7 @@ const loadedTableOfContents = (model: Model): ReadonlyArray<string> =>
       Array.map(DocsMarkdown.tableOfContents(document), entry => entry.id),
   })
 
-export const subscriptions = Subscription.make<Model, Message>()(entry => ({
+const siteSubscriptions = Subscription.make<Model, Message>()(entry => ({
   // `/` or Cmd+K (Ctrl+K off macOS) opens search from any page.
   searchShortcut: entry(
     { isSearchOpen: Schema.Boolean },
@@ -631,6 +631,14 @@ export const subscriptions = Subscription.make<Model, Message>()(entry => ({
     },
   ),
 }))
+
+export const subscriptions = Subscription.aggregate(
+  siteSubscriptions,
+  Subscription.lift(Playground.subscriptions)({
+    read: readPlayground,
+    toParentMessage: toGotPlaygroundMessage,
+  }),
+)
 
 // VIEW
 

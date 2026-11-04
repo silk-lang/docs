@@ -12,6 +12,9 @@ export const Message = defineMessageUnion({
   ClickedRun: {},
   PressedRunShortcut: {},
   ClickedStop: {},
+  // The running program wrote more output, after clearing the screen when
+  // `clear` is true.
+  ReceivedRunOutput: { clear: Schema.Boolean, output: Schema.Array(RunChunk) },
   CompletedRun: {
     output: Schema.Array(RunChunk),
     outcome: RunOutcome,
