@@ -1,3 +1,4 @@
+import { type HtmlBuilder } from 'foldkit/html'
 import {
   Command,
   all,
@@ -20,11 +21,18 @@ import {
   view,
 } from '../main'
 import { Message } from '../message'
+import { type Model } from '../model'
 import { AppRoute } from '../route'
 import { testModel } from '../testModel'
-import { FIBERS_CODE } from './home'
+import { FIBERS_CODE, seeItRun } from './home'
 
 const homeModel = testModel(AppRoute.Home())
+
+// The examples section is hidden from the page, so its tests render it alone.
+const demoView = (model: Model, h: HtmlBuilder<Message>) => ({
+  title: 'See it run',
+  body: seeItRun(model, h),
+})
 
 describe('landing page', () => {
   test('shows the hero and the calls to action', () => {
@@ -59,9 +67,17 @@ describe('landing page', () => {
     )
   })
 
-  test('the example tabs switch the example', () => {
+  test('hides the examples section', () => {
     scene(
       { update, view },
+      given(homeModel),
+      expect(role('heading', { name: 'See it run' })).not.toExist(),
+    )
+  })
+
+  test('the example tabs switch the example', () => {
+    scene(
+      { update, view: demoView },
       given(homeModel),
       expect(role('heading', { name: 'Fiber.forkChild' })).toExist(),
       click(role('tab', { name: 'Borrow checker' })),
@@ -92,7 +108,7 @@ describe('landing page', () => {
 
   test('running the fibers example shows what it returned', () => {
     scene(
-      { update, view },
+      { update, view: demoView },
       given(homeModel),
       click(role('button', { name: 'Run' })),
       expect(role('button', { name: 'Running' })).toBeDisabled(),

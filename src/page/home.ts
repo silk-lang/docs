@@ -1689,7 +1689,8 @@ const demoPanel = (model: Model, demo: Demo, h: HtmlBuilder<Message>): Html =>
     ],
   )
 
-const seeItRun = (model: Model, h: HtmlBuilder<Message>): Html => {
+// Hidden from the page for now; the scene tests still render it on its own.
+export const seeItRun = (model: Model, h: HtmlBuilder<Message>): Html => {
   const demo = pipe(
     Array.findFirst(
       DEMOS,
@@ -1747,7 +1748,7 @@ const origins = (h: HtmlBuilder<Message>): Html =>
       h.div(
         [h.Class(`${container} flex flex-col gap-10 py-16 md:gap-16 md:py-28`)],
         [
-          sectionHeader('03 — Acknowledgments', 'Where Silk comes from', h),
+          sectionHeader('02 — Acknowledgments', 'Where Silk comes from', h),
           h.div(
             [h.Class('grid gap-10 md:grid-cols-3 md:gap-12')],
             Array.map(ORIGINS, origin =>
@@ -1865,7 +1866,7 @@ const batteries = (h: HtmlBuilder<Message>): Html =>
               h.div(
                 [h.Class('flex max-w-[45rem] flex-col gap-6')],
                 [
-                  label('04 — In the box', h),
+                  label('03 — In the box', h),
                   sectionHeading('Batteries included', h),
                   h.p(
                     [
@@ -2006,7 +2007,7 @@ const crossCompile = (h: HtmlBuilder<Message>): Html =>
         [h.Class(`${container} flex flex-col gap-10 py-16 md:gap-16 md:py-28`)],
         [
           sectionHeader(
-            '05 — Cross-compilation',
+            '04 — Cross-compilation',
             'Cross-compile to every target',
             h,
           ),
@@ -2188,7 +2189,7 @@ const faq = (h: HtmlBuilder<Message>): Html =>
         [
           h.div(
             [h.Class('flex flex-col gap-6 md:gap-8')],
-            [label('06 — Before you start', h), sectionHeading('Questions', h)],
+            [label('05 — Before you start', h), sectionHeading('Questions', h)],
           ),
           h.dl(
             [
@@ -2296,7 +2297,6 @@ export const view = (model: Model, h: HtmlBuilder<Message>): Html =>
     [
       hero(model, h),
       annotated(h),
-      seeItRun(model, h),
       origins(h),
       batteries(h),
       crossCompile(h),
