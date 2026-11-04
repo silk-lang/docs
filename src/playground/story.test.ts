@@ -3,52 +3,28 @@ import { describe, expect, test } from 'vitest'
 
 import { ShowFile } from './editor'
 import { Message } from './message'
-import { BUILT_IN, MAIN_FILE, RunOutcome, RunState, fromArchive } from './model'
-import {
-  LoadExamples,
-  RunProgram,
-  StopProgram,
-  enter,
-  init,
-  update,
-} from './update'
+import { EXAMPLES, MAIN_FILE, RunOutcome, RunState } from './model'
+import { RunProgram, StopProgram, init, update } from './update'
 
 const initModel = init().model
 
-const sieve = {
-  id: 'algorithms/sieve',
-  title: 'Sieve of Eratosthenes',
-  target: 'wasm32-wasip1' as const,
-  source: 'pub fn main() -> i32 { return 77 }\n',
+const exampleWithId = (id: string) => {
+  const example = EXAMPLES.find(candidate => candidate.id === id)
+  if (example === undefined) {
+    throw new Error(`No example ${id}`)
+  }
+  return example
 }
 
 describe('playground', () => {
-  test('opening the page loads the examples once', () => {
-    const entered = enter(initModel)
-    expect(entered.model.examplesState).toBe('Loading')
-    expect(enter(entered.model).commands ?? []).toHaveLength(0)
-    expect(entered.commands?.map(command => command.name)).toEqual([
-      LoadExamples.name,
-    ])
-    story(
-      update,
-      given(entered.model),
-      message(Message.SucceededLoadExamples({ examples: [sieve] })),
-      model(model => {
-        expect(model.examples).toEqual([...BUILT_IN, fromArchive(sieve)])
-        expect(model.examplesState).toBe('Loaded')
-      }),
-    )
-  })
-
   test('choosing an example replaces the files and target', () => {
+    const sieve = exampleWithId('sieve')
     story(
       update,
       given(initModel),
-      message(Message.SucceededLoadExamples({ examples: [sieve] })),
       message(Message.SelectedExample({ id: sieve.id })),
       model(model => {
-        expect(model.files).toEqual([{ name: MAIN_FILE, source: sieve.source }])
+        expect(model.files).toEqual(sieve.files)
         expect(model.activeFile).toBe(MAIN_FILE)
         expect(model.exampleId).toBe(sieve.id)
       }),
@@ -87,7 +63,7 @@ describe('playground', () => {
   })
 
   test('editing a file keeps the others, and a tab shows its file', () => {
-    const modules = BUILT_IN[1]!
+    const modules = exampleWithId('modules')
     story(
       update,
       given(initModel),

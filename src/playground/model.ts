@@ -1,5 +1,15 @@
-import { Schema } from 'effect'
+import { type Array, Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
+
+import fibers from '../../demos/playground/fibers/src/main.silk?raw'
+import hello from '../../demos/playground/hello/src/main.silk?raw'
+import life from '../../demos/playground/life/src/main.silk?raw'
+import maze from '../../demos/playground/maze/src/main.silk?raw'
+import modules from '../../demos/playground/modules/src/main.silk?raw'
+import shapes from '../../demos/playground/modules/src/shapes.silk?raw'
+import parse from '../../demos/playground/parse/src/main.silk?raw'
+import quicksort from '../../demos/playground/quicksort/src/main.silk?raw'
+import sieve from '../../demos/playground/sieve/src/main.silk?raw'
 
 export const Target = Schema.Literals([
   'wasm32-wasip1',
@@ -24,22 +34,6 @@ export const Example = Schema.Struct({
   files: Schema.Array(SourceFile),
 })
 export type Example = typeof Example.Type
-
-// An example as a release's playground archive lists it: one `main.silk`.
-export const ArchiveExample = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  target: Target,
-  source: Schema.String,
-})
-export type ArchiveExample = typeof ArchiveExample.Type
-
-export const fromArchive = (example: ArchiveExample): Example => ({
-  id: example.id,
-  title: example.title,
-  target: example.target,
-  files: [{ name: MAIN_FILE, source: example.source }],
-})
 
 export const RunChunk = Schema.Struct({
   stream: Schema.Literals(['compiler', 'stdout', 'stderr']),
@@ -68,16 +62,8 @@ export const RunState = defineTaggedUnion({
 })
 export type RunState = typeof RunState.Type
 
-export const ExamplesState = Schema.Literals([
-  'Idle',
-  'Loading',
-  'Loaded',
-  'Failed',
-])
-
 export const Model = Schema.Struct({
   examples: Schema.Array(Example),
-  examplesState: ExamplesState,
   exampleId: Schema.String,
   files: Schema.Array(SourceFile),
   // The file the editor shows.
@@ -87,82 +73,30 @@ export const Model = Schema.Struct({
 })
 export type Model = typeof Model.Type
 
-// The first program on the page, from chapter 1 of the book.
-export const HELLO: Example = {
-  id: 'hello',
-  title: 'Hello, world',
+// The examples are Silk packages in demos/playground; `pnpm check:examples`
+// compiles them all, so a new Silk release that warns about one shows up there.
+const single = (id: string, title: string, source: string): Example => ({
+  id,
+  title,
   target: 'wasm32-wasip1',
-  files: [
-    {
-      name: MAIN_FILE,
-      source: `import silk.core.effect { Effect }
-import silk.io.logger { LogError }
-import silk.io.logger_native { StdoutLogger }
+  files: [{ name: MAIN_FILE, source }],
+})
 
-pub effect fn main() -> ()
-  ! LogError {
-  let mut logger = StdoutLogger.make()
-
-  run Effect.log("Hello, world!\\n", &()) |> Effect.provideMut(&mut logger)
-}
-`,
-    },
-  ],
-}
-
-// A program in two files: `main.silk` imports the shapes module by its
-// file name.
-export const MODULES: Example = {
-  id: 'modules',
-  title: 'Modules in two files',
-  target: 'wasm32-wasip1',
-  files: [
-    {
-      name: MAIN_FILE,
-      source: `import shapes { Rectangle, Square, rectangleArea, squareArea }
-import silk.core.effect { Effect }
-import silk.io.logger { LogError }
-import silk.io.logger_native { StdoutLogger }
-
-pub effect fn main() -> ()
-  ! LogError {
-  let mut logger = StdoutLogger.make()
-  let room = Rectangle { width: 4, height: 3 }
-  let tile = Square { side: 2 }
-  let total = rectangleArea(&room) + squareArea(&tile)
-
-  run Effect.log("The areas add up to {}.\\n", &.(total)) |> Effect.provideMut(&mut logger)
-}
-`,
-    },
-    {
-      name: 'shapes.silk',
-      source: `//! Shapes and their areas, in a module of their own.
-
-/// A rectangle, \`width\` by \`height\`.
-pub struct Rectangle {
-  pub width: i32,
-  pub height: i32,
-}
-
-/// A square with sides of \`side\`.
-pub struct Square {
-  pub side: i32,
-}
-
-/// The area of \`rectangle\`.
-pub fn rectangleArea(rectangle: &Rectangle) -> i32 {
-  return rectangle.width * rectangle.height
-}
-
-/// The area of \`square\`.
-pub fn squareArea(square: &Square) -> i32 {
-  return square.side * square.side
-}
-`,
-    },
-  ],
-}
-
-// The examples the site carries itself, before the release's.
-export const BUILT_IN: ReadonlyArray<Example> = [HELLO, MODULES]
+export const EXAMPLES: Array.NonEmptyReadonlyArray<Example> = [
+  single('hello', 'Hello, world', hello),
+  single('fibers', 'Fibers that wait together', fibers),
+  single('parse', 'Reading numbers with Result', parse),
+  single('sieve', 'Sieve of Eratosthenes', sieve),
+  single('quicksort', 'Quicksort, step by step', quicksort),
+  single('maze', 'Shortest path through a maze', maze),
+  single('life', "Conway's Game of Life", life),
+  {
+    id: 'modules',
+    title: 'Modules in two files',
+    target: 'wasm32-wasip1',
+    files: [
+      { name: MAIN_FILE, source: modules },
+      { name: 'shapes.silk', source: shapes },
+    ],
+  },
+]

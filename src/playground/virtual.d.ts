@@ -7,8 +7,3 @@ declare module 'virtual:silk-playground' {
   } | null
   export default toolchain
 }
-
-declare module 'virtual:silk-playground-examples' {
-  const examples: unknown
-  export default examples
-}

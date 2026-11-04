@@ -1,0 +1,14 @@
+import shapes { Rectangle, Square, rectangleArea, squareArea }
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  let room = Rectangle { width: 4, height: 3 }
+  let tile = Square { side: 2 }
+  let total = rectangleArea(&room) + squareArea(&tile)
+
+  run Effect.log("The areas add up to {}.\n", &.(total)) |> Effect.provideMut(&mut logger)
+}

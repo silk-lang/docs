@@ -1,0 +1,92 @@
+//! Conway's Game of Life: a cell with two or three live neighbors survives,
+//! and an empty cell with exactly three comes alive. A glider walks across
+//! the board, which wraps around at its edges.
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_native { StdoutLogger }
+
+const WIDTH: usize = 10
+
+const HEIGHT: usize = 6
+
+fn isAlive(board: &[bool], row: usize, column: usize) -> i32 {
+  if board[(row % HEIGHT) * WIDTH + column % WIDTH] {
+    return 1
+  }
+  return 0
+}
+
+fn liveNeighbors(board: &[bool], row: usize, column: usize) -> i32 {
+  // Adding the size before stepping back keeps the indexes positive.
+  let up = row + HEIGHT - 1
+  let down = row + 1
+  let left = column + WIDTH - 1
+  let right = column + 1
+  return isAlive(board, up, left) + isAlive(board, up, column) + isAlive(board, up, right)
+    + isAlive(board, row, left)
+    + isAlive(board, row, right)
+    + isAlive(board, down, left)
+    + isAlive(board, down, column)
+    + isAlive(board, down, right)
+}
+
+fn step(board: &[bool]) -> [bool; 60] {
+  let mut next = [false; 60]
+  let mut row: usize = 0
+  while row < HEIGHT {
+    let mut column: usize = 0
+    while column < WIDTH {
+      let neighbors = liveNeighbors(board, row, column)
+      let index = row * WIDTH + column
+      next[index] = neighbors == 3 || (neighbors == 2 && board[index])
+      column = column + 1
+    }
+    row = row + 1
+  }
+  return next
+}
+
+effect fn show(board: &[bool], generation: i32) -> ()
+  ! LogError
+  ? &mut Logger {
+  run Effect.log("Generation {}\n", &.(generation))
+  let mut row: usize = 0
+  while row < HEIGHT {
+    let mut column: usize = 0
+    while column < WIDTH {
+      if board[row * WIDTH + column] {
+        run Effect.log("# ", &())
+      } else {
+        run Effect.log(". ", &())
+      }
+      column = column + 1
+    }
+    run Effect.log("\n", &())
+    row = row + 1
+  }
+  run Effect.log("\n", &())
+}
+
+effect fn play() -> ()
+  ! LogError
+  ? &mut Logger {
+  let mut board = [false; 60]
+  board[1] = true
+  board[WIDTH + 2] = true
+  board[2 * WIDTH] = true
+  board[2 * WIDTH + 1] = true
+  board[2 * WIDTH + 2] = true
+
+  let mut generation = 0
+  while generation < 5 {
+    run show(&board, generation)
+    board = step(&board)
+    generation = generation + 1
+  }
+}
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  run play() |> Effect.provideMut(&mut logger)
+}

@@ -1,0 +1,123 @@
+//! Breadth-first search through a maze. The search visits cells in rings of
+//! equal distance from the start, so the first time it reaches the exit, it
+//! has found a shortest path. Each cell remembers the cell it came from, and
+//! walking those back from the exit draws the path.
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_native { StdoutLogger }
+import silk.text.string { String }
+
+const WIDTH: usize = 11
+
+const HEIGHT: usize = 7
+
+const CELLS: usize = 77
+
+// A cell with no cell before it.
+const NONE: usize = 77
+
+const MAZE: [string; 7] = [
+  "S...#......",
+  "##.##.####.",
+  "...#..#....",
+  ".#.#.##.###",
+  ".#...#...#.",
+  ".#####.#.#.",
+  ".......#..E",
+]
+
+fn isOpen(row: usize, column: usize) -> bool {
+  return String.utf8Bytes(MAZE[row])[column] != b"#"[0]
+}
+
+effect fn solve() -> ()
+  ! LogError
+  ? &mut Logger {
+  let start: usize = 0
+  let exit = CELLS - 1
+  let mut cameFrom = [NONE; CELLS]
+  let mut queue: [usize; CELLS] = [0; CELLS]
+  let mut head: usize = 0
+  let mut tail: usize = 1
+  queue[0] = start
+  cameFrom[start] = start
+
+  while head < tail && cameFrom[exit] == NONE {
+    let cell = queue[head]
+    head = head + 1
+    let row = cell / WIDTH
+    let column = cell % WIDTH
+
+    // The neighbors above, below, left and right, when they are inside the
+    // maze, open, and not seen yet.
+    let mut neighbors = [NONE; 4]
+    if row > 0 {
+      neighbors[0] = cell - WIDTH
+    }
+    if row + 1 < HEIGHT {
+      neighbors[1] = cell + WIDTH
+    }
+    if column > 0 {
+      neighbors[2] = cell - 1
+    }
+    if column + 1 < WIDTH {
+      neighbors[3] = cell + 1
+    }
+    let mut index: usize = 0
+    while index < 4 {
+      let next = neighbors[index]
+      if next != NONE && isOpen(next / WIDTH, next % WIDTH) && cameFrom[next] == NONE {
+        cameFrom[next] = cell
+        queue[tail] = next
+        tail = tail + 1
+      }
+      index = index + 1
+    }
+  }
+
+  if cameFrom[exit] == NONE {
+    run Effect.log("There is no way out.\n", &())
+    return ()
+  }
+
+  let mut onPath = [false; CELLS]
+  let mut steps = 0
+  let mut cell = exit
+  while cell != start {
+    onPath[cell] = true
+    cell = cameFrom[cell]
+    steps = steps + 1
+  }
+
+  let mut row: usize = 0
+  while row < HEIGHT {
+    let mut column: usize = 0
+    while column < WIDTH {
+      let here = row * WIDTH + column
+      if here == start {
+        run Effect.log("S", &())
+      } else if here == exit {
+        run Effect.log("E", &())
+      } else if !isOpen(row, column) {
+        run Effect.log("#", &())
+      } else if onPath[here] {
+        run Effect.log("*", &())
+      } else {
+        run Effect.log(" ", &())
+      }
+      column = column + 1
+    }
+    run Effect.log("\n", &())
+    row = row + 1
+  }
+  run Effect.log(
+    "\nThe shortest way out takes {} steps; the search looked at {} cells.\n",
+    &(steps, tail),
+  )
+}
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  run solve() |> Effect.provideMut(&mut logger)
+}

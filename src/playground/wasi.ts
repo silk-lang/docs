@@ -22,6 +22,21 @@ export type FsNode = FileNode | DirectoryNode
 
 const now = (): bigint => BigInt(Date.now()) * 1_000_000n
 
+const MONOTONIC = 1
+
+// Clock 0 is the wall clock; the others read the monotonic clock.
+const clockNow = (id: number): bigint =>
+  id === 0 ? now() : BigInt(Math.round(performance.now() * 1_000_000))
+
+// The layouts of `subscription` and `event` in WASI preview 1.
+const SUBSCRIPTION_SIZE = 48
+const EVENT_SIZE = 32
+const EVENT_CLOCK = 0
+
+// Something to block on while a program sleeps. Nothing ever notifies it, so
+// `Atomics.wait` returns when its timeout ends.
+const sleeper = new Int32Array(new SharedArrayBuffer(4))
+
 export const directory = (): DirectoryNode => ({
   kind: 'directory',
   entries: new Map(),
@@ -108,6 +123,7 @@ const NOENT = 44
 const NOSYS = 52
 const NOTDIR = 54
 const NOTEMPTY = 55
+const NOTSUP = 58
 
 const FILETYPE_CHARACTER_DEVICE = 2
 const FILETYPE_DIRECTORY = 3
@@ -699,9 +715,56 @@ export const makeWasi = (options: WasiOptions): Wasi => {
       return SUCCESS
     },
     clock_time_get: (id: number, _precision: bigint, address: number) => {
-      const time =
-        id === 0 ? now() : BigInt(Math.round(performance.now() * 1_000_000))
-      view().setBigUint64(address, time, true)
+      view().setBigUint64(address, clockNow(id), true)
+      return SUCCESS
+    },
+    // Only clock subscriptions wait, which is how a program sleeps. One on a
+    // file descriptor answers at once with NOTSUP.
+    poll_oneoff: (
+      subscriptions: number,
+      events: number,
+      count: number,
+      eventCountAddress: number,
+    ) => {
+      const memoryView = view()
+      const at = (index: number) => subscriptions + index * SUBSCRIPTION_SIZE
+      const deadlines = Array.from({ length: count }, (_, index) => {
+        if (memoryView.getUint8(at(index) + 8) !== EVENT_CLOCK) {
+          return 0n
+        }
+        const id = memoryView.getUint32(at(index) + 16, true)
+        const timeout = memoryView.getBigUint64(at(index) + 24, true)
+        const isAbsolute =
+          (memoryView.getUint16(at(index) + 40, true) & 1) === 1
+        return isAbsolute ? timeout : clockNow(id) + timeout
+      })
+      const earliest = deadlines.reduce(
+        (soonest, deadline) => (deadline < soonest ? deadline : soonest),
+        deadlines[0] ?? 0n,
+      )
+      const waitFor = Number(earliest - clockNow(MONOTONIC)) / 1_000_000
+      if (waitFor > 0) {
+        Atomics.wait(sleeper, 0, 0, waitFor)
+      }
+      const ready = deadlines.flatMap((deadline, index) =>
+        deadline <= earliest ? [index] : [],
+      )
+      ready.forEach((index, slot) => {
+        const event = events + slot * EVENT_SIZE
+        const type = memoryView.getUint8(at(index) + 8)
+        memoryView.setBigUint64(
+          event,
+          memoryView.getBigUint64(at(index), true),
+          true,
+        )
+        memoryView.setUint16(
+          event + 8,
+          type === EVENT_CLOCK ? SUCCESS : NOTSUP,
+          true,
+        )
+        memoryView.setUint8(event + 10, type)
+      })
+      memoryView.setUint32(eventCountAddress, ready.length, true)
       return SUCCESS
     },
     clock_res_get: (_id: number, address: number) => {

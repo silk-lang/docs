@@ -122,10 +122,7 @@ export const init: Runtime.RoutingApplicationInit<
   }
 
   return Option.match(maybePage, {
-    onNone: () =>
-      route._tag === 'Playground'
-        ? foldPlaygroundEnter(baseModel)
-        : { model: baseModel },
+    onNone: () => ({ model: baseModel }),
     onSome: page =>
       Option.match(maybeFlaggedDocument, {
         onSome: ({ key, document }) =>
@@ -281,13 +278,6 @@ const foldPlayground = Update.foldChild({
   toParentMessage: toGotPlaygroundMessage,
 })
 
-const foldPlaygroundEnter = Update.foldChildStep({
-  update: Playground.enter,
-  read: readPlayground,
-  write: writePlayground,
-  toParentMessage: toGotPlaygroundMessage,
-})
-
 const foldSearchRouteChanged = Update.foldChildStep({
   update: Search.informRouteChanged,
   read: readSearch,
@@ -380,17 +370,10 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
           ),
       })
     },
-    onNone: () =>
-      Update.combine(nextModel, [
-        stepModel =>
-          nextRoute._tag === 'Playground'
-            ? foldPlaygroundEnter(stepModel)
-            : { model: stepModel },
-        stepModel => ({
-          model: stepModel,
-          commands: scrollCommands(url, isSamePath),
-        }),
-      ]),
+    onNone: () => ({
+      model: nextModel,
+      commands: scrollCommands(url, isSamePath),
+    }),
   })
 }
 

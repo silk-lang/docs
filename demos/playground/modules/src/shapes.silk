@@ -1,0 +1,22 @@
+//! Shapes and their areas, in a module of their own.
+
+/// A rectangle, `width` by `height`.
+pub struct Rectangle {
+  pub width: i32,
+  pub height: i32,
+}
+
+/// A square with sides of `side`.
+pub struct Square {
+  pub side: i32,
+}
+
+/// The area of `rectangle`.
+pub fn rectangleArea(rectangle: &Rectangle) -> i32 {
+  return rectangle.width * rectangle.height
+}
+
+/// The area of `square`.
+pub fn squareArea(square: &Square) -> i32 {
+  return square.side * square.side
+}

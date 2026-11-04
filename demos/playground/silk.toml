@@ -1,0 +1,11 @@
+[workspace]
+members = [
+  "hello",
+  "fibers",
+  "parse",
+  "sieve",
+  "quicksort",
+  "maze",
+  "life",
+  "modules",
+]

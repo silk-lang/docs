@@ -1,0 +1,52 @@
+//! Quicksort, in place: each pass puts one pivot where it belongs, with the
+//! smaller values to its left and the larger ones to its right.
+import silk.core.effect { Effect }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_native { StdoutLogger }
+
+fn swap(values: &mut [i32], left: usize, right: usize) -> () {
+  let held = values[left]
+  values[left] = values[right]
+  values[right] = held
+}
+
+// Moves every value up to the pivot before it and answers where the pivot
+// ends up.
+fn partition(values: &mut [i32], low: usize, high: usize) -> usize {
+  let pivot = values[high]
+  let mut boundary = low
+  let mut scan = low
+  while scan < high {
+    if values[scan] <= pivot {
+      swap(&mut values, boundary, scan)
+      boundary = boundary + 1
+    }
+    scan = scan + 1
+  }
+  swap(&mut values, boundary, high)
+  return boundary
+}
+
+effect fn sort(values: &mut [i32], low: usize, high: usize) -> ()
+  ! LogError
+  ? &mut Logger {
+  if low >= high {
+    return ()
+  }
+  let pivot = partition(&mut values, low, high)
+  run Effect.log("pivot {} placed: {:?}\n", &(values[pivot], &values))
+  if pivot > low {
+    run sort(&mut values, low, pivot - 1)
+  }
+  run sort(&mut values, pivot + 1, high)
+}
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  let mut values = [9, -3, 5, 1, 0, -8, 7, 2]
+
+  run Effect.log("before: {:?}\n", &.(values)) |> Effect.provideMut(&mut logger)
+  run sort(&mut values, 0, 7) |> Effect.provideMut(&mut logger)
+  run Effect.log("after:  {:?}\n", &.(values)) |> Effect.provideMut(&mut logger)
+}

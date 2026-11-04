@@ -1,0 +1,58 @@
+//! Three tasks, each on its own fiber, waiting at the same time. The scheduler
+//! runs whichever fiber is ready, so the program takes as long as the slowest
+//! task, not as long as all three together.
+import silk.mem.allocator { OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.concurrency.fiber { Cancelled, Fiber }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+import silk.system.system_clock { Instant, SystemClock }
+
+// A fiber can only ask for the scheduler and the clock, so each one writes
+// through a logger of its own.
+effect fn task(name: string, delay: u64) -> u64
+  ! LogError
+  ? &mut MonotonicClock {
+  let mut logger = StdoutLogger.make()
+  run Effect.log("{} started\n", &.(name)) |> Effect.provideMut(&mut logger)
+  run Effect.sleep(delay)
+  run Effect.log("{} finished after {} ms\n", &(name, delay / 1ms))
+    |> Effect.provideMut(&mut logger)
+  return delay
+}
+
+fn millisecondsBetween(start: &Instant, end: &Instant) -> i64 {
+  let seconds = SystemClock.seconds(end) - SystemClock.seconds(start)
+  let nanoseconds = SystemClock.nanoseconds(end) - SystemClock.nanoseconds(start)
+  return seconds * 1000 + nanoseconds / 1000000
+}
+
+effect fn root() -> ()
+  ! LogError | OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
+  let started = run MonotonicClock.now()
+  let download = run Fiber.forkChild(task("download", 600ms))
+  let resize = run Fiber.forkChild(task("resize", 200ms))
+  let upload = run Fiber.forkChild(task("upload", 400ms))
+  let first = run Fiber.join(move download)
+  let second = run Fiber.join(move resize)
+  let third = run Fiber.join(move upload)
+  let finished = run MonotonicClock.now()
+
+  let mut logger = StdoutLogger.make()
+  let summary = (millisecondsBetween(&started, &finished), (first + second + third) / 1ms)
+  run Effect.log("All done in {} ms. One after another, they would take {} ms.\n", &summary)
+    |> Effect.provideMut(&mut logger)
+}
+
+pub effect fn main() -> ()
+  ! LogError | OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  let mut clock = OsMonotonicClock.make()
+  let mut scheduler = LocalScheduler.make()
+  run LocalScheduler.execute(&mut scheduler, root())
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+}

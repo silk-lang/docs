@@ -1,0 +1,43 @@
+//! Reading numbers from text. `Format.i32Value` answers a `Result`, so a
+//! caller has to say what happens when the text is not a number before it can
+//! use the value.
+import silk.core.effect { Effect }
+import silk.core.result { Result }
+import silk.io.logger { LogError, Logger }
+import silk.io.logger_native { StdoutLogger }
+import silk.text.format { Format, NotANumber, OutOfRange, ParseError }
+
+effect fn read(text: string) -> ()
+  ! LogError
+  ? &mut Logger {
+  match move Format.i32Value(text) {
+    Result<i32, ParseError>.Success { value } => {
+      run Effect.log("{:>14?} -> {}, doubled {}\n", &(text, value, value * 2))
+    }
+    Result<i32, ParseError>.Failure { error } => match move error.reason {
+      NotANumber { offset } => {
+        run Effect.log("{:>14?} -> not a number, at byte {}\n", &(text, offset))
+      }
+      OutOfRange {} => {
+        run Effect.log("{:>14?} -> does not fit in an i32\n", &.(text))
+      }
+    }
+  }
+}
+
+effect fn readAll() -> ()
+  ! LogError
+  ? &mut Logger {
+  let inputs = ["42", "-17", "12x", "", "3000000000"]
+  let mut index: usize = 0
+  while index < inputs.length {
+    run read(inputs[index])
+    index = index + 1
+  }
+}
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  run readAll() |> Effect.provideMut(&mut logger)
+}
