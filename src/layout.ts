@@ -2,7 +2,13 @@ import { type Html, type HtmlBuilder } from 'foldkit/html'
 
 import * as Icon from './icon'
 import { Message } from './message'
-import { docPageRouter, docsRouter, homeRouter, releasesRouter } from './route'
+import {
+  docPageRouter,
+  docsRouter,
+  homeRouter,
+  playgroundRouter,
+  releasesRouter,
+} from './route'
 import * as Search from './search'
 
 export const GITHUB_URL = 'https://github.com/silk-lang/silk'
@@ -102,6 +108,7 @@ const navLinks = (
   navLink('Tour', TOUR_PATH, false, h),
   navLink('Book', BOOK_PATH, false, h),
   navLink('Docs', docsRouter(), current === 'Docs', h),
+  navLink('Playground', playgroundRouter(), current === 'Playground', h),
   navLink('Releases', releasesRouter(), current === 'Releases', h),
   h.a(
     [
@@ -230,6 +237,7 @@ export const siteFooter = <Message>(h: HtmlBuilder<Message>): Html =>
                 docPageRouter({ directory: 'guides', slug: 'overview' }),
                 h,
               ),
+              footerLink('Playground', playgroundRouter(), h),
               footerLink('Releases', releasesRouter(), h),
               footerLink('GitHub', GITHUB_URL, h),
             ],
