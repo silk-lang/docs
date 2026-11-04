@@ -1,13 +1,26 @@
 //! Conway's Game of Life: a cell with two or three live neighbors survives,
-//! and an empty cell with exactly three comes alive. A glider walks across
-//! the board, which wraps around at its edges.
+//! and an empty cell with exactly three comes alive. The board wraps around at
+//! its edges. When it settles into a still life or a blinker, or after 300
+//! generations, a new random board starts. It runs until you stop it.
+//!
+//! 🐣 hatched this generation, 🐥 survived from the last one.
 import silk.core.effect { Effect }
 import silk.io.logger { LogError, Logger }
 import silk.io.logger_native { StdoutLogger }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
 
-const WIDTH: usize = 10
+const WIDTH: usize = 24
 
-const HEIGHT: usize = 6
+const HEIGHT: usize = 12
+
+const CELLS: usize = 288
+
+const LONGEST: i32 = 300
+
+// Clears the screen and moves the cursor to the top left, in a terminal and
+// in the playground.
+const CLEAR: string = "\u{1b}[2J\u{1b}[H"
 
 fn isAlive(board: &[bool], row: usize, column: usize) -> i32 {
   if board[(row % HEIGHT) * WIDTH + column % WIDTH] {
@@ -30,8 +43,8 @@ fn liveNeighbors(board: &[bool], row: usize, column: usize) -> i32 {
     + isAlive(board, down, right)
 }
 
-fn step(board: &[bool]) -> [bool; 60] {
-  let mut next = [false; 60]
+fn step(board: &[bool]) -> [bool; CELLS] {
+  let mut next = [false; CELLS]
   let mut row: usize = 0
   while row < HEIGHT {
     let mut column: usize = 0
@@ -46,47 +59,88 @@ fn step(board: &[bool]) -> [bool; 60] {
   return next
 }
 
-effect fn show(board: &[bool], generation: i32) -> ()
+effect fn show(board: &[bool], previous: &[bool], generation: i32) -> ()
   ! LogError
   ? &mut Logger {
-  run Effect.log("Generation {}\n", &.(generation))
-  let mut row: usize = 0
-  while row < HEIGHT {
-    let mut column: usize = 0
-    while column < WIDTH {
-      if board[row * WIDTH + column] {
-        run Effect.log("# ", &())
-      } else {
-        run Effect.log(". ", &())
-      }
-      column = column + 1
+  run Effect.log("{}Generation {}\n\n", &(CLEAR, generation))
+  let mut cell: usize = 0
+  while cell < CELLS {
+    if board[cell] && previous[cell] {
+      run Effect.log("🐥", &())
+    } else if board[cell] {
+      run Effect.log("🐣", &())
+    } else {
+      run Effect.log("⬜", &())
     }
-    run Effect.log("\n", &())
-    row = row + 1
+    cell = cell + 1
+    if cell % WIDTH == 0 {
+      run Effect.log("\n", &())
+    }
   }
-  run Effect.log("\n", &())
+}
+
+// The next number from a linear congruential generator. Numbers stay below
+// 2^31, so the product fits in a u64.
+fn nextRandom(state: u64) -> u64 {
+  return (state * 1103515245 + 12345) % 2147483648
+}
+
+// Fills `board` with about one cell in three alive and answers the
+// generator's next state.
+fn randomize(board: &mut [bool], seed: u64) -> u64 {
+  let mut state = seed
+  let mut index: usize = 0
+  while index < CELLS {
+    state = nextRandom(state)
+    board[index] = (state / 65536) % 3 == 0
+    index = index + 1
+  }
+  return state
+}
+
+fn sameBoard(left: &[bool], right: &[bool]) -> bool {
+  let mut index: usize = 0
+  while index < CELLS {
+    if left[index] != right[index] {
+      return false
+    }
+    index = index + 1
+  }
+  return true
 }
 
 effect fn play() -> ()
   ! LogError
-  ? &mut Logger {
-  let mut board = [false; 60]
-  board[1] = true
-  board[WIDTH + 2] = true
-  board[2 * WIDTH] = true
-  board[2 * WIDTH + 1] = true
-  board[2 * WIDTH + 2] = true
+  ? &mut Logger | &mut MonotonicClock {
+  let mut board = [false; CELLS]
+  let mut state = randomize(&mut board, 2026)
 
+  // The board before this one: a board that matches it next has settled.
+  let mut previous = [false; CELLS]
   let mut generation = 0
-  while generation < 5 {
-    run show(&board, generation)
-    board = step(&board)
+  while true {
+    run show(&board, &previous, generation)
+    let next = step(&board)
+    let isSettled = sameBoard(&next, &board) || sameBoard(&next, &previous)
+    previous = board
+    board = next
     generation = generation + 1
+    if isSettled || generation == LONGEST {
+      state = randomize(&mut board, state)
+
+      // A new board hatches all at once.
+      previous = [false; CELLS]
+      generation = 0
+    }
+    run Effect.sleep(150ms)
   }
 }
 
 pub effect fn main() -> ()
   ! LogError {
   let mut logger = StdoutLogger.make()
-  run play() |> Effect.provideMut(&mut logger)
+  let mut clock = OsMonotonicClock.make()
+  run play()
+    |> Effect.provideMut(&mut logger)
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
 }

@@ -1,7 +1,8 @@
-import { Context, Effect, Layer } from 'effect'
+import { Context, Effect, Layer, Queue, Stream } from 'effect'
 
 import {
   type ProgramFile,
+  type RunProgress,
   type RunResponse,
   type Target,
   type Toolchain,
@@ -17,6 +18,9 @@ type PlaygroundApi = Readonly<{
   // Stops the running program, which then ends as `Stopped`. The next run
   // starts a new worker, which downloads the toolchain again from the cache.
   stop: Effect.Effect<void>
+  // The output of the running program as it writes it, for as long as the
+  // stream is open. The run's response still carries all of it.
+  progress: Stream.Stream<RunProgress>
 }>
 
 const isResponse = (value: unknown): value is RunResponse =>
@@ -25,6 +29,16 @@ const isResponse = (value: unknown): value is RunResponse =>
   'id' in value &&
   typeof value.id === 'number' &&
   'outcome' in value
+
+const isProgress = (value: unknown): value is RunProgress =>
+  typeof value === 'object' &&
+  value !== null &&
+  'id' in value &&
+  typeof value.id === 'number' &&
+  'clear' in value &&
+  typeof value.clear === 'boolean' &&
+  'progress' in value &&
+  Array.isArray(value.progress)
 
 type Pending = Map<number, (response: RunResponse) => void>
 
@@ -51,6 +65,7 @@ const makePlayground = (): PlaygroundApi => {
     nextId: 1,
   }
   const pending: Pending = new Map()
+  const listeners = new Set<(progress: RunProgress) => void>()
 
   const stopWorker = (): void => {
     state.worker?.terminate()
@@ -66,6 +81,10 @@ const makePlayground = (): PlaygroundApi => {
     })
     created.addEventListener('message', event => {
       const response: unknown = event.data
+      if (isProgress(response)) {
+        listeners.forEach(listener => listener(response))
+        return
+      }
       if (!isResponse(response)) {
         return
       }
@@ -98,6 +117,18 @@ const makePlayground = (): PlaygroundApi => {
       stopWorker()
       failAll(pending, id => ended(id, { tag: 'Stopped' }))
     }),
+    progress: Stream.callback<RunProgress>(queue =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          const listener = (progress: RunProgress) => {
+            Queue.offerUnsafe(queue, progress)
+          }
+          listeners.add(listener)
+          return listener
+        }),
+        listener => Effect.sync(() => listeners.delete(listener)),
+      ).pipe(Effect.andThen(Effect.never)),
+    ),
   }
 }
 

@@ -52,7 +52,8 @@ export type RunOutcome = typeof RunOutcome.Type
 
 export const RunState = defineTaggedUnion({
   Idle: {},
-  Running: {},
+  // The output so far, as the program writes it.
+  Running: { output: Schema.Array(RunChunk) },
   Finished: {
     output: Schema.Array(RunChunk),
     outcome: RunOutcome,

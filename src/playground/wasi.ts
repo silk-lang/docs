@@ -158,6 +158,9 @@ export type WasiOptions = Readonly<{
   // it wrote, 0 at the end of the input. It may block. Without it, standard
   // input is empty.
   stdin?: (into: Uint8Array) => number
+  // Called before the program blocks to sleep, so the output it wrote first
+  // can reach the page.
+  onWait?: () => void
 }>
 
 export type Wasi = Readonly<{
@@ -744,6 +747,7 @@ export const makeWasi = (options: WasiOptions): Wasi => {
       )
       const waitFor = Number(earliest - clockNow(MONOTONIC)) / 1_000_000
       if (waitFor > 0) {
+        options.onWait?.()
         Atomics.wait(sleeper, 0, 0, waitFor)
       }
       const ready = deadlines.flatMap((deadline, index) =>

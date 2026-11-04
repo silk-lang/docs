@@ -21,6 +21,15 @@ export type Stream = 'compiler' | 'stdout' | 'stderr'
 
 export type Chunk = Readonly<{ stream: Stream; text: string }>
 
+// Output the program wrote since the last progress message, sent while it
+// runs; `clear` says it cleared the screen first, so the page drops the
+// program's earlier output. The response at the end carries what remains.
+export type RunProgress = Readonly<{
+  id: number
+  clear: boolean
+  progress: ReadonlyArray<Chunk>
+}>
+
 // How a run ended.
 export type Outcome =
   | Readonly<{ tag: 'Exited'; code: number }>

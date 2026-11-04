@@ -1,8 +1,88 @@
 //! Quicksort, in place: each pass puts one pivot where it belongs, with the
 //! smaller values to its left and the larger ones to its right.
+//!
+//! 🟨 is the pivot, 🟥 the value compared with it, 🟧 two values trading
+//! places, and 🟩 a value in its final place. The row under the columns
+//! names each value, so you can follow a column as it moves.
 import silk.core.effect { Effect }
 import silk.io.logger { LogError, Logger }
 import silk.io.logger_native { StdoutLogger }
+import silk.num.i32
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+
+const COUNT: usize = 10
+
+// No position: nothing to mark.
+const NONE: usize = 10
+
+// Clears the screen and moves the cursor to the top left, in a terminal and
+// in the playground.
+const CLEAR: string = "\u{1b}[2J\u{1b}[H"
+
+const LABELS: [string; 10] = [
+  "1️⃣",
+  "2️⃣",
+  "3️⃣",
+  "4️⃣",
+  "5️⃣",
+  "6️⃣",
+  "7️⃣",
+  "8️⃣",
+  "9️⃣",
+  "🔟",
+]
+
+struct Stats {
+  comparisons: i32,
+  swaps: i32,
+}
+
+// What a frame marks: the pivot, and up to two columns, compared or swapping.
+struct Marks {
+  pivot: usize,
+  first: usize,
+  second: usize,
+  isSwap: bool,
+}
+
+fn plain() -> Marks {
+  return Marks { pivot: NONE, first: NONE, second: NONE, isSwap: false }
+}
+
+// One column per value, as tall as the value, with its label under it.
+effect fn draw(values: &[i32], placed: &[bool], marks: &Marks) -> ()
+  ! LogError
+  ? &mut Logger {
+  let mut level: i32 = 10
+  while level > 0 {
+    let mut index: usize = 0
+    while index < COUNT {
+      if values[index] < level {
+        run Effect.log("⬜", &())
+      } else if placed[index] {
+        run Effect.log("🟩", &())
+      } else if (index == marks.first || index == marks.second) && marks.isSwap {
+        run Effect.log("🟧", &())
+      } else if index == marks.first || index == marks.second {
+        run Effect.log("🟥", &())
+      } else if index == marks.pivot {
+        run Effect.log("🟨", &())
+      } else {
+        run Effect.log("🟦", &())
+      }
+      index = index + 1
+    }
+    run Effect.log("\n", &())
+    level = level - 1
+  }
+  let mut index: usize = 0
+  while index < COUNT {
+    run Effect.log("{}", &.(LABELS[i32.toUsize(values[index] - 1)]))
+    index = index + 1
+  }
+  run Effect.log("\n", &())
+}
 
 fn swap(values: &mut [i32], left: usize, right: usize) -> () {
   let held = values[left]
@@ -10,43 +90,111 @@ fn swap(values: &mut [i32], left: usize, right: usize) -> () {
   values[right] = held
 }
 
+// Swaps two columns, with a frame before and after so the move shows.
+effect fn swapShown(
+  values: &mut [i32],
+  placed: &[bool],
+  left: usize,
+  right: usize,
+  pivot: usize,
+  stats: &mut Stats,
+) -> ()
+  ! LogError
+  ? &mut Logger | &mut MonotonicClock {
+  let marks = Marks { pivot: pivot, first: left, second: right, isSwap: true }
+  run Effect.log("{}Swap {} and {}.\n\n", &(CLEAR, values[left], values[right]))
+  run draw(&values, placed, &marks)
+  run Effect.sleep(250ms)
+  swap(&mut values, left, right)
+  stats.swaps = stats.swaps + 1
+  run Effect.log("{}Swapped.\n\n", &.(CLEAR))
+  run draw(&values, placed, &marks)
+  run Effect.sleep(250ms)
+}
+
 // Moves every value up to the pivot before it and answers where the pivot
 // ends up.
-fn partition(values: &mut [i32], low: usize, high: usize) -> usize {
+effect fn partition(
+  values: &mut [i32],
+  placed: &[bool],
+  low: usize,
+  high: usize,
+  stats: &mut Stats,
+) -> usize
+  ! LogError
+  ? &mut Logger | &mut MonotonicClock {
   let pivot = values[high]
   let mut boundary = low
   let mut scan = low
   while scan < high {
+    stats.comparisons = stats.comparisons + 1
+    let marks = Marks { pivot: high, first: scan, second: NONE, isSwap: false }
+    run Effect.log("{}Is {} smaller than the pivot, {}?\n\n", &(CLEAR, values[scan], pivot))
+    run draw(&values, placed, &marks)
+    run Effect.sleep(150ms)
     if values[scan] <= pivot {
-      swap(&mut values, boundary, scan)
+      if boundary != scan {
+        run swapShown(&mut values, placed, boundary, scan, high, &mut stats)
+      }
       boundary = boundary + 1
     }
     scan = scan + 1
   }
-  swap(&mut values, boundary, high)
+  if boundary != high {
+    run swapShown(&mut values, placed, boundary, high, high, &mut stats)
+  }
   return boundary
 }
 
-effect fn sort(values: &mut [i32], low: usize, high: usize) -> ()
+effect fn sort(
+  values: &mut [i32],
+  placed: &mut [bool],
+  low: usize,
+  high: usize,
+  stats: &mut Stats,
+) -> ()
   ! LogError
-  ? &mut Logger {
-  if low >= high {
+  ? &mut Logger | &mut MonotonicClock {
+  if low > high {
     return ()
   }
-  let pivot = partition(&mut values, low, high)
-  run Effect.log("pivot {} placed: {:?}\n", &(values[pivot], &values))
-  if pivot > low {
-    run sort(&mut values, low, pivot - 1)
+  if low == high {
+    placed[low] = true
+    return ()
   }
-  run sort(&mut values, pivot + 1, high)
+  let pivot = run partition(&mut values, &placed, low, high, &mut stats)
+  placed[pivot] = true
+  run Effect.log("{}{} is in its place.\n\n", &(CLEAR, values[pivot]))
+  run draw(&values, &placed, &plain())
+  run Effect.sleep(400ms)
+  if pivot > low {
+    run sort(&mut values, &mut placed, low, pivot - 1, &mut stats)
+  }
+  run sort(&mut values, &mut placed, pivot + 1, high, &mut stats)
+}
+
+effect fn sortAll() -> ()
+  ! LogError
+  ? &mut Logger | &mut MonotonicClock {
+  let mut values = [7, 3, 9, 1, 10, 5, 8, 2, 6, 4]
+  let mut placed = [false; COUNT]
+  let mut stats = Stats { comparisons: 0, swaps: 0 }
+  run Effect.log("{}Ten values to sort.\n\n", &.(CLEAR))
+  run draw(&values, &placed, &plain())
+  run Effect.sleep(800ms)
+  run sort(&mut values, &mut placed, 0, COUNT - 1, &mut stats)
+  run Effect.log(
+    "{}Sorted with {} comparisons and {} swaps.\n\n",
+    &(CLEAR, stats.comparisons, stats.swaps),
+  )
+  run draw(&values, &placed, &plain())
 }
 
 pub effect fn main() -> ()
   ! LogError {
   let mut logger = StdoutLogger.make()
-  let mut values = [9, -3, 5, 1, 0, -8, 7, 2]
-
-  run Effect.log("before: {:?}\n", &.(values)) |> Effect.provideMut(&mut logger)
-  run sort(&mut values, 0, 7) |> Effect.provideMut(&mut logger)
-  run Effect.log("after:  {:?}\n", &.(values)) |> Effect.provideMut(&mut logger)
+  let mut clock = OsMonotonicClock.make()
+  run sortAll()
+    |> Effect.provideMut(&mut logger)
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
 }
