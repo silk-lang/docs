@@ -22,7 +22,7 @@ import {
 import * as Catalog from './docs/catalog'
 import * as Content from './docs/content'
 import * as DocsMarkdown from './docs/markdown'
-import { DemoTopic, InstallMethod } from './landing'
+import { DemoTopic, FibersRun, InstallMethod } from './landing'
 import * as Layout from './layout'
 import { Message } from './message'
 import { DocState, Flags, Model } from './model'
@@ -115,6 +115,7 @@ export const init: Runtime.RoutingApplicationInit<
     search: Search.init().model,
     installMethod: InstallMethod.Unix(),
     demoTopic: DemoTopic.Fibers(),
+    fibersRun: FibersRun.Idle(),
   }
 
   return Option.match(maybePage, {
@@ -201,6 +202,28 @@ export const LoadDocument = Command.define('LoadDocument', {
       Effect.map(document => Message.SucceededLoadDocument({ key, document })),
       Effect.catch(() => Effect.succeed(Message.FailedLoadDocument({ key }))),
     ),
+})
+
+const FibersResult = Schema.Struct({
+  value: Schema.Number,
+  milliseconds: Schema.Number,
+})
+
+export const RunFibers = Command.define('RunFibers', {
+  messages: [Message.SucceededRunFibers, Message.FailedRunFibers],
+  execute: Effect.callback<unknown, Error>(resume => {
+    const worker = new Worker(
+      new URL('./demo/fibers.worker.ts', import.meta.url),
+      { type: 'module' },
+    )
+    worker.onmessage = event => resume(Effect.succeed(event.data))
+    worker.onerror = event => resume(Effect.fail(new Error(event.message)))
+    return Effect.sync(() => worker.terminate())
+  }).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(FibersResult)),
+    Effect.map(Message.SucceededRunFibers),
+    Effect.catch(() => Effect.succeed(Message.FailedRunFibers())),
+  ),
 })
 
 // UPDATE
@@ -447,6 +470,18 @@ export const update = (model: Model, message: Message) =>
     }),
     SelectedDemoTopic: ({ topic }) => ({
       model: modifyFields(model, { demoTopic: () => topic }),
+    }),
+    ClickedRunFibers: () => ({
+      model: modifyFields(model, { fibersRun: () => FibersRun.Running() }),
+      commands: [RunFibers()],
+    }),
+    SucceededRunFibers: ({ value, milliseconds }) => ({
+      model: modifyFields(model, {
+        fibersRun: () => FibersRun.Finished({ value, milliseconds }),
+      }),
+    }),
+    FailedRunFibers: () => ({
+      model: modifyFields(model, { fibersRun: () => FibersRun.Failed() }),
     }),
   })
 

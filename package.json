@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:demos": "silk build --manifest-path demos/fibers/silk.toml --target wasm32-unknown-unknown --release && cp demos/fibers/build/llvm/wasm32-unknown-unknown/release/fibers src/demo/fibers.wasm",
     "preview": "vite preview --outDir dist/client",
     "typecheck": "tsc --noEmit",
     "format": "oxfmt",

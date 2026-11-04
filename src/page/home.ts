@@ -5,7 +5,7 @@ import * as Code from '../code'
 import { type CopiedCodeIds, copyButtonFor } from '../copy'
 import * as Catalog from '../docs/catalog'
 import * as Icon from '../icon'
-import { DemoTopic, InstallMethod } from '../landing'
+import { DemoTopic, FibersRun, InstallMethod } from '../landing'
 import * as Layout from '../layout'
 import { Message } from '../message'
 import { type Model } from '../model'
@@ -180,7 +180,7 @@ type Demo = Readonly<{
   link: Readonly<{ text: string; href: string }>
 }>
 
-const FIBERS_CODE = `effect fn after(delay: u64, value: i32) -> i32
+export const FIBERS_CODE = `effect fn after(delay: u64, value: i32) -> i32
   ? &mut MonotonicClock {
   run Effect.sleep(delay)
   return value
@@ -260,7 +260,7 @@ const DEMOS: Array.NonEmptyReadonlyArray<Demo> = [
     pills: ['forkChild', 'join', 'await', 'sleep'],
     caption:
       'A sleeping task parks and the others keep running. The clock is a provider, so tests can swap in virtual time and skip the wait.',
-    result: ['2.0s · 20 + 22 = ', { strong: '42' }],
+    result: ['Runs in your browser'],
     codes: [{ fileName: 'fibers.silk', status: 'Copy', code: FIBERS_CODE }],
     footnote:
       'The scheduler is a requirement, so tests can pass a deterministic one.',
@@ -1118,6 +1118,42 @@ const dashed = (
     [text],
   )
 
+// A sleep in the fibers timeline. While the program runs, it fills over the
+// length of the sleep.
+const sleeping = (
+  seconds: number,
+  run: FibersRun,
+  className: string,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.span(
+    [
+      h.Class(
+        `relative overflow-hidden rounded-[3px] border border-dashed px-1.5 py-[5px] whitespace-nowrap ${className}`,
+      ),
+    ],
+    [
+      ...FibersRun.match(run, {
+        Idle: () => [],
+        Failed: () => [],
+        Running: () => [
+          h.span([
+            h.AriaHidden(true),
+            h.Class('sleep-progress absolute inset-y-0 left-0 bg-signal-soft'),
+            h.Style({ animationDuration: `${seconds}s` }),
+          ]),
+        ],
+        Finished: () => [
+          h.span([
+            h.AriaHidden(true),
+            h.Class('absolute inset-0 bg-signal-soft'),
+          ]),
+        ],
+      }),
+      h.span([h.Class('relative')], [`sleep(${seconds}s)`]),
+    ],
+  )
+
 const spacer = (className: string, h: HtmlBuilder<Message>): Html =>
   h.span([h.AriaHidden(true), h.Class(className)])
 
@@ -1138,7 +1174,7 @@ const axis = (ticks: ReadonlyArray<string>, h: HtmlBuilder<Message>): Html =>
     ],
   )
 
-const fibersVisual = (h: HtmlBuilder<Message>): Html =>
+const fibersVisual = (run: FibersRun, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex flex-col border-b border-rule')],
     [
@@ -1158,7 +1194,7 @@ const fibersVisual = (h: HtmlBuilder<Message>): Html =>
         'slow',
         [
           spacer('w-16 shrink-0', h),
-          dashed('sleep(2s)', 'flex-1 border-signal text-signal', h),
+          sleeping(2, run, 'flex-1 border-signal text-signal', h),
           solid('→ 20', 'w-20 bg-body text-paper', h),
         ],
         h,
@@ -1167,7 +1203,7 @@ const fibersVisual = (h: HtmlBuilder<Message>): Html =>
         'fast',
         [
           spacer('w-16 shrink-0', h),
-          dashed('sleep(1s)', 'flex-1 border-signal text-signal', h),
+          sleeping(1, run, 'flex-1 border-signal text-signal', h),
           solid('→ 22', 'w-20 bg-body text-paper', h),
           spacer('flex-1', h),
         ],
@@ -1408,9 +1444,13 @@ const memoryVisual = (h: HtmlBuilder<Message>): Html =>
     ],
   )
 
-const demoVisual = (topic: DemoTopic, h: HtmlBuilder<Message>): Html =>
+const demoVisual = (
+  topic: DemoTopic,
+  run: FibersRun,
+  h: HtmlBuilder<Message>,
+): Html =>
   DemoTopic.match(topic, {
-    Fibers: () => fibersVisual(h),
+    Fibers: () => fibersVisual(run, h),
     Scheduling: () => schedulingVisual(h),
     Borrows: () => borrowsVisual(h),
     Memory: () => memoryVisual(h),
@@ -1482,6 +1522,65 @@ const demoCode = (
     ],
   )
 
+const resultText = (result: Demo['result'], h: HtmlBuilder<Message>): Html =>
+  h.span(
+    [h.Class('text-right text-white')],
+    Array.map(result, part =>
+      typeof part === 'string'
+        ? part
+        : h.span([h.Class('font-bold text-signal')], [part.strong]),
+    ),
+  )
+
+const runButton = (
+  label: string,
+  isRunning: boolean,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.button(
+    [
+      h.Type('button'),
+      h.Disabled(isRunning),
+      h.OnClick(Message.ClickedRunFibers()),
+      h.Class(
+        'flex shrink-0 cursor-pointer items-center gap-1.5 rounded bg-signal px-2.5 py-1.5 font-medium text-on-signal hover:opacity-85 disabled:cursor-default disabled:opacity-60',
+      ),
+    ],
+    [Icon.play('h-2.5 w-2', h), label],
+  )
+
+// The fibers example runs the compiled program in a worker, so the result is
+// the value it returned and the time it took on the reader's machine.
+const fibersResult = (
+  run: FibersRun,
+  idle: Demo['result'],
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.div(
+    [h.Class('flex items-center gap-3'), h.AriaLive('polite')],
+    FibersRun.match(run, {
+      Idle: () => [resultText(idle, h), runButton('Run', false, h)],
+      Running: () => [
+        resultText(['Running…'], h),
+        runButton('Running', true, h),
+      ],
+      Finished: ({ value, milliseconds }) => [
+        resultText(
+          [
+            { strong: String(value) },
+            ` in ${(milliseconds / 1000).toFixed(2)}s`,
+          ],
+          h,
+        ),
+        runButton('Run again', false, h),
+      ],
+      Failed: () => [
+        resultText(["Couldn't run here"], h),
+        runButton('Try again', false, h),
+      ],
+    }),
+  )
+
 const demoPanel = (model: Model, demo: Demo, h: HtmlBuilder<Message>): Html =>
   h.div(
     [
@@ -1544,7 +1643,7 @@ const demoPanel = (model: Model, demo: Demo, h: HtmlBuilder<Message>): Html =>
               ),
             ),
           ),
-          demoVisual(demo.topic, h),
+          demoVisual(demo.topic, model.fibersRun, h),
           h.p([h.Class('text-sm leading-[1.5] text-muted')], [demo.caption]),
           h.div(
             [
@@ -1554,14 +1653,9 @@ const demoPanel = (model: Model, demo: Demo, h: HtmlBuilder<Message>): Html =>
             ],
             [
               h.span([h.Class('label text-[#8a8a90]')], ['Result']),
-              h.span(
-                [h.Class('text-right text-white')],
-                Array.map(demo.result, part =>
-                  typeof part === 'string'
-                    ? part
-                    : h.span([h.Class('font-bold text-signal')], [part.strong]),
-                ),
-              ),
+              demo.topic._tag === 'Fibers'
+                ? fibersResult(model.fibersRun, demo.result, h)
+                : resultText(demo.result, h),
             ],
           ),
         ],

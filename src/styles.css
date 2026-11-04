@@ -173,3 +173,18 @@
   background-color: var(--silk-signal);
   color: var(--silk-ink);
 }
+
+/* Fills a sleep in the fibers timeline while the example runs. The view sets
+   the duration to the length of the sleep. */
+@utility sleep-progress {
+  animation: sleep-progress linear both;
+}
+
+@keyframes sleep-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}

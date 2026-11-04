@@ -32,5 +32,8 @@ export const Message = defineMessageUnion({
   ChangedActiveSection: { sectionId: Schema.String },
   SelectedInstallMethod: { method: InstallMethod },
   SelectedDemoTopic: { topic: DemoTopic },
+  ClickedRunFibers: {},
+  SucceededRunFibers: { value: Schema.Number, milliseconds: Schema.Number },
+  FailedRunFibers: {},
 })
 export type Message = typeof Message.Type

@@ -9,12 +9,20 @@ import {
   scene,
   text,
 } from 'foldkit/scene'
-import { describe, test } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { describe, expect as expectValue, test } from 'vitest'
 
-import { CopyCode, WaitBeforeHidingCopied, update, view } from '../main'
+import {
+  CopyCode,
+  RunFibers,
+  WaitBeforeHidingCopied,
+  update,
+  view,
+} from '../main'
 import { Message } from '../message'
 import { AppRoute } from '../route'
 import { testModel } from '../testModel'
+import { FIBERS_CODE } from './home'
 
 const homeModel = testModel(AppRoute.Home())
 
@@ -80,5 +88,26 @@ describe('landing page', () => {
       ),
       expect(role('button', { name: 'Copied' })).not.toExist(),
     )
+  })
+
+  test('running the fibers example shows what it returned', () => {
+    scene(
+      { update, view },
+      given(homeModel),
+      click(role('button', { name: 'Run' })),
+      expect(role('button', { name: 'Running' })).toBeDisabled(),
+      Command.resolve(
+        RunFibers,
+        Message.SucceededRunFibers({ value: 42, milliseconds: 2004 }),
+      ),
+      expect(text('in 2.00s', { exact: false })).toExist(),
+      expect(role('button', { name: 'Run again' })).toExist(),
+    )
+  })
+
+  // The page shows the example; demos/fibers compiles the same code to wasm.
+  test('the fibers example matches the program that runs', () => {
+    const source = readFileSync('demos/fibers/src/main.silk', 'utf8')
+    expectValue(source).toContain(FIBERS_CODE)
   })
 })
