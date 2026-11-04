@@ -12,8 +12,10 @@ build/
   llvm/<target>/<profile>/<file>.map         source map of that module (the same builds)
   llvm/<target>/<profile>/<file>.inputs      the files the build read, to skip an unchanged rebuild
   llvm/<target>/<profile>/<file>.units/      cached compiled code, reused by the next build
+  llvm/<target>/<profile>/<file>.native/     objects compiled from [native].sources
   test/llvm/<target>/<profile>/<name>        silk test runner
   cache/<package>/                           the checker's cache, per package
+  tools/<package>/<step>/                    output of a build.silk tool step
   documentation.json                         silk doc
   documentation/<member>.json                silk doc at a workspace root
 ```
@@ -21,7 +23,7 @@ build/
 - `build` is `[build].output-dir`, or `[workspace].output-dir` for workspace members. See **Workspaces**.
 - `<target>` is the full target name, such as `x86_64-unknown-linux-gnu`.
 - `<profile>` is `debug`, `release`, `release-with-debug`, `release-size` or `release-size-with-debug`, or the name of the selected `[profiles.<name>]`. See **Targets and profiles**.
-- The `.inputs`, `.units` and `cache` entries only make the next build faster. Deleting them is safe.
+- The `.inputs`, `.units`, `.native` and `cache` entries only make the next build faster. Deleting them is safe.
 - A `wasm32-unknown-unknown` executable built with debug information ships without its DWARF. The module names `<file>.debug.wasm` in an `external_debug_info` section and `<file>.map` in a `sourceMappingURL` section, so serve them beside it for a browser's debugger. See **Debugging**.
 - `silk clean` deletes the whole output directory.
 
@@ -203,6 +205,92 @@ Failed cmix in 0.33s
 
 See **Unsafe code and C interop** in the reference for `extern "C"`.
 
+### Per-platform entries
+
+Any entry may add `os`, one of `"macos"`, `"linux"`, `"windows"` and `"wasi"`, or a list of them. A build for another operating system skips the entry instead of refusing it, so one manifest declares each platform's libraries and frameworks:
+
+```toml
+[native]
+link = [
+  { library = "m", mode = "dynamic" },
+  { framework = "Metal", os = "macos" },
+  { library = "stdc++", mode = "dynamic", os = ["linux", "wasi"] },
+]
+```
+
+### Inputs of dependencies
+
+A library's `[native].link` reaches every executable that depends on it, directly or through other packages, so the executable's manifest repeats none of it.
+
+- The executable's own inputs come first, then each dependency's, with every package before the packages it depends on, so an archive follows the objects and archives that use it.
+- An input that several packages list (the same file, the same library with the same mode, or the same framework) links once, at its last place.
+- A `static-library` or `object` artifact links only its own manifest's inputs.
+
+## Compiling C sources
+
+`[native].sources` lists C, Objective-C, C++ and Objective-C++ files of the package. The build compiles them with the same Clang it links with, so there is no separate `clang -c` step to remember:
+
+```toml
+[native]
+sources = [
+  { c = "native/*.c", include = ["native/include"], flags = ["-DSHIM_VERSION=2", "-Wall"] },
+  { objc = "native/metal/*.m", flags = ["-fno-objc-arc", "-fblocks"], os = "macos" },
+]
+```
+
+| Key | Meaning |
+| --- | --- |
+| `c`, `objc`, `cpp`, `objcpp` | Exactly one: the language and the files, as a path or a list of paths relative to the manifest's directory. A `*` in the last segment matches the files of that directory, in name order; a pattern that matches nothing is refused |
+| `include` | Directories of the package to search for headers |
+| `flags` | Extra Clang flags, from an allowlist |
+| `os` | The systems the entry applies to, as for `link` |
+
+- The objects link ahead of the package's `link` entries and reach dependent executables the same way, so a dependency's C code compiles without any setup in your package. A `static-library` artifact archives them.
+- Each file compiles with the build's target, optimization, debug information, CPU and platform supply.
+- `flags` takes defines (`-D`, `-U`), warnings (`-W`, `-w`, `-pedantic`), a language standard (`-std=`), optimization (`-O`), debug information (`-g`) and code generation flags (`-f`, `-m`). A flag that hands arguments to another tool (`-Wl,`, `-Wa,`, `-Wp,`, `-mllvm`), loads code, or names a file for Clang (`-fplugin`, `-I`, `-include`, `-B`, `@file`, sanitizer and profile lists) is refused, naming the manifest line. Use `include` for header directories.
+
+Objects are cached in `<file>.native` beside the output, named by a digest of the Clang, the flags, the file and the package headers it includes. An edit to one file or header compiles only the objects it reaches, a build that changes none of them starts no Clang at all, and `silk check` compiles nothing.
+
+## Prebuilt archives
+
+`[native.archive.<name>]` pins a prebuilt archive, such as a vendor's SDK, by `url` and `sha256`. A path written `<name>:<path>` in `link` or `sources` names a file inside it, so the package uses the SDK without copying it in:
+
+```toml
+[native]
+link = [
+  { static-archive = "dawn:lib/libwebgpu_dawn.a", os = "macos" },
+  { static-archive = "dawn:lib64/libwebgpu_dawn.a", os = "linux" },
+]
+
+[native.archive.dawn.targets.aarch64-apple-darwin]
+url = "https://github.com/google/dawn/releases/download/<version>/Dawn-<commit>-macos-latest-Release.tar.gz"
+sha256 = "d4f419dcbe81de4b86e6fbf172b647f41c67820a925efca55dae3bd43248d8e2"
+strip = 1
+```
+
+| Key | Meaning |
+| --- | --- |
+| `url` | `https://`, or `file:///` for a local mirror |
+| `sha256` | The file's SHA-256, 64 hexadecimal digits |
+| `strip` | Leading path segments to drop when extracting. Optional |
+| `targets.<target>` | The same keys for one target, when each target has its own file |
+
+- A build that links the package fetches the file once into `$SILK_HOME/archives/<sha256>` (`~/.silk/archives` by default), checks its SHA-256 before reading it, and extracts it if it is a tar file, gzip-compressed or not. Later builds reuse the extraction.
+- Extraction writes only directories and regular files, skips links, and refuses a member path that is absolute or holds `..`.
+- `silk check` fetches nothing. With `SILK_OFFLINE` set, a build that needs an archive it does not have fails, naming it.
+- Only the declaring manifest may use its archives, and two packages of one build may not declare the same name. A build for a target the archive has no `url` for refuses the reference.
+
+### Using your own copy
+
+To build against a local checkout of the SDK instead, override the archive with a directory. In the root manifest:
+
+```toml
+[native.override.dawn]
+path = "../dawn-build"
+```
+
+or, for one machine, in `$SILK_HOME/native-overrides.toml`. An override is never fetched, a relative path is resolved against the file that names it, and the machine's file wins over the root manifest. A dependency's overrides are ignored.
+
 ## Function order
 
 `[native].function-order` names a text file of symbols that a Linux or macOS executable places first, in the order listed, so that code which runs together shares memory pages:
@@ -349,4 +437,4 @@ Failed tiny in 0.01s
 
 ## See also
 
-The manifest, Targets and profiles, Libraries and exports, Workspaces; **Unsafe code and C interop** and **Program entry and termination** in the reference.
+The manifest, Targets and profiles, Libraries and exports, Workspaces, Build plans and generated code; **Unsafe code and C interop** and **Program entry and termination** in the reference.

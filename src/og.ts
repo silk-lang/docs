@@ -40,6 +40,13 @@ export const releasesCard: OgCard = {
   footer: TAGLINE,
 }
 
+export const playgroundCard: OgCard = {
+  path: '/og/playground.png',
+  label: 'Playground',
+  title: 'Run Silk in your browser',
+  footer: TAGLINE,
+}
+
 export const pageCard = (page: DocPage, groupTitle: string): OgCard => ({
   path: `/og/docs/${pageKey(page)}.png`,
   label: groupTitle,

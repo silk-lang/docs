@@ -7,7 +7,7 @@ import * as Search from './search'
 
 export const GITHUB_URL = 'https://github.com/silk-lang/silk'
 
-export type NavSection = 'Home' | 'Docs' | 'Releases'
+export type NavSection = 'Home' | 'Docs' | 'Releases' | 'Playground'
 
 // The Silk wordmark (public/brand/silk-wordmark.svg). It draws with
 // currentColor, so it follows the text color, light or dark.

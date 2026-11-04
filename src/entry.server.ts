@@ -81,6 +81,7 @@ export const prerenderPaths: ReadonlyArray<string> = [
   '/',
   '/docs',
   '/releases',
+  '/playground',
   // Copied to 404.html by `pnpm build:site` for Cloudflare's 404 handling.
   '/404',
   ...Catalog.allPages.map(Catalog.pagePath),
@@ -145,6 +146,12 @@ const metaForRoute = (route: AppRoute, flags: Flags): PageMeta =>
           ),
         }),
       }),
+    Playground: () => ({
+      path: '/playground',
+      description:
+        'Write Silk and run it in your browser. The compiler runs on the page as WebAssembly, with no server.',
+      card: Og.playgroundCard,
+    }),
     Releases: () => ({
       path: '/releases',
       description:

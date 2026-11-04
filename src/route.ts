@@ -7,6 +7,7 @@ export const AppRoute = defineRouteUnion({
   Docs: {},
   DocPage: { directory: Schema.String, slug: Schema.String },
   Releases: {},
+  Playground: {},
   NotFound: { path: Schema.String },
 })
 
@@ -25,10 +26,16 @@ export const releasesRouter = pipe(
   Route.mapTo(AppRoute.Releases),
 )
 
+export const playgroundRouter = pipe(
+  literal('playground'),
+  Route.mapTo(AppRoute.Playground),
+)
+
 const routeParser = Route.oneOf(
   docPageRouter,
   docsRouter,
   releasesRouter,
+  playgroundRouter,
   homeRouter,
 )
 
