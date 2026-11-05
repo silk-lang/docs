@@ -401,6 +401,14 @@ The literal `fn(task: &Task) -> bool { ... }` uses `wanted`, a local of `report`
 
 `wanted` is a `Priority`, which is `Copy`, so the closure holds its own copy.
 
+`countWhere` already says what `keep` takes and returns, so the literal does not have to repeat it. A lambda writes its parameters between bars, leaves out their types and the result, and takes them from where it is used. Its body can be a single expression:
+
+```silk
+  let urgentOpen = countWhere(&board, |task| task.isOpen() && task.priority == wanted)
+```
+
+This is the same closure as the `fn(task: &Task) -> bool` literal, with the same captures. When nothing around a lambda gives its types, as in a plain `let double = |value| value * 2`, write them: `|value: i32| value * 2`. See **Closures and callable types** in the reference.
+
 Assigning to a capture changes what the closure is. Here is a counter that bumps an outer local:
 
 ```silk

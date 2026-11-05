@@ -27,8 +27,9 @@ fail, `AttemptsExhausted` has the error of the last attempt.
 - Closing a Unix listener does not remove its socket file. Remove it yourself.
 - Scoped functions close the socket on return, error, and cancellation. A trap does not.
 - On Darwin, socket setup is not safe against a `fork` in another thread.
-- A call fails to compile on targets other than Darwin on aarch64, and Linux with GNU libc on
-  x86_64 or aarch64. The option types still compile.
+- Supported targets are Windows x86_64 MSVC, Darwin x86_64 or aarch64, and GNU/Linux x86_64 or aarch64.
+- Windows uses nonblocking Winsock TCP sockets; Unix-domain operations return `FamilyUnsupported`.
+  Each live descriptor keeps Winsock initialized. Socket handles are pointer-sized.
 
 ## Examples
 ### Connect to a local listener
@@ -813,7 +814,7 @@ The system call that failed.
 pub errno: i32
 ```
 
-The `errno` value.
+The host error code: POSIX errno, a Winsock WSA code, or a Win32 handle-configuration error.
 
 ::Anchor{id="AttemptFailure.impl.Debug"}
 
@@ -1211,7 +1212,7 @@ The system call that failed.
 pub errno: i32
 ```
 
-The `errno` value.
+The host error code: POSIX errno, a Winsock WSA code, or a Win32 handle-configuration error.
 
 ::Anchor{id="NativeSocketError.impl.Debug"}
 
@@ -1578,6 +1579,8 @@ pub fn make(
 ```
 
 Returns listen options.
+Windows defaults to an exclusive bind when `reuseAddress` is false. When true, Windows'
+`SO_REUSEADDR` permits binding over an existing listener, unlike Unix's usual reuse behavior.
 
 #### Errors
 `ListenOptionsError` if `kernelBacklog` is not 1 through 65535, or `pollIntervalNanoseconds`
@@ -1831,6 +1834,24 @@ pub fn connectionPhase(self: &Self) -> ConnectionPhase
 
 Returns the state of the connection.
 
+::Anchor{id="Accepted.impl.intoConnection"}
+
+### Method `intoConnection`
+
+```silk
+pub fn intoConnection(self: Self) -> Connection
+```
+
+Takes the connection out of `self`, and returns it.
+
+#### When to use
+Use it to keep a connection open past one callback, such as a client served across the
+frames of an event loop. Use [`withAccepted`](#withAccepted) when one callback serves the whole connection.
+
+#### Details
+Read [`peer`](#Accepted.impl.peer) first if you need the client address: it goes with `self`. Close the connection
+with `Connection.close` to see a close error. Dropping it closes it too, and ignores the error.
+
 ::Anchor{id="listen"}
 
 ## `listen`
@@ -1860,6 +1881,7 @@ It does not remove an old file at `path` before, or the file after close.
 
 ### Errors
 `InvalidBindAddress` or `PathTooLong` if `path` is not valid. `AddressInUse` if a file exists.
+Windows returns `FamilyUnsupported` for Unix-domain sockets before creating a socket.
 
 ::Anchor{id="accept"}
 
@@ -1972,6 +1994,7 @@ Connects to the Unix socket at `path`, and returns the connection.
 
 ### Errors
 `InvalidEndpoint` if `path` is not valid. `Timeout` if `deadline` passes.
+Windows returns `FamilyUnsupported` for Unix-domain sockets before creating a socket.
 
 ::Anchor{id="connectResolved"}
 
@@ -2024,6 +2047,7 @@ also on error or cancellation. A trap does not close it.
 - The error of `callback`.
 - `InvalidEndpoint` if `path` is not valid.
 - `Timeout` if `deadline` passes.
+- `FamilyUnsupported` on Windows, before creating a socket.
 
 ::Anchor{id="Connection.impl-2"}
 
@@ -2091,4 +2115,4 @@ closeRaw: Connection.closeByteConnection
 
 Category: Networking.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

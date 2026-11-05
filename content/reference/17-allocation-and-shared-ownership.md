@@ -144,14 +144,14 @@ effect fn useCell() -> i32
     fn(c: &mut Counter) -> i32 {
       c.value = c.value + step
       return c.value
-    }
+    },
   )
   drop alias
   let seen = Shared<Counter>.with<i32>(
     &cell,
     fn(c: &Counter) -> i32 {
       return c.value
-    }
+    },
   )
   if after != 42 {
     return 1

@@ -215,7 +215,7 @@ fn record(log: &mut Log, id: i32) -> i32 {
 impl Drop for Tracer {
   fn drop(self: &mut Tracer) -> () {
     let id = self.id
-    let seen = Shared<Log>.withMut<i32>(&self.log, record(id))
+    let _seen = Shared<Log>.withMut<i32>(&self.log, record(id))
     return ()
   }
 }
@@ -226,7 +226,7 @@ fn tracer(id: i32, log: &Shared<Log>) -> Tracer {
 
 fn scenario(log: &Shared<Log>) -> () {
   let mut a = tracer(1, log)
-  let pair = Pair { first: tracer(4, log), second: tracer(5, log) }
+  let _pair = Pair { first: tracer(4, log), second: tracer(5, log) }
   a = tracer(3, log)
   let b = tracer(2, log)
   drop b
@@ -244,7 +244,7 @@ effect fn body() -> i32
   scenario(&log)
 
   // 1: replaced by assignment, 2: dropped by `drop b`,
-  // then at scope end: pair (fields 4, 5), then a (3).
+  // then at scope end: _pair (fields 4, 5), then a (3).
   if Shared<Log>.with<i32>(&log, order) != 12453 {
     return 1
   }

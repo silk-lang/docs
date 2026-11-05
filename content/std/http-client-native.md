@@ -8,7 +8,8 @@ that requires `? &mut Http` then sends real requests over sockets and TLS.
 The provider has its own clocks, random source, and trust store, so you give only an allocator.
 The defaults are a deadline of 30 seconds for each request, a response body of at most 16 MiB,
 up to 10 redirects, and the PEM bundle of the platform for HTTPS: `/etc/ssl/cert.pem` on macOS
-and `/etc/ssl/certs/ca-certificates.crt` on Linux. [`NativeHttp.fromEnvironment`](#NativeHttp.impl.fromEnvironment) uses the file
+and `/etc/ssl/certs/ca-certificates.crt` on Linux, or the logical Windows `ROOT` store.
+[`NativeHttp.fromEnvironment`](#NativeHttp.impl.fromEnvironment) uses the file
 in `SSL_CERT_FILE` when it is set, and the proxies in `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`,
 and `NO_PROXY`. Each request opens a new HTTP/1.1 connection and sends `Accept-Encoding:
 identity`, so the body arrives as the server sent it.
@@ -22,6 +23,8 @@ from HTTPS to HTTP fails. A redirect to another origin does not send `Authorizat
 The deadline covers the TLS handshake and the HTTP exchange, but not the name lookup and the TCP
 connect. The macOS keychain is not used, only the PEM bundle. [`NativeHttp.make`](#NativeHttp.impl.make) reads no
 environment variables, so it never uses a proxy. Only `http://` proxies are supported.
+Windows imports root certificates rather than the Windows chain-engine policy; revocation,
+store usage properties, and disallowed-store entries are not imported.
 
 ## Examples
 ### Set up the client
@@ -40,7 +43,7 @@ effect fn check() -> i32
   // A scheme other than http or https fails before any connection.
   let sent = run Effect.result(Http.send(Request.get("ftp://example.com/version")))
   return match move sent {
-    Result.Success { value: _ } => 1
+    Result.Success {..} => 1
     Result.Failure { error } => match move error {
       HttpError failure => {
         if failure.kind == HttpErrorKind.InvalidUrl {
@@ -132,7 +135,8 @@ requires `? &mut Http` then sends real requests over sockets and TLS.
 The provider has its own clocks, random source, and trust store, so you give only an
 allocator. The defaults are a deadline of 30 seconds for each request, a response body of at
 most 16 MiB, up to 10 redirects, and the PEM bundle of the platform for HTTPS:
-`/etc/ssl/cert.pem` on macOS and `/etc/ssl/certs/ca-certificates.crt` on Linux. Each request
+`/etc/ssl/cert.pem` on macOS and `/etc/ssl/certs/ca-certificates.crt` on Linux, or the logical
+Windows `ROOT` certificate store. Each request
 opens a new HTTP/1.1 connection and sends `Accept-Encoding: identity`, so the body arrives as
 the server sent it.
 
@@ -146,6 +150,8 @@ from HTTPS to HTTP fails. A redirect to another origin does not send `Authorizat
 The deadline covers the TLS handshake and the HTTP exchange, but not the name lookup and the
 TCP connect. The macOS keychain is not used, only the PEM bundle. [`NativeHttp.make`](#NativeHttp.impl.make) reads no
 environment variables, so it never uses a proxy. Only `http://` proxies are supported.
+Windows imports root certificates rather than chain-engine policy; revocation, store usage
+properties, and disallowed-store entries are not imported.
 
 ::Anchor{id="NativeHttp.impl"}
 
@@ -163,15 +169,17 @@ impl<'config> NativeHttp<'config>
 pub fn make() -> NativeHttp<'config>
 ```
 
-Returns a client with the default limits and the PEM bundle of the platform. It reads
+Returns a client with the default limits and platform trust. It reads
 nothing yet.
 
 #### Details
 
 The defaults are a deadline of 30 seconds for each request, a response body of at most 16
 MiB, up to 10 redirects, and the PEM bundle `/etc/ssl/cert.pem` on macOS or
-`/etc/ssl/certs/ca-certificates.crt` on Linux. Use [`NativeHttp.fromEnvironment`](#NativeHttp.impl.fromEnvironment) to honor
-`SSL_CERT_FILE`.
+`/etc/ssl/certs/ca-certificates.crt` on Linux, or the logical Windows `ROOT` store.
+Windows imports certificate anchors without chain-engine policy, store usage properties,
+disallowed-store entries, or revocation. Use [`NativeHttp.fromEnvironment`](#NativeHttp.impl.fromEnvironment) to honor
+`SSL_CERT_FILE`, which replaces platform trust with the configured PEM bundle.
 
 ::Anchor{id="NativeHttp.impl.fromEnvironment"}
 
@@ -276,7 +284,8 @@ pub fn trustBundle(self: Self, path: string<'config>) -> NativeHttp<'config>
 ```
 
 Uses the PEM bundle at the absolute path `path`, such as `"/etc/ssl/cert.pem"`, instead of
-the platform bundle.
+platform trust. On Windows, use an absolute native drive path or `/C:/...` machine path;
+the bundle is opened on local NTFS without following reparse points.
 
 ::Anchor{id="NativeHttp.impl.Http"}
 
@@ -296,4 +305,4 @@ effect fn send(self: &mut Self, request: Request) -> Response ! HttpError | OutO
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`.

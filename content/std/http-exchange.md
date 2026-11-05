@@ -158,7 +158,7 @@ effect<'call> fn readBody<'call, 'exchange: 'call>(
   let entries: [Header<'static>; 0] = []
   let trailers = match Headers.make(&entries, valueLimits()) {
     Result<Headers, ValueError>.Success { value } => value
-    Result<Headers, ValueError>.Failure { error: _ } => {
+    Result<Headers, ValueError>.Failure {..} => {
       return 1
     }
   }
@@ -181,20 +181,20 @@ effect fn program() -> i32
   ? &mut Allocator | &mut MonotonicClock | &mut Random {
   let uri = match Uri.parse("http://example.com/") {
     Result<Uri, ParseError>.Success { value } => value
-    Result<Uri, ParseError>.Failure { error: _ } => {
+    Result<Uri, ParseError>.Failure {..} => {
       return 1
     }
   }
   let origin = match Origin.fromUri(&uri) {
     Result<Origin, OriginError>.Success { value } => value
-    Result<Origin, OriginError>.Failure { error: _ } => {
+    Result<Origin, OriginError>.Failure {..} => {
       return 1
     }
   }
   let entries: [Header<'static>; 0] = []
   let headers = match Headers.make(&entries, valueLimits()) {
     Result<Headers, ValueError>.Success { value } => value
-    Result<Headers, ValueError>.Failure { error: _ } => {
+    Result<Headers, ValueError>.Failure {..} => {
       return 1
     }
   }
@@ -2105,4 +2105,4 @@ framing complete.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

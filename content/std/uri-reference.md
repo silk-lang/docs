@@ -33,12 +33,12 @@ import silk.uri.reference { ParseError, UriReference }
 pub fn main() -> i32 {
   let reference = match UriReference.parse("/search?q=silk#results") {
     Result<UriReference, ParseError>.Success { value } => value
-    Result<UriReference, ParseError>.Failure { error: _ } => {
+    Result<UriReference, ParseError>.Failure {..} => {
       return 1
     }
   }
   let relative = match UriReference.scheme(&reference) {
-    Option<string>.Some { value: _ } => false
+    Option<string>.Some {..} => false
     Option<string>.None => true
   }
   let query = UriReference.query(&reference) |> Option<string>.unwrapOr("")
@@ -63,7 +63,7 @@ pub fn main() -> i32 {
       }
       return 0
     }
-    Result<UriReference, ParseError>.Success { value: _ } => 1
+    Result<UriReference, ParseError>.Success {..} => 1
   }
 }
 ```
@@ -676,4 +676,4 @@ Returns the text and consumes the value. It does not copy.
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

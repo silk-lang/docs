@@ -12,7 +12,8 @@ TupleDecl      = 'pub'? 'tuple' Name TypeParams? '(' ( Type ( ',' Type )* ','? )
 RecordLiteral  = TypePath '{' ( FieldInit ( ',' FieldInit )* ','? )? '}'
 ContextRecord  = '.' '{' ( FieldInit ( ',' FieldInit )* ','? )? '}'
 FieldInit      = Name ':' Expression
-TupleLiteral   = '(' Expression ',' ( Expression ( ',' Expression )* ','? )? ')'
+TupleLiteral   = '(' Expression ',' Expression ( ',' Expression )* ','? ')'
+               | '.(' ( Expression ( ',' Expression )* ','? )? ')'
 UnitLiteral    = '(' ')'
 ArrayLiteral   = '[' ( Expression ( ',' Expression )* ','? )? ']'
 ArrayRepeat    = '[' Expression ';' Expression ']'
@@ -76,7 +77,7 @@ UnitType       = '(' ')'
 - `Name { … }` record syntax does not construct a tuple. `Pair { 0: a, 1: b }` is PAR0010: "A tuple's elements have no field names; build it by position, as in `Pair(first, second)`". Other field names are SEM0018.
 - A `(a, b)` literal with no tuple context creates an anonymous tuple. Like anonymous records, each literal is its own type.
 - There is no tuple type syntax. `(T)` in a type is just `T` in parentheses, so `(i32, bool)` is not a type. Declare a `tuple` to name one.
-- `(x)` is a grouped expression. A one-element tuple literal needs a trailing comma: `(x,)`.
+- `(x)` is a grouped expression. A leading dot makes a tuple of any length: `.(x)` is a one-element tuple, `.(a, b)` is the same as `(a, b)`, and `.()` is the unit value. Write a one-element tuple as `.(x)`, not `(x,)`.
 
 ## Unit
 
@@ -170,7 +171,7 @@ pub fn main() -> i32 {
   r.0 = 3
   let m = Meters(1.5)
   let pair = (10, true)
-  let nothing: () = ()
+  let _nothing: () = ()
   if width(&r) != 6 || width(&unit()) != 1 {
     return 1
   }

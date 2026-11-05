@@ -96,7 +96,7 @@ These stop `silk check` with "unsupported: this construct is not supported by th
 - A method with `static` parameters cannot be called from the body of a `static fn` yet. That is SEM0249: "A method with `static` parameters cannot receive its static arguments here yet; call it from the body of a runtime function".
 - Static parameter types include integers, scalar enums, `string`, fixed arrays and structs without `Drop`.
 - Recursion through static parameters must reach a base case. `countdown(n - 1)` guarded by `static if n == 0` is accepted. Recursion whose static argument keeps growing is refused as not supported.
-- An anonymous function or `effect { ... }` block in a function with a `static` parameter is not supported yet: the native compiler does not build it once per static argument. It is SEM0245 at the literal: ``An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled` ``. Put the literal in a named function without `static` parameters and call that.
+- An anonymous function or `effect { ... }` block in a function with a `static` parameter is built once per static argument, like the function around it.
 
 ## Static text
 
@@ -376,7 +376,6 @@ pub fn main() -> i32 {
 | SEM0182 | The residual-growth budget of one specialization is exhausted |
 | SEM0210 | An omitted result lifetime has no unique input to come from, as in a `static fn` returning bare `string` |
 | SEM0223 | Constants depend on each other in a cycle |
-| SEM0245 | An anonymous function or `effect {}` block in a function with `static` parameters |
 | SEM0249 | A method with `static` parameters called where its static arguments cannot be selected yet, such as in a `static fn` |
 | SEM0251 | A `static fn` parameter marked `static` or `mut` |
 | SEM0083 | A conformance whose witness differs from the operation in being `static fn` or in its `static` parameters |

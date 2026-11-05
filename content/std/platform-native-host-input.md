@@ -15,7 +15,7 @@ directory is read at each call, not captured.
 ## Gotchas
 - The capture functions are unsafe. The input vectors and their strings must stay readable and
   unchanged during the capture. No other code can change the environment at that time.
-- The module is empty on targets other than Darwin on aarch64, and Linux with GNU libc on x86_64
+- The module is empty on targets other than Darwin on x86_64 or aarch64, and Linux with GNU libc on x86_64
   or aarch64.
 
 ## Examples
@@ -41,7 +41,7 @@ effect fn program() -> i32
   let mut empty: [u8; 0] = []
   let missing = NativeHostInput.variable(&inputs, b"SILK_DOC_NOT_SET", &mut empty)
   match move missing {
-    Option.Some { value: _ } => {
+    Option.Some {..} => {
       return 1
     }
     Option.None => {}

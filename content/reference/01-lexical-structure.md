@@ -176,19 +176,18 @@ In a byte string, `\u{…}` must be at most `FF`.
 //! Lexical forms in one file.
 
 import silk.text.string { String }
-import silk.num.usize
 
 /// Counts bytes in a few literals.
 pub fn main() -> i32 {
-  let mask = 0xFF_FF
-  let flags = 0b1010
+  let _mask = 0xFF_FF
+  let _flags = 0b1010
   let timeout: u64 = 1h30m
-  let path = r"C:\build\out"
-  let block = """
+  let _path = r"C:\build\out"
+  let _block = """
 first
   second"""
   let snowman = "\u{2603}"
-  let space: u8 = ' '
+  let _space: u8 = ' '
   if timeout != 5400000000000 {
     return 1
   }

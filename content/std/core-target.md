@@ -69,6 +69,16 @@ Wasm32
 
 32-bit WebAssembly.
 
+::Anchor{id="Arch.Wasm64"}
+
+### `Wasm64`
+
+```silk
+Wasm64
+```
+
+64-bit WebAssembly (`memory64`).
+
 ::Anchor{id="Arch.X86_64"}
 
 ### `X86_64`
@@ -112,6 +122,16 @@ Linux
 ```
 
 Linux.
+
+::Anchor{id="OperatingSystem.Windows"}
+
+### `Windows`
+
+```silk
+Windows
+```
+
+Windows.
 
 ::Anchor{id="OperatingSystem.Freestanding"}
 
@@ -167,6 +187,16 @@ Gnu
 
 The GNU calling convention.
 
+::Anchor{id="Abi.Msvc"}
+
+### `Msvc`
+
+```silk
+Msvc
+```
+
+The Microsoft calling convention.
+
 ::Anchor{id="Abi.Wasm"}
 
 ### `Wasm`
@@ -210,6 +240,16 @@ Elf
 ```
 
 ELF, the format of Linux.
+
+::Anchor{id="ObjectFormat.Coff"}
+
+### `Coff`
+
+```silk
+Coff
+```
+
+COFF, the object format of Windows.
 
 ::Anchor{id="ObjectFormat.Wasm"}
 
@@ -405,4 +445,4 @@ Returns `true` if the build enables the CPU feature `value`.
 
 Category: Core.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

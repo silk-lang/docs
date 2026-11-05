@@ -243,7 +243,7 @@ unsafe extern "C" fn qsort(
   base: ?[*]mut i32,
   count: usize,
   size: usize,
-  compare: extern "C" fn(*const i32, *const i32) -> i32
+  compare: extern "C" fn(*const i32, *const i32) -> i32,
 ) -> ()
 
 export "C" fn descending(left: *const i32, right: *const i32) -> i32 {

@@ -1,0 +1,53 @@
+Scoped ownership of a Windows Winsock initialization reference.
+
+Import as `Winsock` with `import silk.platform.windows.winsock as Winsock`.
+
+Public declarations: 1.
+
+::Anchor{id="WinsockSession"}
+
+## `WinsockSession`
+
+```silk
+pub struct WinsockSession
+```
+
+One successful Winsock 2.2 initialization, released when dropped.
+Keep the session alive until all sockets and address lists created under it are closed.
+
+::Anchor{id="WinsockSession.impl.Drop"}
+
+## Implementation `Drop for WinsockSession`
+
+```silk
+impl Drop for WinsockSession
+```
+
+::Anchor{id="WinsockSession.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut WinsockSession) -> ()
+```
+
+::Anchor{id="WinsockSession.impl"}
+
+## Implementation `WinsockSession`
+
+```silk
+impl WinsockSession
+```
+
+::Anchor{id="WinsockSession.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Result<WinsockSession, i32>
+```
+
+Acquires a Winsock 2.2 reference or returns WSAStartup's direct error code.
+Each successful call owns its own reference; concurrent providers do not share mutable state.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

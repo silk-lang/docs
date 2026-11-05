@@ -36,13 +36,13 @@ pub fn main() -> i32 {
   two[31] = 2
   let alice = match P256.fromBytes(&one) {
     Result<P256, P256Error>.Success { value } => move value
-    Result<P256, P256Error>.Failure { error: _ } => {
+    Result<P256, P256Error>.Failure {..} => {
       return 1
     }
   }
   let bob = match P256.fromBytes(&two) {
     Result<P256, P256Error>.Success { value } => move value
-    Result<P256, P256Error>.Failure { error: _ } => {
+    Result<P256, P256Error>.Failure {..} => {
       return 1
     }
   }
@@ -55,13 +55,13 @@ pub fn main() -> i32 {
   }
   let fromAlice = match P256.agree(move alice, &bobPublic) {
     Result<[u8; 32], P256Error>.Success { value } => value
-    Result<[u8; 32], P256Error>.Failure { error: _ } => {
+    Result<[u8; 32], P256Error>.Failure {..} => {
       return 1
     }
   }
   let fromBob = match P256.agree(move bob, &alicePublic) {
     Result<[u8; 32], P256Error>.Success { value } => value
-    Result<[u8; 32], P256Error>.Failure { error: _ } => {
+    Result<[u8; 32], P256Error>.Failure {..} => {
       return 1
     }
   }
@@ -221,8 +221,8 @@ pub fn main() -> i32 {
     0xa8
   ]
   match EcdsaP256Sha256.verify(&publicKey, b"hello", &signature) {
-    Result<(), P256SignatureError>.Success { value: _ } => {}
-    Result<(), P256SignatureError>.Failure { error: _ } => {
+    Result<(), P256SignatureError>.Success {..} => {}
+    Result<(), P256SignatureError>.Failure {..} => {
       return 1
     }
   }
@@ -580,4 +580,4 @@ It checks only this one signature. It does not check the chain, the dates, or th
 
 Category: Cryptography.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

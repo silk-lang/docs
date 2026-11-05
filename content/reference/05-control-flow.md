@@ -193,7 +193,7 @@ pub fn main() -> i32 {
   if positionOf(&values, 15) != 2 {
     return 1
   }
-  if let Option.Some { value } = find(&values, 99) {
+  if let Option.Some { .. } = find(&values, 99) {
     return 2
   } else {
     return 0

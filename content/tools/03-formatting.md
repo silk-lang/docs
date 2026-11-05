@@ -63,6 +63,20 @@ pub effect fn main() -> ()
 
 Each struct field gets its own line, a one-line function body is split over three lines, a struct literal that fits joins onto one line, and the failure row of an effect signature moves to its own line. A comma after the last field stays as you wrote it: `y: i32` had none, so it gets none.
 
+A pipeline with one `|>` stays on one line when it fits, as the `Effect.log` line does, and moves the step to the next line, indented, when it does not. A chain of two or more `|>` steps always puts each step on its own line:
+
+```silk
+let piped = 10 |> subtract(3) |> negate
+```
+
+becomes
+
+```silk
+let piped = 10
+  |> subtract(3)
+  |> negate
+```
+
 Directives go one per line before the declaration they apply to. A `//` comment after a directive stays on its line, and so does a `///` doc comment, which may sit before or after the directives:
 
 ```silk

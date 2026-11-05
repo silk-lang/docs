@@ -35,7 +35,7 @@ prepare.
 ## Gotchas
 - Resolution of a host name cannot stop at a deadline. A host name with a deadline fails with
   `UnsupportedDeadline` before any contact. An IP address with a deadline is accepted.
-- Only Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
+- Windows x86_64 MSVC, Darwin x86_64 or aarch64, and GNU/Linux x86_64 or aarch64 are supported. On other
   targets, a call that is used fails to compile. Unused imports and [`Options`](#Options) still compile.
 
 ## Examples
@@ -52,20 +52,20 @@ import silk.uri.reference { ParseError }
 fn origin(text: string<'static>) -> Option<Origin> {
   let uri = match Uri.parse(text) {
     Result<Uri, ParseError>.Success { value } => value
-    Result<Uri, ParseError>.Failure { error: _ } => {
+    Result<Uri, ParseError>.Failure {..} => {
       return Option<Origin>.none()
     }
   }
   return match Origin.fromUri(&uri) {
     Result<Origin, OriginError>.Success { value } => Option<Origin>.some(value)
-    Result<Origin, OriginError>.Failure { error: _ } => Option<Origin>.none()
+    Result<Origin, OriginError>.Failure {..} => Option<Origin>.none()
   }
 }
 
 fn passes(checked: Result<(), NativeExchangeError>) -> bool {
   return match move checked {
-    Result.Success { value: _ } => true
-    Result.Failure { error: _ } => false
+    Result.Success {..} => true
+    Result.Failure {..} => false
   }
 }
 
@@ -92,7 +92,7 @@ pub fn main() -> i32 {
   // The resolver cannot stop at a deadline, so a host name with a deadline fails.
   options.deadline = Option<Instant>.some(SystemClock.make(5, 0))
   let rejected = match move preflight(&named, &options) {
-    Result.Success { value: _ } => false
+    Result.Success {..} => false
     Result.Failure { error } => match move error {
       NativeExchangeError.UnsupportedDeadline => true
       _ => false
@@ -582,7 +582,7 @@ connection keeps no deadline. Close it, or give it to another owner such as a po
   the socket, TLS, and the certificate check.
 
 ### Gotchas
-Only Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
+Only Darwin on x86_64 or aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
 targets, a call fails to compile.
 
 ::Anchor{id="admitUnixRoute"}
@@ -624,7 +624,7 @@ certificate against `origin`. The opening deadline is the earlier of `options.de
 another owner such as a pool.
 
 ### Gotchas
-Only Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
+Only Darwin on x86_64 or aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
 targets, a call fails to compile.
 
 ::Anchor{id="withConnection"}
@@ -663,7 +663,7 @@ fails, the connection is closed. Closing does not flush and does not send a TLS 
 - The error of the handler.
 
 ### Gotchas
-Only Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
+Only Darwin on x86_64 or aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
 targets, a call fails to compile.
 
 ::Anchor{id="withUnixConnection"}
@@ -701,7 +701,7 @@ flush and does not send a TLS close message.
 - `ExchangeError` and the error of the handler.
 
 ### Gotchas
-Only Darwin on aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
+Only Darwin on x86_64 or aarch64, and Linux with GNU libc on x86_64 or aarch64, are supported. On other
 targets, a call fails to compile.
 
 ::Anchor{id="withProxyRoute"}
@@ -928,4 +928,4 @@ Returns the route of a native connection.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

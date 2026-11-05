@@ -70,7 +70,7 @@ effect fn program() -> i32
   let parsed = run parseResponse(&wire, limits()) |> Effect.provideMut<Allocator>(&mut allocator)
   let result = match move parsed {
     Result<ParsedResponse, ParseError>.Success { value } => move value
-    Result<ParsedResponse, ParseError>.Failure { error: _ } => {
+    Result<ParsedResponse, ParseError>.Failure {..} => {
       return 1
     }
   }
@@ -81,7 +81,7 @@ effect fn program() -> i32
   }
   let head = match ResponseParser.head(&result.parser) {
     Result<ResponseHead, ParseError>.Success { value } => value
-    Result<ResponseHead, ParseError>.Failure { error: _ } => {
+    Result<ResponseHead, ParseError>.Failure {..} => {
       return 1
     }
   }
@@ -1519,4 +1519,4 @@ start of `output`. Returns the length. If `output` is too small, it writes nothi
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

@@ -1,4 +1,4 @@
-The native provider of the `Resolver` effect, with the `getaddrinfo` function of the system.
+The native `Resolver` provider using the system's `getaddrinfo`, or `GetAddrInfoW` on Windows.
 
 ## When to use
 Provide [`NativeSystemResolver`](#NativeSystemResolver) for `Resolver` in a native program when a blocking lookup is
@@ -8,6 +8,8 @@ acceptable. Code that resolves uses `silk.net.resolver`, so a test can provide a
 A host name without a deadline makes one `getaddrinfo` call with the name as written, so names in
 the hosts file, such as `localhost`, resolve. The result is copied, and the list of the system is
 freed one time, also on errors. Numeric hosts do not call the provider.
+Windows preserves validated ASCII host names in UTF-16 and owns a Winsock reference until the
+native result chain is freed. The Windows provider supports the x86_64 MSVC system profile.
 
 ## Errors
 `ResolverError` if the host is not found, has no address of the selected family, or the lookup
@@ -17,8 +19,7 @@ fails. A host name with a deadline fails with `DeadlineUnsupported`.
 - A host name with a deadline fails with `DeadlineUnsupported` before the lookup. After
   `getaddrinfo` starts, it cannot be cancelled or limited in time or memory.
 - The lookup blocks the thread. It does not let another fiber run.
-- [`NativeSystemResolver.make`](#NativeSystemResolver.impl.make) fails to compile on targets other than Darwin on aarch64, and
-  Linux with GNU libc on x86_64 or aarch64.
+- The supported targets are Windows x86_64 MSVC, Darwin x86_64 or aarch64, and GNU/Linux x86_64 or aarch64.
 
 ## Examples
 ### Use the system resolver
@@ -37,7 +38,7 @@ import silk.system.system_clock { Instant, SystemClock }
 fn request(name: string, deadline: Option<Instant>) -> Option<ResolveRequest> {
   let host = match Host.parse(name) {
     Result<Host, AddressError>.Success { value } => value
-    Result<Host, AddressError>.Failure { error: _ } => {
+    Result<Host, AddressError>.Failure {..} => {
       return Option<ResolveRequest>.none()
     }
   }
@@ -45,7 +46,7 @@ fn request(name: string, deadline: Option<Instant>) -> Option<ResolveRequest> {
     Result<ResolveRequest, ResolverError>.Success { value } => Option<ResolveRequest>.some(
       move value
     )
-    Result<ResolveRequest, ResolverError>.Failure { error: _ } => Option<ResolveRequest>.none()
+    Result<ResolveRequest, ResolverError>.Failure {..} => Option<ResolveRequest>.none()
   }
 }
 
@@ -80,7 +81,7 @@ pub fn main() -> i32 {
     |> Effect.provideMut<MonotonicClock>(&mut clock)
     |> Effect.provideMut<Allocator>(&mut allocator)
   return match move attempted {
-    Result.Success { value: _ } => 1
+    Result.Success {..} => 1
     Result.Failure { error } => match move error {
       ResolverError.DeadlineUnsupported => 0
       _ => 1
@@ -111,6 +112,8 @@ resolves uses `silk.net.resolver`, so a test can provide a fake.
 A host name without a deadline makes one `getaddrinfo` call with the name as written, so names in
 the hosts file, such as `localhost`, resolve. The result is copied, and the list of the system is
 freed one time, also on errors. Numeric hosts do not call the provider.
+Windows uses `GetAddrInfoW`, preserves the validated ASCII name, and keeps a scoped Winsock
+reference alive until the returned list is freed. Numeric hosts need no Winsock initialization.
 
 ### Gotchas
 - A host name with a deadline fails with `DeadlineUnsupported` before the lookup. After
@@ -136,8 +139,7 @@ pub fn make() -> NativeSystemResolver
 Returns a resolver. It does no lookup.
 
 #### Gotchas
-It fails to compile on targets other than Darwin on aarch64, and Linux with GNU libc on x86_64
-or aarch64.
+Supported targets are Windows x86_64 MSVC, Darwin x86_64 or aarch64, and GNU/Linux x86_64 or aarch64.
 
 ::Anchor{id="NativeSystemResolver.impl.Resolver"}
 
@@ -157,4 +159,4 @@ resolveDomain: NativeSystemResolver.resolveDomain
 
 Category: Networking.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

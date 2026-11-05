@@ -1,9 +1,10 @@
-Borrowed subranges of slices, with no copy and no allocation.
+Borrowed subranges and byte views of slices, with no copy and no allocation.
 
 ## When to use
 Use [`Slice.view`](#Slice.impl.view) to give a part of a slice to a function that takes `&[T]`, such as the
 remaining input of a parser. Use [`Slice.viewMut`](#Slice.impl.viewMut) to give a part of a slice to a function that
-takes `&mut [T]`, such as one row of a scratch buffer.
+takes `&mut [T]`, such as one row of a scratch buffer. Use [`Slice.asBytes`](#Slice.impl.asBytes) to pass a slice of
+numbers to a function that takes `&[u8]`, such as a GPU buffer upload.
 
 ## Details
 A view borrows the input. It has the same lifetime as the input and does not copy elements.
@@ -37,7 +38,49 @@ pub fn main() -> i32 {
 
 Import as `Slice` with `import silk.collections.slice { Slice }`.
 
-Public declarations: 1.
+Public declarations: 2.
+
+::Anchor{id="ByteView"}
+
+## `ByteView`
+
+```silk
+pub interface ByteView
+```
+
+Element types whose slices [`Slice.asBytes`](#Slice.impl.asBytes) and [`Slice.asMutBytes`](#Slice.impl.asMutBytes) can view as bytes.
+
+### Details
+
+Every primitive integer type and `f32` and `f64` conform. These types have no padding bytes, and
+every bit pattern of their size is a valid value, so any byte can be read from them or written to
+them. `bool` and `char` do not conform, because most bit patterns are not valid values of them.
+
+### Gotchas
+
+A conformance for another type must return a view of exactly the bytes of `values`, in memory
+order. Writing one needs `unsafe` code that proves the type has no padding and no invalid bit
+patterns.
+
+::Anchor{id="ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[Self]) -> &[u8]
+```
+
+Returns the bytes of `values` in memory order, as a shared borrow of the same storage.
+
+::Anchor{id="ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [Self]) -> &mut [u8]
+```
+
+Returns the bytes of `values` in memory order, as an exclusive borrow of the same storage.
 
 ::Anchor{id="Slice"}
 
@@ -133,6 +176,377 @@ empty view.
 If `offset` is more than `values.length`, or `offset + length` is more than `values.length`,
 the program traps.
 
+::Anchor{id="Slice.impl.asBytes"}
+
+### Associated function `asBytes`
+
+```silk
+pub fn asBytes<T: ByteView>(values: &[T]) -> &[u8]
+```
+
+Returns the bytes of `values` in memory order, with no copy.
+
+#### When to use
+
+Use `asBytes` to pass numbers to an API that takes bytes, such as a GPU buffer upload or a
+binary file write. To build the bytes of one value in a fixed byte order, use the integer
+type's own conversion instead.
+
+#### Details
+
+`T` conforms to [`ByteView`](#ByteView): every primitive integer type, `f32`, and `f64` do. The result has
+`values.length` times the size of `T` bytes and lives as long as `values`. The call does not
+copy or allocate.
+
+#### Gotchas
+
+The bytes are in memory order, which is little-endian on every current target. A reader on a
+big-endian machine sees each element with its bytes reversed.
+
+#### Examples
+```silk
+import silk.collections.slice { Slice }
+
+pub fn main() -> i32 {
+  let words: [u32; 2] = [0x04030201, 0x08070605]
+  let bytes = Slice.asBytes<u32>(&words)
+  if bytes.length != 8 || bytes[0] != 1 || bytes[7] != 8 {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="Slice.impl.asMutBytes"}
+
+### Associated function `asMutBytes`
+
+```silk
+pub fn asMutBytes<T: ByteView>(values: &mut [T]) -> &mut [u8]
+```
+
+Returns the bytes of `values` in memory order as an exclusive borrow, with no copy.
+
+#### When to use
+
+Use `asMutBytes` to fill a slice of numbers from an API that writes bytes, such as a GPU
+buffer readback or a binary file read.
+
+#### Details
+
+`T` conforms to [`ByteView`](#ByteView): every primitive integer type, `f32`, and `f64` do. Every bit
+pattern is a valid value of those types, so any byte written through the result leaves valid
+numbers. The result has `values.length` times the size of `T` bytes. While it lives, `values`
+cannot be used.
+
+#### Gotchas
+
+The bytes are in memory order, which is little-endian on every current target.
+
+#### Examples
+```silk
+import silk.collections.slice { Slice }
+
+pub fn main() -> i32 {
+  let mut words: [u16; 2] = [0, 0]
+  let bytes = Slice.asMutBytes<u16>(&mut words)
+  bytes[0] = 0x34
+  bytes[1] = 0x12
+  if words[0] != 0x1234 || words[1] != 0 {
+    return 1
+  }
+  return 0
+}
+```
+
+::Anchor{id="u8.impl.ByteView"}
+
+## Implementation `ByteView for u8`
+
+```silk
+impl ByteView for u8
+```
+
+::Anchor{id="u8.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[u8]) -> &[u8]
+```
+
+::Anchor{id="u8.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [u8]) -> &mut [u8]
+```
+
+::Anchor{id="u16.impl.ByteView"}
+
+## Implementation `ByteView for u16`
+
+```silk
+impl ByteView for u16
+```
+
+::Anchor{id="u16.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[u16]) -> &[u8]
+```
+
+::Anchor{id="u16.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [u16]) -> &mut [u8]
+```
+
+::Anchor{id="u32.impl.ByteView"}
+
+## Implementation `ByteView for u32`
+
+```silk
+impl ByteView for u32
+```
+
+::Anchor{id="u32.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[u32]) -> &[u8]
+```
+
+::Anchor{id="u32.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [u32]) -> &mut [u8]
+```
+
+::Anchor{id="u64.impl.ByteView"}
+
+## Implementation `ByteView for u64`
+
+```silk
+impl ByteView for u64
+```
+
+::Anchor{id="u64.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[u64]) -> &[u8]
+```
+
+::Anchor{id="u64.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [u64]) -> &mut [u8]
+```
+
+::Anchor{id="usize.impl.ByteView"}
+
+## Implementation `ByteView for usize`
+
+```silk
+impl ByteView for usize
+```
+
+::Anchor{id="usize.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[usize]) -> &[u8]
+```
+
+::Anchor{id="usize.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [usize]) -> &mut [u8]
+```
+
+::Anchor{id="i8.impl.ByteView"}
+
+## Implementation `ByteView for i8`
+
+```silk
+impl ByteView for i8
+```
+
+::Anchor{id="i8.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[i8]) -> &[u8]
+```
+
+::Anchor{id="i8.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [i8]) -> &mut [u8]
+```
+
+::Anchor{id="i16.impl.ByteView"}
+
+## Implementation `ByteView for i16`
+
+```silk
+impl ByteView for i16
+```
+
+::Anchor{id="i16.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[i16]) -> &[u8]
+```
+
+::Anchor{id="i16.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [i16]) -> &mut [u8]
+```
+
+::Anchor{id="i32.impl.ByteView"}
+
+## Implementation `ByteView for i32`
+
+```silk
+impl ByteView for i32
+```
+
+::Anchor{id="i32.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[i32]) -> &[u8]
+```
+
+::Anchor{id="i32.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [i32]) -> &mut [u8]
+```
+
+::Anchor{id="i64.impl.ByteView"}
+
+## Implementation `ByteView for i64`
+
+```silk
+impl ByteView for i64
+```
+
+::Anchor{id="i64.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[i64]) -> &[u8]
+```
+
+::Anchor{id="i64.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [i64]) -> &mut [u8]
+```
+
+::Anchor{id="isize.impl.ByteView"}
+
+## Implementation `ByteView for isize`
+
+```silk
+impl ByteView for isize
+```
+
+::Anchor{id="isize.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[isize]) -> &[u8]
+```
+
+::Anchor{id="isize.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [isize]) -> &mut [u8]
+```
+
+::Anchor{id="f32.impl.ByteView"}
+
+## Implementation `ByteView for f32`
+
+```silk
+impl ByteView for f32
+```
+
+::Anchor{id="f32.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[f32]) -> &[u8]
+```
+
+::Anchor{id="f32.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [f32]) -> &mut [u8]
+```
+
+::Anchor{id="f64.impl.ByteView"}
+
+## Implementation `ByteView for f64`
+
+```silk
+impl ByteView for f64
+```
+
+::Anchor{id="f64.impl.ByteView.bytes"}
+
+### Operation `bytes`
+
+```silk
+fn bytes(values: &[f64]) -> &[u8]
+```
+
+::Anchor{id="f64.impl.ByteView.mutBytes"}
+
+### Operation `mutBytes`
+
+```silk
+fn mutBytes(values: &mut [f64]) -> &mut [u8]
+```
+
 Category: Collections.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

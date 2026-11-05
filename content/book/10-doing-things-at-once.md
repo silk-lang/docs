@@ -4,7 +4,7 @@ Your board grows as needed, refuses duplicate titles and saves itself through th
 
 ## One thread, many fibers
 
-A fiber is a small task that can pause and let other fibers run. Silk runs all the fibers of one scheduler on a single thread. Nothing runs in parallel and nothing is interrupted. A fiber keeps the thread until it *parks*: it sleeps, waits for another fiber, yields, or forks a child.
+A fiber is a small task that can pause and let other fibers run. Silk runs all the fibers of one scheduler on a single thread. Nothing runs in parallel and nothing is preempted. A fiber keeps the thread until it *parks*: it sleeps, waits for another fiber, yields, or forks a child.
 
 That sounds limiting, but most waiting is not computing. A reminder that fires in 200 ms spends all 200 ms doing nothing. While it waits, other fibers can run, and the waits overlap.
 
@@ -27,7 +27,7 @@ Replace `src/main.silk` with this. Each `estimate` pretends to need a slow 300 m
 
 ```silk
 import silk.core.effect { Effect }
-import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.fiber { Cancelled }
 import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
 import silk.io.logger { Logger, LogError }
 import silk.system.monotonic_clock { MonotonicClock }
@@ -158,7 +158,7 @@ effect fn check(id: u32) -> i32
   let Outcome<i32, NoSuchTask> { value } = move outcome
   return match move value {
     Success<i32> { value: minutes } => minutes
-    Failure<NoSuchTask> { error } => -1
+    Failure<NoSuchTask> { .. } => -1
     Cancelled {} => -2
   }
 }

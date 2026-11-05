@@ -120,7 +120,7 @@ From weakest to strongest:
 ## Other expression forms
 
 - Literals: see Lexical structure. Names and paths such as `Option<i32>.some`: see Functions and methods and Generics.
-- `()` is the unit value. `(a, b)` is a tuple. `(a,)` is a one-element tuple. `(e)` is grouping.
+- `()` is the unit value. `(a, b)` is a tuple. `.(a)` is a one-element tuple. `(e)` is grouping.
 - `[a, b, c]` is an array literal. `Name { field: e }` is a struct literal. `.{ field: e }` takes its type from context. See Structs, tuples and arrays.
 - In `if` and `while` conditions and `match` subjects, a struct literal must be parenthesized: `(P { x: 1 }).x`.
 - `match` is an expression. `if` is a statement, and also an expression when its `else` chain ends in a final `else`. See Patterns and match, and Control flow.
@@ -160,7 +160,9 @@ pub fn main() -> i32 {
   if -7 / 2 != -3 || -7 % 2 != -1 {
     return 4
   }
-  let piped = 10 |> subtract(3) |> negate
+  let piped = 10
+    |> subtract(3)
+    |> negate
   if piped != -7 {
     return 5
   }

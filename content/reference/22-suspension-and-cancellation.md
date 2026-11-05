@@ -372,8 +372,8 @@ effect fn middle(slot: Shared<Slot>, log: Shared<Log>) -> i32
 fn wasCancelled(outcome: Outcome<i32, never>) -> bool {
   let Outcome<i32, never> { value } = move outcome
   return match move value {
-    Success<i32> { value: success } => false
-    Failure<never> { error } => false
+    Success<i32> { .. } => false
+    Failure<never> { .. } => false
     Cancelled {} => true
   }
 }
@@ -416,7 +416,7 @@ effect fn scenario() -> i32
 }
 
 effect fn recover(
-  error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError
+  error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError,
 ) -> i32 {
   drop error
   return 99

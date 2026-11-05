@@ -13,11 +13,12 @@ The script needs `curl`, `tar`, `uname`, `mktemp`, `cmp`, `ln`, and `sha256sum` 
 | Host | Release target |
 | --- | --- |
 | macOS on Apple silicon | `aarch64-apple-darwin` |
+| macOS on Intel | `x86_64-apple-darwin` |
 | Linux on x86-64 | `x86_64-unknown-linux-gnu` |
 | Linux on ARM64 | `aarch64-unknown-linux-gnu` |
 | Windows on x86-64 | `x86_64-pc-windows-msvc` |
 
-Intel Macs are not supported. On one, the script stops with `silk-install: Silk has no build for Intel Macs yet`. Other systems stop with a similar line. A shell running under Rosetta on an Apple silicon Mac is detected, and gets the Apple silicon build.
+Intel Mac builds start with `v0.1.0-dev.45+256a8b0335d5`. Other systems stop with a line such as `silk-install: Silk has no build for Linux on riscv64 yet`. A shell running under Rosetta on an Apple silicon Mac is detected, and gets the Apple silicon build; only a real Intel Mac gets the Intel one.
 
 Windows builds start with `v0.1.0-dev.41+b10165a17baa` and install with `install.ps1` instead of `install.sh`. Windows on ARM64 is not supported yet; the PowerShell script stops with `This release requires Windows x86_64`.
 

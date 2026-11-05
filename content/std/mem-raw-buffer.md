@@ -171,6 +171,33 @@ The caller must prove that both ranges are in bounds and that the source values 
 initialized. The values move, so the caller must not use or drop them at the source again. The
 destination slots must be uninitialized, or their old values leak.
 
+::Anchor{id="RawBuffer.impl.resize"}
+
+### Associated function `resize`
+
+```silk
+pub unsafe fn resize<T>(buffer: &mut Intrinsic.RawBuffer<T>, count: usize) -> bool
+```
+
+Grows the buffer to `count` slots in place when the process heap owns its storage, keeping
+the values in its current slots. Returns `true` on success.
+
+#### When to use
+
+Use it before allocating a larger buffer and copying into it. The heap can often extend the
+block, or move a large one without copying its pages.
+
+#### Details
+
+Returns `false` and leaves the buffer unchanged when its storage came from another allocator
+or owns nothing, when `count` is below [`RawBuffer.count`](#RawBuffer.impl.count), when `T` has no size, or when the
+heap refuses. The resize goes straight to the heap, so an `Allocator` provider never sees it.
+
+#### Gotchas
+
+Slots past the old count are uninitialized. A slice or slot taken before the call may point
+into the old storage.
+
 ::Anchor{id="RawBuffer.impl.fill"}
 
 ### Associated function `fill`
@@ -216,4 +243,4 @@ The caller must prove that the range is in bounds and that each slot in it is in
 
 Category: Memory.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

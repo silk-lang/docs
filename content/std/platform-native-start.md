@@ -1,7 +1,7 @@
 The default start code of a native program: it calls your `main` and returns its status.
 
 ## When to use
-The compiler uses this runtime for native programs on Darwin on aarch64, and Linux with GNU libc
+The compiler uses this runtime for native programs on Darwin on x86_64 or aarch64, and Linux with GNU libc
 on x86_64 or aarch64. You do not call it.
 
 ## Details
@@ -31,4 +31,4 @@ This module declares no public items.
 
 Category: Native platform.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

@@ -30,7 +30,7 @@ pub fn main() -> i32 {
   let secret: [u8; 32] = [7; 32]
   let fromMessages = match TlsHkdfSha256.deriveSecret(&secret, b"derived", b"") {
     Result<[u8; 32], LabelError>.Success { value } => value
-    Result<[u8; 32], LabelError>.Failure { error: _ } => {
+    Result<[u8; 32], LabelError>.Failure {..} => {
       return 1
     }
   }
@@ -39,7 +39,7 @@ pub fn main() -> i32 {
   let emptyHash = Sha256.hash(b"")
   let fromHash = match TlsHkdfSha256.deriveSecretFromHash(&secret, b"derived", &emptyHash) {
     Result<[u8; 32], LabelError>.Success { value } => value
-    Result<[u8; 32], LabelError>.Failure { error: _ } => {
+    Result<[u8; 32], LabelError>.Failure {..} => {
       return 1
     }
   }
@@ -400,4 +400,4 @@ secret.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

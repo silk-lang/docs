@@ -45,6 +45,7 @@ Constraint       = Type 'in' Type
 - A shared entry does not satisfy an exclusive use. Running an Effect that needs `&mut S` under `? &S` is SEM0071.
 - A shared borrow of a provider (`Effect.provide`) cannot satisfy an exclusive entry (SEM0131). An exclusive borrow (`Effect.provideMut`) satisfies either kind.
 - One value may be lent shared to several entries at once. Lending it exclusively to two entries at once is a borrow conflict (OWN0010).
+- A `&mut S` entry in a function's own row whose body only ever needs `&S` is warning SEM0254 at the entry: "This function only needs shared access to `Random`; require `&Random` instead of `&mut Random`". The check still passes. The rows of service and interface operations are contracts, so they are not checked.
 
 ## Declaring a service
 
@@ -52,7 +53,10 @@ Constraint       = Type 'in' Type
 - An operation may have a body. The body is its default: a provider that leaves the operation out uses it, and one that implements the operation replaces it.
 - A field or any other member that is not an operation is SEM0090. A `pub` modifier on an operation is a parse error (PAR0001).
 - Operation names are distinct within a service (SEM0003).
-- An operation normally requires its own service: `effect fn next() -> i32 ? &mut Counter`. The entry's access decides what a provider's implementation may do.
+- An operation reaches its provider through a leading `self` receiver, written as the implementation writes it: `effect fn next(self: &mut Self) -> i32`. `self: &Self` is the requirement entry `&Counter`, and `self: &mut Self` is `&mut Counter`. The receiver is not an argument: `Counter.next()` takes none, and its caller must provide the entry like any other requirement.
+- Requiring the service in the row instead, `effect fn next() -> i32 ? &mut Counter`, declares the same operation. Both spellings are accepted. The entry's access decides what a provider's implementation may do.
+- An operation with neither a receiver nor its own service in its row cannot be called: each `Counter.next()` is SEM0253, "This service operation takes no `self` receiver, so a call cannot obtain its provider from the Effect environment; declare `self: &Self` or `self: &mut Self` as its first parameter".
+- The receiver form applies to a service without type parameters, with no lifetime or role on the reference. A default body has no `self` binding; it reaches the provider by calling the service's operations.
 - An operation may require other services as well, and may declare a failure row. For example, `HostInput.argument` requires `? &mut HostInput | &mut Allocator`.
 - A service may take type parameters and row parameters: `service Source<T>`, `service AcquiredRouteContext<P, A, E, ?R>`.
 - A service with no operations is allowed. It works as a pure capability token.
@@ -77,6 +81,7 @@ Constraint       = Type 'in' Type
 - Every operation needs a member. A missing member is SEM0083.
 - A member is either an inline function or a mapping `operation: Type.function` to an existing function.
 - The provider arrives as the first parameter `self`. The operation's own entry becomes that parameter, so the member does not repeat it. Other requirements and failures stay in the member's signature.
+- A member that leaves out `self` is SEM0083, which names the parameter to add: "it takes no `self` receiver; an implementation of a service operation receives its provider first, so add `self: &Self` as its first parameter".
 - For an operation that requires `&Service`, `self` must be `&Self`. Using `&mut Self` there is SEM0083.
 - For an operation that requires `&mut Service`, `self` may be `&mut Self` or `&Self`.
 - A role-qualified operation (`? &mut Journal at Audit`) is implemented by an ordinary member. The role is not written in the impl.
@@ -257,7 +262,8 @@ effect fn work() -> i32
 pub fn main() -> i32 {
   let mut daily = Book { entries: 0 }
   let mut audit = Book { entries: 0 }
-  let total = run work() |> Effect.provideMut<Journal>(&mut daily)
+  let total = run work()
+    |> Effect.provideMut<Journal>(&mut daily)
     |> Effect.provideMut<Journal at Audit>(&mut audit)
   if daily.entries != 1 || audit.entries != 100 {
     return 1
@@ -411,12 +417,14 @@ effect fn plain() -> i32 {
   return 1
 }
 
-effect fn traced() -> i32 ? &Tracer {
+effect fn traced() -> i32
+  ? &Tracer {
   return run Tracer.trace(1)
 }
 
 // Runs with or without a Tracer.
-effect fn measure() -> i32 ? &Option<&Tracer> {
+effect fn measure() -> i32
+  ? &Option<&Tracer> {
   return run withSome<&Tracer>(plain(), traced())
 }
 
@@ -429,7 +437,9 @@ pub fn main() -> i32 {
   let present = run Effect.provide(measure(), &owned)
   let absent = run Effect.provide(measure(), &missing)
   let never = run Effect.provide(measure(), &none)
-  if lifted != 11 || present != 21 || absent != 1 || never != 1 { return 1 }
+  if lifted != 11 || present != 21 || absent != 1 || never != 1 {
+    return 1
+  }
   return 0
 }
 ```
@@ -450,7 +460,7 @@ src/main.silk:33:14: error[SEM0123] A provider that matches no member of its con
 | SEM0062 | Requirement row on an ordinary `fn` (message mentions failure channels) |
 | SEM0070 | Requirement entry is not one concrete service type |
 | SEM0071 | `run` leaves requirements that the enclosing signature does not provide |
-| SEM0083 | Invalid conformance: missing member, or `&mut Self` for a shared operation |
+| SEM0083 | Invalid conformance: missing member, a member without its `self` receiver, or `&mut Self` for a shared operation |
 | SEM0088 | Row variable used where a type is expected |
 | SEM0090 | Service contains a field or another member that is not an operation |
 | SEM0099 | Selected entry or row argument cannot be inferred |
@@ -462,6 +472,8 @@ src/main.silk:33:14: error[SEM0123] A provider that matches no member of its con
 | SEM0233 | A requirement row names one service with both shared and exclusive access |
 | SEM0234 | A call does not prove a `where S in R` premise of its callee, including `R in Without<R, S>`, as when the `absent` branch of `withSome` requires `S` |
 | SEM0240 | An optional service with exclusive access, `&Option<&mut S>` |
+| SEM0253 | A call of a service operation that has no `self` receiver and does not require its own service |
+| SEM0254 | Warning: a function requires `&mut S` but only needs `&S` |
 | OWN0010 | One provider lent exclusively to two entries at once |
 | OWN0011 | Provider used while an unconsumed Effect still borrows it |
 

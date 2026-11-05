@@ -132,7 +132,7 @@ pub fn main() -> i32 {
   let wide = widen(item)
   let arr = [5, 6]
   let head = first(&arr)
-  let text = label()
+  let _text = label()
   return wide.* + head.* - 12
 }
 ```
@@ -231,10 +231,12 @@ struct View<'v> {
 
 fn sum<'s>(x: &'s i32) -> i32 {
   let local = 5
+
   // `&i32` leaves its lifetime out, so the call infers one that both
   // operands meet, here the shorter one of `local`.
   let a = first<&i32>(x, &local)
   let r = Reader { base: x }
+
   // A method call's type argument may leave lifetimes out too.
   let b = r.pick<View>(View { value: x }, View { value: &local })
   return a.* + b.value.*

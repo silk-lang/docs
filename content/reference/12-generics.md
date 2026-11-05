@@ -326,7 +326,9 @@ interface Zero {
 }
 
 impl Zero for i32 {
-  fn zero() -> i32 { return 0 }
+  fn zero() -> i32 {
+    return 0
+  }
 }
 
 interface Twice {
@@ -334,7 +336,9 @@ interface Twice {
 }
 
 impl Twice for i32 {
-  fn twice(value: i32) -> i32 { return value * 2 }
+  fn twice(value: i32) -> i32 {
+    return value * 2
+  }
 }
 
 struct Pair<T> {

@@ -98,20 +98,20 @@ effect fn program() -> i32
     |> Effect.provideMut<Allocator>(&mut allocator)
   let result = match move parsed {
     Result<ParsedResponse, ParseError>.Success { value } => move value
-    Result<ParsedResponse, ParseError>.Failure { error: _ } => {
+    Result<ParsedResponse, ParseError>.Failure {..} => {
       return 1
     }
   }
   let head = match ResponseParser.head(&result.parser) {
     Result<ResponseHead, ParseError>.Success { value } => value
-    Result<ResponseHead, ParseError>.Failure { error: _ } => {
+    Result<ResponseHead, ParseError>.Failure {..} => {
       return 1
     }
   }
   let get = Method.get()
   let selection = match selectResponse(head, &get, TrailerPolicy.defaultPolicy()) {
     Result<Selection, BodyError>.Success { value } => move value
-    Result<Selection, BodyError>.Failure { error: _ } => {
+    Result<Selection, BodyError>.Failure {..} => {
       return 1
     }
   }
@@ -126,7 +126,7 @@ effect fn program() -> i32
     |> Effect.provideMut<Allocator>(&mut allocator)
   let mut decoder = match move made {
     Result<Decoder, BodyError>.Success { value } => move value
-    Result<Decoder, BodyError>.Failure { error: _ } => {
+    Result<Decoder, BodyError>.Failure {..} => {
       return 1
     }
   }
@@ -136,7 +136,7 @@ effect fn program() -> i32
   let mut payload: [u8; 16] = [0; 16]
   let progress = match Decoder.step(&mut decoder, body, &mut payload, true) {
     Result<Progress, BodyError>.Success { value } => move value
-    Result<Progress, BodyError>.Failure { error: _ } => {
+    Result<Progress, BodyError>.Failure {..} => {
       return 1
     }
   }
@@ -1733,4 +1733,4 @@ incomplete.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

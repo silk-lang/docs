@@ -27,7 +27,7 @@ pub fn main() -> i32 {
   let mut output: [u8; 64] = [0; 64]
   let length = match encodeInto(b"Aladdin", b"open sesame", &mut scratch, &mut output) {
     Result<usize, BasicError>.Success { value } => value
-    Result<usize, BasicError>.Failure { error: _ } => {
+    Result<usize, BasicError>.Failure {..} => {
       return 1
     }
   }
@@ -38,7 +38,7 @@ pub fn main() -> i32 {
   }
   let size = match encodedLength(7, 11) {
     Result<usize, BasicError>.Success { value } => value
-    Result<usize, BasicError>.Failure { error: _ } => 0
+    Result<usize, BasicError>.Failure {..} => 0
   }
   if size != length {
     return 1
@@ -46,7 +46,7 @@ pub fn main() -> i32 {
 
   // A colon in the username fails.
   let colon = match encodeInto(b"a:b", b"c", &mut scratch, &mut output) {
-    Result<usize, BasicError>.Success { value: _ } => false
+    Result<usize, BasicError>.Success {..} => false
     Result<usize, BasicError>.Failure { error } => error == BasicError.InvalidUsername
   }
   if !colon {
@@ -179,4 +179,4 @@ the password as plain text. Overwrite it when you are done.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

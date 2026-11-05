@@ -64,6 +64,7 @@ A manifest that has `[workspace]` and no `[package]` is a workspace root. At a r
 | `--profile <name>` | Use the named `[profiles.<name>]` from the manifest |
 | `--profile-input <json>` | Supply a complete logical profile as JSON |
 | `--stdlib <directory>` | Use this std lib instead of the one installed beside `silk`. A directory without `compositions.json` exits 1 |
+| `--backend <llvm\|direct>` | `build` and `run` only. `direct` builds a WebAssembly target without Clang. See **Targets and profiles** |
 | `--clang <path>` | `build`, `run` and `test` only. Use this Clang; a bare name is looked up on `PATH`. See **Build outputs and native linking** |
 
 Without `--target`, a command uses the targets the manifest selects, or the host. Targets, profiles and output paths are described in **Targets and profiles** and **Build outputs and native linking**.
@@ -152,7 +153,7 @@ That is `silk check --target host --target wasm32-wasip1` on the program `silk i
 ## build
 
 ```
-silk build [project options] [--progress <mode>] [--quiet] [--timings]
+silk build [project options] [--backend llvm|direct] [--progress <mode>] [--quiet] [--timings]
 ```
 
 Builds every planned target. The rows add `codegen` and `link`, and the final line names the program, relative to the current directory, or in full when it is outside it, as from inside a workspace member:
@@ -172,7 +173,7 @@ Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.71s
 ## run
 
 ```
-silk run [project options] [--progress <mode>] [--quiet] [--coredump <path>] [arguments...] [-- arguments...]
+silk run [project options] [--backend llvm|direct] [--progress <mode>] [--quiet] [--coredump <path>] [arguments...] [-- arguments...]
 ```
 
 Builds the executable and runs it in the current directory. On a WASI target it runs the module with `wasmtime`; see **Targets and profiles**. The build prints the same progress output as `silk build`, on standard error, and ends with `Finished` before the program starts or `Failed` when it does not build. Standard output carries only the program's output. `--progress` and `--quiet` work as for `check`.
@@ -442,7 +443,7 @@ No silk.toml found from /home/you/loose; run `silk init` to create a package her
 ```
 
 ```
-silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|object] [--target <triple>] [--clang <path>] [--stdlib <directory>] [--optimization none|speed|size] [--debug true|false] [--stats]
+silk build <source> -o <output> [--emit final|llvm-ir|llvm-bitcode|assembly|object] [--target <triple>] [--clang <path>] [--stdlib <directory>] [--optimization none|speed|size] [--backend llvm|direct] [--debug true|false] [--stats]
 silk test <root> -o <executable> [--stdlib <directory>] [--filter <text>] [--file <path>] [--timeout <seconds>] [--optimization none|speed|size] [--debug true|false] [--no-cache]
 ```
 
@@ -486,6 +487,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_NO_TOOL_SANDBOX` | Set, the host behaves as one with no sandbox for `build.silk` tool steps, so they are refused unless `[build].unsandboxed-tools = true` |
 | `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and profiles** |
 | `SILK_PROFILE_USE` | A merged `.profdata` file: native builds pass `-fprofile-use=<file>` to Clang |
+| `SILK_CODEGEN_UNITS` | A number above 1: an optimized native executable is split into that many codegen units along its call graph, so Clang optimizes them on several threads. Calls across units inline less. Without it, an optimized build is one module |
 | `SILK_WASMTIME` | The `wasmtime` that `silk run`, `silk debug` and `silk test` use on a WASI target; default `wasmtime` on `PATH` |
 | `WASMTIME_BACKTRACE_DETAILS` | Passed to Wasmtime by `silk run`, `silk debug` and `silk test` on a WASI target, set to `1` when the environment does not set it, so trap traces show source lines |
 | `SILK_LLDB` | The LLDB that `silk debug` starts for a native program; default `lldb` on `PATH` |

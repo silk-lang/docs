@@ -27,13 +27,13 @@ import silk.uri.reference { ParseError }
 pub fn main() -> i32 {
   let uri = match Uri.parse("https://Example.COM/docs?page=2") {
     Result<Uri, ParseError>.Success { value } => value
-    Result<Uri, ParseError>.Failure { error: _ } => {
+    Result<Uri, ParseError>.Failure {..} => {
       return 1
     }
   }
   let origin = match Origin.fromUri(&uri) {
     Result<Origin, OriginError>.Success { value } => value
-    Result<Origin, OriginError>.Failure { error: _ } => {
+    Result<Origin, OriginError>.Failure {..} => {
       return 1
     }
   }
@@ -45,7 +45,7 @@ pub fn main() -> i32 {
   let mut output: [u8; 64] = [0; 64]
   let length = match Origin.authorityInto(&origin, &mut output) {
     Result<usize, OriginError>.Success { value } => value
-    Result<usize, OriginError>.Failure { error: _ } => {
+    Result<usize, OriginError>.Failure {..} => {
       return 1
     }
   }
@@ -284,4 +284,4 @@ compared without case, and equal IP addresses match in any spelling.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

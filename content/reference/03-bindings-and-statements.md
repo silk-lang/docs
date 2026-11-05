@@ -156,7 +156,9 @@ struct Point {
 }
 
 const BASE: i32 = 40
+
 const ORIGIN: Point = Point { x: 1, y: 1 }
+
 const STEPS: [i32; 3] = [1, 2, 3]
 
 static fn offset(step: i32) -> i32 {

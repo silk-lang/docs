@@ -158,6 +158,7 @@ A directive is a line such as `@inline` or `@features("avx2")` written before a 
 | `@inlineAlways` | none | a function with a Silk body | hint |
 | `@inlineNever` | none | a function with a Silk body | hint |
 | `@cold` | none | a function with a Silk body | hint |
+| `@optimizeSize` | none | a function with a Silk body | hint |
 | `@nonParking` | none | a function with a Silk body, or a service or interface operation | checked contract |
 | `@features("avx2", ...)` | CPU feature names | an `unsafe fn` with a Silk body | target |
 | `@foreign(memory:, locality:, noCapture:)` | named, each at most once | an `extern "C"` or `export "C"` function, or a foreign function type | optimizer fact |
@@ -175,10 +176,11 @@ The class says what removing the directive does. Removing a hint leaves the same
 - A foreign function type takes `@foreign` before `extern`: `@foreign(memory: "none") extern "C" fn(i32) -> i32`.
 - Arguments are literals: text, decimal integers, `true`, `false`, and parenthesized tuples of them. `@features("avx2", "bmi2")` and `@features(("avx2", "bmi2"))` mean the same. A name or a call in an argument is a parse error (PAR0002, and for a call a few more), with no SEM0235 for a known directive. An unknown directive with a name argument is still SEM0235: `@bogus(N)` prints PAR0002 at `N`, then SEM0235 at the `@`. `@features` with a name still adds SEM0242; see the open questions.
 - `@inline`, `@inlineAlways`, `@inlineNever` and `@cold` ask for inlining and code layout. `@cold` keeps the function out of line and lays out the branches that reach it as unlikely. A function takes at most one of the four.
+- `@optimizeSize` builds one function for small code, whatever the build's profile: Clang sees it as `optsize` and `minsize`. It may sit beside any of the four above. It suits setup code, table builders and other rarely run paths in a module that is otherwise optimized for speed, such as a WebAssembly module.
 - `@nonParking` makes every call owe a proof that the callee never parks its thread. On a function or an operation, a body that can park is SEM0139 at each call that enters it, when `silk build` checks it. See Suspension and cancellation.
 - `@foreign`, the callback directives, `@naked` and `@noReturn` are described in Unsafe code and C interop. `@naked @noReturn` appears only on startup entry points in the standard library.
 - An unknown directive, an argument the directive does not take, or a repeated named argument is SEM0235 at the directive: "This directive, or one of its arguments, is not one the language defines". Examples: `@bogus`, `@detached`, `@nonParking(strict: true)`, `@foreign(bogus: 1)`.
-- A known directive on a declaration that does not take it is SEM0236 at the directive: "This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@deferredCallbacks`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions". Examples: `@naked` on a plain function, `@inline` on a service operation or a struct, `@features` on an `export "C"` function, and any directive on a `static fn`. SEM0235 takes precedence.
+- A known directive on a declaration that does not take it is SEM0236 at the directive: "This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold`, `@optimizeSize` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@deferredCallbacks`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions". Examples: `@naked` on a plain function, `@inline` on a service operation or a struct, `@features` on an `export "C"` function, and any directive on a `static fn`. SEM0235 takes precedence.
 - A directive before an `import` or a `static if` is a parse error at the `@` (PAR0002), with no other error.
 - On a function with a Silk body or an operation, the same directive twice, or two of the inline hints, is SEM0250 at the second one. `@inline` twice prints ``error[SEM0250] `@inline` is written twice on this declaration; keep one``, and `@cold` then `@inlineNever` prints ``error[SEM0250] `@inlineNever` cannot be written with `@cold`: a function takes at most one of `@inline`, `@inlineAlways`, `@inlineNever` and `@cold` ``.
 - A leftover `with` clause is PAR0011 at the clause. The message names the directive to write: `fn work() -> i32 with Intrinsic.inline() { return 1 }` prints ``Silk has no `with` clauses; write `@inline` on the line before the declaration``. For `with Intrinsic.foreign(...)` and `with Intrinsic.machine(...)` it lists the directives that replace each field. `module with ...` is gone and is PAR0011 too; delete the line, since a module takes no directives.
@@ -293,7 +295,7 @@ import silk.core.option { Option }
 pub fn main() -> i32 {
   let big: i32 = 2147483647
   let sum = Intrinsic.i32CheckedAdd<Option<i32>>(big, 1, Option.some, Option.none)
-  if let Option<i32>.Some { value } = move sum {
+  if let Option<i32>.Some { .. } = move sum {
     return 1
   }
   let saturated = Intrinsic.i32SaturatingAdd(big, 1)
@@ -305,7 +307,7 @@ pub fn main() -> i32 {
     return 3
   }
   let narrow = Intrinsic.i32CheckedToU8<Option<u8>>(300, Option.some, Option.none)
-  if let Option<u8>.Some { value } = move narrow {
+  if let Option<u8>.Some { .. } = move narrow {
     return 4
   }
   return 0
@@ -333,8 +335,8 @@ impl Intrinsic.Drop for Counter {
 }
 
 fn twice<T: Intrinsic.Copy>(value: T) -> i32 {
-  let first = value
-  let second = value
+  let _first = value
+  let _second = value
   return 2
 }
 
@@ -382,7 +384,7 @@ static if Intrinsic.targetArchitecture() == "x86_64" {
   unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> {
     let low = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(
       Intrinsic.simdSplat<simd<u8, 16>>(7),
-      Intrinsic.simdSplat<simd<u8, 16>>(0)
+      Intrinsic.simdSplat<simd<u8, 16>>(0),
     )
     if Intrinsic.simdExtract<simd<u8, 16>>(low, 0) != 7 {
       return table
@@ -429,7 +431,7 @@ pub fn main() -> i32 {
           29,
           30,
           31,
-        ]
+        ],
       )
 
       // Each index picks within its own 16-byte half: lane 3, then lane 19.

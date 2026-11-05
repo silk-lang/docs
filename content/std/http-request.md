@@ -64,14 +64,14 @@ effect fn program() -> i32
   let mut allocator = Allocator.systemAllocatorProvider()
   let uri = match Uri.parse("http://example.com/a?b#frag") {
     Result<Uri, ParseError>.Success { value } => value
-    Result<Uri, ParseError>.Failure { error: _ } => {
+    Result<Uri, ParseError>.Failure {..} => {
       return 1
     }
   }
   let entries: [Header<'static>; 0] = []
   let headers = match Headers.make(&entries, limits()) {
     Result<Headers, ValueError>.Success { value } => value
-    Result<Headers, ValueError>.Failure { error: _ } => {
+    Result<Headers, ValueError>.Failure {..} => {
       return 1
     }
   }
@@ -824,4 +824,4 @@ By default, Basic credentials fail over plain HTTP with `InsecureBasic`.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

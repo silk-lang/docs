@@ -53,7 +53,7 @@ pub effect fn main() -> i32
         return 1
       }
     }
-    Result<OutputProgress, RecordError>.Failure { error: _ } => {
+    Result<OutputProgress, RecordError>.Failure {..} => {
       return 1
     }
   }
@@ -67,13 +67,13 @@ pub effect fn main() -> i32
         return 1
       }
     }
-    Result<InputProgress, RecordError>.Failure { error: _ } => {
+    Result<InputProgress, RecordError>.Failure {..} => {
       return 1
     }
   }
   match TlsRecordSender.ackWritten(&mut sender, length) {
-    Result<(), RecordError>.Success { value: _ } => {}
-    Result<(), RecordError>.Failure { error: _ } => {
+    Result<(), RecordError>.Success {..} => {}
+    Result<(), RecordError>.Failure {..} => {
       return 1
     }
   }
@@ -85,7 +85,7 @@ pub effect fn main() -> i32
       }
       return 0
     }
-    Result<usize, RecordError>.Failure { error: _ } => 1
+    Result<usize, RecordError>.Failure {..} => 1
   }
 }
 ```
@@ -830,4 +830,4 @@ Releases the ready record, so that the receiver can take the next one.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

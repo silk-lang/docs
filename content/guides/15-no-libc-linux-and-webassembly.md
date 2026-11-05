@@ -105,7 +105,8 @@ static if Target.operatingSystem() == OperatingSystem.Freestanding {
   pub fn main() -> i32 {
     return sumOfSquares(10)
   }
-} else static if Target.operatingSystem() == OperatingSystem.Linux && Compilation.libc() == Libc.None {
+} else static if Target.operatingSystem() == OperatingSystem.Linux
+  && Compilation.libc() == Libc.None {
   import silk.platform.linux.syscall { RawLinux }
   import silk.platform.linux.process_inputs { ProcessInputs }
   import silk.core.result { Result }
@@ -137,8 +138,8 @@ static if Target.operatingSystem() == OperatingSystem.Freestanding {
     let mut out = RawStdout {}
     let outcome = run Effect.result(report(10)) |> Effect.provideMut<Writer>(&mut out)
     return match move outcome {
-      Result.Success { value } => 0
-      Result.Failure { error } => 1
+      Result.Success { .. } => 0
+      Result.Failure { .. } => 1
     }
   }
 } else {
