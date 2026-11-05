@@ -122,7 +122,7 @@ Finished build/llvm/x86_64-unknown-linux-gnu/release/tiny in 0.89s
 
 The heading names the profile in parentheses after the target.
 
-Within one profile, directives on a function steer the optimizer: `@inline`, `@inlineAlways` and `@inlineNever` on the line before a `fn` ask for or against inlining, and `@cold` marks a function that rarely runs. See **Intrinsics** in the reference.
+Within one profile, directives on a function steer the optimizer: `@inline`, `@inlineAlways` and `@inlineNever` on the line before a `fn` ask for or against inlining, and `@cold` marks a function that rarely runs. `@optimizeSize` builds one function for size inside a speed build. See **Intrinsics** in the reference.
 
 ## Named profiles
 

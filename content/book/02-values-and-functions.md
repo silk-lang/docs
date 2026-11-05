@@ -397,7 +397,7 @@ fn addMinutes(left: u8, right: u8) -> u8 {
 }
 
 pub fn main() -> i32 {
-  let total = addMinutes(200, 90)
+  let _total = addMinutes(200, 90)
   return 0
 }
 ```

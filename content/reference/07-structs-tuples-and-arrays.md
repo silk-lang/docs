@@ -170,7 +170,7 @@ pub fn main() -> i32 {
   r.0 = 3
   let m = Meters(1.5)
   let pair = (10, true)
-  let nothing: () = ()
+  let _nothing: () = ()
   if width(&r) != 6 || width(&unit()) != 1 {
     return 1
   }

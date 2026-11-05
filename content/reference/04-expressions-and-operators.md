@@ -160,7 +160,9 @@ pub fn main() -> i32 {
   if -7 / 2 != -3 || -7 % 2 != -1 {
     return 4
   }
-  let piped = 10 |> subtract(3) |> negate
+  let piped = 10
+    |> subtract(3)
+    |> negate
   if piped != -7 {
     return 5
   }

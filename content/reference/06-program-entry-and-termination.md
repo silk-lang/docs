@@ -102,20 +102,28 @@ An uncaught failure:
 import silk.text.format { Debug, Format, Formatter }
 import silk.io.writer { Writer, WriterError }
 
-pub struct NotFound { pub code: i32 }
+pub struct NotFound {
+  pub code: i32
+}
 
 impl Debug for NotFound {
-  effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer {
+  effect fn debug(self: &Self, formatter: &mut Formatter) -> ()
+    ! WriterError
+    ? &mut Writer {
     return run Format.debugFields(self, "NotFound", &mut formatter)
   }
 }
 
-effect fn load(present: bool) -> i32 ! NotFound {
-  if !present { fail NotFound { code: 4 } }
+effect fn load(present: bool) -> i32
+  ! NotFound {
+  if !present {
+    fail NotFound { code: 4 }
+  }
   return 1
 }
 
-pub effect fn main() -> i32 ! NotFound {
+pub effect fn main() -> i32
+  ! NotFound {
   let value = run load(false)
   return value
 }
@@ -145,8 +153,8 @@ import silk.io.writer { Writer, WriterError }
 import silk.num.usize
 
 pub effect fn main() -> i32
-! HostInputError | OutOfMemoryError | WriterError | StreamReadError
-? &mut HostInput {
+  ! HostInputError | OutOfMemoryError | WriterError | StreamReadError
+  ? &mut HostInput {
   let mut allocator = Allocator.systemAllocatorProvider()
   let mut stdout = StdoutWriter.make()
   let first = run HostInput.argument(1) |> Effect.provideMut<Allocator>(&mut allocator)
@@ -158,8 +166,11 @@ pub effect fn main() -> i32
   let mut buffer: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0]
   let mut total: usize = 0
   while true {
-    let outcome = run StandardInput.receive(&mut buffer) |> Effect.provideMut<StandardInput>(&mut input)
-    if StandardInput.isEndOfInput(&outcome) { break }
+    let outcome = run StandardInput.receive(&mut buffer)
+      |> Effect.provideMut<StandardInput>(&mut input)
+    if StandardInput.isEndOfInput(&outcome) {
+      break
+    }
     total = total + StandardInput.count(&outcome)
   }
   return usize.toI32(total)

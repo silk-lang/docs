@@ -257,7 +257,8 @@ effect fn work() -> i32
 pub fn main() -> i32 {
   let mut daily = Book { entries: 0 }
   let mut audit = Book { entries: 0 }
-  let total = run work() |> Effect.provideMut<Journal>(&mut daily)
+  let total = run work()
+    |> Effect.provideMut<Journal>(&mut daily)
     |> Effect.provideMut<Journal at Audit>(&mut audit)
   if daily.entries != 1 || audit.entries != 100 {
     return 1
@@ -411,12 +412,14 @@ effect fn plain() -> i32 {
   return 1
 }
 
-effect fn traced() -> i32 ? &Tracer {
+effect fn traced() -> i32
+  ? &Tracer {
   return run Tracer.trace(1)
 }
 
 // Runs with or without a Tracer.
-effect fn measure() -> i32 ? &Option<&Tracer> {
+effect fn measure() -> i32
+  ? &Option<&Tracer> {
   return run withSome<&Tracer>(plain(), traced())
 }
 
@@ -429,7 +432,9 @@ pub fn main() -> i32 {
   let present = run Effect.provide(measure(), &owned)
   let absent = run Effect.provide(measure(), &missing)
   let never = run Effect.provide(measure(), &none)
-  if lifted != 11 || present != 21 || absent != 1 || never != 1 { return 1 }
+  if lifted != 11 || present != 21 || absent != 1 || never != 1 {
+    return 1
+  }
   return 0
 }
 ```

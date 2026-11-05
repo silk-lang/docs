@@ -177,12 +177,18 @@ config.main.verbose = true
 
 ```silk
 pub param port: u16
+
 pub param verbose: bool = false
+
 param retries: i32 = 3 where retries >= 0
 
 pub fn main() -> i32 {
-  if port != 8080 { return 1 }
-  static if !verbose { return 2 }
+  if port != 8080 {
+    return 1
+  }
+  static if !verbose {
+    return 2
+  }
   return retries - 3
 }
 ```

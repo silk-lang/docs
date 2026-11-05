@@ -77,14 +77,14 @@ effect fn work(index: usize) -> i32 {
 }
 
 effect fn root() -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled
-? &mut Scheduler | &mut MonotonicClock {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ? &mut Scheduler | &mut MonotonicClock {
   let child = run Fiber<i32, never>.forkChild(work(5))
   return run child.join()
 }
 
 pub effect fn main() -> i32
-! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
   let mut clock = OsMonotonicClock.make()
   let mut scheduler = LocalScheduler.make()
   return run scheduler.execute<i32, OutOfMemoryError | TaskIdExhaustedError | Cancelled>(root())
@@ -110,27 +110,34 @@ A typed failure that escapes an effect `main` is not a trap. The program exits w
 import silk.io.writer { Writer, WriterError }
 import silk.text.format { Debug, Format, Formatter }
 
-pub struct ConfigError { pub code: i32 }
+pub struct ConfigError {
+  pub code: i32
+}
 
 impl Debug for ConfigError {
-  effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer {
+  effect fn debug(self: &Self, formatter: &mut Formatter) -> ()
+    ! WriterError
+    ? &mut Writer {
     return run Format.debugFields(self, "ConfigError", &mut formatter)
   }
 }
 
-effect fn load(code: i32) -> i32 ! ConfigError {
+effect fn load(code: i32) -> i32
+  ! ConfigError {
   if code > 0 {
     fail ConfigError { code: code }
   }
   return code
 }
 
-effect fn configure(code: i32) -> i32 ! ConfigError {
+effect fn configure(code: i32) -> i32
+  ! ConfigError {
   return run load(code)
 }
 
-pub effect fn main() -> () ! ConfigError {
-  let code = run configure(7)
+pub effect fn main() -> ()
+  ! ConfigError {
+  let _code = run configure(7)
 }
 ```
 
@@ -384,7 +391,10 @@ silk: `debug` needs lldb on PATH or SILK_LLDB
 This package, `shapes`, overflows:
 
 ```silk
-struct Rect { width: i32, height: i32 }
+struct Rect {
+  width: i32,
+  height: i32
+}
 
 fn area(rect: &Rect) -> i32 {
   let scaled = rect.width * 1000000

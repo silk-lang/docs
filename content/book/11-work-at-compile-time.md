@@ -502,9 +502,11 @@ fn label(static verbose: bool) -> string<'static> {
   return "quiet"
 }
 
-pub effect fn main() -> () ! LogError {
+pub effect fn main() -> ()
+  ! LogError {
   let mut logger = StdoutLogger.make()
-  run Effect.log("{a} {b}\n", &.{ a: label(true), b: label(false) }) |> Effect.provideMut<Logger>(&mut logger)
+  run Effect.log("{a} {b}\n", &.{ a: label(true), b: label(false) })
+    |> Effect.provideMut<Logger>(&mut logger)
 }
 ```
 

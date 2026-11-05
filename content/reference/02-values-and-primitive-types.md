@@ -268,6 +268,7 @@ pub fn main() -> i32 {
   if f64.fma(2.0, 3.0, 1.0) != 7.0 || f64.exp(0.0) != 1.0 || f64.log(1.0) != 0.0 {
     return 2
   }
+
   // The full product of two u64 values: high half, then low half.
   if u64.multiplyHigh(u64.MAX, 2) != 1 || u64.wrappingMultiply(u64.MAX, 2) != u64.MAX - 1 {
     return 3
@@ -282,7 +283,6 @@ pub fn main() -> i32 {
 ```silk
 import silk.text.char
 import silk.text.string { String }
-import silk.num.usize
 
 pub fn main() -> i32 {
   let letter = 'é'
@@ -490,8 +490,10 @@ pub fn main() -> i32 {
   let high = u8x16.splat(250)
   let wrapped = u8x16.wrappingAdd(high, u8x16.splat(10))
   let clamped = u8x16.saturatingAdd(high, u8x16.splat(10))
-  if u8x16.extract(wrapped, 0) != 4 || u8x16.extract(clamped, 0) != 255 { return 1 }
-  let sum = high + u8x16.splat(10)
+  if u8x16.extract(wrapped, 0) != 4 || u8x16.extract(clamped, 0) != 255 {
+    return 1
+  }
+  let _sum = high + u8x16.splat(10)
   return 0
 }
 ```
@@ -500,7 +502,7 @@ pub fn main() -> i32 {
 
 ```
 fatal trap: arithmetic overflow
-  at main.main (main:8:13)
+  at main.main (main:10:14)
 ```
 
 ## Diagnostics

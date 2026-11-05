@@ -233,7 +233,7 @@ pub fn main() -> i32 {
   let mut holder = Holder {
     step: fn() -> i32 {
       return 5
-    }
+    },
   }
   if drive(&mut holder) != 10 {
     return 3
@@ -245,8 +245,13 @@ pub fn main() -> i32 {
 A callable whose parameter is a wider union than the use passes:
 
 ```silk
-struct Cat { lives: i32 }
-struct Dog { tricks: i32 }
+struct Cat {
+  lives: i32
+}
+
+struct Dog {
+  tricks: i32
+}
 
 fn score(pet: Cat | Dog) -> i32 {
   return match move pet {

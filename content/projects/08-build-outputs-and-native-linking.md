@@ -360,7 +360,9 @@ composition = { runtimes = [{ name = "synchronous", module = "silk/platform/nati
 import silk.system.host_input { HostInput, HostInputError }
 import silk.num.usize
 
-pub effect fn main() -> i32 ! HostInputError ? &mut HostInput {
+pub effect fn main() -> i32
+  ! HostInputError
+  ? &mut HostInput {
   let count = run HostInput.argumentCount()
   if count == usize.ONE {
     return 0

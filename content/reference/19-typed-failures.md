@@ -199,7 +199,7 @@ pub fn main() -> i32 {
   let mixed: i32 | bool = run Effect.catchAll(Effect.mapError(load(false), wrap), fallback)
   let n = match mixed {
     i32 v => v
-    bool b => 7
+    bool _ => 7
   }
   return n - 7
 }
@@ -246,7 +246,7 @@ impl Journal for Memory {
 effect fn work(count: &mut i32) -> i32
   ! Problem
   ? &mut Journal {
-  let guard = Guard { count: move count }
+  let _guard = Guard { count: move count }
   run Journal.mark(1)
   fail Problem { code: 3 }
 }

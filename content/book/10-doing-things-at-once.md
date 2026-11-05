@@ -27,7 +27,7 @@ Replace `src/main.silk` with this. Each `estimate` pretends to need a slow 300 m
 
 ```silk
 import silk.core.effect { Effect }
-import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.fiber { Cancelled }
 import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
 import silk.io.logger { Logger, LogError }
 import silk.system.monotonic_clock { MonotonicClock }
@@ -158,7 +158,7 @@ effect fn check(id: u32) -> i32
   let Outcome<i32, NoSuchTask> { value } = move outcome
   return match move value {
     Success<i32> { value: minutes } => minutes
-    Failure<NoSuchTask> { error } => -1
+    Failure<NoSuchTask> { .. } => -1
     Cancelled {} => -2
   }
 }

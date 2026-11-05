@@ -8,17 +8,19 @@ A diagnostic prints as `path:line:column: error[CODE] message`. When the compile
 
 The message is either a filled-in template, such as `Unknown type Size`, or, when the compiler cannot fill the template, the code's one-line meaning, such as `Invoking a stored callable through too weak an aggregate receiver access`. The meaning names the rule but not the names or values involved; read the line and column. Entries below give the template when the printed message is the meaning.
 
+Three codes are warnings, not errors: MOD0007 (an unused import), SEM0254 (a `&mut` requirement the body only reads) and SEM0255 (an unused local binding). A warning prints `warning[CODE]` in place of `error[CODE]`. It does not fail the command: `silk check` and `silk build` still exit with status 0 and the build still writes its output. The language server shows warnings too.
+
 A construct the compiler parses but cannot compile yet is not a coded error. It prints `unsupported: this construct is not supported by the native compiler yet` or `unsupported[Reason] not supported by the native compiler yet`, and the command exits with status 2.
 
 | Family | Phase | Codes |
 | --- | --- | --- |
 | LEX | Lexing tokens and literals | LEX0001-LEX0014 |
 | PAR | Parsing | PAR0001-PAR0011 |
-| MOD | Module and package resolution | MOD0001-MOD0006 |
+| MOD | Module and package resolution | MOD0001-MOD0007 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0251 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0255 |
 
-There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041 and SEM0199; they are never reused.
+There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041, SEM0199 and SEM0245; they are never reused.
 
 Each example is the whole `src/main.silk` of a package named `demo` in `/home/you/demo`, run with `silk check` unless the entry says `silk build`. Output lines are quoted as printed. Codes the compiler never reports are listed in the last section.
 
@@ -721,6 +723,28 @@ src/main.silk:1:8: error[MOD0006] Module util.mod names a `mod.silk` file, which
 ```
 
 Fix: Write `import util { one }`. See Modules and imports.
+
+### MOD0007
+
+A warning: an imported name that the module never uses.
+
+```silk
+import silk.core.option { Option }
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:1:27: warning[MOD0007] Import `Option` is never used; remove it
+```
+
+The column is the unused name inside the braces. Each unused name of an import list gets its own warning. The check still passes and exits with status 0.
+
+Fix: Remove the name from the import list, or the whole `import` line when no name of it is used. See Modules and imports.
 
 ## OWN: ownership and borrowing
 
@@ -4275,7 +4299,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes and directives (SEM0187-SEM0251)
+## SEM: C interop, impls, lifetimes, directives, lambdas and warnings (SEM0187-SEM0255)
 
 ### SEM0185
 
@@ -5101,7 +5125,7 @@ pub fn main() -> i32 { return naked() }
 `silk check` prints:
 
 ```text
-src/main.silk:1:1: error[SEM0236] This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@deferredCallbacks`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions
+src/main.silk:1:1: error[SEM0236] This directive is not allowed here; `@inline`, `@inlineAlways`, `@inlineNever`, `@cold`, `@optimizeSize` and `@features` apply only to runtime functions with a Silk body, `@nonParking` also to service operations, and `@foreign`, `@callbacks`, `@threadCallbacks`, `@deferredCallbacks`, `@invokesDeferredCallbacks`, `@naked` and `@noReturn` only to `extern "C"` or `export "C"` functions
 ```
 
 The column is the directive. The same code covers `@features` on an `extern "C"` function, `@inline` on a `static fn`, any directive on a struct or other declaration that is not a function, and any directive but `@nonParking` on a service or interface operation. An `@` before an `import` or a `static if` is PAR0002 at the `@` alone.
@@ -5311,41 +5335,6 @@ For an imported function the column is the callee's name; each call is reported,
 
 Fix: Select the feature in the profile, as in `[profiles.fast.cpu] features = ["avx"]` or `model = "x86-64-v3"`, and build with `--profile fast`. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and profiles.
 
-### SEM0245
-
-An anonymous function or `effect {}` block that the native compiler cannot specialize yet: one run from a function with `static` parameters, or one in a `static for` body.
-
-```silk
-import silk.core.effect { Effect }
-
-effect fn again<'env, A, E, ?R>(mut action: mut Effect<'env; A ! E ? R>) -> A ! E ? R {
-  return run action
-}
-
-effect fn one() -> i32 {
-  return 1
-}
-
-effect fn scaled(static factor: i32) -> i32 {
-  let got = run again(effect { return run one() })
-  return got * factor
-}
-
-pub fn main() -> i32 {
-  return run scaled(3)
-}
-```
-
-`silk check` prints:
-
-```text
-src/main.silk:12:23: error[SEM0245] An `effect {}` block cannot run inside `scaled` yet: the native compiler does not specialize it for each argument of a `static` parameter; move the code that builds and runs it into a named function without `static` parameters and call that from `scaled`
-```
-
-The column is the block. An anonymous function prints "An anonymous function" in place of "An `effect {}` block". Inside a `static for` body the message is the other template: ``An `effect {}` block inside a `static for` body is not supported by the native compiler yet: every unrolled iteration would share its one declaration; move the code that builds and runs it into a named function and call that from the loop body``.
-
-Fix: Move the code that builds and runs the block into a named function without `static` parameters, such as `effect fn oneAgain() -> i32 { return run again(effect { return run one() }) }`, and call it from `scaled` or from the loop body. See Writing effect combinators and Static control flow and reflection.
-
 ### SEM0246
 
 `mut` or `once` written before a type name other than `Effect`, such as `f: mut F`.
@@ -5518,6 +5507,105 @@ static fn bumped(count: i32) -> i32 {
 ```
 
 See Static evaluation.
+
+### SEM0252
+
+A lambda parameter or result whose type the place where the lambda is used does not give.
+
+```silk
+pub fn main() -> i32 {
+  let double = |value| value * 2
+  return double(21)
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:2:17: error[SEM0252] Cannot infer the type of lambda parameter `value` from where the lambda is used; write it, as in `|value: T|`
+```
+
+The column is the parameter. A lambda takes its missing types from the callable type its context expects: an annotated binding, a call parameter or a pipeline target. A plain `let` with no type gives none.
+
+Fix: Write the parameter type, as in `|value: i32| value * 2`, or annotate the binding: `let double: fn(i32) -> i32 = |value| value * 2`. See Closures and callable types.
+
+### SEM0253
+
+A call of a service operation that has no way to reach its provider: the operation declares no `self` receiver and does not require its own service.
+
+```silk
+service Random {
+  effect fn next() -> u32
+}
+
+effect fn roll() -> u32 ? &Random {
+  return run Random.next()
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:6:21: error[SEM0253] This service operation takes no `self` receiver, so a call cannot obtain its provider from the Effect environment; declare `self: &Self` or `self: &mut Self` as its first parameter
+```
+
+The column is the operation name in the call. The declaration itself is accepted; each call is reported.
+
+Fix: Declare the receiver, as in `effect fn next(self: &Self) -> u32`, or the equivalent requirement row, `effect fn next() -> u32 ? &Random`. See Services and providers.
+
+### SEM0254
+
+A warning: a function requires `&mut S`, but every `run` in its body that needs `S` needs only `&S`.
+
+```silk
+service Random {
+  effect fn next(self: &Self) -> u32
+}
+
+effect fn roll() -> u32
+  ? &mut Random {
+  return run Random.next()
+}
+
+pub fn main() -> i32 {
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:6:5: warning[SEM0254] This function only needs shared access to `Random`; require `&Random` instead of `&mut Random`
+```
+
+The column is the `&mut` entry of the requirement row. The check still passes. Only rows a function declares are checked; the rows of service and interface operations are contracts, so they are not.
+
+Fix: Require `&Random`. Callers can then provide the service through a shared borrow. See Services and providers.
+
+### SEM0255
+
+A warning: a local binding that is never read.
+
+```silk
+pub fn main() -> i32 {
+  let unused = 5
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:2:7: warning[SEM0255] `unused` is never used; remove it, or start its name with `_` to keep it
+```
+
+The column is the binding's name. Names bound by a pattern, such as a field of `let P { a, b } = ...` or a `match` arm's `i32 other`, and `static for` names are checked the same way. Function parameters are not. A name that starts with `_` is never reported.
+
+Fix: Remove the binding, or rename it `_unused` when it is there on purpose. To run an expression only for what it does, write `drop compute()`.
 
 ## Codes this compiler does not report
 

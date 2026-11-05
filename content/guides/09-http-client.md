@@ -447,25 +447,31 @@ effect fn pump(from: &mut Connection, to: &mut Connection, label: string) -> ()
     let progress = run Connection.receive(&mut to.*, input)
     at = at + progress.consumed
     match move progress.event {
-      Event.Headers { stream, fields, endStream } => {
+      Event.Headers { stream, fields, .. } => {
         let list = List.asSlice(&fields)
         let mut index: usize = 0
         while index < list.length {
-          run Format.format("{label} stream {stream}: {name} = {value}\n", &.{
-            label: label,
-            stream: stream,
-            name: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&list[index].name)),
-            value: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&list[index].value)),
-          })
+          run Format.format(
+            "{label} stream {stream}: {name} = {value}\n",
+            &.{
+              label: label,
+              stream: stream,
+              name: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&list[index].name)),
+              value: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&list[index].value)),
+            },
+          )
           index = index + 1
         }
       }
-      Event.Data { stream, bytes, endStream } => {
-        run Format.format("{label} stream {stream}: body {body}\n", &.{
-          label: label,
-          stream: stream,
-          body: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&bytes)),
-        })
+      Event.Data { stream, bytes, .. } => {
+        run Format.format(
+          "{label} stream {stream}: body {body}\n",
+          &.{
+            label: label,
+            stream: stream,
+            body: unsafe String.fromUtf8Unchecked(Bytes.asSlice(&bytes)),
+          },
+        )
       }
       _ => {}
     }
@@ -490,7 +496,7 @@ effect fn exchange() -> ()
     Field { name: b"content-type", value: b"text/plain", sensitive: false },
   ]
   run Connection.sendHeaders(&mut server, stream, &response, false)
-  let sent = run Connection.sendData(&mut server, stream, b"2 open", true)
+  let _sent = run Connection.sendData(&mut server, stream, b"2 open", true)
   run pump(&mut server, &mut client, "client got")
   run pump(&mut client, &mut server, "server got")
 }

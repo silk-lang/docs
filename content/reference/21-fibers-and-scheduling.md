@@ -187,7 +187,7 @@ effect fn program() -> i32
 }
 
 effect fn recover(
-  error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError
+  error: OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError,
 ) -> i32 {
   drop error
   return 99
@@ -204,7 +204,7 @@ Fork order, dropped fibers, and cancellation when the root finishes. The child r
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.core.effect { Effect }
-import silk.concurrency.fiber { Fiber, Cancelled }
+import silk.concurrency.fiber { Fiber }
 import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
