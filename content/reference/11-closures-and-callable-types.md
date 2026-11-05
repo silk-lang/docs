@@ -51,7 +51,9 @@ pub fn main() -> i32 {
   let b = applyTwice(|value| value + 1, 40)
   let positive: fn(i32) -> bool = |value| value > 0
   let tripled = |value: i32| value * 3
-  let explicit = |value: i32| -> i32 { return value * 4 }
+  let explicit = |value: i32| -> i32 {
+    return value * 4
+  }
   let seven = || 7
   if positive(a) && b == 42 && tripled(1) == 3 && explicit(1) == 4 && seven() == 7 {
     return 0
