@@ -126,13 +126,14 @@ The server tells the client where the std lib lives, so a std lib file opened th
 
 | Feature | State in this release |
 | --- | --- |
-| Errors as you type | Works: each diagnostic is shown at its code and range |
+| Errors as you type | Works: each diagnostic is shown at its code and range, warnings (unused imports and bindings) included |
 | Document outline | Works: the file's declarations |
 | Folding | Works |
 | Format document | Works, with the same layout as `silk format`, including one line per `@` directive before a declaration |
-| Hover, go to definition, signature help | Work on the names you use and the names you declare, from your package or the std lib. Hover shows a function's signature and doc comment, a type's declaration and doc comment, such as `Effect` in `Effect.log`, `name: Type` for a parameter, a `let` binding, a match binder or a record field (`name: string` in `Item { name: "tea", ... }`), and `module silk.collections.list` on an import path. Definition opens the declaring file, std lib files included. Signature help shows the parameters of the call you are typing. A `{placeholder}` inside a template string shows nothing |
+| Hover, go to definition, signature help | Work on the names you use and the names you declare, from your package or the std lib. Hover shows a function's signature and doc comment, a type's declaration and doc comment, such as `Effect` in `Effect.log`, `name: Type` for a parameter, a `let` binding, a match binder or a record field (`name: string` in `Item { name: "tea", ... }`), and `module silk.collections.list` on an import path. Hover on a directive such as `@inline` says what it does. Every inferred type is spelled out, Effects as `Effect<A ! E ? R>` with their rows, tuples, records and lambda types included. Definition opens the declaring file, std lib files included. Signature help shows the parameters of the call you are typing. A `{placeholder}` inside a template string shows nothing |
 | Inlay hints | Work: the type of each `let` binding, such as `: StdoutLogger` after `let mut logger` |
-| Completion | Works: a name you type completes from the declarations, imports, parameters and bindings in scope, also in a body that does not check yet. After a `.`, it lists the receiver's members, or a type's static members, or a module's public declarations. Inside an import's `{ ... }` list it offers the public members of that module |
+| Completion | Works: a name you type completes from the declarations, imports, parameters and bindings in scope, also in a body that does not check yet. After a `.`, it lists the receiver's members, or a type's static members, or a module's public declarations. Inside an import's `{ ... }` list it offers the public members of that module. Inside an import's path it offers the modules and directories that can follow, dependency names, and `silk` as the first segment |
+| Quick fixes | A name the check cannot resolve offers one fix per module that declares it public: the fix adds the name to an existing import of that module, or writes a new import |
 | Find references, rename | Work over the package for a declaration, an import member, a local variable or a generic parameter: start from any place the name is written |
 | Workspace symbols | Works: search the package's declarations by name |
 | Workspace members | An edit in one member's file is seen by the members that import it, before you save |
