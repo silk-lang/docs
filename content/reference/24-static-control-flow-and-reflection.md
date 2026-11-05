@@ -316,7 +316,7 @@ fn build<U>(word: string, length: u32) -> U {
   static for variant in Reflect.variants<U>() {
     static if Reflect.variantLabel(variant) == "Line" {
       if word == "Line" {
-        return Reflect.makeVariant(variant, (length,))
+        return Reflect.makeVariant(variant, .(length))
       }
     }
   }

@@ -1,11 +1,14 @@
 # Closures and callable types
 
-A callable is a value you can call. Silk has four sources of callables: function literals, named functions used as values, staged calls that supply only some arguments, and bound methods. This page also covers callable types, which state how a callable may be invoked and how long its captured environment lives.
+A callable is a value you can call. Silk has four sources of callables: function literals and lambdas, named functions used as values, staged calls that supply only some arguments, and bound methods. This page also covers callable types, which state how a callable may be invoked and how long its captured environment lives.
 
 ## Syntax
 
 ```
 FunctionLiteral = 'effect'? 'fn' '(' Parameters? ')' '->' Type FailureRow? RequirementRow? Block
+Lambda          = 'effect'? '|' LambdaParams? '|' ( Expression | Block | '->' Type Block )
+LambdaParams    = LambdaParam (',' LambdaParam)* ','?
+LambdaParam     = 'mut'? Identifier (':' Type)?
 Parameters      = Parameter (',' Parameter)* ','?
 Parameter       = 'mut'? Identifier ':' Type
 
@@ -27,6 +30,44 @@ BoundMethod     = Expression '.' Identifier          (not followed by '(')
 - Each literal and each named function has its own distinct type. Two different callables cannot be assigned to one binding, even with the same signature (SEM0037).
 - A literal may be nested inside another literal.
 - `effect fn(...) -> T { ... }` builds a callable that returns an Effect instead of running its body. See Effects and run.
+
+## Lambdas
+
+A lambda is a function literal that may leave out its types. Its parameters go between bars, and its body follows them.
+
+```silk
+fn apply(transform: fn(i32) -> i32, value: i32) -> i32 {
+  return transform(value)
+}
+
+fn applyTwice<T>(mut transform: mut fn(T) -> T, value: T) -> T {
+  let first = transform(move value)
+  return transform(move first)
+}
+
+pub fn main() -> i32 {
+  let offset = 2
+  let a = apply(|value| value + offset, 40)
+  let b = applyTwice(|value| value + 1, 40)
+  let positive: fn(i32) -> bool = |value| value > 0
+  let tripled = |value: i32| value * 3
+  let explicit = |value: i32| -> i32 { return value * 4 }
+  let seven = || 7
+  if positive(a) && b == 42 && tripled(1) == 3 && explicit(1) == 4 && seven() == 7 {
+    return 0
+  }
+  return 1
+}
+```
+
+- `|value| value + 1` has an expression body, which is its result. A braced block is an ordinary body with `return`. `->` writes the result type, and then the body must be a block.
+- `||` is a lambda with no parameters. A parameter may be `mut name`. A parameter type is a single type; parenthesize a union.
+- A missing parameter type is the matching parameter type of the callable the context expects: an annotated binding, a call parameter or a pipeline target. A missing result is the expected result, or else what the body returns.
+- In a generic call, a lambda whose parameter types use type parameters the call has not inferred yet is checked after the other arguments. `applyTwice(|value| value + 1, 40)` gets `T = i32` from `40`, then types `value` as `i32`.
+- When the context gives no type, write it: `let double = |value| value * 2` is SEM0252, "Cannot infer the type of lambda parameter `value` from where the lambda is used; write it, as in `|value: T|`".
+- An inferred type must be one a signature could name. A type that holds a loan of the enclosing body, or a type parameter the enclosing call is still inferring, cannot be inferred; write it.
+- `effect |value| ...` is an effect lambda, an anonymous `effect fn`. When it leaves out its result, its success, failure and requirements come from the Effect the context expects, or else from its body, as for an `effect { }` block. A lambda without `effect` whose body returns an Effect is an ordinary function that returns that Effect; `effect |value| run next(value)` and `|value| next(value)` both satisfy `fn(i32) -> Effect<i32>`.
+- Otherwise a lambda is a function literal: it captures, has an invocation mode and has its own distinct type exactly as below. Code that uses no lambdas pays nothing for inference.
 
 ## Capture modes
 
@@ -293,6 +334,7 @@ pub fn main() -> i32 {
 | SEM0078 | Calling a function that has parameters with no arguments |
 | SEM0082 | Calling an `unsafe fn` value outside `unsafe` |
 | SEM0210 | Callable result environment lifetime cannot be elided |
+| SEM0252 | A lambda parameter or result type that its context does not give |
 
 ## See also
 

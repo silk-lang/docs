@@ -7,9 +7,12 @@ A build compiles for one target with one profile. Pick the target with `--target
 | Target | Platform | Default libc |
 | --- | --- | --- |
 | `aarch64-apple-darwin` | macOS on Apple silicon | `system` |
+| `x86_64-apple-darwin` | macOS on Intel | `system` |
 | `x86_64-unknown-linux-gnu` | Linux on x86-64 | `gnu` |
 | `aarch64-unknown-linux-gnu` | Linux on arm64 | `gnu` |
+| `x86_64-pc-windows-msvc` | Windows on x86-64 | `system` |
 | `wasm32-unknown-unknown` | WebAssembly, no operating system | `none` |
+| `wasm64-unknown-unknown` | 64-bit WebAssembly (memory64), no operating system | `none` |
 | `wasm32-wasip1` | WebAssembly with WASI Preview 1, a core module | `none` |
 | `wasm32-wasip2` | WebAssembly with WASI Preview 2, a component | `none` |
 
@@ -20,33 +23,40 @@ The two Linux targets also have a no-libc form: the same target name with a prof
 
 What works for each target with this compiler:
 
-| Target | `silk check` | Executable | Object, archive or IR |
+| Target | `silk check` | Executable | `silk run` and `silk test` |
 | --- | --- | --- | --- |
-| The host's own target | yes | yes | yes |
-| Another macOS or Linux target | yes | no: `Cannot link an executable for target aarch64-apple-darwin on host x86_64-unknown-linux-gnu` | yes |
-| Linux without libc | yes | not yet (see below) | `kind = "object"` builds |
-| `wasm32-unknown-unknown` | yes | yes, a WebAssembly module, on any host (see below) | yes |
-| `wasm32-wasip1`, `wasm32-wasip2` | yes | yes, on any host; `wasm32-wasip2` needs `wasm-tools` (see WASI below) | yes |
+| macOS, Linux and Windows | yes | yes, from any host (see Cross-compiling) | on a host of that target only |
+| Linux without libc | yes | not yet (see below) | no |
+| `wasm32-unknown-unknown`, `wasm64-unknown-unknown` | yes | yes, a WebAssembly module, on any host (see below) | no; run the module with `wasm-runner.mjs` |
+| `wasm32-wasip1`, `wasm32-wasip2` | yes | yes, on any host; `wasm32-wasip2` needs `wasm-tools` (see WASI below) | yes, with Wasmtime |
 
-To cross-compile, set `[build].stage = "object"` (or `llvm-ir`, `assembly`, `llvm-bitcode`), or `[package].kind = "object"` or `"static-library"`, and link the result with your own toolchain:
+Objects, static archives, LLVM IR and assembly build for every target. `silk run` for another target stops with `Cannot run target aarch64-apple-darwin on host x86_64-unknown-linux-gnu` (exit 2).
+
+## Cross-compiling
+
+`silk build --target <name>` links an executable for any macOS, Linux or Windows target on any host, with the same Clang 22 and its LLD. No SDK, sysroot or second toolchain is needed:
 
 ```sh
-silk build --target aarch64-unknown-linux-gnu
+silk build --target aarch64-apple-darwin
+file build/llvm/aarch64-apple-darwin/debug/tiny
 ```
 
 ```
-Compiling tiny (aarch64-unknown-linux-gnu, debug)
-  load     135 modules, 1 in package         0.05s
-  check    1 module                          0.09s
-  codegen  484 functions                     0.10s
-  borrow   147 bodies                        0.00s
-  link     clang                             0.28s
-Finished build/llvm/aarch64-unknown-linux-gnu/debug/tiny.o in 0.55s
+Compiling tiny (aarch64-apple-darwin, debug)
+  load     161 modules, 1 in package         0.07s
+  check    1 module                          0.07s
+  codegen  267 functions                     0.07s
+  borrow   151 bodies                        0.00s
+  link     clang                             0.17s
+Finished build/llvm/aarch64-apple-darwin/debug/tiny in 0.43s
+build/llvm/aarch64-apple-darwin/debug/tiny: Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|PIE|HAS_TLV_DESCRIPTORS>
 ```
 
-Here `tiny` is a package whose `main` only returns 0, with `stage = "object"` in `[build]`. Without it, the build stops with `Cannot link an executable for target aarch64-unknown-linux-gnu on host x86_64-unknown-linux-gnu` (exit 2).
+Here `tiny` is a package whose `main` only returns 0, built on Linux. The program links to the same bytes on every host. What the compiler links against:
 
-With an object stage, the `link` row is Clang compiling the object; nothing is linked.
+- **macOS.** Without `SDKROOT` or declared link inputs, the link uses Silk's own stub of `libSystem`, for both macOS architectures, and `ld64.lld`. The default deployment is then 12.0. A program that links C objects, archives, libraries or frameworks needs a real SDK: a Mac finds it with `xcrun`, and another host needs `SDKROOT` or an explicit `[native].platform-supply`. See macOS SDK and Linux sysroots in Build outputs and native linking.
+- **Linux.** A dynamically linked `libc = "gnu"` executable needs no sysroot. The compiler writes stub shared libraries for glibc 2.28, with their symbol versions, and its own `_start`, then links with `ld.lld` and the target's interpreter. The program runs on glibc 2.28 or later. A static executable (`link = "static"`), or one with declared link inputs, needs the target's own libraries: the host toolchain supplies them for the host's target, and a cross link without a `[native].platform-supply` stops: `silk: cannot link an executable for aarch64-unknown-linux-gnu without a sysroot: a static glibc link needs the target's static libraries.`, followed by the `platform-supply` line to declare.
+- **Windows.** Programs call the system DLLs directly, with no C runtime, so no Windows SDK or Visual Studio is needed on any host. The compiler writes its own import libraries with the `llvm-dlltool` beside Clang and links with `lld-link`. The executable is `tiny.exe`. Its only `libc` is `system`.
 
 ## Choosing targets
 
@@ -171,22 +181,23 @@ The manifest page lists every field and its values. The native build applies the
 | `target` | The target. |
 | `optimization` | `none` passes `-O0` to Clang; `speed` passes `-O2`; `size` passes `-Oz`. |
 | `debug` | `true` passes `-g`. |
-| `libc` | Chooses the runtime from the std lib catalog. Linux takes `gnu` or `none`; macOS takes `system` (or `none` for object and archive output only); wasm takes `none`. |
+| `libc` | Chooses the runtime from the std lib catalog. Linux takes `gnu` or `none`; macOS takes `system` (or `none` for object and archive output only); Windows takes `system`; wasm takes `none`. |
 | `runtime` | `{ kind = "named", name = "..." }` picks a runtime listed in `[unstable].composition`; `{ kind = "none" }` builds without one, so an executable must export its own C `main`. `"default"` and `"none"` take no other key, so `{ kind = "default", name = "x" }` is refused as `profiles.u.runtime.name is not a supported field`. See Build outputs and native linking. |
 | `relocation` | `pic` or `static` code. On Linux it also decides whether an executable is position independent: the default, `static`, links a non-PIE executable (`-fno-pic`, `-no-pie`), and `pic` links a PIE. macOS executables, objects and libraries default to `pic`. |
-| `deployment` | macOS minimum version for the link. Only `aarch64-apple-darwin` takes it. |
-| `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts the target's default, `x86-64` on x86-64 Linux and `generic` elsewhere; x86-64 Linux also takes the levels `x86-64-v2`, `x86-64-v3` and `x86-64-v4`. |
+| `deployment` | macOS minimum version for the link. Only the two macOS targets take it. |
+| `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts the target's default, `x86-64` on x86-64 targets and `generic` elsewhere; x86-64 targets also take the levels `x86-64-v2`, `x86-64-v3` and `x86-64-v4`. |
 | `code-model` | `large` passes `-mcmodel=large`. x86-64 targets only. |
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
 | `artifact` | Must name the same form as `[package].kind`. Set the output form there. |
-| `threading` | `multi` on wasm32 builds with atomics and a shared memory (see below). Refused on other targets. |
-| `max-memory` | wasm32 only: the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
+| `backend` | `llvm`, the default, or `direct` for WebAssembly without Clang (see The direct WebAssembly backend). `--backend` on the command line sets it too. |
+| `threading` | `multi` on `wasm32-unknown-unknown` builds with atomics and a shared memory (see below). Refused on other targets. |
+| `max-memory` | WebAssembly only (`wasm32` and `wasm64`): the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
 
 `cpu.features` takes these names:
 
 | Target | Features |
 | --- | --- |
-| x86-64 Linux | `aes`, `avx`, `avx2`, `avx512bw`, `avx512cd`, `avx512dq`, `avx512f`, `avx512vbmi`, `avx512vl`, `bmi`, `bmi2`, `cx16`, `f16c`, `fma`, `lzcnt`, `movbe`, `pclmul`, `popcnt`, `sha`, `sse2`, `sse3`, `sse4.1`, `sse4.2`, `ssse3`, `xsave` |
+| x86-64 | `aes`, `avx`, `avx2`, `avx512bw`, `avx512cd`, `avx512dq`, `avx512f`, `avx512vbmi`, `avx512vl`, `bmi`, `bmi2`, `cx16`, `f16c`, `fma`, `lzcnt`, `movbe`, `pclmul`, `popcnt`, `sha`, `sse2`, `sse3`, `sse4.1`, `sse4.2`, `ssse3`, `xsave` |
 | arm64 | `aes`, `crc`, `crypto`, `dotprod`, `fp-armv8`, `fullfp16`, `i8mm`, `lse`, `neon`, `rdm`, `sha2`, `sha3` |
 | wasm32 | `atomics`, `bulk-memory`, `mutable-globals`, `relaxed-simd`, `sign-ext`, `simd128` |
 
@@ -258,7 +269,7 @@ These combinations are refused when the manifest is read:
 | `thread` sanitizer without `threading = "multi"` | `UnsupportedCombination: profiles.fast.threading` |
 | macOS executable with `link = "static"` | `UnsupportedCombination: profiles.mac.link = "static"` |
 | `target = "host"` | `UnsupportedCombination: profiles.fast.target = "host"` |
-| `max-memory` on a target other than wasm32 | `UnsupportedCombination: profiles.hostmem.max-memory = "256MiB"` |
+| `max-memory` on a target that is not WebAssembly | `UnsupportedCombination: profiles.hostmem.max-memory = "256MiB"` |
 | `cpu.model` other than the target's default | `UnsupportedCombination: profiles.fast.cpu.model = "znver3"` |
 | a `cpu.features` entry the target does not have | `UnsupportedCombination: profiles.fast.cpu.features` |
 | `artifact` different from `[package].kind` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [package].kind = "executable"; set [package].kind to choose the artifact, and omit the profile's artifact or write it as "executable"` |
@@ -416,6 +427,29 @@ max-memory = "256MiB"
 The module is compiled with atomics and bulk memory and imports a shared memory (`env.memory`), plus `wasi.thread-spawn` when the program starts threads, so `silk/concurrency/thread_native` works. `wasm-runner.mjs` creates the memory and runs `main` and each thread in its own Worker. `max-memory` sets the memory's maximum; a threaded module defaults to 1 GiB. Joining a thread frees its stack. A value that is not a multiple of 64 KiB, or above 4 GiB, is `InvalidInput: profiles.threads.max-memory = "100KiB"`.
 
 The **No-libc Linux and WebAssembly** guide builds a portable program for wasm32 and runs it in Node.
+
+## The direct WebAssembly backend
+
+`--backend direct`, or `backend = "direct"` in a profile, builds a WebAssembly target without LLVM or Clang: the compiler writes the module itself. It builds `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2` and `wasm64-unknown-unknown`, including SIMD and threaded modules, and needs no `clang` at all:
+
+```sh
+silk build --target wasm32-wasip1 --backend direct
+```
+
+```
+Compiling hello (wasm32-wasip1, debug)
+  load     164 modules, 1 in package         0.08s
+  check    1 module                          0.13s
+  codegen  459 functions                     0.15s
+  borrow   333 bodies                        0.01s
+Finished build/llvm/wasm32-wasip1/debug/hello in 0.44s
+```
+
+- There is no `link` row: the module is written as it is generated. The output goes to the same directory as an LLVM build.
+- The direct backend translates each function body once and reuses the result across builds, so an edit rebuilds only what changed. It optimizes less than LLVM: use it for fast edit loops and for building where LLVM is not available, such as in a browser, and use the default backend for a release you ship.
+- The module has the same imports and exports as an LLVM build, so `wasm-runner.mjs`, Wasmtime and Node run it the same way. A `wasm32-wasip2` component still needs `wasm-tools` and the Preview 1 adapter.
+- `backend = "direct"` for a macOS, Linux or Windows target is refused: `silk: invalid build profile` (exit 1).
+- The playground on this site builds with the direct backend, with the compiler itself running in the browser.
 
 ## WASI
 

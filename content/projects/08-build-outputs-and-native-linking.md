@@ -93,15 +93,21 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 
 Each of these fails the target and exits 2. `silk build` and `silk run` print the message, then a `link     failed` row and a `Failed` line.
 
-## macOS SDK
+## macOS SDK and Linux sysroots
 
-On macOS the link needs an SDK. The compiler resolves it once per build, in this order:
+A program with no C link inputs links without an SDK or sysroot on any host:
+
+- On macOS targets, the compiler links against its own stub of `libSystem` with `ld64.lld`, and the default deployment is 12.0.
+- On Linux, a dynamically linked `libc = "gnu"` executable links against stub glibc 2.28 libraries that the compiler writes, with its own `_start`, so it runs on glibc 2.28 or later.
+- On Windows, the compiler writes its own import libraries and links with `lld-link`. Windows never needs an SDK.
+
+A macOS program that links C objects, archives, libraries or frameworks needs a real SDK. The compiler resolves it once per build, in this order:
 
 1. `[native].platform-supply`, when the manifest sets one.
 2. `SDKROOT`, when set. An invalid `SDKROOT` fails; it never falls back.
-3. `xcrun` discovery, for the host target only.
+3. `xcrun` discovery, on a Mac. One SDK serves both macOS architectures. Without `xcrun`, the link falls back to the stub.
 
-The SDK reaches Clang as `-isysroot`, with `-mmacosx-version-min` from the profile's `deployment`. Linux needs no SDK.
+The SDK reaches Clang as `-isysroot`, with `-mmacosx-version-min` from the profile's `deployment`. With an SDK the default deployment is 11.0, raised to the SDK's minimum when the SDK no longer supports 11.0. A Linux executable with C link inputs, or a static one, needs the target's own libraries: the host's toolchain supplies them for the host's target, and a cross build needs an `explicit` platform supply that names a sysroot.
 
 `[native].platform-supply` takes one of:
 

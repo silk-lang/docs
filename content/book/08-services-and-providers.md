@@ -456,7 +456,7 @@ import silk.io.logger_native { StdoutLogger }
 
 // A service is a set of operations. Code that needs it says `? &mut Notifier`.
 service Notifier {
-  effect fn notify(title: string) -> () ! LogError ? &mut Notifier
+  effect fn notify(self: &mut Self, title: string) -> () ! LogError
 }
 
 // One provider prints...
@@ -500,7 +500,7 @@ pub effect fn main() -> i32
 }
 ```
 
-A service holds only signatures. Each operation names its own service in its `?` row. In the `impl`, that entry becomes the `self` parameter, so the member does not repeat it.
+A service holds only signatures. Each operation starts with a `self` receiver, written the way the `impl` writes it. `self: &mut Self` means the operation needs `&mut Notifier`, so a caller of `Notifier.notify` must have that entry in its own row, as `remindAll` does. The receiver is not an argument: the call is `Notifier.notify("Water the plants")`, and the provider comes from the effect's environment. Writing the entry in the row instead, `effect fn notify(title: string) -> () ! LogError ? &mut Notifier`, declares the same operation.
 
 ```sh
 silk run
