@@ -1,0 +1,144 @@
+Windows standard-output and standard-error writes without a C runtime.
+
+## When to use
+Provide `WindowsConsole.stdout` or `WindowsConsole.stderr` for `Writer`. Runtime reports also
+use `WindowsConsole.writeAll`, with selector 1 for standard output or 2 for standard error.
+
+Import as `WindowsConsole` with `import silk.platform.windows.console { WindowsConsole }`.
+
+Public declarations: 1.
+
+::Anchor{id="WindowsConsole"}
+
+## `WindowsConsole`
+
+```silk
+pub struct WindowsConsole
+```
+
+An unbuffered `Writer` for a Windows standard handle, without ownership of that handle.
+
+### Details
+
+Redirection writes bytes unchanged with `WriteFile`. A real console receives UTF-16 through
+`WriteConsoleW`, independent of its output code page. Each console write requires complete canonical
+WTF-8 bytes; malformed or incomplete input fails. Lone surrogates are passed as UTF-16 code units.
+Flush does nothing. Writes have no inter-thread message lock and can make partial progress before failure.
+
+::Anchor{id="WindowsConsole.impl"}
+
+## Implementation `WindowsConsole`
+
+```silk
+impl WindowsConsole
+```
+
+::Anchor{id="WindowsConsole.impl.enableAnsi"}
+
+### Associated function `enableAnsi`
+
+```silk
+pub effect fn enableAnsi(selector: i32) -> bool
+```
+
+Enables ANSI escape processing on standard output (1) or standard error (2).
+
+#### Details
+
+Returns false for another selector, a redirected or invalid handle, or an OS refusal.
+Existing mode bits are preserved. The successful setting persists on the console handle.
+
+::Anchor{id="WindowsConsole.impl.stdout"}
+
+### Associated function `stdout`
+
+```silk
+pub fn stdout() -> WindowsConsole
+```
+
+Returns an unbuffered standard-output writer. It does not read or change the process handle.
+
+::Anchor{id="WindowsConsole.impl.stderr"}
+
+### Associated function `stderr`
+
+```silk
+pub fn stderr() -> WindowsConsole
+```
+
+Returns an unbuffered standard-error writer. It does not read or change the process handle.
+
+::Anchor{id="WindowsConsole.impl.writeAllGather"}
+
+### Associated function `writeAllGather`
+
+```silk
+pub effect fn writeAllGather(selector: i32, prefix: &[u8], rest: &[&[u8]], error: &mut i32) -> bool
+```
+
+Writes `prefix` followed by every slice in `rest` to standard handle 1 or 2.
+
+#### Details
+
+Redirected output preserves arbitrary bytes. Console output decodes the concatenation as
+canonical WTF-8, including characters split across slices, without allocating. Calls can
+interleave with other threads and can write a prefix before failure. Empty input succeeds.
+Success sets `error` to zero; failure sets a Windows error, 6 for an invalid selector,
+1113 for invalid WTF-8, or 29 for invalid progress. No handle is closed.
+
+::Anchor{id="WindowsConsole.impl.writeAll"}
+
+### Associated function `writeAll`
+
+```silk
+pub effect fn writeAll(selector: i32, bytes: &[u8], error: &mut i32) -> bool
+```
+
+Writes all bytes to standard handle 1 or 2, and returns whether all writes succeeded.
+
+#### Details
+
+Redirection preserves bytes. A real console receives decoded UTF-16 without a code-page change.
+Each real-console call requires complete canonical WTF-8. The operation does not allocate or close handles.
+On failure, `error` receives the Windows error, 6 for an invalid selector, 1113 for invalid
+WTF-8, or 29 for zero or invalid progress. Successful calls set `error` to zero.
+
+#### Gotchas
+
+Some output can precede a failure. Concurrent writes can interleave. Empty input makes no host call.
+
+::Anchor{id="WindowsConsole.impl.Writer"}
+
+## Implementation `Writer for WindowsConsole`
+
+```silk
+impl Writer for WindowsConsole
+```
+
+::Anchor{id="WindowsConsole.impl.Writer.writeAll"}
+
+### Operation `writeAll`
+
+```silk
+effect fn writeAll(self: &mut Self, bytes: &[u8]) -> () ! WriterError ? &mut Writer
+```
+
+::Anchor{id="WindowsConsole.impl.Writer.flush"}
+
+### Operation `flush`
+
+```silk
+effect fn flush(self: &mut Self) -> () ! WriterError ? &mut Writer
+```
+
+::Anchor{id="WindowsConsole.impl.Writer.writeVectored"}
+
+### Operation `writeVectored`
+
+```silk
+effect fn writeVectored(self: &mut Self, bytes: &[&[u8]]) -> () ! WriterError ? &mut Writer
+```
+
+Category: Windows platform.
+
+Profiles: `x86_64-pc-windows-msvc`.

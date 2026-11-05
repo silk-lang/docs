@@ -35,14 +35,14 @@ pub fn main() -> i32 {
       }
       return 0
     }
-    Result<TrustSnapshot, TrustSourceError>.Failure { error: _ } => 1
+    Result<TrustSnapshot, TrustSourceError>.Failure {..} => 1
   }
 }
 ```
 
 Import as `TrustSnapshot` with `import silk.tls.trust_snapshot { TrustSnapshot }`.
 
-Public declarations: 7.
+Public declarations: 8.
 
 ::Anchor{id="SnapshotLimits"}
 
@@ -194,7 +194,7 @@ The size of all anchors.
 InputBytes
 ```
 
-The size of a file that a native trust source reads.
+The total input bytes that a native trust source reads.
 
 ::Anchor{id="TrustLimitKind.impl.Debug"}
 
@@ -340,6 +340,64 @@ effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &m
 
 Writes the name of the variant, such as `Open`.
 
+::Anchor{id="TrustStoreOperation"}
+
+## `TrustStoreOperation`
+
+```silk
+pub enum TrustStoreOperation
+```
+
+The certificate-store operation that failed.
+
+::Anchor{id="TrustStoreOperation.Open"}
+
+### `Open`
+
+```silk
+Open
+```
+
+Opening the configured store.
+
+::Anchor{id="TrustStoreOperation.Enumerate"}
+
+### `Enumerate`
+
+```silk
+Enumerate
+```
+
+Enumerating a certificate in the store.
+
+::Anchor{id="TrustStoreOperation.Close"}
+
+### `Close`
+
+```silk
+Close
+```
+
+Closing the store after enumeration.
+
+::Anchor{id="TrustStoreOperation.impl.Debug"}
+
+## Implementation `Debug for TrustStoreOperation`
+
+```silk
+impl Debug for TrustStoreOperation
+```
+
+::Anchor{id="TrustStoreOperation.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the store operation name.
+
 ::Anchor{id="TrustSourceError"}
 
 ## `TrustSourceError`
@@ -449,6 +507,36 @@ pub error: FileError
 ```
 
 The file error.
+
+::Anchor{id="TrustSourceError.Store"}
+
+### `Store`
+
+```silk
+Store
+```
+
+A native certificate-store operation failed.
+
+::Anchor{id="TrustSourceError.Store.operation"}
+
+#### Field `operation`
+
+```silk
+pub operation: TrustStoreOperation
+```
+
+The operation that failed.
+
+::Anchor{id="TrustSourceError.Store.code"}
+
+#### Field `code`
+
+```silk
+pub code: u32
+```
+
+The native unsigned error code.
 
 ::Anchor{id="TrustSourceError.impl.Debug"}
 
@@ -615,4 +703,4 @@ trust wider.
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

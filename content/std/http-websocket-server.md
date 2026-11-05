@@ -189,7 +189,7 @@ effect<'call> fn chat<'call, 'channel: 'call, 'transport: 'channel>(
     &mut message,
     Option<Instant>.none()
   ) {
-    Event.PeerClose { data: _ } => 0
+    Event.PeerClose {..} => 0
     _ => 1
   }
 }
@@ -219,7 +219,7 @@ effect<'call> fn handleRequest<
   )
   return match move outcome {
     Outcome.Upgraded { value } => value
-    Outcome.Rejected { status: _ } => 1
+    Outcome.Rejected {..} => 1
   }
 }
 
@@ -1848,4 +1848,4 @@ the session.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

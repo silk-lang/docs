@@ -29,8 +29,8 @@ import silk.toml.scanner { TomlError, TomlScanner, TomlToken }
 pub fn main() -> i32 {
   let mut scanner = TomlScanner.make(b"name = \"Ada\"\nyear = 1815\n")
   match TomlScanner.validate(&mut scanner) {
-    Result<bool, TomlError>.Success { value: _ } => {}
-    Result<bool, TomlError>.Failure { error: _ } => {
+    Result<bool, TomlError>.Success {..} => {}
+    Result<bool, TomlError>.Failure {..} => {
       return 1
     }
   }
@@ -45,7 +45,7 @@ pub fn main() -> i32 {
         TomlToken.Newline => {
           atLineStart = true
         }
-        TomlToken.Text { span: _ } => {
+        TomlToken.Text {..} => {
           if atLineStart {
             keys = keys + 1
           }
@@ -55,7 +55,7 @@ pub fn main() -> i32 {
           atLineStart = false
         }
       }
-      Result<TomlToken, TomlError>.Failure { error: _ } => {
+      Result<TomlToken, TomlError>.Failure {..} => {
         return 1
       }
     }
@@ -709,4 +709,4 @@ Returns the byte position where the next call to [`TomlScanner.next`](#TomlScann
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

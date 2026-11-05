@@ -1836,7 +1836,7 @@ and as a field that [`Format.debugFields`](#Format.impl.debugFields) writes. An 
 [`Format.debug`](#Format.impl.debug) and a `T: Debug` bound still need a `Debug` implementation, so an array or an
 anonymous tuple cannot be passed to `Format.debug` or held in an `Option` or a `List` that
 writes its `Debug` form. Pass it as a `{:?}` argument instead, as
-`Format.format("{:?}", &(values, ))`, or write a slice of an array with `&values`.
+`Format.format("{:?}", &.(values))`, or write a slice of an array with `&values`.
 
 ::Anchor{id="Debug.debug"}
 
@@ -2909,4 +2909,4 @@ that it reads as a float. A set precision writes the same text as `Display`.
 
 Category: Text.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

@@ -1,0 +1,253 @@
+Build plans that a package's `build.silk` computes while the package compiles: modules it
+generates, native sources it compiles and native libraries it links.
+
+## When to use
+Use [`Plan`](#Plan) in `build.silk` when the manifest's `[native]` keys cannot say what the package
+needs, such as a module generated from a data file of the package. Prefer the manifest keys when
+they can.
+
+## Details
+`build.silk` sits beside the package's `silk.toml` and declares `pub const PLAN: string`, built
+with these functions from [`Plan.empty`](#Plan.impl.empty). The compiler evaluates it during static evaluation,
+so it cannot reach the network, start a process or read a file outside the package; it reads
+package files with `silk.build.source`. Each build and check of the package, or of a package
+that depends on it, evaluates its `build.silk` first, on its own: it imports only the standard
+library.
+
+## Examples
+### Generate a module and link a library
+```silk,ignore
+import silk.build.plan { Plan }
+import silk.build.source { Source }
+
+static fn plan() -> string<'static> {
+  let mut plan = Plan.empty()
+  plan = Plan.module(plan, "generated_limit", "pub const LIMIT: i32 = 42\n")
+  plan = Plan.compileC(plan, "native/shim.c")
+  plan = Plan.linkLibrary(plan, "m")
+  return plan
+}
+
+pub const PLAN: string = plan()
+```
+
+Import as `Plan` with `import silk.build.plan { Plan }`.
+
+Public declarations: 1.
+
+::Anchor{id="Plan"}
+
+## `Plan`
+
+```silk
+pub struct Plan
+```
+
+The owner type of the plan operations. It has no fields and is never constructed.
+
+### Details
+
+A plan is text in a format the compiler reads; build it only with these operations.
+
+::Anchor{id="Plan.impl"}
+
+## Implementation `Plan`
+
+```silk
+impl Plan
+```
+
+::Anchor{id="Plan.impl.empty"}
+
+### Associated function `empty`
+
+```silk
+pub static fn empty() -> string<'static>
+```
+
+Returns a plan with no steps.
+
+::Anchor{id="Plan.impl.module"}
+
+### Associated function `module`
+
+```silk
+pub static fn module(plan: string, name: string, source: string) -> string<'static>
+```
+
+Returns `plan` with a module `name` of the package whose source is `source`, as if the
+package had the file `<name>.silk` in its source root.
+
+#### Gotchas
+
+`name` is one module path segment, such as `generated_tables`; any other name is a compile
+error, as is a name that the package's own files also define.
+
+::Anchor{id="Plan.impl.compileC"}
+
+### Associated function `compileC`
+
+```silk
+pub static fn compileC(plan: string, path: string) -> string<'static>
+```
+
+Returns `plan` with the C file at `path`, relative to the package directory, compiled into
+the package's link inputs, as a `[native].sources` entry `{ c = path }` does.
+
+::Anchor{id="Plan.impl.compileObjectiveC"}
+
+### Associated function `compileObjectiveC`
+
+```silk
+pub static fn compileObjectiveC(plan: string, path: string) -> string<'static>
+```
+
+Returns `plan` with the Objective-C file at `path`, relative to the package directory,
+compiled into the package's link inputs, as a `[native].sources` entry `{ objc = path }` does.
+
+::Anchor{id="Plan.impl.compileCpp"}
+
+### Associated function `compileCpp`
+
+```silk
+pub static fn compileCpp(plan: string, path: string) -> string<'static>
+```
+
+Returns `plan` with the C++ file at `path`, relative to the package directory, compiled into
+the package's link inputs, as a `[native].sources` entry `{ cpp = path }` does.
+
+::Anchor{id="Plan.impl.linkLibrary"}
+
+### Associated function `linkLibrary`
+
+```silk
+pub static fn linkLibrary(plan: string, name: string) -> string<'static>
+```
+
+Returns `plan` linking the system library `name` dynamically, as a `[native].link` entry
+`{ library = name, mode = "dynamic" }` does.
+
+::Anchor{id="Plan.impl.linkFramework"}
+
+### Associated function `linkFramework`
+
+```silk
+pub static fn linkFramework(plan: string, name: string) -> string<'static>
+```
+
+Returns `plan` linking the macOS framework `name`, as a `[native].link` entry
+`{ framework = name }` does.
+
+::Anchor{id="Plan.impl.linkArchive"}
+
+### Associated function `linkArchive`
+
+```silk
+pub static fn linkArchive(plan: string, path: string) -> string<'static>
+```
+
+Returns `plan` linking the static archive at `path`, relative to the package directory, as a
+`[native].link` entry `{ static-archive = path }` does.
+
+::Anchor{id="Plan.impl.tool"}
+
+### Associated function `tool`
+
+```silk
+pub static fn tool(plan: string, name: string, program: string) -> string<'static>
+```
+
+Returns `plan` with a tool step `name` that runs the package's program at `program`, relative
+to the package directory, while the package builds.
+
+#### Details
+
+Add the step's arguments, inputs and outputs with [`Plan.toolArgument`](#Plan.impl.toolArgument),
+[`Plan.toolInput`](#Plan.impl.toolInput) and [`Plan.toolOutput`](#Plan.impl.toolOutput), each right after this call or another of them.
+The step runs in an operating-system sandbox: it reads only the system's programs and
+libraries, the program and its declared inputs, writes only its own output directory, which
+is its working directory, and opens no TCP connection. It runs again only when the program,
+its arguments or an input changes. A dependency's steps run only when the root manifest lists
+the dependency in `[build].tools`.
+
+#### Gotchas
+
+`name` is one module path segment, such as `tables`; any other name is a compile error. A
+host without a sandbox refuses the step unless the root manifest sets
+`[build].unsandboxed-tools = true`.
+
+::Anchor{id="Plan.impl.toolArgument"}
+
+### Associated function `toolArgument`
+
+```silk
+pub static fn toolArgument(plan: string, text: string) -> string<'static>
+```
+
+Returns `plan` with `text` as the next argument of its last tool step.
+
+#### Gotchas
+
+It follows a [`Plan.tool`](#Plan.impl.tool) call; without one, the plan is refused. `text` cannot hold a line
+break.
+
+::Anchor{id="Plan.impl.toolInput"}
+
+### Associated function `toolInput`
+
+```silk
+pub static fn toolInput(plan: string, path: string) -> string<'static>
+```
+
+Returns `plan` letting its last tool step read the file or directory at `path`, relative to
+the package directory. A change to that file runs the step again.
+
+#### Gotchas
+
+It follows a [`Plan.tool`](#Plan.impl.tool) call; without one, the plan is refused.
+
+::Anchor{id="Plan.impl.toolOutput"}
+
+### Associated function `toolOutput`
+
+```silk
+pub static fn toolOutput(plan: string, path: string) -> string<'static>
+```
+
+Returns `plan` declaring that its last tool step writes the file at `path`, relative to the
+step's output directory. A step that does not write it fails the build.
+
+#### Gotchas
+
+It follows a [`Plan.tool`](#Plan.impl.tool) call; without one, the plan is refused.
+
+::Anchor{id="Plan.impl.toolModule"}
+
+### Associated function `toolModule`
+
+```silk
+pub static fn toolModule(plan: string, name: string, step: string, path: string) -> string<'static>
+```
+
+Returns `plan` with module `name` of the package whose source is the output `path` of its
+tool step `step`, as if the package had the file `<name>.silk` in its source root.
+
+#### Gotchas
+
+`name` is one module path segment; a name that the package's own files also define is a
+compile error. `path` must be one of the step's declared outputs.
+
+::Anchor{id="Plan.impl.linkObject"}
+
+### Associated function `linkObject`
+
+```silk
+pub static fn linkObject(plan: string, path: string) -> string<'static>
+```
+
+Returns `plan` linking the object file at `path`, relative to the package directory, as a
+`[native].link` entry `{ object = path }` does.
+
+Category: Core.
+
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

@@ -37,7 +37,7 @@ fn port(document: &Value) -> i32 {
   return match Toml.field(document, "port") {
     Option<&Value>.Some { value } => match TomlCodec.decodeOne<i32>(value) {
       Result<i32, TomlError>.Success { value: number } => number
-      Result<i32, TomlError>.Failure { error: _ } => 0
+      Result<i32, TomlError>.Failure {..} => 0
     }
     Option<&Value>.None => 0
   }
@@ -388,4 +388,4 @@ effect fn deserialize(value: &Value) -> Self ! TomlError | OutOfMemoryError ? &m
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

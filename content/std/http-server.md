@@ -199,20 +199,20 @@ effect<'call> fn handleRequest<
   ? &mut Allocator | &mut MonotonicClock {
   let length = match move Header.make("Content-Length", b"5", valueLimits()) {
     Result.Success { value } => value
-    Result.Failure { error: _ } => {
+    Result.Failure {..} => {
       return 1
     }
   }
   let entries: [Header<'static>; 1] = [length]
   let headers = match move Headers.make(&entries, valueLimits()) {
     Result.Success { value } => value
-    Result.Failure { error: _ } => {
+    Result.Failure {..} => {
       return 1
     }
   }
   let status = match move Status.fromCode(200) {
     Result.Success { value } => value
-    Result.Failure { error: _ } => {
+    Result.Failure {..} => {
       return 1
     }
   }
@@ -224,7 +224,7 @@ effect<'call> fn handleRequest<
     valueLimits(),
   ) {
     Result.Success { value } => move value
-    Result.Failure { error: _ } => {
+    Result.Failure {..} => {
       return 1
     }
   }
@@ -1621,4 +1621,4 @@ Call it one time. Trailers are sent only with `Chunked`. For other modes, give e
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

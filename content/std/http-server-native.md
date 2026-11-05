@@ -15,8 +15,8 @@ yourself.
 - The error of the handler.
 
 ## Gotchas
-The whole module exists only on Darwin on aarch64, and on Linux with GNU libc on x86_64 or
-aarch64. On other targets, an import from it fails to compile.
+The module exists on Windows x86_64 with the system runtime, Darwin on x86_64 or aarch64, and
+Linux with GNU libc on x86_64 or aarch64. On other targets, an import from it fails to compile.
 
 Import as `HttpServerNative` with `import silk.http.server_native { HttpServerNative }`.
 
@@ -70,8 +70,10 @@ start tasks yourself.
 - The error of the handler.
 
 ### Gotchas
-It exists only on Darwin on aarch64, and on Linux with GNU libc on x86_64 or aarch64.
+
+It exists on Windows x86_64 with the system runtime, Darwin x86_64 or aarch64, and Linux with
+GNU libc on x86_64 or aarch64.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`.

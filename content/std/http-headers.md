@@ -37,7 +37,7 @@ fn limits() -> Limits {
 fn field(name: string<'static>, bytes: &'static [u8]) -> Header<'static> {
   return match Header.make(name, bytes, limits()) {
     Result<Header, ValueError>.Success { value } => value
-    Result<Header, ValueError>.Failure { error: _ } => {
+    Result<Header, ValueError>.Failure {..} => {
       Intrinsic.trap("unexpected failure")
       return field(name, bytes)
     }
@@ -48,7 +48,7 @@ pub fn main() -> i32 {
   let entries = [field("Accept", b"text/html"), field("Vary", b"Accept"), field("ACCEPT", b"*/*")]
   let headers = match Headers.make(&entries, limits()) {
     Result<Headers, ValueError>.Success { value } => value
-    Result<Headers, ValueError>.Failure { error: _ } => {
+    Result<Headers, ValueError>.Failure {..} => {
       return 1
     }
   }
@@ -58,7 +58,7 @@ pub fn main() -> i32 {
   let mut count = 0
   while true {
     match HeaderIterator.next(&mut accept) {
-      Option<Header>.Some { value: _ } => {
+      Option<Header>.Some {..} => {
         count = count + 1
       }
       Option<Header>.None => {
@@ -72,8 +72,8 @@ pub fn main() -> i32 {
 
   // getUnique fails, because Accept occurs two times.
   let unique = match Headers.getUnique(&headers, "Accept") {
-    Result<Option<Header>, ValueError>.Success { value: _ } => true
-    Result<Option<Header>, ValueError>.Failure { error: _ } => false
+    Result<Option<Header>, ValueError>.Success {..} => true
+    Result<Option<Header>, ValueError>.Failure {..} => false
   }
   if unique {
     return 1
@@ -81,7 +81,7 @@ pub fn main() -> i32 {
   let mut output: [u8; 64] = [0; 64]
   let length = match Headers.formatInto(&headers, &mut output) {
     Result<usize, ValueError>.Success { value } => value
-    Result<usize, ValueError>.Failure { error: _ } => {
+    Result<usize, ValueError>.Failure {..} => {
       return 1
     }
   }
@@ -575,4 +575,4 @@ Returns the next item, or `None` at the end.
 
 Category: HTTP.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

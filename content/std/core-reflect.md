@@ -467,7 +467,7 @@ pub fn main() -> i32 {
   static for variant in Reflect.variants<Shape>() {
     let static count = fieldCount(variant)
     static if count == 0 { total = total + area(Reflect.makeVariant(variant, ())) }
-    static if count == 1 { total = total + area(Reflect.makeVariant(variant, (two,))) }
+    static if count == 1 { total = total + area(Reflect.makeVariant(variant, .(two))) }
     static if count == 2 { total = total + area(Reflect.makeVariant(variant, (three, four))) }
   }
   // 0 + 12 + 12
@@ -500,4 +500,4 @@ active variant, like a `match` with one arm for that variant.
 
 Category: Core.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

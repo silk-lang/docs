@@ -46,7 +46,7 @@ pub fn main() -> i32 {
     OriginHost<'static>.Dns { bytes: b"API.example.com" }
   ) {
     Result<ReferenceIdentity, IdentityError>.Success { value } => value
-    Result<ReferenceIdentity, IdentityError>.Failure { error: _ } => {
+    Result<ReferenceIdentity, IdentityError>.Failure {..} => {
       return 1
     }
   }
@@ -63,7 +63,7 @@ pub fn main() -> i32 {
       }
       return 0
     }
-    Result<IdentityMatch, IdentityError>.Failure { error: _ } => 1
+    Result<IdentityMatch, IdentityError>.Failure {..} => 1
   }
 }
 ```
@@ -1190,4 +1190,4 @@ check the chain, the dates, or the TLS handshake. The common name (CN) is never 
 
 Category: TLS and certificates.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

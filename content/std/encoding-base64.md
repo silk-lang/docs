@@ -33,7 +33,7 @@ pub fn main() -> i32 {
   let mut encoded: [u8; 8] = [0; 8]
   let written = match Base64.encodeInto(&mut encoded, b"Hi!?") {
     Result<usize, Base64Error>.Success { value } => value
-    Result<usize, Base64Error>.Failure { error: _ } => {
+    Result<usize, Base64Error>.Failure {..} => {
       return 1
     }
   }
@@ -49,7 +49,7 @@ pub fn main() -> i32 {
       }
       return 0
     }
-    Result<usize, Base64Error>.Failure { error: _ } => 1
+    Result<usize, Base64Error>.Failure {..} => 1
   }
 }
 ```
@@ -70,7 +70,7 @@ pub fn main() -> i32 {
       }
       return 0
     }
-    Result<usize, Base64Error>.Success { value: _ } => 1
+    Result<usize, Base64Error>.Success {..} => 1
   }
 }
 ```
@@ -360,4 +360,4 @@ encoding.
 
 Category: Data formats.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

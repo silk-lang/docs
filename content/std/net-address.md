@@ -29,7 +29,7 @@ import silk.core.result { Result }
 pub fn main() -> i32 {
   let host = match Host.parse("[2001:DB8:0:0::1]") {
     Result<Host, AddressError>.Success { value } => value
-    Result<Host, AddressError>.Failure { error: _ } => {
+    Result<Host, AddressError>.Failure {..} => {
       return 1
     }
   }
@@ -42,7 +42,7 @@ pub fn main() -> i32 {
   let mut text: [u8; 64] = [0; 64]
   let length = match Ipv6Address.formatInto(&address, &mut text) {
     Result<usize, AddressError>.Success { value } => value
-    Result<usize, AddressError>.Failure { error: _ } => {
+    Result<usize, AddressError>.Failure {..} => {
       return 1
     }
   }
@@ -52,10 +52,10 @@ pub fn main() -> i32 {
     return 1
   }
   let failed = match Port.make(70000) {
-    Result<Port, AddressError>.Success { value: _ } => false
+    Result<Port, AddressError>.Success {..} => false
     Result<Port, AddressError>.Failure { error: AddressError.InvalidPort { value } } => value
       == 70000
-    Result<Port, AddressError>.Failure { error: _ } => false
+    Result<Port, AddressError>.Failure {..} => false
   }
   if !failed {
     return 1
@@ -1318,4 +1318,4 @@ effect fn display(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? 
 
 Category: Networking.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

@@ -2,12 +2,17 @@ Each page describes the selected source API for the listed profiles. Distinct su
 
 | Module | Category | Import namespace | Summary |
 | --- | --- | --- | --- |
+| [`silk.build.plan`](/docs/std/build-plan) | Core | `Plan` | Build plans that a package's \`build.silk\` computes while the package compiles: modules it generates, native sources it compiles and native libraries it links. |
+| [`silk.build.source`](/docs/std/build-source) | Core | `Source` | Files of the package read while it compiles: shaders, tables and other data the program keeps as part of its code. |
 | [`silk.collections.bytes`](/docs/std/collections-bytes) | Collections | `Bytes` | Owned byte buffers for file contents, process output, and other data with no fixed encoding. |
 | [`silk.collections.hash`](/docs/std/collections-hash) | Collections | `HashKey` | Deterministic seeded hashing for hash maps, hash sets, and key types that users define. |
 | [`silk.collections.hash_map`](/docs/std/collections-hash-map) | Collections | `HashMap` | Hash maps that own their keys and values, with deterministic seeded hashing. |
 | [`silk.collections.hash_set`](/docs/std/collections-hash-set) | Collections | `HashSet` | Hash sets that own their elements, with deterministic seeded hashing. |
 | [`silk.collections.list`](/docs/std/collections-list) | Collections | `List` | Growable lists that own their elements, with stable sorting and binary search. |
-| [`silk.collections.slice`](/docs/std/collections-slice) | Collections | `Slice` | Borrowed subranges of slices, with no copy and no allocation. |
+| [`silk.collections.slice`](/docs/std/collections-slice) | Collections | `Slice` | Borrowed subranges and byte views of slices, with no copy and no allocation. |
+| [`silk.color.color`](/docs/std/color-color) | Color | `Color` | Colors in the CSS Color 4 color spaces, with conversion, gamut mapping, mixing, adjustment, and contrast measurement. |
+| [`silk.color.rgba`](/docs/std/color-rgba) | Color | `Rgba` | Red, green, blue, and alpha channels with straight or premultiplied alpha, over any number type. |
+| [`silk.color.srgb`](/docs/std/color-srgb) | Color | `srgb` | The sRGB transfer function: conversion between gamma-encoded sRGB channels and linear light. |
 | [`silk.compress.checksum`](/docs/std/compress-checksum) | Data formats | `CompressionChecksum` | CRC checksums used by gzip and XZ containers. |
 | [`silk.compress.deflate`](/docs/std/compress-deflate) | Data formats | `Deflate` | Compress bytes as raw DEFLATE, zlib, or gzip with a bounded LZ77 match table. |
 | [`silk.compress.inflate`](/docs/std/compress-inflate) | Data formats | `Decoder` | Decompress raw DEFLATE, zlib, and gzip data in steps, with fixed memory and limits that you set. |
@@ -30,7 +35,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.concurrency.sync`](/docs/std/concurrency-sync) | Concurrency | `Arc` | Shared ownership, locks and thread parking for values that several native threads use. |
 | [`silk.concurrency.thread`](/docs/std/concurrency-thread) | Concurrency | `Transferable` | The normal names of the sealed thread properties \`Transferable\` and \`Concurrent\`. |
 | [`silk.concurrency.thread_native`](/docs/std/concurrency-thread-native) | Concurrency | `NativeThread` | Operating-system threads that each run one \`Transferable\` closure and return its result. |
-| [`silk.concurrency.thread_pool`](/docs/std/concurrency-thread-pool) | Concurrency | `ThreadPool` | A work-stealing pool of native threads that runs lazy tasks in parallel. |
+| [`silk.concurrency.thread_pool`](/docs/std/concurrency-thread-pool) | Concurrency | `ThreadPool` | A work-stealing pool of native threads that runs fibers in parallel. |
 | [`silk.concurrency.work_queue`](/docs/std/concurrency-work-queue) | Concurrency | `WorkDeque` | Queues that move owned values between native threads, for work-stealing schedulers. |
 | [`silk.core.bool`](/docs/std/core-bool) | Core | `bool` | Named functions for Boolean equality and negation. |
 | [`silk.core.compilation`](/docs/std/core-compilation) | Core | `Compilation` | Build choices of the current compilation, such as safety, threading, and artifact kind, for use in static evaluation. |
@@ -42,6 +47,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.core.ownership`](/docs/std/core-ownership) | Core | `Copy` | The ordinary names for the sealed ownership properties \`Copy\` and \`Drop\`. |
 | [`silk.core.reflect`](/docs/std/core-reflect) | Core | `Reflect` | Compile-time descriptions of the fields of a struct or tuple type, for generic code that visits each field. |
 | [`silk.core.result`](/docs/std/core-result) | Core | `Result` | Completed outcomes that hold a success value or a failure value as ordinary data. |
+| [`silk.core.schedule`](/docs/std/core-schedule) | Core | `Schedule` | Schedules: policies that say when to run an effect again, and when to stop. |
 | [`silk.core.static_sequence`](/docs/std/core-static-sequence) | Core | `StaticSequence` | Immutable lists of values that exist only during static evaluation. |
 | [`silk.core.static_text`](/docs/std/core-static-text) | Core | `StaticText` | Operations on string literals during static evaluation: length, byte access, concatenation, and slices. |
 | [`silk.core.target`](/docs/std/core-target) | Core | `Target` | Facts about the target machine of the current compilation: architecture, operating system, ABI, and pointer width. |
@@ -63,10 +69,12 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.encoding.base64`](/docs/std/encoding-base64) | Data formats | `Base64` | Encode and decode standard Base64 (RFC 4648, with padding) into byte slices that you supply. |
 | [`silk.encoding.uuid`](/docs/std/encoding-uuid) | Data formats | `Uuid` | UUID values and constructors for versions 1 through 8, with RFC 9562 byte order. |
 | [`silk.geometry.affine`](/docs/std/geometry-affine) | Geometry | `Affine2` | Two-dimensional affine transforms: scale, rotation, skew, and translation in one matrix. |
+| [`silk.geometry.corners`](/docs/std/geometry-corners) | Geometry | `Corners` | A value for each of the four corners of a box, over any number type. |
 | [`silk.geometry.insets`](/docs/std/geometry-insets) | Geometry | `Insets` | Distances inward from the four edges of a box, over any number type. |
 | [`silk.geometry.matrix`](/docs/std/geometry-matrix) | Geometry | `Matrix3` | Square 3x3 and 4x4 matrices for projective and three-dimensional transforms. |
 | [`silk.geometry.point`](/docs/std/geometry-point) | Geometry | `Point2` | Two- and three-dimensional positions over any number type. |
 | [`silk.geometry.rect`](/docs/std/geometry-rect) | Geometry | `Rect` | Axis-aligned rectangles stored as their minimum and maximum corners, over any number type. |
+| [`silk.geometry.rounded_rect`](/docs/std/geometry-rounded-rect) | Geometry | `RoundedRect` | Axis-aligned rectangles with a circular radius at each corner, over any number type. |
 | [`silk.geometry.size`](/docs/std/geometry-size) | Geometry | `Size2` | Two-dimensional extents over any number type. |
 | [`silk.geometry.vector`](/docs/std/geometry-vector) | Geometry | `Vector2` | Two- and three-dimensional displacements over any number type. |
 | [`silk.http.basic`](/docs/std/http-basic) | HTTP | `HttpBasic` | Make the value of an \`Authorization: Basic\` header from a username and a password. |
@@ -149,7 +157,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.net.datagram_wasi`](/docs/std/net-datagram-wasi) | Networking | `UdpSocket` | Owned UDP sockets and complete datagrams through WASI Preview 2. |
 | [`silk.net.datagram_wasi`](/docs/std/net-datagram-wasi) | Networking | `UdpSocket` | Owned UDP sockets and complete datagrams through WASI Preview 2. |
 | [`silk.net.resolver`](/docs/std/net-resolver) | Networking | `Resolver` | Turn a host and a port into a list of endpoints to connect to. |
-| [`silk.net.resolver_native`](/docs/std/net-resolver-native) | Networking | `NativeSystemResolver` | The native provider of the \`Resolver\` effect, with the \`getaddrinfo\` function of the system. |
+| [`silk.net.resolver_native`](/docs/std/net-resolver-native) | Networking | `NativeSystemResolver` | The native \`Resolver\` provider using the system's \`getaddrinfo\`, or \`GetAddrInfoW\` on Windows. |
 | [`silk.net.resolver_wasi`](/docs/std/net-resolver-wasi) | Networking | `WasiResolver` | DNS resolution through a WASI Preview 2 network capability. |
 | [`silk.net.resolver_wasi`](/docs/std/net-resolver-wasi) | Networking | `WasiResolver` | DNS resolution through a WASI Preview 2 network capability. |
 | [`silk.net.socket_native`](/docs/std/net-socket-native) | Networking | `NativeSocket` | TCP and Unix socket connections and listeners, as \`ByteDuplex\` providers. |
@@ -191,6 +199,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.platform.native.report`](/docs/std/platform-native-report) | Native platform | `NativeReport` | Writes the report of an unhandled error or a trap to a descriptor, with fixed limits. |
 | [`silk.platform.native.start`](/docs/std/platform-native-start) | Native platform | `NativeStart` | The default start code of a native program: it calls your \`main\` and returns its status. |
 | [`silk.platform.native.start_sync`](/docs/std/platform-native-start-sync) | Native platform | `NativeStartSync` | A minimal start code for a native program whose \`main\` is an \`i32\` effect that requires \`&mut HostInput\`. |
+| [`silk.platform.wasi.canonical`](/docs/std/platform-wasi-canonical) | Native platform | Not applicable | The canonical ABI allocator of every \`wasm32-wasip2\` component. |
 | [`silk.platform.wasi.clock`](/docs/std/platform-wasi-clock) | Native platform | `WasiClock` | WASI wall-clock and monotonic-clock operations. |
 | [`silk.platform.wasi.clock`](/docs/std/platform-wasi-clock) | Native platform | `WasiClock` | WASI wall-clock and monotonic-clock operations. |
 | [`silk.platform.wasi.component`](/docs/std/platform-wasi-component) | Native platform | `wasi_component` | Memory and polling operations shared by WASI Preview 2 providers. |
@@ -210,7 +219,40 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.platform.wasi.start`](/docs/std/platform-wasi-start) | Native platform | `wasi_start` | The command entry for WASI Preview 1 and Preview 2. |
 | [`silk.platform.wasi.stream`](/docs/std/platform-wasi-stream) | Native platform | `wasi_stream` | Owned Preview 2 input and output streams with partial transfers and deadlines. |
 | [`silk.platform.wasi.stream`](/docs/std/platform-wasi-stream) | Native platform | `wasi_stream` | Owned Preview 2 input and output streams with partial transfers and deadlines. |
+| [`silk.platform.wasm.heap`](/docs/std/platform-wasm-heap) | Native platform | Not applicable | The linear-memory heap of every wasm module, and the report buffer of a module without WASI. |
+| [`silk.platform.wasm.heap`](/docs/std/platform-wasm-heap) | Native platform | Not applicable | The linear-memory heap of every wasm module, and the report buffer of a module without WASI. |
+| [`silk.platform.wasm.thread`](/docs/std/platform-wasm-thread) | Native platform | Not applicable | The wasi-threads records of a multi-threaded wasm32 module. |
+| [`silk.platform.wasm.thread`](/docs/std/platform-wasm-thread) | Native platform | Not applicable | The wasi-threads records of a multi-threaded wasm32 module. |
+| [`silk.platform.wasm.support`](/docs/std/platform-wasm-support) | Native platform | Not applicable | The C library of every wasm32 executable: the heap entry points, the byte routines, the 128-bit multiply, the floating remainder and the fused multiply-add. |
+| [`silk.platform.wasm.support`](/docs/std/platform-wasm-support) | Native platform | Not applicable | The C library of every wasm32 executable: the heap entry points, the byte routines, the 128-bit multiply, the floating remainder and the fused multiply-add. |
 | [`silk.platform.wasm.start`](/docs/std/platform-wasm-start) | Native platform | `WasmStart` | The program entry for the standalone LLVM-to-WebAssembly profile. |
+| [`silk.platform.windows.clock`](/docs/std/platform-windows-clock) | Windows platform | `WindowsClock` | Windows wall and monotonic clocks without a C runtime. |
+| [`silk.platform.windows.clock`](/docs/std/platform-windows-clock) | Windows platform | `WindowsClock` | Windows wall and monotonic clocks without a C runtime. |
+| [`silk.platform.windows.command_line`](/docs/std/platform-windows-command-line) | Windows platform | `CommandLine` | MSVC command-line encoding and decoding over Windows UTF-16 code units. |
+| [`silk.platform.windows.console`](/docs/std/platform-windows-console) | Windows platform | `WindowsConsole` | Windows standard-output and standard-error writes without a C runtime. |
+| [`silk.platform.windows.console`](/docs/std/platform-windows-console) | Windows platform | `WindowsConsole` | Windows standard-output and standard-error writes without a C runtime. |
+| [`silk.platform.windows.environment`](/docs/std/platform-windows-environment) | Windows platform | `EnvironmentEntry` | Delimiter rules for Windows UTF-16 environment entries. |
+| [`silk.platform.windows.filesystem`](/docs/std/platform-windows-filesystem) | Windows platform | `WindowsFileSystem` | Handle-relative filesystem operations for the Windows \`OsFileSystem\` provider. |
+| [`silk.platform.windows.filesystem`](/docs/std/platform-windows-filesystem) | Windows platform | `WindowsFileSystem` | Handle-relative filesystem operations for the Windows \`OsFileSystem\` provider. |
+| [`silk.platform.windows.heap`](/docs/std/platform-windows-heap) | Windows platform | `WindowsHeap` | Process-heap storage for the Windows runtime and the system allocator. |
+| [`silk.platform.windows.heap`](/docs/std/platform-windows-heap) | Windows platform | `WindowsHeap` | Process-heap storage for the Windows runtime and the system allocator. |
+| [`silk.platform.windows.host_input`](/docs/std/platform-windows-host-input) | Windows platform | `WindowsHostInput` | Windows \`HostInput\` with owned arguments and an environment snapshot in raw canonical WTF-8. |
+| [`silk.platform.windows.host_input`](/docs/std/platform-windows-host-input) | Windows platform | `WindowsHostInput` | Windows \`HostInput\` with owned arguments and an environment snapshot in raw canonical WTF-8. |
+| [`silk.platform.windows.host_path`](/docs/std/platform-windows-host-path) | Windows platform | `WindowsHostPath` | Windows host path discovery for tools. These operations intentionally resolve links in the machine namespace; they do not establish a confined filesystem root. |
+| [`silk.platform.windows.host_path`](/docs/std/platform-windows-host-path) | Windows platform | `WindowsHostPath` | Windows host path discovery for tools. These operations intentionally resolve links in the machine namespace; they do not establish a confined filesystem root. |
+| [`silk.platform.windows.input`](/docs/std/platform-windows-input) | Windows platform | `WindowsInput` | Raw-byte reads from the Windows standard-input handle. |
+| [`silk.platform.windows.input`](/docs/std/platform-windows-input) | Windows platform | `WindowsInput` | Raw-byte reads from the Windows standard-input handle. |
+| [`silk.platform.windows.path`](/docs/std/platform-windows-path) | Windows platform | `WindowsPath` | Windows host paths represented in an explicit machine-wide path namespace. |
+| [`silk.platform.windows.process`](/docs/std/platform-windows-process) | Windows platform | `WindowsProcess` | Direct Windows child execution with explicit inherited handles and owned process cleanup. |
+| [`silk.platform.windows.process`](/docs/std/platform-windows-process) | Windows platform | `WindowsProcess` | Direct Windows child execution with explicit inherited handles and owned process cleanup. |
+| [`silk.platform.windows.process_image`](/docs/std/platform-windows-process-image) | Windows platform | `WindowsProcessImage` | Interactive Windows process execution: inherit the terminal, environment, and working directory, wait for the image, and return its exact exit status to the shell. |
+| [`silk.platform.windows.process_image`](/docs/std/platform-windows-process-image) | Windows platform | `WindowsProcessImage` | Interactive Windows process execution: inherit the terminal, environment, and working directory, wait for the image, and return its exact exit status to the shell. |
+| [`silk.platform.windows.random`](/docs/std/platform-windows-random) | Windows platform | `WindowsRandom` | Secure Windows random bytes without a C runtime. |
+| [`silk.platform.windows.random`](/docs/std/platform-windows-random) | Windows platform | `WindowsRandom` | Secure Windows random bytes without a C runtime. |
+| [`silk.platform.windows.start`](/docs/std/platform-windows-start) | Windows platform | `WindowsStart` | Synchronous Windows executable entry without a C runtime. |
+| [`silk.platform.windows.time`](/docs/std/platform-windows-time) | Windows platform | `WindowsTime` | Exact conversions between Windows clock units and Silk instants. |
+| [`silk.platform.windows.winsock`](/docs/std/platform-windows-winsock) |  | `Winsock` | Scoped ownership of a Windows Winsock initialization reference. |
+| [`silk.platform.windows.wtf8`](/docs/std/platform-windows-wtf8) | Windows platform | `Wtf8` | Lossless conversion between Windows UTF-16 code units and canonical WTF-8 bytes. |
 | [`silk.simd.aarch64`](/docs/std/simd-aarch64) | SIMD | `aarch64` | AArch64 NEON instructions that the portable \`silk.simd.simd\` operations do not express: table lookups, dot products, pairwise sums, and AES round steps. |
 | [`silk.simd.cpu`](/docs/std/simd-cpu) | SIMD | `CpuFeatures` | Runtime detection of the CPU features that the running machine has. |
 | [`silk.simd.f32x4`](/docs/std/simd-f32x4) | SIMD | `f32x4` | Operations on \`simd\<f32, 4\>\`: four 32-bit float lanes in one 128-bit vector. |
@@ -250,9 +292,13 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.system.child_process`](/docs/std/system-child-process) | System | `ChildProcess` | Run another program, wait for it to end, and get its exit code and all of its output. |
 | [`silk.system.child_process_native`](/docs/std/system-child-process-native) | System | `OsChildProcess` | The native provider of the \`ChildProcess\` effect: it runs real programs. |
 | [`silk.system.child_process_native`](/docs/std/system-child-process-native) | System | `OsChildProcess` | The native provider of the \`ChildProcess\` effect: it runs real programs. |
+| [`silk.system.child_process_native`](/docs/std/system-child-process-native) | System | `OsChildProcess` | The native provider of the \`ChildProcess\` effect: it runs real programs. |
 | [`silk.system.filesystem`](/docs/std/system-filesystem) | System | `FileSystem` | Files and directories through the \`FileSystem\` effect: paths, whole-file reads and writes, atomic writes, directory listings, and temporary directories. |
+| [`silk.system.filesystem_machine`](/docs/std/system-filesystem-machine) | System | `MachineFileSystem` | A filesystem provider for absolute paths in the host machine namespace. |
+| [`silk.system.filesystem_machine`](/docs/std/system-filesystem-machine) | System | `MachineFileSystem` | A filesystem provider for absolute paths in the host machine namespace. |
 | [`silk.system.filesystem_native`](/docs/std/system-filesystem-native) | System | `OsFileSystem` | The native provider of the \`FileSystem\` effect, confined to one directory of the host. |
 | [`silk.system.filesystem_native`](/docs/std/system-filesystem-native) | System | `OsFileSystem` | The native provider of the \`FileSystem\` effect, confined to one directory of the host. |
+| [`silk.system.glob_scan`](/docs/std/system-glob-scan) | System | `glob_scan` | Find the files and directories that a glob pattern matches, by walking directories through the \`FileSystem\` effect. |
 | [`silk.system.host_input`](/docs/std/system-host-input) | System | `HostInput` | The \`HostInput\` effect: the command-line arguments, environment variables, and working directory of the process, as bytes. |
 | [`silk.system.host_input_native`](/docs/std/system-host-input-native) | System | `OsHostInput` | The native provider of the \`HostInput\` effect: command-line arguments, environment, and the working directory. |
 | [`silk.system.host_input_native`](/docs/std/system-host-input-native) | System | `OsHostInput` | The native provider of the \`HostInput\` effect: command-line arguments, environment, and the working directory. |
@@ -268,13 +314,27 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.testing.exchange`](/docs/std/testing-exchange) | Testing | `TestExchange` | The binary plan and receipt formats that let \`silk test\` control the test runner. |
 | [`silk.testing.runner`](/docs/std/testing-runner) | Testing | `TestRunner` | The built-in test runner that \`silk test\` selects. It runs tests one at a time. |
 | [`silk.testing.testing`](/docs/std/testing-testing) | Testing | `Testing` | Assertions for tests, and the filter rules that the test runner uses to select tests. |
+| [`silk.text.bidi`](/docs/std/text-bidi) | Text | `bidi` | The Unicode Bidirectional Algorithm (UAX #9) for text that mixes left-to-right and right-to-left scripts, with data from Unicode 18.0.0. |
 | [`silk.text.byte_search`](/docs/std/text-byte-search) | Text | `byte_search` | Fast searches over byte slices: the first or last position of a byte, the first of two or three bytes, the number of times a byte occurs, and the first position of a byte sequence. |
 | [`silk.text.char`](/docs/std/text-char) | Text | `char` | Conversion between \`char\` and integers, and named comparison functions for \`char\`. |
 | [`silk.text.format`](/docs/std/text-format) | Text | `Format` | Text output for values through the ambient \`Writer\`, compile-time checked templates, and decimal parsing. |
+| [`silk.text.glob`](/docs/std/text-glob) | Text | `glob` | Glob patterns: compile a pattern such as \`src/\*\*/\*.{silk,toml}\` and test paths against it, and inspect text for glob syntax. |
+| [`silk.text.line_break`](/docs/std/text-line-break) | Text | `line_break` | Line break opportunities: the Unicode Line Breaking Algorithm (UAX #14) with CSS tailoring, with data from Unicode 18.0.0. |
+| [`silk.text.script_itemization`](/docs/std/text-script-itemization) | Text | `script_itemization` | Script itemization: the split of a text into runs of one script each (UAX #24), with data from Unicode 18.0.0. |
+| [`silk.text.segmentation`](/docs/std/text-segmentation) | Text | `segmentation` | Grapheme cluster, word and sentence boundaries (UAX #29), with data from Unicode 18.0.0. |
 | [`silk.text.string`](/docs/std/text-string) | Text | `String` | UTF-8 text: owned strings, validation of bytes, search, splitting, trimming, and traversal one Unicode scalar at a time. |
-| [`silk.text.unicode`](/docs/std/text-unicode) | Text | `Unicode` | Unicode canonical normalization (NFC and NFD), with data from Unicode 17.0.0. |
-| [`silk.text.unicode_tables`](/docs/std/text-unicode-tables) | Text | `UnicodeTables` | Generated Unicode data tables for canonical normalization. \`silk.text.unicode\` uses these tables. |
+| [`silk.text.unicode`](/docs/std/text-unicode) | Text | `Unicode` | Unicode canonical normalization (NFC and NFD), canonical composition, and the Boolean and mapping character properties, with data from Unicode 18.0.0. |
+| [`silk.text.unicode_data`](/docs/std/text-unicode-data) |  | `unicode_data` |  |
+| [`silk.text.unicode_properties`](/docs/std/text-unicode-properties) |  | `GeneralCategory` |  |
+| [`silk.text.unicode_script`](/docs/std/text-unicode-script) | Text | `Script` | Unicode scripts as ISO 15924 values, and the Script and Script\_Extensions properties, with data from Unicode 18.0.0. |
 | [`silk.text.utf8_decoder`](/docs/std/text-utf8-decoder) | Text | `Utf8Decoder` | Decoding of UTF-8 one byte at a time, for input that arrives in chunks. No allocation. |
+| [`silk.text.utf8_scan`](/docs/std/text-utf8-scan) | Text | `utf8_scan` | Random-access decoding of one Unicode scalar from UTF-8 bytes, for text algorithms that scan by byte offset. |
+| [`silk.text.vertical_text`](/docs/std/text-vertical-text) | Text | `vertical_text` | Character orientation in vertical text (UAX #50), with data from Unicode 18.0.0. |
+| [`silk.text.word_dictionary`](/docs/std/text-word-dictionary) | Text | `IcuDictionary` | Dictionary word segmentation for Thai, Lao, Khmer and Myanmar text, for line breaking, with the dictionaries of ICU 78.1. |
+| [`silk.text.word_dictionary_khmer`](/docs/std/text-word-dictionary-khmer) | Text | `word_dictionary_khmer` | The ICU Khmer word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
+| [`silk.text.word_dictionary_lao`](/docs/std/text-word-dictionary-lao) | Text | `word_dictionary_lao` | The ICU Lao word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
+| [`silk.text.word_dictionary_myanmar`](/docs/std/text-word-dictionary-myanmar) | Text | `word_dictionary_myanmar` | The ICU Burmese (Myanmar) word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
+| [`silk.text.word_dictionary_thai`](/docs/std/text-word-dictionary-thai) | Text | `word_dictionary_thai` | The ICU Thai word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
 | [`silk.tls.certificate`](/docs/std/tls-certificate) | TLS and certificates | `Certificate` | Decode one X.509 certificate from DER or PEM, and read its fields. |
 | [`silk.tls.certificate_bundle`](/docs/std/tls-certificate-bundle) | TLS and certificates | `CertificateBundle` | Decode a PEM file with one or more certificates, such as a certificate chain or a CA bundle. |
 | [`silk.tls.certificate_identities`](/docs/std/tls-certificate-identities) | TLS and certificates | `CertificateSan` | Decode the subject alternative names (SAN) of a certificate: the DNS names and IP addresses that it is for. |
@@ -292,6 +352,8 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.tls.trust_source_memory`](/docs/std/tls-trust-source-memory) | TLS and certificates | `MemoryTrustSource` | A \`TrustSource\` provider that holds a trust snapshot in memory. |
 | [`silk.tls.trust_source_native`](/docs/std/tls-trust-source-native) | TLS and certificates | `NativeFileTrustSource` | A native \`TrustSource\` provider that loads trust anchors from one PEM file. |
 | [`silk.tls.trust_source_native`](/docs/std/tls-trust-source-native) | TLS and certificates | `NativeFileTrustSource` | A native \`TrustSource\` provider that loads trust anchors from one PEM file. |
+| [`silk.tls.trust_source_windows`](/docs/std/tls-trust-source-windows) | TLS and certificates | `WindowsRootTrustSource` | A \`TrustSource\` provider for the current user's Windows \`ROOT\` certificate store. |
+| [`silk.tls.trust_source_windows`](/docs/std/tls-trust-source-windows) | TLS and certificates | `WindowsRootTrustSource` | A \`TrustSource\` provider for the current user's Windows \`ROOT\` certificate store. |
 | [`silk.toml.codec`](/docs/std/toml-codec) | Data formats | `TomlCodec` | Convert TOML values to Silk values, and write Silk values as TOML. |
 | [`silk.toml.output`](/docs/std/toml-output) | Data formats | `TomlOutput` | Write a TOML document or a single TOML string or key through the ambient \`Writer\`. |
 | [`silk.toml.scanner`](/docs/std/toml-scanner) | Data formats | `TomlScanner` | Validate TOML source and read it as a sequence of tokens. |
@@ -312,6 +374,8 @@ Profile identities:
 - `wasm32-unknown-unknown`: target `wasm32-unknown-unknown`.
 - `wasm32-wasip1`: target `wasm32-wasip1`.
 - `wasm32-wasip2`: target `wasm32-wasip2`.
+- `x86_64-pc-windows-msvc`: target `x86_64-pc-windows-msvc`.
+- `wasm64-unknown-unknown`: target `wasm64-unknown-unknown`.
 
 ## See also
 

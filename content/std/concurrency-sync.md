@@ -20,7 +20,7 @@ it computed when that allocation was new. Handles and guards only copy those poi
 write to state that other threads can see is atomic or done under the lock.
 
 ## Gotchas
-- These types need the same targets as [`Atomic.wait`](/docs/std/concurrency-atomic#Atomic.impl.wait): Darwin on aarch64, Linux with GNU libc
+- These types need the same targets as [`Atomic.wait`](/docs/std/concurrency-atomic#Atomic.impl.wait): Darwin on x86_64 or aarch64, Linux with GNU libc
   on x86_64 or aarch64, and wasm32.
 - An `Arc<T>` gives only shared borrows. Change the value through a `Mutex` or atomics. Unlike
   `Shared<T>`, `Arc<T>` does not detect reentrant access.
@@ -144,7 +144,7 @@ every handle lets its thread read the value.
 
 - It gives only shared borrows. Unlike `Shared<T>`, it does not detect reentrant access.
 - A reference cycle of `Arc` handles leaks.
-- These types need the same targets as `Atomic.wait`: Darwin on aarch64, Linux with GNU libc on
+- These types need the same targets as `Atomic.wait`: Darwin on x86_64 or aarch64, Linux with GNU libc on
 x86_64 or aarch64, and wasm32.
 
 ::Anchor{id="Arc.impl.Transferable"}
@@ -252,7 +252,7 @@ system and does not spin.
 ### Gotchas
 
 - Locking a mutex again on the thread that holds it deadlocks.
-- These types need the same targets as `Atomic.wait`: Darwin on aarch64, Linux with GNU libc on
+- These types need the same targets as `Atomic.wait`: Darwin on x86_64 or aarch64, Linux with GNU libc on
 x86_64 or aarch64, and wasm32.
 
 ::Anchor{id="Mutex.impl.Transferable"}
@@ -397,7 +397,7 @@ wake it.
 
 ### Gotchas
 - `park` can also return with no token. Check your own condition again in a loop.
-- These types need the same targets as `Atomic.wait`: Darwin on aarch64, Linux with GNU libc on
+- These types need the same targets as `Atomic.wait`: Darwin on x86_64 or aarch64, Linux with GNU libc on
 x86_64 or aarch64, and wasm32.
 
 ::Anchor{id="Unparker"}
@@ -519,4 +519,4 @@ Adds another unparker for the same parker.
 
 Category: Concurrency.
 
-Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`.
+Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.
