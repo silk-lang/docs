@@ -85,7 +85,7 @@ const single = (id: string, title: string, source: string): Example => ({
 
 export const EXAMPLES: Array.NonEmptyReadonlyArray<Example> = [
   single('hello', 'Hello, world', hello),
-  single('fibers', 'Fibers that wait together', fibers),
+  single('fibers', 'A race between fibers', fibers),
   single('parse', 'Reading numbers with Result', parse),
   single('sieve', 'Sieve of Eratosthenes', sieve),
   single('quicksort', 'Quicksort, step by step', quicksort),

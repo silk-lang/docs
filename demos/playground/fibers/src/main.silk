@@ -1,28 +1,41 @@
-//! Three tasks, each on its own fiber, waiting at the same time. The scheduler
-//! runs whichever fiber is ready, so the program takes as long as the slowest
-//! task, not as long as all three together.
+//! A race between three fibers. Each runner waits on its own fiber, and the
+//! scheduler runs whichever is ready, so they all wait at the same time and
+//! the race takes as long as the slowest, not as long as all three together.
+//!
+//! The main fiber draws the track every 50 ms. It asks each fiber whether it
+//! has finished with `Fiber.isFinished`, which never waits, and joins them
+//! only once all three are done.
 import silk.mem.allocator { OutOfMemoryError }
 import silk.core.effect { Effect }
 import silk.concurrency.fiber { Cancelled, Fiber }
 import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
 import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
-import silk.io.logger { LogError }
+import silk.io.logger { LogError, Logger }
 import silk.io.logger_native { StdoutLogger }
+import silk.num.i64
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 import silk.system.system_clock { Instant, SystemClock }
 
-// A fiber can only ask for the scheduler and the clock, so each one writes
-// through a logger of its own.
-effect fn task(name: string, delay: u64) -> u64
-  ! LogError
+// How long each runner takes, in milliseconds.
+const RABBIT: i64 = 700
+
+const TURTLE: i64 = 1500
+
+const SNAIL: i64 = 2400
+
+// Cells in a lane, before the flag.
+const LENGTH: i64 = 16
+
+// Clears the screen and moves the cursor to the top left, in a terminal and
+// in the playground.
+const CLEAR: string = "\u{1b}[2J\u{1b}[H"
+
+// The runner's whole race: one wait.
+effect fn runRace(milliseconds: i64) -> i64
   ? &mut MonotonicClock {
-  let mut logger = StdoutLogger.make()
-  run Effect.log("{} started\n", &.(name)) |> Effect.provideMut(&mut logger)
-  run Effect.sleep(delay)
-  run Effect.log("{} finished after {} ms\n", &(name, delay / 1ms))
-    |> Effect.provideMut(&mut logger)
-  return delay
+  run Effect.sleep(i64.toU64(milliseconds) * 1ms)
+  return milliseconds
 }
 
 fn millisecondsBetween(start: &Instant, end: &Instant) -> i64 {
@@ -31,21 +44,82 @@ fn millisecondsBetween(start: &Instant, end: &Instant) -> i64 {
   return seconds * 1000 + nanoseconds / 1000000
 }
 
+// A runner moves along by the time that passed and reaches the flag when its
+// fiber has finished.
+effect fn lane(runner: string, name: string, milliseconds: i64, elapsed: i64, isDone: bool) -> ()
+  ! LogError
+  ? &mut Logger {
+  let estimate = elapsed * (LENGTH - 1) / milliseconds
+  let position = if isDone {
+    LENGTH - 1
+  } else if estimate > LENGTH - 2 {
+    LENGTH - 2
+  } else {
+    estimate
+  }
+  let mut cell: i64 = 0
+  while cell < LENGTH {
+    if cell == position {
+      run Effect.log("{}", &.(runner))
+    } else if cell < position {
+      run Effect.log("🟩", &())
+    } else {
+      run Effect.log("⬜", &())
+    }
+    cell = cell + 1
+  }
+  if isDone {
+    run Effect.log("🏁 {}, {} ms\n", &(name, milliseconds))
+  } else {
+    run Effect.log("🏁 {}\n", &.(name))
+  }
+}
+
+effect fn draw(elapsed: i64, isRabbitDone: bool, isTurtleDone: bool, isSnailDone: bool) -> ()
+  ! LogError
+  ? &mut Logger {
+  run Effect.log("{}Three fibers, waiting at the same time: {} ms\n\n", &(CLEAR, elapsed))
+  run lane("🐇", "rabbit", RABBIT, elapsed, isRabbitDone)
+  run lane("🐢", "turtle", TURTLE, elapsed, isTurtleDone)
+  run lane("🐌", "snail", SNAIL, elapsed, isSnailDone)
+}
+
 effect fn root() -> ()
   ! LogError | OutOfMemoryError | TaskIdExhaustedError | Cancelled
   ? &mut Scheduler | &mut MonotonicClock {
-  let started = run MonotonicClock.now()
-  let download = run Fiber.forkChild(task("download", 600ms))
-  let resize = run Fiber.forkChild(task("resize", 200ms))
-  let upload = run Fiber.forkChild(task("upload", 400ms))
-  let first = run Fiber.join(move download)
-  let second = run Fiber.join(move resize)
-  let third = run Fiber.join(move upload)
-  let finished = run MonotonicClock.now()
-
+  // A fiber can ask only for the scheduler and the clock, so the main fiber
+  // writes through a logger of its own.
   let mut logger = StdoutLogger.make()
-  let summary = (millisecondsBetween(&started, &finished), (first + second + third) / 1ms)
-  run Effect.log("All done in {} ms. One after another, they would take {} ms.\n", &summary)
+  let started = run MonotonicClock.now()
+  let rabbit = run Fiber.forkChild(runRace(RABBIT))
+  let turtle = run Fiber.forkChild(runRace(TURTLE))
+  let snail = run Fiber.forkChild(runRace(SNAIL))
+
+  while !(Fiber.isFinished(&rabbit) && Fiber.isFinished(&turtle) && Fiber.isFinished(&snail)) {
+    let now = run MonotonicClock.now()
+    run draw(
+      millisecondsBetween(&started, &now),
+      Fiber.isFinished(&rabbit),
+      Fiber.isFinished(&turtle),
+      Fiber.isFinished(&snail),
+    )
+      |> Effect.provideMut(&mut logger)
+
+    // Sleeping parks the main fiber, which lets the runners' fibers run.
+    run Effect.sleep(50ms)
+  }
+
+  // Every fiber has finished, so joining them returns at once.
+  let rabbitTime = run Fiber.join(move rabbit)
+  let turtleTime = run Fiber.join(move turtle)
+  let snailTime = run Fiber.join(move snail)
+  let finished = run MonotonicClock.now()
+  let elapsed = millisecondsBetween(&started, &finished)
+  run draw(elapsed, true, true, true) |> Effect.provideMut(&mut logger)
+  run Effect.log(
+    "\nThe race took {} ms. One after another, it would take {} ms.\n",
+    &(elapsed, rabbitTime + turtleTime + snailTime),
+  )
     |> Effect.provideMut(&mut logger)
 }
 
