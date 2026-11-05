@@ -487,6 +487,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_NO_TOOL_SANDBOX` | Set, the host behaves as one with no sandbox for `build.silk` tool steps, so they are refused unless `[build].unsandboxed-tools = true` |
 | `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and profiles** |
 | `SILK_PROFILE_USE` | A merged `.profdata` file: native builds pass `-fprofile-use=<file>` to Clang |
+| `SILK_CODEGEN_UNITS` | A number above 1: an optimized native executable is split into that many codegen units along its call graph, so Clang optimizes them on several threads. Calls across units inline less. Without it, an optimized build is one module |
 | `SILK_WASMTIME` | The `wasmtime` that `silk run`, `silk debug` and `silk test` use on a WASI target; default `wasmtime` on `PATH` |
 | `WASMTIME_BACKTRACE_DETAILS` | Passed to Wasmtime by `silk run`, `silk debug` and `silk test` on a WASI target, set to `1` when the environment does not set it, so trap traces show source lines |
 | `SILK_LLDB` | The LLDB that `silk debug` starts for a native program; default `lldb` on `PATH` |

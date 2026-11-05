@@ -239,7 +239,7 @@ slow HTTP/1.1 200 OK 1.5s
 
 ## A timeout around any effect
 
-Every socket operation already takes a deadline. `within` adds one to any effect that can run as a fiber, including one made of many socket calls, without changing the effect itself:
+Every socket operation already takes a deadline. For a deadline around a whole effect, `Effect.timeout(work, budget)` from `silk/core/effect` is the short way: it stops `work` at its next park once the budget has passed and fails with `TimeoutError` (see Fibers and scheduling in the reference). The `within` helper below builds the same idea by hand, which shows how fibers, a fresh scheduler and a shared slot fit together. It adds a deadline to any effect that can run as a fiber, including one made of many socket calls, without changing the effect itself:
 
 ```silk
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ Three details are worth noting:
 - The slot is a `Shared<Option<Result<A, E>>>`. `Shared.withMut` lends the value to a plain function for the length of one call. `storeResult(move result)` is a staged call: it fixes the second argument now, and `withMut` supplies the first.
 - The inner scheduler waits on the outer task's clock. When `within` runs inside a fiber, as it does below, its sleeps park that fiber only.
 
-Polling once a millisecond is the cost of having no wait-for-either primitive. It is cheap for a handful of fibers, and the budget is honored to within a millisecond or so.
+Polling once a millisecond is cheap for a handful of fibers, and the budget is honored to within a millisecond or so. `Fiber.awaitEither` and `Effect.timeout` wait without polling.
 
 ## Parallel requests, a producer and a consumer
 

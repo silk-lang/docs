@@ -5,7 +5,8 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 ## Execution model
 
 - All fibers of one scheduler run on one host thread. There is no parallelism and no preemption.
-- Native threads are separate from fibers. `NativeThread.spawn` in `silk/concurrency/thread_native` runs a `Transferable` closure on its own operating-system thread, and `JoinHandle.join` waits for its result. `silk/concurrency/atomic`, `silk/concurrency/sync` and `silk/concurrency/thread` hold the matching atomics, locks and thread properties. `silk/concurrency/work_queue` has queues that move owned values between threads, and `silk/concurrency/thread_pool` runs `Transferable` lazy tasks on a work-stealing pool of native threads. This page does not cover them.
+- Native threads are separate from fibers. `NativeThread.spawn` in `silk/concurrency/thread_native` runs a `Transferable` closure on its own operating-system thread, and `JoinHandle.join` waits for its result. `silk/concurrency/atomic`, `silk/concurrency/sync` and `silk/concurrency/thread` hold the matching atomics, locks and thread properties. `silk/concurrency/work_queue` has queues that move owned values between threads, and `silk/concurrency/thread_pool` runs fibers in parallel on a work-stealing pool of native threads. This page does not cover them.
+- A thread pool fiber is a `PoolFiber`. It has the same observations as a `Fiber`: `await`, `join`, `interrupt`, `awaitEither` and `race`, with the same `Outcome`, and `Pool.timeout` bounds a wait as `Effect.timeout` does. A pool fiber can park on one worker and continue on another. See `silk.concurrency.thread_pool` in the standard library reference.
 - A task runs until it parks. It parks when it waits on an unfinished fiber, yields, waits on a timer, or forks a child.
 - When a task parks, the scheduler resumes another ready task. `LocalScheduler` keeps ready tasks in FIFO order.
 - A task that never parks keeps the thread until it finishes.
@@ -36,6 +37,11 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 - `Fiber<A, E>.join(fiber)` returns the success value. It raises the task's failure `E` unchanged, or `Cancelled` if the task was cancelled. Its failure row is `! E | Cancelled`.
 - On a finished task, both return at once. On an unfinished task, the caller parks until the task completes.
 - Neither needs a requirement row. Type arguments are inferred from the fiber.
+- `fiber.isFinished()` says whether the task has finished, without parking or observing it. The fiber can still be awaited, joined or interrupted.
+- `Fiber<A, E>.interrupt(fiber)` cancels the task unless it has already finished, waits until the cancellation is done, and returns the final `Outcome<A, E>`. A task that finished first gives its real outcome. Cancelling runs the `Drop` hooks and non-parking finalizers of the task and its unfinished children. It requires `? &mut Scheduler`.
+- `first.awaitEither(second)` waits for whichever of two tasks finishes first. It returns `FirstLeft` or `FirstRight`, each with the winner's `Outcome` and the other fiber, still running and unobserved.
+- `first.race(second)` takes two fibers of the same type, returns the first result, and interrupts the other before it returns. A failure or cancellation of the winner is raised, as with `join`. It requires `? &mut Scheduler`.
+- A task is cancelled only where it parks: at a timer wait, an `await` or another parking operation. Code between two parks always runs to its end. `Effect.ensuring` finalizers do not run on cancellation.
 
 ## Structured lifetime
 
@@ -82,6 +88,58 @@ Silk runs concurrent work as cooperative fibers on one thread. This page covers 
 - Clock reads inside a task return one cached mark per driver turn.
 - The parent clock decides what a wait means. `OsMonotonicClock.make()` from `silk/system/monotonic_clock_native` blocks the host thread. A provider whose `waitUntil` only records the deadline gives virtual time.
 - Outside any scheduler, `Effect.sleep` with `OsMonotonicClock` blocks the whole program.
+
+## Timeouts, retries and repeats
+
+- `Effect.timeout(work, howLong)` runs `work` in the current task and fails with `TimeoutError` from `silk/core/effect` if it has not finished `howLong` nanoseconds from now. `Effect.timeoutAt(work, deadline)` takes an `Instant` instead, to bound several steps by one deadline. Both require `? &mut Scheduler`, so they work under `LocalScheduler`.
+- When the deadline passes while `work` is parked, the scheduler abandons it from that park, running its `Drop` hooks and non-parking finalizers, and the call fails. An effect that never parks is never stopped. Nested timeouts work; the one whose deadline passes first stops.
+- `Effect.retry(work, &schedule)` runs `work` again after each typed failure, waiting as a `Schedule` from `silk/core/schedule` says, and `Effect.retryWhile` retries only the failures a predicate accepts. `Effect.repeat(work, &schedule)` runs `work` again after each delay and returns the last success. `work` must be a reusable `mut Effect`. These three require `? &mut MonotonicClock | &mut InsecureRandom`, the second for jittered schedules.
+- `Schedule.spaced`, `fixed`, `exponential`, `fibonacci`, `linear`, `recurs` and `forever` make schedules; `limit`, `capDelay`, `upTo` and `jittered` change them. `Schedule.recurs(3)` allows three runs after the first.
+
+Here one effect finishes inside its budget and one does not:
+
+```silk
+import silk.core.effect { Effect, TimeoutError }
+import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
+import silk.concurrency.scheduler { Scheduler }
+import silk.mem.allocator { OutOfMemoryError }
+import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock_native { OsMonotonicClock }
+
+effect fn slow() -> i32
+  ? &mut MonotonicClock {
+  run Effect.sleep(10s)
+  return 1
+}
+
+effect fn quick() -> i32
+  ? &mut MonotonicClock {
+  run Effect.sleep(1ms)
+  return 2
+}
+
+effect fn timedOut(error: TimeoutError) -> i32 {
+  drop error
+  return 0
+}
+
+effect fn root() -> i32
+  ? &mut Scheduler | &mut MonotonicClock {
+  let late = run Effect.timeout(slow(), 5ms) |> Effect.catchAll(timedOut)
+  let early = run Effect.timeout(quick(), 1s) |> Effect.catchAll(timedOut)
+  return late * 10 + early
+}
+
+pub effect fn main() -> i32
+  ! OutOfMemoryError | StalledError {
+  let mut clock = OsMonotonicClock.make()
+  let mut scheduler = LocalScheduler.make()
+  return run LocalScheduler.execute(&mut scheduler, root())
+    |> Effect.provideMut<MonotonicClock>(&mut clock)
+}
+```
+
+`late` is 0, because `slow` is stopped after 5 milliseconds at its sleep, and `early` is 2. The program exits with status 2, well before `slow`'s ten seconds.
 
 ## Runtime setup in main
 

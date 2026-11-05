@@ -4,7 +4,7 @@ Your board grows as needed, refuses duplicate titles and saves itself through th
 
 ## One thread, many fibers
 
-A fiber is a small task that can pause and let other fibers run. Silk runs all the fibers of one scheduler on a single thread. Nothing runs in parallel and nothing is interrupted. A fiber keeps the thread until it *parks*: it sleeps, waits for another fiber, yields, or forks a child.
+A fiber is a small task that can pause and let other fibers run. Silk runs all the fibers of one scheduler on a single thread. Nothing runs in parallel and nothing is preempted. A fiber keeps the thread until it *parks*: it sleeps, waits for another fiber, yields, or forks a child.
 
 That sounds limiting, but most waiting is not computing. A reminder that fires in 200 ms spends all 200 ms doing nothing. While it waits, other fibers can run, and the waits overlap.
 
