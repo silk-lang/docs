@@ -4,26 +4,56 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # A silk release can trigger a rebuild so the releases page picks it up:
+  # A silk release can trigger a rebuild so the site picks it up:
   # POST /repos/silk-lang/docs/dispatches with {"event_type": "silk-release"}.
   repository_dispatch:
     types: [silk-release]
-  # Daily rebuild as a fallback for new releases.
+  # Every hour, a quick check deploys when there is a release the site has
+  # not been built with yet (the `release` job below).
   schedule:
-    - cron: '17 6 * * *'
+    - cron: '17 * * * *'
 
 concurrency:
   group: deploy
   cancel-in-progress: false
 
 jobs:
+  # The newest silk release, and whether a deploy already built the site with
+  # it. Scheduled runs stop here when nothing is new.
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.newest.outputs.tag }}
+      deployed: ${{ steps.marker.outputs.cache-hit }}
+    steps:
+      - id: newest
+        # Every silk release so far is a prerelease, which releases/latest
+        # leaves out, so this takes the first of the list.
+        run: echo "tag=$(gh api 'repos/silk-lang/silk/releases?per_page=1' --jq '.[0].tag_name')" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: marker
+        uses: actions/cache/restore@v4
+        with:
+          path: .deployed-release
+          key: deployed-release-${{ steps.newest.outputs.tag }}
+          lookup-only: true
+
   deploy:
+    needs: release
+    if: github.event_name != 'schedule' || needs.release.outputs.deployed != 'true'
     runs-on: ubuntu-latest
     environment: production
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The archived docs of each release take the hand-written pages
+          # from this repository's history (scripts/versions.ts).
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -31,6 +61,19 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The archive from the last deploy, so only new releases are generated.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .versions
+            .cache/silk.git
+          key: docs-versions-${{ github.run_id }}
+          restore-keys: docs-versions-
+      # Every release's docs into .versions/, and the newest release's
+      # standard library into content/std, which the landing page lists.
+      - run: node scripts/versions.ts --sync-latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm run deploy --no-input
         env:
           CI: true
@@ -42,3 +85,10 @@ jobs:
           SILK_SITE_URL: ${{ vars.SILK_DOCS_DOMAIN != '' && format('https://{0}', vars.SILK_DOCS_DOMAIN) || 'https://silkdocs-website-prod-nneqbw44rs6hjtkw.juliaortiz-js.workers.dev' }}
           # Raises the GitHub API rate limit for the releases page.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo '${{ needs.release.outputs.tag }}' > .deployed-release
+      - uses: actions/cache/save@v4
+        with:
+          path: .deployed-release
+          key: deployed-release-${{ needs.release.outputs.tag }}
+        # A second deploy with the same release finds the marker saved.
+        continue-on-error: true

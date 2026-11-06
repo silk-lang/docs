@@ -8,6 +8,7 @@ import * as Markdown from '@foldkit/markdown'
 import { DemoTopic, InstallMethod } from './landing'
 import * as Playground from './playground'
 import * as Search from './search'
+import { ArchivedCatalog } from './versions/archive'
 
 export const Message = defineMessageUnion({
   ClickedLink: { request: UrlRequest },
@@ -25,6 +26,11 @@ export const Message = defineMessageUnion({
     document: Markdown.MarkdownDocument,
   },
   FailedLoadDocument: { key: Schema.String },
+  SucceededLoadCatalog: {
+    version: Schema.String,
+    catalog: ArchivedCatalog,
+  },
+  FailedLoadCatalog: { version: Schema.String },
   PointedAtDocLink: { key: Schema.String },
   ClickedSidebarGroup: { groupKey: Schema.String },
   ClickedDocsNavToggle: {},

@@ -17,6 +17,7 @@ export const testModel = (route: AppRoute): Model =>
     maybePendingAnchor: Option.none(),
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
+    versionCatalogs: HashMap.empty(),
     search: Search.init().model,
     installMethod: InstallMethod.Unix(),
     demoTopic: DemoTopic.Fibers(),

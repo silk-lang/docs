@@ -13,11 +13,9 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-import { parseMarkdown } from '@foldkit/markdown/vite'
+import { parseContent } from './parse.ts'
 
-import { islandAttributes } from '../src/docs/islands.ts'
-
-const SOURCE_REPOSITORY = 'https://github.com/silk-lang/docs'
+export const SOURCE_REPOSITORY = 'https://github.com/silk-lang/docs'
 
 const docsRoot = resolve(import.meta.dirname, '..')
 
@@ -25,27 +23,28 @@ const docsRoot = resolve(import.meta.dirname, '..')
 
 // The sidebar order of the hand-written sections. The synced standard library
 // group follows them.
-const sections: ReadonlyArray<Readonly<{ directory: string; title: string }>> =
-  [
-    { directory: 'get-started', title: 'Get started' },
-    { directory: 'book', title: 'The Silk book' },
-    { directory: 'reference', title: 'Language reference' },
-    { directory: 'projects', title: 'Projects and packages' },
-    { directory: 'tools', title: 'Tools' },
-    { directory: 'guides', title: 'Guides' },
-    { directory: 'appendix', title: 'Appendix' },
-  ]
+export const sections: ReadonlyArray<
+  Readonly<{ directory: string; title: string }>
+> = [
+  { directory: 'get-started', title: 'Get started' },
+  { directory: 'book', title: 'The Silk book' },
+  { directory: 'reference', title: 'Language reference' },
+  { directory: 'projects', title: 'Projects and packages' },
+  { directory: 'tools', title: 'Tools' },
+  { directory: 'guides', title: 'Guides' },
+  { directory: 'appendix', title: 'Appendix' },
+]
 
 // PAGES
 
-type WrittenPage = Readonly<{
+export type WrittenPage = Readonly<{
   directory: string
   slug: string
   title: string
   sourcePath: string
 }>
 
-const POSITIONED_FILE = /^\d+-(.+)\.md$/
+export const POSITIONED_FILE = /^\d+-(.+)\.md$/
 
 const pageTitle = (sourcePath: string, slug: string, markdown: string) => {
   if (slug === 'overview') {
@@ -58,11 +57,20 @@ const pageTitle = (sourcePath: string, slug: string, markdown: string) => {
   return heading[1]!.trim()
 }
 
-const sectionPages = (directory: string): ReadonlyArray<WrittenPage> =>
-  readdirSync(join(docsRoot, 'content', directory))
-    .filter(fileName => fileName.endsWith('.md'))
+// The pages of one section, from the markdown files of content/ keyed by
+// path (content/book/04-ownership.md). The deploy also runs this over older
+// trees of this repository from git, for the archived versions of the docs.
+export const sectionPages = (
+  files: ReadonlyMap<string, string>,
+  directory: string,
+  options: Readonly<{ skipUnparsable?: boolean }> = {},
+): ReadonlyArray<WrittenPage> =>
+  [...files.keys()]
+    .filter(path => path.startsWith(`content/${directory}/`))
+    .map(path => path.slice(`content/${directory}/`.length))
+    .filter(fileName => fileName.endsWith('.md') && !fileName.includes('/'))
     .sort()
-    .map(fileName => {
+    .flatMap(fileName => {
       const sourcePath = `content/${directory}/${fileName}`
       const match = fileName.match(POSITIONED_FILE)
       if (match === null) {
@@ -71,20 +79,36 @@ const sectionPages = (directory: string): ReadonlyArray<WrittenPage> =>
         )
       }
       const slug = match[1]!
-      const markdown = readFileSync(join(docsRoot, sourcePath), 'utf8')
+      const markdown = files.get(sourcePath) ?? ''
       try {
-        parseMarkdown(markdown, { islands: islandAttributes })
+        parseContent(markdown)
       } catch (error) {
+        if (options.skipUnparsable === true) {
+          console.warn(`skipped ${sourcePath}, which does not parse`)
+          return []
+        }
         console.error(`${sourcePath} does not parse:`)
         throw error
       }
-      return {
-        directory,
-        slug,
-        title: pageTitle(sourcePath, slug, markdown),
-        sourcePath,
-      }
+      return [
+        {
+          directory,
+          slug,
+          title: pageTitle(sourcePath, slug, markdown),
+          sourcePath,
+        },
+      ]
     })
+
+const contentFilesOnDisk = (): ReadonlyMap<string, string> =>
+  new Map(
+    sections.flatMap(({ directory }) =>
+      readdirSync(join(docsRoot, 'content', directory)).map(fileName => {
+        const sourcePath = `content/${directory}/${fileName}`
+        return [sourcePath, readFileSync(join(docsRoot, sourcePath), 'utf8')]
+      }),
+    ),
+  )
 
 // OUTPUT
 
@@ -141,9 +165,10 @@ ${groups
 // MAIN
 
 const main = (): void => {
+  const files = contentFilesOnDisk()
   const groups = sections.map(section => ({
     ...section,
-    pages: sectionPages(section.directory),
+    pages: sectionPages(files, section.directory),
   }))
 
   const writtenPath = join(docsRoot, 'src/docs/written.ts')
@@ -159,4 +184,6 @@ const main = (): void => {
   )
 }
 
-main()
+if (import.meta.main) {
+  main()
+}

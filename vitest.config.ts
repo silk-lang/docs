@@ -11,6 +11,7 @@ export default defineConfig({
     alias: {
       'virtual:silk-releases': '/src/releases/fixture.ts',
       'virtual:silk-playground': '/src/playground/fixture.ts',
+      'virtual:silk-versions': '/src/versions/fixture.ts',
     },
   },
   test: {

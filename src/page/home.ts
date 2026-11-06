@@ -1904,7 +1904,13 @@ const batteries = (h: HtmlBuilder<Message>): Html =>
                 '-mx-5 flex snap-x gap-2.5 overflow-x-auto px-5 scrollbar-none md:mx-0 md:grid md:grid-cols-2 md:gap-0 md:overflow-visible md:border-t-2 md:border-ink md:px-0 xl:grid-cols-3',
               ),
             ],
-            Array.map(HIGHLIGHTS, highlight => highlightCard(highlight, h)),
+            // A highlight whose area is gone from the synced standard library
+            // drops out instead of claiming 0 modules.
+            pipe(
+              HIGHLIGHTS,
+              Array.filter(highlight => areaCount(highlight.area) > 0),
+              Array.map(highlight => highlightCard(highlight, h)),
+            ),
           ),
           h.div(
             [h.Class('flex flex-col gap-4')],

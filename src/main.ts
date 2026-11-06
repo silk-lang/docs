@@ -25,17 +25,76 @@ import * as DocsMarkdown from './docs/markdown'
 import { DemoTopic, FibersRun, InstallMethod } from './landing'
 import * as Layout from './layout'
 import { Message } from './message'
-import { DocState, Flags, Model } from './model'
+import { CatalogState, DocState, Flags, Model } from './model'
 import * as DocsPage from './page/docs'
 import * as Home from './page/home'
 import * as Releases from './page/releases'
 import * as Playground from './playground'
 import { AppRoute, homeRouter, urlToAppRoute } from './route'
 import * as Search from './search'
+import { archivedPagePath, versionPrefix } from './versions/archive'
+import { archivedDocs } from './versions/context'
+import {
+  ArchiveUnavailable,
+  isArchiveKey,
+  loadArchivedDocument,
+  loadCatalog,
+} from './versions/load'
+import * as VersionsPage from './versions/page'
 
 export { Flags, Message, Model }
 
 // ROUTE HELPERS
+
+type Catalogs = Pick<Model, 'versionCatalogs'>
+
+type RoutedPage = Readonly<{
+  context: Catalog.DocsContext
+  page: Catalog.DocPage
+}>
+
+// The docs a route reads: the current ones, or a downloaded release archive.
+const routeDocs = (
+  model: Catalogs,
+  route: AppRoute,
+): Option.Option<Catalog.DocsContext> => {
+  const archived = (version: string) =>
+    pipe(
+      HashMap.get(model.versionCatalogs, version),
+      Option.flatMap(state =>
+        state._tag === 'Loaded'
+          ? Option.some(archivedDocs(state.catalog))
+          : Option.none(),
+      ),
+    )
+  return AppRoute.match(route, {
+    Home: () => Option.none(),
+    Docs: () => Option.some(Catalog.currentDocs),
+    DocPage: () => Option.some(Catalog.currentDocs),
+    Releases: () => Option.none(),
+    Playground: () => Option.none(),
+    Versions: () => Option.none(),
+    VersionedDocs: ({ version }) => archived(version),
+    VersionedDocPage: ({ version }) => archived(version),
+    NotFound: () => Option.none(),
+  })
+}
+
+const routedPage = (
+  model: Catalogs,
+  route: AppRoute,
+): Option.Option<RoutedPage> =>
+  route._tag === 'DocPage' || route._tag === 'VersionedDocPage'
+    ? pipe(
+        routeDocs(model, route),
+        Option.flatMap(context =>
+          Option.map(
+            Catalog.findPageIn(context, route.directory, route.slug),
+            page => ({ context, page }),
+          ),
+        ),
+      )
+    : Option.none()
 
 const routePage = (route: AppRoute): Option.Option<Catalog.DocPage> =>
   route._tag === 'DocPage'
@@ -49,6 +108,10 @@ const routePath = (route: AppRoute): string =>
     DocPage: page => Catalog.pagePath(page),
     Releases: () => '/releases',
     Playground: () => '/playground',
+    Versions: () => '/v',
+    VersionedDocs: ({ version }) => `${versionPrefix(version)}/docs`,
+    VersionedDocPage: ({ version, directory, slug }) =>
+      archivedPagePath(version, { directory, slug }),
     NotFound: ({ path }) => path,
   })
 
@@ -60,34 +123,62 @@ const docStateKey = (doc: DocState): Option.Option<string> =>
     Failed: ({ key }) => Option.some(key),
   })
 
+// The document key of a current docs page, for prefetching from a link.
 const routeKey = (route: AppRoute): Option.Option<string> =>
   Option.map(routePage(route), Catalog.pageKey)
 
+const routeDocumentKey = (
+  model: Catalogs,
+  route: AppRoute,
+): Option.Option<string> =>
+  Option.map(routedPage(model, route), ({ context, page }) =>
+    context.documentKey(page),
+  )
+
 // The pages a reader is likely to open next, fetched ahead of time.
-const neighborKeys = (route: AppRoute): ReadonlyArray<string> =>
-  Option.match(routePage(route), {
+const neighborKeys = (
+  model: Catalogs,
+  route: AppRoute,
+): ReadonlyArray<string> =>
+  Option.match(routedPage(model, route), {
     onNone: () => [],
-    onSome: page => {
-      const { maybePrevious, maybeNext } = Catalog.neighbors(page)
+    onSome: ({ context, page }) => {
+      const { maybePrevious, maybeNext } = Catalog.neighborsIn(context, page)
       return Array.map(
         Array.getSomes([maybeNext, maybePrevious]),
-        Catalog.pageKey,
+        context.documentKey,
       )
     },
   })
 
 const openGroupsFor = (
   openGroups: HashSet.HashSet<string>,
+  model: Catalogs,
   route: AppRoute,
 ): HashSet.HashSet<string> =>
   pipe(
-    routePage(route),
-    Option.flatMap(Catalog.findGroup),
+    routedPage(model, route),
+    Option.flatMap(({ context, page }) => Catalog.findGroupIn(context, page)),
     Option.match({
       onNone: () => openGroups,
       onSome: group => HashSet.add(openGroups, group.key),
     }),
   )
+
+// The version an archived route reads, when its catalog is not downloaded or
+// on its way yet.
+const missingCatalog = (
+  model: Catalogs,
+  route: AppRoute,
+): Option.Option<string> =>
+  (route._tag === 'VersionedDocs' || route._tag === 'VersionedDocPage') &&
+  !HashMap.has(model.versionCatalogs, route.version)
+    ? Option.some(route.version)
+    : Option.none()
+
+// Stands in for the document key while an archived page waits for its
+// version's catalog.
+const catalogKey = (version: string): string => `catalog:${version}`
 
 // INIT
 
@@ -99,6 +190,10 @@ export const init: Runtime.RoutingApplicationInit<
 > = (flags, url) => {
   const route = urlToAppRoute(url)
   const maybePage = routePage(route)
+  const maybeMissingCatalog = missingCatalog(
+    { versionCatalogs: HashMap.empty() },
+    route,
+  )
   const maybeFlaggedDocument = pipe(
     flags.maybeDocument,
     Option.filter(({ key }) =>
@@ -109,17 +204,39 @@ export const init: Runtime.RoutingApplicationInit<
     route,
     copiedCodeIds: HashSet.empty(),
     doc: DocState.Idle(),
-    openGroups: openGroupsFor(HashSet.empty(), route),
+    openGroups: openGroupsFor(
+      HashSet.empty(),
+      { versionCatalogs: HashMap.empty() },
+      route,
+    ),
     isDocsNavOpen: false,
     maybeActiveSection: Option.none(),
     maybePendingAnchor: Option.none(),
     documents: HashMap.empty(),
     requestedDocumentKeys: HashSet.empty(),
+    versionCatalogs: Option.match(maybeMissingCatalog, {
+      onNone: () => HashMap.empty(),
+      onSome: version => HashMap.make([version, CatalogState.Loading()]),
+    }),
     search: Search.init().model,
     installMethod: InstallMethod.Unix(),
     demoTopic: DemoTopic.Fibers(),
     fibersRun: FibersRun.Idle(),
     playground: Playground.init().model,
+  }
+
+  if (Option.isSome(maybeMissingCatalog)) {
+    const version = maybeMissingCatalog.value
+    return {
+      model: modifyFields(baseModel, {
+        doc: () =>
+          route._tag === 'VersionedDocPage'
+            ? DocState.Loading({ key: catalogKey(version) })
+            : DocState.Idle(),
+        maybePendingAnchor: () => url.hash,
+      }),
+      commands: [LoadCatalog({ version })],
+    }
   }
 
   return Option.match(maybePage, {
@@ -132,7 +249,7 @@ export const init: Runtime.RoutingApplicationInit<
               doc: () => DocState.Loaded({ key, document }),
               documents: HashMap.set(key, document),
             }),
-            neighborKeys(route),
+            neighborKeys(baseModel, route),
           ),
         onNone: () =>
           requestDocuments(
@@ -215,9 +332,26 @@ export const LoadDocument = Command.define('LoadDocument', {
   args: { key: Schema.String },
   messages: [Message.SucceededLoadDocument, Message.FailedLoadDocument],
   execute: ({ key }) =>
-    Content.loadDocumentByKey(key).pipe(
+    (isArchiveKey(key)
+      ? loadArchivedDocument(key)
+      : Content.loadDocumentByKey(key).pipe(
+          Effect.mapError(() => new ArchiveUnavailable({ url: key })),
+        )
+    ).pipe(
       Effect.map(document => Message.SucceededLoadDocument({ key, document })),
       Effect.catch(() => Effect.succeed(Message.FailedLoadDocument({ key }))),
+    ),
+})
+
+export const LoadCatalog = Command.define('LoadCatalog', {
+  args: { version: Schema.String },
+  messages: [Message.SucceededLoadCatalog, Message.FailedLoadCatalog],
+  execute: ({ version }) =>
+    loadCatalog(version).pipe(
+      Effect.map(catalog => Message.SucceededLoadCatalog({ version, catalog })),
+      Effect.catch(() =>
+        Effect.succeed(Message.FailedLoadCatalog({ version })),
+      ),
     ),
 })
 
@@ -343,8 +477,7 @@ const scrollCommands = (
 const changeUrl = (model: Model, url: Url): UpdateReturn => {
   const nextRoute = urlToAppRoute(url)
   const isSamePath = routePath(nextRoute) === routePath(model.route)
-  const maybePage = routePage(nextRoute)
-  const maybeNextKey = Option.map(maybePage, Catalog.pageKey)
+  const maybeNextKey = routeDocumentKey(model, nextRoute)
   const isDocumentCurrent =
     model.doc._tag !== 'Failed' &&
     Option.exists(maybeNextKey, key =>
@@ -353,12 +486,31 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
 
   const nextModel = modifyFields(model, {
     route: () => nextRoute,
-    openGroups: openGroups => openGroupsFor(openGroups, nextRoute),
+    openGroups: openGroups => openGroupsFor(openGroups, model, nextRoute),
     isDocsNavOpen: () => false,
     maybeActiveSection: maybeActiveSection =>
       isSamePath ? maybeActiveSection : Option.none(),
     maybePendingAnchor: () => Option.none(),
   })
+
+  const maybeMissingVersion = missingCatalog(model, nextRoute)
+  if (Option.isSome(maybeMissingVersion)) {
+    const version = maybeMissingVersion.value
+    return {
+      model: modifyFields(nextModel, {
+        versionCatalogs: HashMap.set<string, CatalogState>(
+          version,
+          CatalogState.Loading(),
+        ),
+        doc: () =>
+          nextRoute._tag === 'VersionedDocPage'
+            ? DocState.Loading({ key: catalogKey(version) })
+            : model.doc,
+        maybePendingAnchor: () => url.hash,
+      }),
+      commands: [LoadCatalog({ version }), ScrollToTop()],
+    }
+  }
 
   return Option.match(maybeNextKey, {
     onSome: key => {
@@ -371,7 +523,7 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
             modifyFields(nextModel, {
               doc: () => DocState.Loaded({ key, document }),
             }),
-            neighborKeys(nextRoute),
+            neighborKeys(model, nextRoute),
             scrollCommands(url, isSamePath),
           ),
         onNone: () =>
@@ -468,7 +620,7 @@ export const update = (model: Model, message: Message) =>
               doc: () => DocState.Loaded({ key, document }),
               maybePendingAnchor: () => Option.none(),
             }),
-            neighborKeys(model.route),
+            neighborKeys(model, model.route),
             Option.match(model.maybePendingAnchor, {
               onNone: () => [],
               onSome: hash => [ScrollToAnchor({ hash })],
@@ -488,6 +640,63 @@ export const update = (model: Model, message: Message) =>
           }
         : { model: nextModel }
     },
+    SucceededLoadCatalog: ({ version, catalog }) => {
+      const nextModel = modifyFields(model, {
+        versionCatalogs: HashMap.set<string, CatalogState>(
+          version,
+          CatalogState.Loaded({ catalog }),
+        ),
+      })
+      const route = model.route
+      if (route._tag !== 'VersionedDocPage' && route._tag !== 'VersionedDocs') {
+        return { model: nextModel }
+      }
+      if (route.version !== version) {
+        return { model: nextModel }
+      }
+      const withGroups = modifyFields(nextModel, {
+        openGroups: openGroups => openGroupsFor(openGroups, nextModel, route),
+      })
+      return Option.match(routeDocumentKey(nextModel, route), {
+        onNone: () => ({
+          model: modifyFields(withGroups, { doc: () => DocState.Idle() }),
+        }),
+        onSome: key =>
+          Option.match(HashMap.get(model.documents, key), {
+            onSome: document =>
+              requestDocuments(
+                modifyFields(withGroups, {
+                  doc: () => DocState.Loaded({ key, document }),
+                  maybePendingAnchor: () => Option.none(),
+                }),
+                neighborKeys(nextModel, route),
+                Option.match(model.maybePendingAnchor, {
+                  onNone: () => [],
+                  onSome: hash => [ScrollToAnchor({ hash })],
+                }),
+              ),
+            onNone: () =>
+              requestDocuments(
+                modifyFields(withGroups, {
+                  doc: () => DocState.Loading({ key }),
+                }),
+                [key],
+              ),
+          }),
+      })
+    },
+    FailedLoadCatalog: ({ version }) => ({
+      model: modifyFields(model, {
+        versionCatalogs: HashMap.set<string, CatalogState>(
+          version,
+          CatalogState.Failed(),
+        ),
+        doc: doc =>
+          Option.contains(docStateKey(doc), catalogKey(version))
+            ? DocState.Failed({ key: catalogKey(version) })
+            : doc,
+      }),
+    }),
     PointedAtDocLink: ({ key }) => requestDocuments(model, [key]),
     ClickedSidebarGroup: ({ groupKey }) => ({
       model: modifyFields(model, {
@@ -675,6 +884,13 @@ const routeTitle = (route: AppRoute): string =>
       }),
     Releases: () => `Download Silk | ${SITE_NAME}`,
     Playground: () => `Playground | ${SITE_NAME}`,
+    Versions: () => `Docs for every release | ${SITE_NAME}`,
+    VersionedDocs: ({ version }) => `Docs for ${version} | ${SITE_NAME}`,
+    VersionedDocPage: ({ version, directory, slug }) =>
+      Option.match(Catalog.findPage(directory, slug), {
+        onNone: () => `Docs for ${version} | ${SITE_NAME}`,
+        onSome: page => `${page.title} (${version}) | ${SITE_NAME} docs`,
+      }),
     NotFound: () => `Not found | ${SITE_NAME}`,
   })
 
@@ -724,15 +940,51 @@ const notFound = (h: HtmlBuilder<Message>): Html =>
     h,
   )
 
+// An archived release's docs, once its catalog is downloaded.
+const archivedView = (
+  model: Model,
+  version: string,
+  loaded: (context: Catalog.DocsContext) => Html,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Option.match(HashMap.get(model.versionCatalogs, version), {
+    onNone: () => DocsPage.archiveLoadingView(model, version, h),
+    onSome: state =>
+      CatalogState.match(state, {
+        Loading: () => DocsPage.archiveLoadingView(model, version, h),
+        Failed: () => DocsPage.archiveMissingView(model, version, h),
+        Loaded: ({ catalog }) => loaded(archivedDocs(catalog)),
+      }),
+  })
+
 const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
   AppRoute.match(model.route, {
     Home: () => Home.view(model, h),
-    Docs: () => DocsPage.indexView(model, h),
+    Docs: () => DocsPage.indexView(model, Catalog.currentDocs, h),
     DocPage: ({ directory, slug }) =>
       Option.match(Catalog.findPage(directory, slug), {
         onNone: () => notFound(h),
-        onSome: page => DocsPage.pageView(model, page, h),
+        onSome: page => DocsPage.pageView(model, Catalog.currentDocs, page, h),
       }),
+    Versions: () => VersionsPage.view(h),
+    VersionedDocs: ({ version }) =>
+      archivedView(
+        model,
+        version,
+        context => DocsPage.indexView(model, context, h),
+        h,
+      ),
+    VersionedDocPage: ({ version, directory, slug }) =>
+      archivedView(
+        model,
+        version,
+        context =>
+          Option.match(Catalog.findPageIn(context, directory, slug), {
+            onNone: () => DocsPage.missingPageView(model, context, h),
+            onSome: page => DocsPage.pageView(model, context, page, h),
+          }),
+        h,
+      ),
     Releases: () => Releases.view(model.copiedCodeIds, h),
     Playground: () =>
       Layout.page(

@@ -8,6 +8,13 @@ export const AppRoute = defineRouteUnion({
   DocPage: { directory: Schema.String, slug: Schema.String },
   Releases: {},
   Playground: {},
+  Versions: {},
+  VersionedDocs: { version: Schema.String },
+  VersionedDocPage: {
+    version: Schema.String,
+    directory: Schema.String,
+    slug: Schema.String,
+  },
   NotFound: { path: Schema.String },
 })
 
@@ -31,7 +38,27 @@ export const playgroundRouter = pipe(
   Route.mapTo(AppRoute.Playground),
 )
 
+// Archived docs of a release: /v/0.1.0-dev.47/docs/std/core-effect.
+export const versionsRouter = pipe(literal('v'), Route.mapTo(AppRoute.Versions))
+export const versionedDocsRouter = pipe(
+  literal('v'),
+  slash(string('version')),
+  slash(literal('docs')),
+  Route.mapTo(AppRoute.VersionedDocs),
+)
+export const versionedDocPageRouter = pipe(
+  literal('v'),
+  slash(string('version')),
+  slash(literal('docs')),
+  slash(string('directory')),
+  slash(string('slug')),
+  Route.mapTo(AppRoute.VersionedDocPage),
+)
+
 const routeParser = Route.oneOf(
+  versionedDocPageRouter,
+  versionedDocsRouter,
+  versionsRouter,
   docPageRouter,
   docsRouter,
   releasesRouter,

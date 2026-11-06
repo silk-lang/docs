@@ -83,6 +83,8 @@ export const view = (
   documentKey: string,
   copiedCodeIds: CopiedCodeIds,
   h: HtmlBuilder<Message>,
+  // Rewrites link targets, such as /docs links inside an archived version.
+  mapUrl: (url: string) => string = url => url,
 ): Html => {
   const ids = headingIds(document)
   return Markdown.view(document, {
@@ -128,7 +130,7 @@ export const view = (
       Link: ({ url }, content) =>
         h.a(
           [
-            h.Href(url),
+            h.Href(mapUrl(url)),
             h.Class(
               'font-semibold text-ink underline decoration-signal underline-offset-4 hover:text-signal',
             ),
