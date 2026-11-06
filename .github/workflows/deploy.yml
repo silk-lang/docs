@@ -50,10 +50,6 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          # The archived docs of each release take the hand-written pages
-          # from this repository's history (scripts/versions.ts).
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -69,8 +65,8 @@ jobs:
             .cache/silk.git
           key: docs-versions-${{ github.run_id }}
           restore-keys: docs-versions-
-      # Every release's docs into .versions/, and the newest release's
-      # standard library into content/std, which the landing page lists.
+      # Every release's standard library reference into .versions/, and the
+      # newest one into content/std, which the landing page lists.
       - run: node scripts/versions.ts --sync-latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

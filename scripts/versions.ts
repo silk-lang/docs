@@ -4,12 +4,10 @@
 //
 //   node scripts/versions.ts [--sync-latest]
 //
-// A release's archive is its standard library reference, generated from the
-// release tag in silk-lang/silk, and the hand-written pages of this
-// repository as they stood while that release was the newest one: the last
-// commit on this branch before the next release came out, or HEAD for the
-// newest release. Pages are stored once by content hash, so a page that did
-// not change between releases costs nothing.
+// Only what is generated is versioned: a release's archive is its standard
+// library reference, generated from the release tag in silk-lang/silk. The
+// hand-written pages always show the current docs. Pages are stored once by
+// content hash, so a page that did not change between releases costs nothing.
 //
 // --sync-latest also replaces content/std and src/docs/generated.ts with the
 // standard library of the newest release, so the deployed site, its landing
@@ -44,11 +42,6 @@ import {
   type ArchivedGroup,
   type VersionEntry,
 } from '../src/versions/archive.ts'
-import {
-  SOURCE_REPOSITORY as DOCS_REPOSITORY,
-  sectionPages,
-  sections,
-} from './catalog-written.ts'
 import { parseContent } from './parse.ts'
 import {
   SOURCE_REPOSITORY as SILK_REPOSITORY,
@@ -70,7 +63,6 @@ const FORMAT = createHash('sha256')
     [
       'scripts/versions.ts',
       'scripts/sync-silk-docs.ts',
-      'scripts/catalog-written.ts',
       'src/versions/archive.ts',
       'pnpm-lock.yaml',
     ]
@@ -277,58 +269,6 @@ const stdlibGroup = (
   }
 }
 
-const writtenGroups = (commit: string): ReadonlyArray<ArchivedGroup> => {
-  const files = treeFiles(join(docsRoot, '.git'), commit, ['content']).filter(
-    file => !file.path.startsWith('content/std/') && file.path.endsWith('.md'),
-  )
-  const blobs = readBlobs(
-    join(docsRoot, '.git'),
-    files.map(file => file.oid),
-  )
-  const contents = new Map(
-    files.map(file => [file.path, blobs.get(file.oid) ?? '']),
-  )
-  return sections.flatMap(section => {
-    try {
-      const pages = sectionPages(contents, section.directory, {
-        skipUnparsable: true,
-      })
-      return pages.length === 0
-        ? []
-        : [
-            {
-              key: section.directory,
-              title: section.title,
-              pages: pages.map(page => ({
-                directory: page.directory,
-                slug: page.slug,
-                title: page.title,
-                sourceUrl: `${DOCS_REPOSITORY}/blob/${commit}/${page.sourcePath}`,
-                document: storeDocument(contents.get(page.sourcePath) ?? ''),
-              })),
-            },
-          ]
-    } catch (error) {
-      console.warn(`${commit}: skipped ${section.directory}: ${String(error)}`)
-      return []
-    }
-  })
-}
-
-// The commit of this repository whose hand-written pages belong to a
-// release: the last one before the next release, or HEAD for the newest.
-const docsCommitFor = (maybeNext: Release | undefined): string | undefined => {
-  const docsGit = join(docsRoot, '.git')
-  const commit = git(docsGit, [
-    'rev-list',
-    '-1',
-    '--first-parent',
-    ...(maybeNext === undefined ? [] : [`--before=${maybeNext.publishedAt}`]),
-    'HEAD',
-  ]).trim()
-  return commit === '' ? undefined : commit
-}
-
 const readCatalog = (version: string): ArchivedCatalog | undefined => {
   const path = join(VERSIONS_DIR, version, 'catalog.json')
   try {
@@ -359,16 +299,6 @@ const main = async (): Promise<void> => {
   const releases = await fetchReleases()
   const gitDir = silkGitDir()
   mkdirSync(DOCUMENTS_DIR, { recursive: true })
-
-  const shallow = git(join(docsRoot, '.git'), [
-    'rev-parse',
-    '--is-shallow-repository',
-  ]).trim()
-  if (shallow === 'true') {
-    console.warn(
-      'This checkout is shallow, so every release gets the hand-written pages of HEAD. Check out with full history (fetch-depth: 0) for the real ones.',
-    )
-  }
 
   // Missing file contents of every tag at once, so reading them stays local.
   const allFiles = releases.flatMap(release => {
@@ -404,14 +334,12 @@ const main = async (): Promise<void> => {
 
   const catalogs: Array<ArchivedCatalog> = []
   const archived: Array<VersionEntry> = []
-  for (const [index, release] of releases.entries()) {
-    const docsCommit = docsCommitFor(releases[index - 1])
+  for (const release of releases) {
     const cached = readCatalog(release.version)
     if (
       cached !== undefined &&
       cached.format === FORMAT &&
-      cached.tag === release.tag &&
-      cached.docsCommit === (docsCommit ?? null)
+      cached.tag === release.tag
     ) {
       catalogs.push(cached)
       archived.push(release)
@@ -434,12 +362,8 @@ const main = async (): Promise<void> => {
       version: release.version,
       tag: release.tag,
       publishedAt: release.publishedAt,
-      docsCommit: docsCommit ?? null,
       format: FORMAT,
-      groups: [
-        ...(docsCommit === undefined ? [] : writtenGroups(docsCommit)),
-        std,
-      ],
+      groups: [std],
     }
     mkdirSync(join(VERSIONS_DIR, release.version), { recursive: true })
     writeFileSync(

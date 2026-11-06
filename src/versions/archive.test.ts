@@ -13,7 +13,6 @@ const catalog: ArchivedCatalog = {
   version: '0.1.0-dev.1',
   tag: 'v0.1.0-dev.1+aaaaaaaaaaaa',
   publishedAt: '2026-10-01T00:00:00Z',
-  docsCommit: null,
   format: 'test',
   groups: [
     {
@@ -85,9 +84,12 @@ describe('archived versions', () => {
     expect(model.doc._tag).toBe('Failed')
   })
 
-  test('docs links stay inside the version', () => {
-    expect(versionedUrl('0.1.0-dev.1', '/docs/book/ownership#moves')).toBe(
-      '/v/0.1.0-dev.1/docs/book/ownership#moves',
+  test('stdlib links stay inside the version, guide links go to the current docs', () => {
+    expect(versionedUrl('0.1.0-dev.1', '/docs/std/core-effect#map')).toBe(
+      '/v/0.1.0-dev.1/docs/std/core-effect#map',
+    )
+    expect(versionedUrl('0.1.0-dev.1', '/docs/book/ownership')).toBe(
+      '/docs/book/ownership',
     )
     expect(versionedUrl('0.1.0-dev.1', '/releases')).toBe('/releases')
     expect(versionedUrl('0.1.0-dev.1', 'https://example.com/docs/x')).toBe(

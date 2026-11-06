@@ -10,8 +10,8 @@ import { DocState, type Model } from '../model'
 import { versionsRouter } from '../route'
 import * as Search from '../search'
 import {
+  VERSIONED_DIRECTORY,
   archivedPagePath,
-  versionPrefix,
   versionedUrl,
 } from '../versions/archive'
 import * as Versions from '../versions/list'
@@ -151,7 +151,7 @@ const shortDate = (iso: string): string =>
 
 // Where a version's copy of the page a reader is on lives: the same page when
 // the version has it (an archived page that is missing says so), or the
-// version's docs index.
+// version's standard library overview.
 const versionHref = (
   maybeVersion: Option.Option<string>,
   maybeCurrent: Option.Option<Catalog.DocPage>,
@@ -167,10 +167,18 @@ const versionHref = (
         }),
       ),
     onSome: version =>
-      Option.match(maybeCurrent, {
-        onNone: () => `${versionPrefix(version)}/docs`,
-        onSome: page => archivedPagePath(version, page),
-      }),
+      pipe(
+        maybeCurrent,
+        Option.filter(page => page.directory === VERSIONED_DIRECTORY),
+        Option.match({
+          onNone: () =>
+            archivedPagePath(version, {
+              directory: VERSIONED_DIRECTORY,
+              slug: 'overview',
+            }),
+          onSome: page => archivedPagePath(version, page),
+        }),
+      ),
   })
 
 const pickerItem = (
@@ -200,15 +208,20 @@ const pickerItem = (
     ],
   )
 
-// Picks the release the docs describe. The current docs are the newest
-// release; every release has an archived copy under /v/. The menu is keyed by
-// the page, so it closes when a reader picks a version.
+// Picks the release the standard library reference describes, on its pages.
+// The current docs follow the newest release; every release has an archived
+// copy under /v/. Hand-written pages are not versioned, so they show no
+// picker. The menu is keyed by the page, so it closes when a reader picks a
+// version.
 export const versionPicker = (
   context: Catalog.DocsContext,
   maybeCurrent: Option.Option<Catalog.DocPage>,
   h: HtmlBuilder<Message>,
 ): Html => {
-  if (!Array.isReadonlyArrayNonEmpty(Versions.versions)) {
+  const isVersionedPage =
+    Option.isSome(context.maybeVersion) ||
+    Option.exists(maybeCurrent, page => page.directory === VERSIONED_DIRECTORY)
+  if (!Array.isReadonlyArrayNonEmpty(Versions.versions) || !isVersionedPage) {
     return h.empty
   }
   const isLatest = Option.isNone(context.maybeVersion)
@@ -319,7 +332,7 @@ const archiveBanner = (
           ),
         ],
         [
-          'You are reading the docs for Silk ',
+          'You are reading the standard library reference for Silk ',
           h.span([h.Class('font-mono text-ink')], [version]),
           Option.match(Versions.findVersion(version), {
             onNone: () => '',
@@ -333,7 +346,7 @@ const archiveBanner = (
                 'font-semibold text-ink underline decoration-signal underline-offset-4 hover:text-signal',
               ),
             ],
-            ['Read the latest docs'],
+            ['Read the latest'],
           ),
         ],
       ),
@@ -869,7 +882,7 @@ const pendingContext = (version: string): Catalog.DocsContext => ({
   ...Catalog.currentDocs,
   groups: [],
   pages: [],
-  indexPath: `${versionPrefix(version)}/docs`,
+  indexPath: '/docs',
   pagePath: page => archivedPagePath(version, page),
   maybeVersion: Option.some(version),
 })

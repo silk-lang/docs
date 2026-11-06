@@ -8,7 +8,9 @@ import { Schema } from 'effect'
 //   /v/documents/<hash>.json          one parsed page, shared by every
 //                                     version whose page has the same content
 //
-// Archived pages are read at /v/<version>/docs/<directory>/<slug>.
+// Archived pages are read at /v/<version>/docs/std/<slug>. Only generated
+// pages, the standard library reference, are versioned; the hand-written
+// pages always show the current docs.
 
 export const VersionEntry = Schema.Struct({
   version: Schema.String,
@@ -37,9 +39,6 @@ export const ArchivedCatalog = Schema.Struct({
   version: Schema.String,
   tag: Schema.String,
   publishedAt: Schema.String,
-  // The commit of silk-lang/docs the hand-written pages come from, or null
-  // for a release older than this repository's content.
-  docsCommit: Schema.NullOr(Schema.String),
   format: Schema.String,
   groups: Schema.Array(ArchivedGroup),
 })
@@ -58,9 +57,12 @@ export const archivedPagePath = (
   page: Readonly<{ directory: string; slug: string }>,
 ): string => `${versionPrefix(version)}/docs/${page.directory}/${page.slug}`
 
-// Archived pages link to each other as the current site does, /docs/...;
-// shown inside a version, such a link stays in that version.
+export const VERSIONED_DIRECTORY = 'std'
+
+// Archived pages link to each other as the current site does,
+// /docs/std/...; shown inside a version, such a link stays in that version.
+// Links to hand-written pages go to the current docs.
 export const versionedUrl = (version: string, url: string): string =>
-  url === '/docs' || url.startsWith('/docs/') || url.startsWith('/docs#')
+  url.startsWith(`/docs/${VERSIONED_DIRECTORY}/`)
     ? `${versionPrefix(version)}${url}`
     : url

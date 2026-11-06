@@ -3,7 +3,7 @@ import { type Html, type HtmlBuilder } from 'foldkit/html'
 
 import * as Layout from '../layout'
 import { type Message } from '../message'
-import { docsRouter, versionedDocsRouter } from '../route'
+import { docsRouter, versionedDocPageRouter } from '../route'
 import { versions } from './list'
 
 const date = (iso: string): string =>
@@ -41,7 +41,7 @@ export const view = (h: HtmlBuilder<Message>): Html =>
               h.p(
                 [h.Class('text-lg leading-[1.65] text-body')],
                 [
-                  'The docs as they were for each release: its standard library reference, and the guides from while it was the newest release. ',
+                  'The standard library reference of every release, generated from its source. ',
                   h.a(
                     [
                       h.Href(docsRouter()),
@@ -51,7 +51,7 @@ export const view = (h: HtmlBuilder<Message>): Html =>
                     ],
                     ['The current docs'],
                   ),
-                  ' follow the newest release.',
+                  ' follow the newest release, and the guides are always current.',
                 ],
               ),
             ],
@@ -73,7 +73,11 @@ export const view = (h: HtmlBuilder<Message>): Html =>
                       h.a(
                         [
                           h.Href(
-                            versionedDocsRouter({ version: entry.version }),
+                            versionedDocPageRouter({
+                              version: entry.version,
+                              directory: 'std',
+                              slug: 'overview',
+                            }),
                           ),
                           h.Class(
                             'flex items-baseline justify-between gap-4 py-3.5 hover:text-signal',
