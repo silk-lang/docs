@@ -114,7 +114,8 @@ ResponseOut
 pub struct Resource
 ```
 
-An HTTP resource owner used by provider implementations. Drop releases an untransferred handle.
+An HTTP resource owner used by provider implementations. Drop releases an untransferred
+handle.
 
 ::Anchor{id="Resource.impl"}
 
@@ -364,7 +365,8 @@ Converts stream failures to HTTP failure kinds.
 pub unsafe effect fn wait(pollable: u32, until: &Option<Instant>) -> () ! HttpError ? &mut MonotonicClock
 ```
 
-Waits on an owned pollable and releases it, failing if the supplied clock reaches the deadline.
+Waits on an owned pollable and releases it, failing if the supplied clock reaches the
+deadline.
 
 ::Anchor{id="readBody"}
 
@@ -375,8 +377,8 @@ pub unsafe effect fn readBody(body: Resource, maximum: usize, until: &Option<Ins
     ! HttpError | OutOfMemoryError ? &mut Allocator | &mut MonotonicClock
 ```
 
-Drains an owned incoming body, validates completion and trailers, and enforces `maximum` bytes.
-The body must be an incoming-body handle with no existing stream child.
+Drains an owned incoming body, validates completion and trailers, and enforces `maximum`
+bytes. The body must be an incoming-body handle with no existing stream child.
 
 ::Anchor{id="writeBody"}
 
@@ -428,8 +430,8 @@ The field value bytes, which need not be UTF-8.
 pub unsafe effect fn readFields(handle: u32) -> List<Field> ! HttpError | OutOfMemoryError ? &mut Allocator
 ```
 
-Copies a live fields resource into ordinary owned values, preserving repeated fields and order.
-The caller keeps the fields resource and its parent alive until the operation returns.
+Copies a live fields resource into ordinary owned values, preserving repeated fields and
+order. The caller keeps the fields resource and its parent alive until the operation returns.
 
 ::Anchor{id="appendField"}
 

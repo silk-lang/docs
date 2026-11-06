@@ -1,5 +1,5 @@
 The C library of every wasm32 executable: the heap entry points, the byte routines, the 128-bit
-multiply, the floating remainder and the fused multiply-add.
+multiply and shifts, the floating remainder and the fused multiply-add.
 
 ## When to use
 The standard library's catalog names this module as the wasm32 targets' support module, so

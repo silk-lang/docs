@@ -14,9 +14,10 @@ and then waits until that deadline.
 - A wait blocks the whole thread. It does not let another fiber run.
 - A failure of the clock is a trap.
 - On Linux, the clock stops while the system sleeps, and needs glibc 2.17 or later. On macOS, it
-  counts the time of sleep. Windows QPC also includes system suspend; waits round up to milliseconds.
-- [`OsMonotonicClock.make`](#OsMonotonicClock.impl.make) requires WASI, Windows x86_64 with system libraries, Darwin x86_64 or aarch64,
-  or GNU Linux x86_64 or aarch64.
+  counts the time of sleep. Windows QPC also includes system suspend; waits round up to
+  milliseconds.
+- [`OsMonotonicClock.make`](#OsMonotonicClock.impl.make) requires WASI, Windows x86_64 with system libraries, Darwin x86_64
+  or aarch64, or GNU Linux x86_64 or aarch64.
 
 ## Examples
 ### Measure a wait
@@ -75,7 +76,8 @@ and then waits until that deadline.
   times.
 - A wait blocks the whole thread. It does not let another fiber run.
 - On Linux, the clock stops while the system sleeps, and needs glibc 2.17 or later. On macOS, it
-  counts the time of sleep. Windows QPC also includes system suspend; waits round up to milliseconds.
+  counts the time of sleep. Windows QPC also includes system suspend; waits round up to
+  milliseconds.
 
 ::Anchor{id="OsMonotonicClock.impl"}
 

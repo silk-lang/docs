@@ -51,7 +51,7 @@ pub effect fn main() -> i32
 
 Import as `Certificate` with `import silk.tls.certificate { Certificate }`.
 
-Public declarations: 12.
+Public declarations: 13.
 
 ::Anchor{id="DecodeLimits"}
 
@@ -1058,6 +1058,35 @@ pub value: &'a [u8]
 
 The bytes inside the extension OCTET STRING. They are not decoded.
 
+::Anchor{id="CertificateDer"}
+
+## `CertificateDer`
+
+```silk
+pub struct CertificateDer<'a>
+```
+
+The borrowed DER bytes of one certificate, as a TLS Certificate message carries it. A
+`silk.tls.server` chain and a `silk.tls.client` credential are lists of these.
+
+::Anchor{id="CertificateDer.bytes"}
+
+### Field `bytes`
+
+```silk
+pub bytes: &'a [u8]
+```
+
+The DER bytes of the certificate.
+
+::Anchor{id="CertificateDer.impl.Copy"}
+
+## Implementation `Copy for CertificateDer<'a>`
+
+```silk
+impl<'a> Copy for CertificateDer<'a>
+```
+
 ::Anchor{id="Certificate"}
 
 ## `Certificate`
@@ -1078,9 +1107,9 @@ handshake. For a file with more than one certificate, use `silk.tls.certificate_
 
 The accessors return slices of the DER, such as [`Certificate.subjectDer`](#Certificate.impl.subjectDer), and decoded values,
 such as [`Certificate.notAfter`](#Certificate.impl.notAfter). Nothing is normalized: names, algorithms, and extensions keep
-their original bytes.
-The accessors borrow the certificate. Unknown algorithms, duplicate extensions, and other values
-that a validator can reject stay available, so that `silk.tls.certificate_profile` can check them.
+their original bytes. The accessors borrow the certificate. Unknown algorithms, duplicate
+extensions, and other values that a validator can reject stay available, so that
+`silk.tls.certificate_profile` can check them.
 
 ### Gotchas
 

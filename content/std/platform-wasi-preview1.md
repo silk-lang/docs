@@ -1,12 +1,13 @@
 The WASI Preview 1 canonical ABI, also used inside Preview 2 command components.
 
 ## When to use
-Use these unsafe calls to implement a WASI provider. Applications use the portable service interfaces.
+Use these unsafe calls to implement a WASI provider. Applications use the portable service
+interfaces.
 
 ## Details
-Functions return a WASI errno: zero means success. Pointer arguments use the Preview 1 memory layouts.
-Calls do not retain pointers. The host controls descriptor rights and available resources.
-Preview 2 builds translate these calls through the WASI command adapter.
+Functions return a WASI errno: zero means success. Pointer arguments use the Preview 1 memory
+layouts. Calls do not retain pointers. The host controls descriptor rights and available
+resources. Preview 2 builds translate these calls through the WASI command adapter.
 
 Import as `wasi` with `import silk.platform.wasi.preview1 as wasi`.
 
@@ -397,7 +398,8 @@ pub unsafe extern "C" fn args_get(
 Calls WASI `args_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="args_sizes_get"}
 
@@ -414,7 +416,8 @@ pub unsafe extern "C" fn args_sizes_get(
 Calls WASI `args_sizes_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="environ_get"}
 
@@ -431,7 +434,8 @@ pub unsafe extern "C" fn environ_get(
 Calls WASI `environ_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="environ_sizes_get"}
 
@@ -448,14 +452,15 @@ pub unsafe extern "C" fn environ_sizes_get(
 Calls WASI `environ_sizes_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="clock_res_get"}
 
 ## `clock_res_get`
 
 ```silk
-@foreign(noCapture: ("resolution",))
+@foreign(noCapture: .("resolution"))
 pub unsafe extern "C" fn clock_res_get(
     clock: u32,
     resolution: *mut u64
@@ -465,14 +470,15 @@ pub unsafe extern "C" fn clock_res_get(
 Calls WASI `clock_res_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="clock_time_get"}
 
 ## `clock_time_get`
 
 ```silk
-@foreign(noCapture: ("time",))
+@foreign(noCapture: .("time"))
 pub unsafe extern "C" fn clock_time_get(
     clock: u32,
     precision: u64,
@@ -483,7 +489,8 @@ pub unsafe extern "C" fn clock_time_get(
 Calls WASI `clock_time_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_advise"}
 
@@ -501,7 +508,8 @@ pub unsafe extern "C" fn fd_advise(
 Calls WASI `fd_advise` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_allocate"}
 
@@ -518,7 +526,8 @@ pub unsafe extern "C" fn fd_allocate(
 Calls WASI `fd_allocate` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_close"}
 
@@ -531,7 +540,8 @@ pub unsafe extern "C" fn fd_close(fd: u32) -> u32 as "wasi_snapshot_preview1#fd_
 Calls WASI `fd_close` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_datasync"}
 
@@ -544,14 +554,15 @@ pub unsafe extern "C" fn fd_datasync(fd: u32) -> u32 as "wasi_snapshot_preview1#
 Calls WASI `fd_datasync` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_fdstat_get"}
 
 ## `fd_fdstat_get`
 
 ```silk
-@foreign(noCapture: ("stat",))
+@foreign(noCapture: .("stat"))
 pub unsafe extern "C" fn fd_fdstat_get(
     fd: u32,
     stat: *mut FdStat
@@ -561,7 +572,8 @@ pub unsafe extern "C" fn fd_fdstat_get(
 Calls WASI `fd_fdstat_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_fdstat_set_flags"}
 
@@ -577,7 +589,8 @@ pub unsafe extern "C" fn fd_fdstat_set_flags(
 Calls WASI `fd_fdstat_set_flags` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_fdstat_set_rights"}
 
@@ -594,14 +607,15 @@ pub unsafe extern "C" fn fd_fdstat_set_rights(
 Calls WASI `fd_fdstat_set_rights` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_filestat_get"}
 
 ## `fd_filestat_get`
 
 ```silk
-@foreign(noCapture: ("stat",))
+@foreign(noCapture: .("stat"))
 pub unsafe extern "C" fn fd_filestat_get(
     fd: u32,
     stat: *mut FileStat
@@ -611,7 +625,8 @@ pub unsafe extern "C" fn fd_filestat_get(
 Calls WASI `fd_filestat_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_filestat_set_size"}
 
@@ -627,7 +642,8 @@ pub unsafe extern "C" fn fd_filestat_set_size(
 Calls WASI `fd_filestat_set_size` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_filestat_set_times"}
 
@@ -645,7 +661,8 @@ pub unsafe extern "C" fn fd_filestat_set_times(
 Calls WASI `fd_filestat_set_times` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_pread"}
 
@@ -665,14 +682,15 @@ pub unsafe extern "C" fn fd_pread(
 Calls WASI `fd_pread` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_prestat_get"}
 
 ## `fd_prestat_get`
 
 ```silk
-@foreign(noCapture: ("stat",))
+@foreign(noCapture: .("stat"))
 pub unsafe extern "C" fn fd_prestat_get(
     fd: u32,
     stat: *mut Prestat
@@ -682,14 +700,15 @@ pub unsafe extern "C" fn fd_prestat_get(
 Calls WASI `fd_prestat_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_prestat_dir_name"}
 
 ## `fd_prestat_dir_name`
 
 ```silk
-@foreign(noCapture: ("path",))
+@foreign(noCapture: .("path"))
 pub unsafe extern "C" fn fd_prestat_dir_name(
     fd: u32,
     path: ?[*]mut u8,
@@ -700,7 +719,8 @@ pub unsafe extern "C" fn fd_prestat_dir_name(
 Calls WASI `fd_prestat_dir_name` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_pwrite"}
 
@@ -720,7 +740,8 @@ pub unsafe extern "C" fn fd_pwrite(
 Calls WASI `fd_pwrite` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_read"}
 
@@ -739,7 +760,8 @@ pub unsafe extern "C" fn fd_read(
 Calls WASI `fd_read` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_readdir"}
 
@@ -759,7 +781,8 @@ pub unsafe extern "C" fn fd_readdir(
 Calls WASI `fd_readdir` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_renumber"}
 
@@ -772,14 +795,15 @@ pub unsafe extern "C" fn fd_renumber(from: u32, to: u32) -> u32 as "wasi_snapsho
 Calls WASI `fd_renumber` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_seek"}
 
 ## `fd_seek`
 
 ```silk
-@foreign(noCapture: ("position",))
+@foreign(noCapture: .("position"))
 pub unsafe extern "C" fn fd_seek(
     fd: u32,
     offset: i64,
@@ -791,7 +815,8 @@ pub unsafe extern "C" fn fd_seek(
 Calls WASI `fd_seek` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_sync"}
 
@@ -804,14 +829,15 @@ pub unsafe extern "C" fn fd_sync(fd: u32) -> u32 as "wasi_snapshot_preview1#fd_s
 Calls WASI `fd_sync` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_tell"}
 
 ## `fd_tell`
 
 ```silk
-@foreign(noCapture: ("position",))
+@foreign(noCapture: .("position"))
 pub unsafe extern "C" fn fd_tell(
     fd: u32,
     position: *mut u64
@@ -821,7 +847,8 @@ pub unsafe extern "C" fn fd_tell(
 Calls WASI `fd_tell` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="fd_write"}
 
@@ -840,14 +867,15 @@ pub unsafe extern "C" fn fd_write(
 Calls WASI `fd_write` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_create_directory"}
 
 ## `path_create_directory`
 
 ```silk
-@foreign(noCapture: ("path",))
+@foreign(noCapture: .("path"))
 pub unsafe extern "C" fn path_create_directory(
     fd: u32,
     path: ?[*]const u8,
@@ -858,7 +886,8 @@ pub unsafe extern "C" fn path_create_directory(
 Calls WASI `path_create_directory` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_filestat_get"}
 
@@ -878,14 +907,15 @@ pub unsafe extern "C" fn path_filestat_get(
 Calls WASI `path_filestat_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_filestat_set_times"}
 
 ## `path_filestat_set_times`
 
 ```silk
-@foreign(noCapture: ("path",))
+@foreign(noCapture: .("path"))
 pub unsafe extern "C" fn path_filestat_set_times(
     fd: u32,
     lookup: u32,
@@ -900,7 +930,8 @@ pub unsafe extern "C" fn path_filestat_set_times(
 Calls WASI `path_filestat_set_times` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_link"}
 
@@ -922,7 +953,8 @@ pub unsafe extern "C" fn path_link(
 Calls WASI `path_link` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_open"}
 
@@ -946,7 +978,8 @@ pub unsafe extern "C" fn path_open(
 Calls WASI `path_open` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_readlink"}
 
@@ -971,14 +1004,15 @@ pub unsafe extern "C" fn path_readlink(
 Calls WASI `path_readlink` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_remove_directory"}
 
 ## `path_remove_directory`
 
 ```silk
-@foreign(noCapture: ("path",))
+@foreign(noCapture: .("path"))
 pub unsafe extern "C" fn path_remove_directory(
     fd: u32,
     path: ?[*]const u8,
@@ -989,7 +1023,8 @@ pub unsafe extern "C" fn path_remove_directory(
 Calls WASI `path_remove_directory` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_rename"}
 
@@ -1010,7 +1045,8 @@ pub unsafe extern "C" fn path_rename(
 Calls WASI `path_rename` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_symlink"}
 
@@ -1030,14 +1066,15 @@ pub unsafe extern "C" fn path_symlink(
 Calls WASI `path_symlink` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="path_unlink_file"}
 
 ## `path_unlink_file`
 
 ```silk
-@foreign(noCapture: ("path",))
+@foreign(noCapture: .("path"))
 pub unsafe extern "C" fn path_unlink_file(
     fd: u32,
     path: ?[*]const u8,
@@ -1048,7 +1085,8 @@ pub unsafe extern "C" fn path_unlink_file(
 Calls WASI `path_unlink_file` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="poll_oneoff"}
 
@@ -1071,7 +1109,8 @@ pub unsafe extern "C" fn poll_oneoff(
 Calls WASI `poll_oneoff` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="proc_exit"}
 
@@ -1084,8 +1123,8 @@ pub unsafe extern "C" fn proc_exit(code: u32) -> () as "wasi_snapshot_preview1#p
 Calls WASI `proc_exit` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
-This call terminates the process without resource cleanup.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call. This call terminates the process without resource cleanup.
 
 ::Anchor{id="proc_raise"}
 
@@ -1098,14 +1137,15 @@ pub unsafe extern "C" fn proc_raise(signal: u32) -> u32 as "wasi_snapshot_previe
 Calls WASI `proc_raise` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="random_get"}
 
 ## `random_get`
 
 ```silk
-@foreign(noCapture: ("buffer",))
+@foreign(noCapture: .("buffer"))
 pub unsafe extern "C" fn random_get(
     buffer: ?[*]mut u8,
     length: u32
@@ -1115,7 +1155,8 @@ pub unsafe extern "C" fn random_get(
 Calls WASI `random_get` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="sched_yield"}
 
@@ -1128,14 +1169,15 @@ pub unsafe extern "C" fn sched_yield() -> u32 as "wasi_snapshot_preview1#sched_y
 Calls WASI `sched_yield` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="sock_accept"}
 
 ## `sock_accept`
 
 ```silk
-@foreign(noCapture: ("accepted",))
+@foreign(noCapture: .("accepted"))
 pub unsafe extern "C" fn sock_accept(
     fd: u32,
     flags: u32,
@@ -1146,7 +1188,8 @@ pub unsafe extern "C" fn sock_accept(
 Calls WASI `sock_accept` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="sock_recv"}
 
@@ -1171,7 +1214,8 @@ pub unsafe extern "C" fn sock_recv(
 Calls WASI `sock_recv` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="sock_send"}
 
@@ -1191,7 +1235,8 @@ pub unsafe extern "C" fn sock_send(
 Calls WASI `sock_send` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 ::Anchor{id="sock_shutdown"}
 
@@ -1204,7 +1249,8 @@ pub unsafe extern "C" fn sock_shutdown(fd: u32, how: u32) -> u32 as "wasi_snapsh
 Calls WASI `sock_shutdown` with the Preview 1 ABI.
 
 ### Gotchas
-All pointers must address the buffers and structures that the WASI specification requires for this call.
+All pointers must address the buffers and structures that the WASI specification requires for
+this call.
 
 Category: Native platform.
 

@@ -1,8 +1,9 @@
-Incremental seed-zero XXH64 state for zstd frame checksum validation.
+Incremental seed-zero XXH64 state for zstd frame checksums.
 
 ## Details
-`Xxh64.make` creates fixed storage. `Xxh64.updateByte` accepts decoded bytes, and `Xxh64.finish`
-returns the complete hash without changing the state. The decoder compares its low 32 bits.
+`Xxh64.make` creates fixed storage. `Xxh64.updateByte` and `Xxh64.update` accept bytes, and
+`Xxh64.finish` returns the complete hash without changing the state. Frames store its low 32
+bits.
 
 Import as `Xxh64` with `import silk.compress.zstd_checksum { Xxh64 }`.
 
@@ -45,6 +46,20 @@ pub fn updateByte(self: &mut Self, value: u8) -> ()
 ```
 
 Adds one decoded byte without allocating storage.
+
+#### Gotchas
+
+The caller must reject input that would make the total byte count exceed `u64.MAX`.
+
+::Anchor{id="Xxh64.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds a run of bytes without allocating storage.
 
 #### Gotchas
 

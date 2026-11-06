@@ -9,13 +9,13 @@ use `silk.json.scanner`.
 
 ## Details
 Parsing is strict (RFC 8259): no comments, no trailing commas, and no duplicate keys in an
-object. Arrays and objects keep the order of the source. A number keeps its source text and is
-converted only when you call [`Json.asI32`](#Json.impl.asI32) or a similar function. String escapes are decoded
-when the document is parsed. If parsing fails, everything that was built is released.
+object. Arrays and objects keep the order of the source. Numbers and string escapes are converted
+when the document is parsed: an integer that fits in `i64` or `u64` stays exact, and any other
+number becomes the nearest `f64`. If parsing fails, everything that was built is released.
 
 ## Errors
-- `JsonError` if the input is not valid JSON, has a duplicate key, nests deeper than `MAX_DEPTH`
-  (64), or has content after the value. `offset` gives the position.
+- `JsonError` if the input is not valid JSON, has a duplicate key, has a number too large for a
+  finite `f64`, nests deeper than `MAX_DEPTH` (64), or has content after the value. `offset` gives the position.
 - `OutOfMemoryError` if the `Allocator` cannot supply the tree.
 - `WriterError` from the write functions if the `Writer` fails.
 
@@ -69,7 +69,7 @@ pub effect fn main() -> i32
 
 Import as `Json` with `import silk.json.value { Json }`.
 
-Public declarations: 4.
+Public declarations: 10.
 
 ::Anchor{id="JsonEntry"}
 
@@ -101,59 +101,93 @@ pub value: Value
 
 The value.
 
-::Anchor{id="JsonChild"}
+::Anchor{id="JsonNumber"}
 
-## `JsonChild`
+## `JsonNumber`
 
 ```silk
-pub union JsonChild
+pub union JsonNumber
 ```
 
-One element of an array or one member of an object.
+A JSON number, converted to the type that holds it exactly when there is one.
 
 ### Details
 
-Arrays and objects use the same storage type, so nested arrays and objects drop in the same way.
+An integer written without a fraction or an exponent is `Integer` if it fits in `i64` and
+`Unsigned` if it is larger but fits in `u64`. Any other number is `Float`, rounded to the nearest
+`f64` with ties to even. `1.0` and `1e3` are floats.
 
-::Anchor{id="JsonChild.Item"}
+### Gotchas
 
-### `Item`
+`Json.write` fails with `InvalidNumber` for a `Float` that is not finite.
+
+::Anchor{id="JsonNumber.Integer"}
+
+### `Integer`
 
 ```silk
-Item
+Integer
 ```
 
-An array element.
+An integer that fits in `i64`.
 
-::Anchor{id="JsonChild.Item.value"}
+::Anchor{id="JsonNumber.Integer.value"}
 
 #### Field `value`
 
 ```silk
-pub value: Value
+pub value: i64
 ```
 
-The element.
+The value.
 
-::Anchor{id="JsonChild.Member"}
+::Anchor{id="JsonNumber.Unsigned"}
 
-### `Member`
+### `Unsigned`
 
 ```silk
-Member
+Unsigned
 ```
 
-An object member.
+An integer more than `i64.MAX` that fits in `u64`.
 
-::Anchor{id="JsonChild.Member.entry"}
+::Anchor{id="JsonNumber.Unsigned.value"}
 
-#### Field `entry`
+#### Field `value`
 
 ```silk
-pub entry: JsonEntry
+pub value: u64
 ```
 
-The key and the value.
+The value.
+
+::Anchor{id="JsonNumber.Float"}
+
+### `Float`
+
+```silk
+Float
+```
+
+A number with a fraction or an exponent, or an integer too large for `u64`.
+
+::Anchor{id="JsonNumber.Float.value"}
+
+#### Field `value`
+
+```silk
+pub value: f64
+```
+
+The nearest `f64`.
+
+::Anchor{id="JsonNumber.impl.Copy"}
+
+## Implementation `Copy for JsonNumber`
+
+```silk
+impl Copy for JsonNumber
+```
 
 ::Anchor{id="Value"}
 
@@ -168,8 +202,8 @@ One JSON value: null, a boolean, a number, a string, an array, or an object.
 ### Details
 
 A `Value` owns all of its children. Use `match` to get the kind, or the `Json.as...` functions
-to read a field of a known kind. Arrays and objects keep the order of the source. A number keeps
-its source text and is converted only when you call [`Json.asI32`](#Json.impl.asI32) or a similar function.
+to read a field of a known kind. Arrays and objects keep the order of the source. A number is
+converted when the document is parsed, as a [`JsonNumber`](#JsonNumber).
 
 ### Gotchas
 
@@ -213,17 +247,17 @@ The boolean value.
 Number
 ```
 
-A JSON number, kept as its source text.
+A JSON number.
 
-::Anchor{id="Value.Number.text"}
+::Anchor{id="Value.Number.value"}
 
-#### Field `text`
+#### Field `value`
 
 ```silk
-pub text: String
+pub value: JsonNumber
 ```
 
-The number as it was written in the source, such as `"-1.5e3"`.
+The number, converted when the document was parsed.
 
 ::Anchor{id="Value.String"}
 
@@ -260,10 +294,10 @@ A JSON array.
 #### Field `values`
 
 ```silk
-pub values: Box<List<JsonChild>>
+pub values: List<Value>
 ```
 
-The elements in source order. Each is a `JsonChild.Item`.
+The elements in source order.
 
 ::Anchor{id="Value.Object"}
 
@@ -280,10 +314,10 @@ A JSON object.
 #### Field `entries`
 
 ```silk
-pub entries: Box<List<JsonChild>>
+pub entries: List<JsonEntry>
 ```
 
-The members in source order. Each is a `JsonChild.Member`.
+The members in source order.
 
 ::Anchor{id="Json"}
 
@@ -474,7 +508,12 @@ Writes `document` as compact JSON to the `Writer`. It does not flush the `Writer
 #### Errors
 
 - `JsonError` if the nesting is deeper than 64.
-- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+- `WriterError` if the `Writer` fails.
+
+#### Gotchas
+
+The text goes to the `Writer` in pieces of up to 4 KiB. After a failure, the `Writer` holds
+only the pieces passed to it before the failure.
 
 ::Anchor{id="Json.impl.writeWith"}
 
@@ -491,7 +530,12 @@ It does not flush the `Writer`.
 #### Errors
 
 - `JsonError` if the nesting is deeper than the limit in `options`.
-- `WriterError` if the `Writer` fails. Bytes that it accepted before the failure stay written.
+- `WriterError` if the `Writer` fails.
+
+#### Gotchas
+
+The text goes to the `Writer` in pieces of up to 4 KiB. After a failure, the `Writer` holds
+only the pieces passed to it before the failure.
 
 ::Anchor{id="Json.impl.field"}
 
@@ -527,8 +571,8 @@ Use it to read nested fields in a chain: `Json.field(&doc, "user") |> Json.field
 pub fn asI32(self: Option<&Value>) -> Option<i32>
 ```
 
-Returns the number as `i32`. Returns an absent option if the value is absent, is not a number,
-is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in `i32`.
+Returns the number as `i32`. Returns an absent option if the value is absent, is not an
+integer (`1.0` and `1e3` are not), or does not fit in `i32`.
 
 ::Anchor{id="Json.impl.asI64"}
 
@@ -538,8 +582,8 @@ is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in 
 pub fn asI64(self: Option<&Value>) -> Option<i64>
 ```
 
-Returns the number as `i64`. Returns an absent option if the value is absent, is not a number,
-is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in `i64`.
+Returns the number as `i64`. Returns an absent option if the value is absent, is not an
+integer (`1.0` and `1e3` are not), or does not fit in `i64`.
 
 ::Anchor{id="Json.impl.asU64"}
 
@@ -549,8 +593,8 @@ is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in 
 pub fn asU64(self: Option<&Value>) -> Option<u64>
 ```
 
-Returns the number as `u64`. Returns an absent option if the value is absent, is not a number,
-is not written as a plain integer (`1.0` and `1e3` are not), or does not fit in `u64`.
+Returns the number as `u64`. Returns an absent option if the value is absent, is not an
+integer (`1.0` and `1e3` are not), or does not fit in `u64`.
 
 ::Anchor{id="Json.impl.asF64"}
 
@@ -561,7 +605,7 @@ pub fn asF64(self: Option<&Value>) -> Option<f64>
 ```
 
 Returns the number as `f64`, rounded to the nearest value. Returns an absent option if the
-value is absent, is not a number, or is too large for a finite `f64`.
+value is absent, is not a number, or is not finite.
 
 ::Anchor{id="Json.impl.asF32"}
 
@@ -573,6 +617,11 @@ pub fn asF32(self: Option<&Value>) -> Option<f32>
 
 Returns the number as `f32`, rounded to the nearest value. Returns an absent option if the
 value is absent, is not a number, or is too large for a finite `f32`.
+
+#### Gotchas
+
+A `Float` was already rounded to `f64` when the document was parsed, so it is rounded two
+times.
 
 ::Anchor{id="Json.impl.asString"}
 
@@ -618,6 +667,453 @@ impl Deserialize for Value
 effect fn deserialize(scanner: &mut JsonScanner)
     -> Self ! JsonError | OutOfMemoryError ? &mut Allocator
 ```
+
+::Anchor{id="JsonDocument"}
+
+## `JsonDocument`
+
+```silk
+pub struct JsonDocument
+```
+
+A parsed JSON document kept in two flat buffers: one record for each value, in source order,
+and the decoded text of every string and key.
+
+### When to use
+
+Use it to read a document. Parsing allocates about two buffers in all, instead of one for each
+string, array, and object as [`Json.parse`](#Json.impl.parse) does, and dropping it frees only those buffers. Use
+a [`Value`](#Value) tree when you need to build or change a document; [`JsonDocument.toValue`](#JsonDocument.impl.toValue) makes one.
+
+### Details
+
+A value is named by a [`JsonNode`](#JsonNode), a position in its document. An array record is followed by
+its elements, and an object record by each key and its value, so a node's children are the
+records after it. Each array and object knows where its last child ends, so skipping a value is
+one step.
+
+### Gotchas
+
+A `JsonNode` is only meaningful with the document that returned it. With another document it
+names some other value or traps.
+
+### Examples
+#### Read fields of a parsed document
+```silk
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.core.effect { Effect }
+import silk.core.option { Option }
+import silk.json.scanner { JsonError }
+import silk.json.value { JsonDocument, JsonNode }
+
+effect fn read() -> i32 ! JsonError | OutOfMemoryError ? &mut Allocator {
+  let document = run JsonDocument.parse(b"{\"name\":\"Ada\",\"tags\":[1,2,3]}")
+  let root = JsonDocument.root(&document)
+  let tags = match JsonDocument.field(&document, root, "tags") {
+    Option<JsonNode>.Some { value } => value
+    Option<JsonNode>.None => { return 1 }
+  }
+  if JsonDocument.length(&document, tags) != 3 {
+    return 2
+  }
+  let name = match JsonDocument.field(&document, root, "name") {
+    Option<JsonNode>.Some { value } => value
+    Option<JsonNode>.None => { return 3 }
+  }
+  return match JsonDocument.asString(&document, name) {
+    Option<string>.Some { value } => if value == "Ada" { 0 } else { 4 }
+    Option<string>.None => 4
+  }
+}
+
+effect fn program() -> i32 ! JsonError | OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  return run read() |> Effect.provideMut<Allocator>(&mut allocator)
+}
+
+effect fn failed(error: JsonError | OutOfMemoryError) -> i32 {
+  return 5
+}
+
+pub fn main() -> i32 {
+  return run Effect.catchAll(program(), failed)
+}
+```
+
+::Anchor{id="JsonNode"}
+
+## `JsonNode`
+
+```silk
+pub struct JsonNode
+```
+
+One value in a [`JsonDocument`](#JsonDocument): its position in the document.
+
+::Anchor{id="JsonNode.impl.Copy"}
+
+## Implementation `Copy for JsonNode`
+
+```silk
+impl Copy for JsonNode
+```
+
+::Anchor{id="JsonKind"}
+
+## `JsonKind`
+
+```silk
+pub enum JsonKind
+```
+
+The kind of a value in a [`JsonDocument`](#JsonDocument).
+
+::Anchor{id="JsonKind.Null"}
+
+### `Null`
+
+```silk
+Null
+```
+
+JSON `null`.
+
+::Anchor{id="JsonKind.Bool"}
+
+### `Bool`
+
+```silk
+Bool
+```
+
+JSON `true` or `false`.
+
+::Anchor{id="JsonKind.Number"}
+
+### `Number`
+
+```silk
+Number
+```
+
+A JSON number.
+
+::Anchor{id="JsonKind.String"}
+
+### `String`
+
+```silk
+String
+```
+
+A JSON string.
+
+::Anchor{id="JsonKind.Array"}
+
+### `Array`
+
+```silk
+Array
+```
+
+A JSON array.
+
+::Anchor{id="JsonKind.Object"}
+
+### `Object`
+
+```silk
+Object
+```
+
+A JSON object.
+
+::Anchor{id="JsonMember"}
+
+## `JsonMember`
+
+```silk
+pub struct JsonMember
+```
+
+One member of an object in a [`JsonDocument`](#JsonDocument): the node of its key, which is a string, and the
+node of its value.
+
+::Anchor{id="JsonMember.key"}
+
+### Field `key`
+
+```silk
+pub key: JsonNode
+```
+
+The key, a string node.
+
+::Anchor{id="JsonMember.value"}
+
+### Field `value`
+
+```silk
+pub value: JsonNode
+```
+
+The value.
+
+::Anchor{id="JsonMember.impl.Copy"}
+
+## Implementation `Copy for JsonMember`
+
+```silk
+impl Copy for JsonMember
+```
+
+::Anchor{id="JsonItems"}
+
+## `JsonItems`
+
+```silk
+pub struct JsonItems
+```
+
+The elements of an array in a [`JsonDocument`](#JsonDocument), in source order. [`JsonDocument.items`](#JsonDocument.impl.items) makes it.
+
+::Anchor{id="JsonMembers"}
+
+## `JsonMembers`
+
+```silk
+pub struct JsonMembers
+```
+
+The members of an object in a [`JsonDocument`](#JsonDocument), in source order. [`JsonDocument.members`](#JsonDocument.impl.members) makes
+it.
+
+::Anchor{id="JsonItems.impl"}
+
+## Implementation `JsonItems`
+
+```silk
+impl JsonItems
+```
+
+::Anchor{id="JsonItems.impl.next"}
+
+### Method `next`
+
+```silk
+pub fn next(self: &mut Self, document: &JsonDocument) -> Option<JsonNode>
+```
+
+Returns the next element, or an absent option after the last one. `document` must be the one
+that made these items.
+
+::Anchor{id="JsonMembers.impl"}
+
+## Implementation `JsonMembers`
+
+```silk
+impl JsonMembers
+```
+
+::Anchor{id="JsonMembers.impl.next"}
+
+### Method `next`
+
+```silk
+pub fn next(self: &mut Self, document: &JsonDocument) -> Option<JsonMember>
+```
+
+Returns the next member, or an absent option after the last one. `document` must be the one
+that made these members.
+
+::Anchor{id="JsonDocument.impl"}
+
+## Implementation `JsonDocument`
+
+```silk
+impl JsonDocument
+```
+
+::Anchor{id="JsonDocument.impl.parse"}
+
+### Associated function `parse`
+
+```silk
+pub effect fn parse(bytes: &[u8]) -> JsonDocument ! JsonError | OutOfMemoryError ? &mut Allocator
+```
+
+Parses `bytes` as one complete JSON document.
+
+#### Details
+
+Parsing is strict (RFC 8259), with the same rules and errors as [`Json.parse`](#Json.impl.parse): no comments,
+no trailing commas, no duplicate keys, nesting at most 64 deep, and nothing after the value.
+String escapes are decoded when the document is parsed, and numbers are converted to a
+[`JsonNumber`](#JsonNumber).
+
+#### Errors
+
+- `JsonError` if `bytes` is not one valid JSON value, with the reason and offset that
+  [`Json.parse`](#Json.impl.parse) reports.
+- `OutOfMemoryError` if the `Allocator` cannot supply the buffers.
+
+::Anchor{id="JsonDocument.impl.fromValue"}
+
+### Associated function `fromValue`
+
+```silk
+pub effect fn fromValue(value: &Value) -> JsonDocument ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns a document that holds a copy of `value`.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the buffers.
+
+::Anchor{id="JsonDocument.impl.root"}
+
+### Method `root`
+
+```silk
+pub fn root(self: &Self) -> JsonNode
+```
+
+Returns the node of the whole document.
+
+::Anchor{id="JsonDocument.impl.kind"}
+
+### Method `kind`
+
+```silk
+pub fn kind(self: &Self, node: JsonNode) -> JsonKind
+```
+
+Returns the kind of `node`.
+
+::Anchor{id="JsonDocument.impl.asBool"}
+
+### Method `asBool`
+
+```silk
+pub fn asBool(self: &Self, node: JsonNode) -> Option<bool>
+```
+
+Returns the value of a boolean. Returns an absent option if `node` is not a boolean.
+
+::Anchor{id="JsonDocument.impl.asNumber"}
+
+### Method `asNumber`
+
+```silk
+pub fn asNumber(self: &Self, node: JsonNode) -> Option<JsonNumber>
+```
+
+Returns the value of a number. Returns an absent option if `node` is not a number.
+
+::Anchor{id="JsonDocument.impl.asString"}
+
+### Method `asString`
+
+```silk
+pub fn asString<'a>(self: &'a Self, node: JsonNode) -> Option<string<'a>>
+```
+
+Returns the text of a string, with escapes decoded. Returns an absent option if `node` is not
+a string. The text is borrowed from the document.
+
+::Anchor{id="JsonDocument.impl.length"}
+
+### Method `length`
+
+```silk
+pub fn length(self: &Self, node: JsonNode) -> usize
+```
+
+Returns the number of elements of an array or members of an object, or 0 for any other value.
+
+::Anchor{id="JsonDocument.impl.items"}
+
+### Method `items`
+
+```silk
+pub fn items(self: &Self, node: JsonNode) -> JsonItems
+```
+
+Returns the elements of an array, or no elements if `node` is not an array.
+
+::Anchor{id="JsonDocument.impl.members"}
+
+### Method `members`
+
+```silk
+pub fn members(self: &Self, node: JsonNode) -> JsonMembers
+```
+
+Returns the members of an object, or no members if `node` is not an object.
+
+::Anchor{id="JsonDocument.impl.field"}
+
+### Method `field`
+
+```silk
+pub fn field(self: &Self, node: JsonNode, key: string) -> Option<JsonNode>
+```
+
+Returns the value of member `key` of an object. Returns an absent option if `node` is not an
+object or has no such key.
+
+::Anchor{id="JsonDocument.impl.toValue"}
+
+### Method `toValue`
+
+```silk
+pub effect fn toValue(self: &Self, node: JsonNode) -> Value ! OutOfMemoryError ? &mut Allocator
+```
+
+Returns a [`Value`](#Value) tree that holds a copy of `node` and everything in it.
+
+#### Errors
+
+- `OutOfMemoryError` if the `Allocator` cannot supply the tree.
+
+::Anchor{id="JsonDocument.impl.write"}
+
+### Method `write`
+
+```silk
+pub effect fn write(self: &Self) -> () ! JsonError | WriterError ? &mut Writer
+```
+
+Writes the document as compact JSON to the `Writer`. It does not flush the `Writer`.
+
+#### Errors
+
+- `JsonError` with reason `InvalidNumber` for a float that is not finite, which only
+  [`JsonDocument.fromValue`](#JsonDocument.impl.fromValue) can store.
+- `WriterError` if the `Writer` fails.
+
+#### Gotchas
+
+The text goes to the `Writer` in pieces of up to 4 KiB. After a failure, the `Writer` holds
+only the pieces passed to it before the failure.
+
+::Anchor{id="JsonDocument.impl.writeWith"}
+
+### Method `writeWith`
+
+```silk
+pub effect fn writeWith(self: &Self, options: &JsonOptions) -> () ! JsonError | WriterError ? &mut Writer
+```
+
+Writes the document as JSON to the `Writer`, with the indentation and depth limit of
+`options`. It does not flush the `Writer`.
+
+#### Errors
+
+- `JsonError` if the nesting is deeper than the limit in `options`, or with reason
+  `InvalidNumber` for a float that is not finite.
+- `WriterError` if the `Writer` fails.
 
 Category: Data formats.
 

@@ -1,8 +1,9 @@
 Hash maps that own their keys and values, with deterministic seeded hashing.
 
 ## When to use
-Use [`HashMap`](#HashMap) to find a value by a key. The key type must implement `silk.collections.hash.HashKey`. Use
-`silk.collections.list.List` when the order of insertion matters, or when the code finds values by position.
+Use [`HashMap`](#HashMap) to find a value by a key. The key type must implement
+`silk.collections.hash.HashKey`. Use `silk.collections.list.List` when the order of insertion
+matters, or when the code finds values by position.
 
 ## Details
 [`HashMap.make`](#HashMap.impl.make) does not allocate. The first insert allocates eight buckets.
@@ -103,9 +104,9 @@ A hash map that owns unique keys and their values, with deterministic seeded has
 
 ### When to use
 
-Use it to find a value by a key. The key type must implement `silk.collections.hash.HashKey`. Use
-`silk.collections.list.List` when the order of insertion matters, or when the code finds values by
-position.
+Use it to find a value by a key. The key type must implement `silk.collections.hash.HashKey`.
+Use `silk.collections.list.List` when the order of insertion matters, or when the code finds
+values by position.
 
 ### Details
 
@@ -218,166 +219,6 @@ pub fn occupiedAt(self: &Self, index: usize) -> bool
 Returns `true` if the bucket at `index` holds an entry. Returns `false` for an index out of
 range.
 
-::Anchor{id="HashMap.impl.insert"}
-
-### Method `insert`
-
-```silk
-pub effect<'env> fn insert<K: HashKey + 'env, 'env>(
-    self: &mut Self,
-    key: K,
-    value: V
-  ) -> Option<V> ! OutOfMemoryError ? &mut Allocator
-```
-
-Inserts `key` with `value`. Returns the old value if the map already held an equal key, or
-`None`.
-
-#### Details
-
-The map takes ownership of `key` and `value`. If an equal key is already present, the length
-does not change: the map keeps the new key and value, drops the old key, and returns the old
-value.
-
-#### Errors
-
-- `OutOfMemoryError` if the table must grow and the `Allocator` cannot supply the storage. The
-  map does not change.
-
-::Anchor{id="HashMap.impl.contains"}
-
-### Method `contains`
-
-```silk
-pub fn contains<K: HashKey>(self: &Self, key: K) -> bool
-```
-
-Returns `true` if the map holds a key equal to `key`.
-
-#### Details
-
-This function consumes `key`. It does not change the map.
-
-::Anchor{id="HashMap.impl.indexOf"}
-
-### Method `indexOf`
-
-```silk
-pub fn indexOf<K: HashKey>(self: &Self, key: K) -> Option<usize>
-```
-
-Returns the bucket index of the entry with a key equal to `key`, or `None` if there is no such
-entry.
-
-#### When to use
-
-Use `indexOf` to find a key without a copy or a move, for example when the value type is not
-`Copy`.
-
-#### Details
-
-This function consumes `key`. It does not change the map.
-
-::Anchor{id="HashMap.impl.get"}
-
-### Method `get`
-
-```silk
-pub fn get<K: HashKey + Copy, V: Copy>(self: &Self, key: K) -> Option<V>
-```
-
-Returns a copy of the value for the key equal to `key`, or `None` if there is no such key.
-
-#### When to use
-
-Use `get` when the key and value types are `Copy`. Use [`HashMap.withMut`](#HashMap.impl.withMut) or
-[`HashMap.remove`](#HashMap.impl.remove) for a value that is not `Copy`.
-
-#### Details
-
-This function consumes `key`. It does not change the map.
-
-::Anchor{id="HashMap.impl.withMut"}
-
-### Method `withMut`
-
-```silk
-pub fn withMut<K: HashKey, F: once fn(&mut V) -> () + Intrinsic.NonParking
-  >(self: &mut Self, key: K, use: F) -> bool
-```
-
-Calls `use` one time with an exclusive borrow of the value for the key equal to `key`. Returns
-`false` and does not call `use` if there is no such key.
-
-#### When to use
-
-Use `withMut` to change a value in place, such as to increment a counter, when the value type
-is not `Copy`.
-
-#### Details
-
-This function does not allocate and does not grow the map. It consumes `key`. The stored key,
-the length, and the bucket count do not change. `use` returns `()`, so it cannot keep the
-borrow.
-
-#### Gotchas
-
-`use` must be `Intrinsic.NonParking`. It cannot suspend.
-
-::Anchor{id="HashMap.impl.remove"}
-
-### Method `remove`
-
-```silk
-pub fn remove<K: HashKey>(self: &mut Self, key: K) -> Option<V>
-```
-
-Removes the entry with a key equal to `key` and returns its value. Returns `None` if there is
-no such entry.
-
-#### Details
-
-The caller owns the returned value. The stored key is dropped. This function consumes `key`.
-It does not allocate.
-
-::Anchor{id="HashMap.impl.keyAt"}
-
-### Method `keyAt`
-
-```silk
-pub fn keyAt<K: Copy, V: Copy>(self: &Self, index: usize) -> K
-```
-
-Returns a copy of the key in the bucket at `index`.
-
-#### When to use
-
-Use `keyAt` with [`HashMap.occupiedAt`](#HashMap.impl.occupiedAt) to visit each entry in bucket order.
-
-#### Gotchas
-
-The key and value types must be `Copy`. If `index` is out of range or the bucket is empty, the
-program traps.
-
-::Anchor{id="HashMap.impl.valueAt"}
-
-### Method `valueAt`
-
-```silk
-pub fn valueAt<K: Copy, V: Copy>(self: &Self, index: usize) -> V
-```
-
-Returns a copy of the value in the bucket at `index`.
-
-#### When to use
-
-Use `valueAt` with [`HashMap.occupiedAt`](#HashMap.impl.occupiedAt) to visit each entry in bucket order.
-
-#### Gotchas
-
-The key and value types must be `Copy`. If `index` is out of range or the bucket is empty, the
-program traps.
-
 ::Anchor{id="HashMap.impl.reserve"}
 
 ### Method `reserve`
@@ -399,8 +240,7 @@ If the buckets already hold `additional` more entries under three quarters of th
 count, this function does nothing. Otherwise, it rebuilds the table once, with the smallest
 bucket count, doubling from the current one or from 8, that holds the length plus `additional`
 entries. The rebuild also reclaims the buckets of removed entries. The length does not change.
-An
-`additional` of 0 does nothing.
+An `additional` of 0 does nothing.
 
 #### Errors
 
@@ -445,6 +285,190 @@ Use `clearAndFree` when the map stays alive but its storage is no longer needed.
 
 This function does not allocate and does not need an `Allocator`. The next insert allocates
 eight buckets again, as on a map from [`HashMap.make`](#HashMap.impl.make). The seed does not change.
+
+::Anchor{id="HashMap.impl-2"}
+
+## Implementation `HashMap<K, V>`
+
+```silk
+impl<K: HashKey, V> HashMap<K, V>
+```
+
+::Anchor{id="HashMap.impl.insert"}
+
+### Method `insert`
+
+```silk
+pub effect<'env> fn insert<'env>(
+    self: &mut Self,
+    key: K,
+    value: V
+  ) -> Option<V> ! OutOfMemoryError ? &mut Allocator
+```
+
+Inserts `key` with `value`. Returns the old value if the map already held an equal key, or
+`None`.
+
+#### Details
+
+The map takes ownership of `key` and `value`. If an equal key is already present, the length
+does not change: the map keeps the new key and value, drops the old key, and returns the old
+value.
+
+#### Errors
+
+- `OutOfMemoryError` if the table must grow and the `Allocator` cannot supply the storage. The
+  map does not change.
+
+::Anchor{id="HashMap.impl.contains"}
+
+### Method `contains`
+
+```silk
+pub fn contains(self: &Self, key: K) -> bool
+```
+
+Returns `true` if the map holds a key equal to `key`.
+
+#### Details
+
+This function consumes `key`. It does not change the map.
+
+::Anchor{id="HashMap.impl.indexOf"}
+
+### Method `indexOf`
+
+```silk
+pub fn indexOf(self: &Self, key: K) -> Option<usize>
+```
+
+Returns the bucket index of the entry with a key equal to `key`, or `None` if there is no such
+entry.
+
+#### When to use
+
+Use `indexOf` to find a key without a copy or a move, for example when the value type is not
+`Copy`.
+
+#### Details
+
+This function consumes `key`. It does not change the map.
+
+::Anchor{id="HashMap.impl.remove"}
+
+### Method `remove`
+
+```silk
+pub fn remove(self: &mut Self, key: K) -> Option<V>
+```
+
+Removes the entry with a key equal to `key` and returns its value. Returns `None` if there is
+no such entry.
+
+#### Details
+
+The caller owns the returned value. The stored key is dropped. This function consumes `key`.
+It does not allocate.
+
+::Anchor{id="HashMap.impl.withMut"}
+
+### Method `withMut`
+
+```silk
+pub fn withMut<F: once fn(&mut V) -> () + Intrinsic.NonParking
+  >(self: &mut Self, key: K, use: F) -> bool
+```
+
+Calls `use` one time with an exclusive borrow of the value for the key equal to `key`. Returns
+`false` and does not call `use` if there is no such key.
+
+#### When to use
+
+Use `withMut` to change a value in place, such as to increment a counter, when the value type
+is not `Copy`.
+
+#### Details
+
+This function does not allocate and does not grow the map. It consumes `key`. The stored key,
+the length, and the bucket count do not change. `use` returns `()`, so it cannot keep the
+borrow.
+
+#### Gotchas
+
+`use` must be `Intrinsic.NonParking`. It cannot suspend.
+
+::Anchor{id="HashMap.impl-3"}
+
+## Implementation `HashMap<K, V>`
+
+```silk
+impl<K: HashKey + Copy, V: Copy> HashMap<K, V>
+```
+
+::Anchor{id="HashMap.impl.get"}
+
+### Method `get`
+
+```silk
+pub fn get(self: &Self, key: K) -> Option<V>
+```
+
+Returns a copy of the value for the key equal to `key`, or `None` if there is no such key.
+
+#### When to use
+
+Use `get` when the key and value types are `Copy`. Use [`HashMap.withMut`](#HashMap.impl.withMut) or
+[`HashMap.remove`](#HashMap.impl.remove) for a value that is not `Copy`.
+
+#### Details
+
+This function consumes `key`. It does not change the map.
+
+::Anchor{id="HashMap.impl-4"}
+
+## Implementation `HashMap<K, V>`
+
+```silk
+impl<K: Copy, V: Copy> HashMap<K, V>
+```
+
+::Anchor{id="HashMap.impl.keyAt"}
+
+### Method `keyAt`
+
+```silk
+pub fn keyAt(self: &Self, index: usize) -> K
+```
+
+Returns a copy of the key in the bucket at `index`.
+
+#### When to use
+
+Use `keyAt` with [`HashMap.occupiedAt`](#HashMap.impl.occupiedAt) to visit each entry in bucket order.
+
+#### Gotchas
+
+The key and value types must be `Copy`. If `index` is out of range or the bucket is empty, the
+program traps.
+
+::Anchor{id="HashMap.impl.valueAt"}
+
+### Method `valueAt`
+
+```silk
+pub fn valueAt(self: &Self, index: usize) -> V
+```
+
+Returns a copy of the value in the bucket at `index`.
+
+#### When to use
+
+Use `valueAt` with [`HashMap.occupiedAt`](#HashMap.impl.occupiedAt) to visit each entry in bucket order.
+
+#### Gotchas
+
+The key and value types must be `Copy`. If `index` is out of range or the bucket is empty, the
+program traps.
 
 ::Anchor{id="HashMap.impl.Drop"}
 

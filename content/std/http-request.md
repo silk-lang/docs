@@ -415,6 +415,18 @@ pub http10KeepAlive: bool
 When `true`, an HTTP/1.0 request sends `Connection: keep-alive`. HTTP/1.1 keeps the connection
 by default.
 
+::Anchor{id="HeaderPolicy.upgrade"}
+
+### Field `upgrade`
+
+```silk
+pub upgrade: Option<&'value [u8]>
+```
+
+The protocol to switch to, such as `websocket`. With a value, the request sends `Upgrade` with
+it and `Connection: upgrade`, and needs HTTP/1.1. You cannot also give `Upgrade` in `headers`.
+The default is none.
+
 ::Anchor{id="HeaderPolicy.impl.Copy"}
 
 ## Implementation `Copy for HeaderPolicy<'value>`
@@ -613,6 +625,16 @@ InvalidTarget
 ```
 
 A direct request has an absolute target for another origin.
+
+::Anchor{id="RequestError.InvalidUpgrade"}
+
+### `InvalidUpgrade`
+
+```silk
+InvalidUpgrade
+```
+
+The policy asks for an upgrade in an HTTP/1.0 request, or with an empty protocol.
 
 ::Anchor{id="RequestError.impl.Debug"}
 

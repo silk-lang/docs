@@ -2,7 +2,8 @@ Hash sets that own their elements, with deterministic seeded hashing.
 
 ## When to use
 Use [`HashSet`](#HashSet) to test membership fast, or to keep one copy of each value. The element type
-must implement `silk.collections.hash.HashKey`. Use `silk.collections.list.List` when order or duplicate values matter.
+must implement `silk.collections.hash.HashKey`. Use `silk.collections.list.List` when order or
+duplicate values matter.
 
 ## Details
 [`HashSet.make`](#HashSet.impl.make) does not allocate. The first insert allocates eight buckets.
@@ -105,7 +106,8 @@ A hash set that owns unique elements, with deterministic seeded hashing.
 ### When to use
 
 Use it to test membership fast, or to keep one copy of each value. The element type must
-implement `silk.collections.hash.HashKey`. Use `silk.collections.list.List` when order or duplicate values matter.
+implement `silk.collections.hash.HashKey`. Use `silk.collections.list.List` when order or
+duplicate values matter.
 
 ### Details
 
@@ -217,98 +219,6 @@ pub fn occupiedAt(self: &Self, index: usize) -> bool
 Returns `true` if the bucket at `index` holds an element. Returns `false` for an index out of
 range.
 
-::Anchor{id="HashSet.impl.insert"}
-
-### Method `insert`
-
-```silk
-pub effect<'env> fn insert<T: HashKey + 'env, 'env>(
-    self: &mut Self,
-    value: T
-  ) -> bool ! OutOfMemoryError ? &mut Allocator
-```
-
-Adds `value` to the set. Returns `true` if the set already held an equal element, or `false`
-if `value` is new.
-
-#### Details
-
-If an equal element is already present, the set does not change and drops `value`. The set
-keeps the element that it already held.
-
-#### Errors
-
-- `OutOfMemoryError` if the table must grow and the `Allocator` cannot supply the storage. The
-  set does not change.
-
-::Anchor{id="HashSet.impl.contains"}
-
-### Method `contains`
-
-```silk
-pub fn contains<T: HashKey>(self: &Self, value: T) -> bool
-```
-
-Returns `true` if the set holds an element equal to `value`.
-
-#### Details
-
-This function consumes `value`. It does not change the set.
-
-::Anchor{id="HashSet.impl.indexOf"}
-
-### Method `indexOf`
-
-```silk
-pub fn indexOf<T: HashKey>(self: &Self, value: T) -> Option<usize>
-```
-
-Returns the bucket index of the element equal to `value`, or `None` if there is no such
-element.
-
-#### When to use
-
-Use `indexOf` to find an element without a copy or a move, for example when the element type
-is not `Copy`.
-
-#### Details
-
-This function consumes `value`. It does not change the set.
-
-::Anchor{id="HashSet.impl.remove"}
-
-### Method `remove`
-
-```silk
-pub fn remove<T: HashKey>(self: &mut Self, value: T) -> Option<T>
-```
-
-Removes the element equal to `value` and returns the stored element. Returns `None` if there
-is no such element.
-
-#### Details
-
-The caller owns the returned element. This function consumes `value`. It does not allocate.
-
-::Anchor{id="HashSet.impl.elementAt"}
-
-### Method `elementAt`
-
-```silk
-pub fn elementAt<T: Copy>(self: &Self, index: usize) -> T
-```
-
-Returns a copy of the element in the bucket at `index`.
-
-#### When to use
-
-Use `elementAt` with [`HashSet.occupiedAt`](#HashSet.impl.occupiedAt) to visit each element in bucket order.
-
-#### Gotchas
-
-The element type must be `Copy`. If `index` is out of range or the bucket is empty, the
-program traps.
-
 ::Anchor{id="HashSet.impl.reserve"}
 
 ### Method `reserve`
@@ -330,8 +240,7 @@ If the buckets already hold `additional` more elements under three quarters of t
 count, this function does nothing. Otherwise, it rebuilds the table once, with the smallest
 bucket count, doubling from the current one or from 8, that holds the length plus `additional`
 elements. The rebuild also reclaims the buckets of removed elements. The length does not
-change. An
-`additional` of 0 does nothing.
+change. An `additional` of 0 does nothing.
 
 #### Errors
 
@@ -376,6 +285,114 @@ Use `clearAndFree` when the set stays alive but its storage is no longer needed.
 
 This function does not allocate and does not need an `Allocator`. The next insert allocates
 eight buckets again, as on a set from [`HashSet.make`](#HashSet.impl.make). The seed does not change.
+
+::Anchor{id="HashSet.impl-2"}
+
+## Implementation `HashSet<T>`
+
+```silk
+impl<T: HashKey> HashSet<T>
+```
+
+::Anchor{id="HashSet.impl.insert"}
+
+### Method `insert`
+
+```silk
+pub effect<'env> fn insert<'env>(
+    self: &mut Self,
+    value: T
+  ) -> bool ! OutOfMemoryError ? &mut Allocator
+```
+
+Adds `value` to the set. Returns `true` if the set already held an equal element, or `false`
+if `value` is new.
+
+#### Details
+
+If an equal element is already present, the set does not change and drops `value`. The set
+keeps the element that it already held.
+
+#### Errors
+
+- `OutOfMemoryError` if the table must grow and the `Allocator` cannot supply the storage. The
+  set does not change.
+
+::Anchor{id="HashSet.impl.contains"}
+
+### Method `contains`
+
+```silk
+pub fn contains(self: &Self, value: T) -> bool
+```
+
+Returns `true` if the set holds an element equal to `value`.
+
+#### Details
+
+This function consumes `value`. It does not change the set.
+
+::Anchor{id="HashSet.impl.indexOf"}
+
+### Method `indexOf`
+
+```silk
+pub fn indexOf(self: &Self, value: T) -> Option<usize>
+```
+
+Returns the bucket index of the element equal to `value`, or `None` if there is no such
+element.
+
+#### When to use
+
+Use `indexOf` to find an element without a copy or a move, for example when the element type
+is not `Copy`.
+
+#### Details
+
+This function consumes `value`. It does not change the set.
+
+::Anchor{id="HashSet.impl.remove"}
+
+### Method `remove`
+
+```silk
+pub fn remove(self: &mut Self, value: T) -> Option<T>
+```
+
+Removes the element equal to `value` and returns the stored element. Returns `None` if there
+is no such element.
+
+#### Details
+
+The caller owns the returned element. This function consumes `value`. It does not allocate.
+
+::Anchor{id="HashSet.impl-3"}
+
+## Implementation `HashSet<T>`
+
+```silk
+impl<T: Copy> HashSet<T>
+```
+
+::Anchor{id="HashSet.impl.elementAt"}
+
+### Method `elementAt`
+
+```silk
+pub fn elementAt(self: &Self, index: usize) -> T
+```
+
+Returns a copy of the element in the bucket at `index`.
+
+#### When to use
+
+Use `elementAt` with [`HashSet.occupiedAt`](#HashSet.impl.occupiedAt) to visit each element in bucket order.
+
+#### Gotchas
+
+The element type must be `Copy`. If `index` is out of range or the bucket is empty, the
+program traps.
 
 ::Anchor{id="HashSet.impl.Drop"}
 

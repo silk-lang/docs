@@ -1,8 +1,9 @@
-Compute SHA-3 digests: SHA3-224, SHA3-256, SHA3-384, and SHA3-512 (FIPS 202).
+Compute SHA-3 digests (SHA3-224, SHA3-256, SHA3-384, SHA3-512) and the SHAKE128 and SHAKE256
+extendable-output functions (FIPS 202).
 
 ## When to use
-Use these types when a protocol names SHA-3. For a general cryptographic hash, `silk.crypto.sha2` is
-more common. Use `silk.collections.hash` for the keys of a hash map.
+Use these types when a protocol names SHA-3. For a general cryptographic hash,
+`silk.crypto.sha2` is more common. Use `silk.collections.hash` for the keys of a hash map.
 
 ## Details
 [`Sha3_224`](#Sha3_224), [`Sha3_256`](#Sha3_256), [`Sha3_384`](#Sha3_384), and [`Sha3_512`](#Sha3_512) return 28, 32, 48, and 64 bytes. Each
@@ -10,9 +11,13 @@ type has the same functions: `hash` returns the digest of one slice, and `make`,
 `finish` hash a message that arrives in parts. The states are fixed-size values and nothing
 allocates. There is no length limit.
 
+[`Shake128`](#Shake128) and [`Shake256`](#Shake256) return as many bytes as the caller asks for. `finishInto` fills
+the whole output slice, so a 16-byte slice gives the 16-byte SHAKE128 output that Node's
+`createHash("shake128")` returns by default. A shorter output is a prefix of a longer one.
+
 ## Gotchas
 SHA-3 is not Keccak-256 as Ethereum uses it: the padding is different, so the digests are
-different. This module has no SHAKE or other extendable-output function.
+different.
 
 ## Examples
 ### Hash a message in one call and in parts
@@ -36,7 +41,7 @@ pub fn main() -> i32 {
 
 Import as `Sha3_256` with `import silk.crypto.sha3 { Sha3_256 }`.
 
-Public declarations: 4.
+Public declarations: 8.
 
 ::Anchor{id="Sha3_224"}
 
@@ -305,6 +310,584 @@ pub fn hash(bytes: &[u8]) -> [u8; 64]
 ```
 
 Returns the 64-byte SHA3-512 digest of `bytes`.
+
+::Anchor{id="Sha3_224.impl.Digest"}
+
+## Implementation `Digest for Sha3_224`
+
+```silk
+impl Digest for Sha3_224
+```
+
+::Anchor{id="Sha3_224.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha3_224.make
+```
+
+Returns a SHA3-224 state for an empty message.
+
+::Anchor{id="Sha3_224.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha3_224.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha3_224.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 144, the SHA3-224 block length in bytes.
+
+::Anchor{id="Sha3_224.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 28, the SHA3-224 digest length in bytes.
+
+::Anchor{id="Sha3_224.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA3-224 object identifier, 2.16.840.1.101.3.4.2.7.
+
+::Anchor{id="Sha3_224.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha3_224.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 28-byte SHA3-224 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha3_256.impl.Digest"}
+
+## Implementation `Digest for Sha3_256`
+
+```silk
+impl Digest for Sha3_256
+```
+
+::Anchor{id="Sha3_256.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha3_256.make
+```
+
+Returns a SHA3-256 state for an empty message.
+
+::Anchor{id="Sha3_256.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha3_256.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha3_256.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 136, the SHA3-256 block length in bytes.
+
+::Anchor{id="Sha3_256.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 32, the SHA3-256 digest length in bytes.
+
+::Anchor{id="Sha3_256.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA3-256 object identifier, 2.16.840.1.101.3.4.2.8.
+
+::Anchor{id="Sha3_256.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha3_256.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 32-byte SHA3-256 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha3_384.impl.Digest"}
+
+## Implementation `Digest for Sha3_384`
+
+```silk
+impl Digest for Sha3_384
+```
+
+::Anchor{id="Sha3_384.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha3_384.make
+```
+
+Returns a SHA3-384 state for an empty message.
+
+::Anchor{id="Sha3_384.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha3_384.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha3_384.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 104, the SHA3-384 block length in bytes.
+
+::Anchor{id="Sha3_384.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 48, the SHA3-384 digest length in bytes.
+
+::Anchor{id="Sha3_384.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA3-384 object identifier, 2.16.840.1.101.3.4.2.9.
+
+::Anchor{id="Sha3_384.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha3_384.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 48-byte SHA3-384 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha3_512.impl.Digest"}
+
+## Implementation `Digest for Sha3_512`
+
+```silk
+impl Digest for Sha3_512
+```
+
+::Anchor{id="Sha3_512.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha3_512.make
+```
+
+Returns a SHA3-512 state for an empty message.
+
+::Anchor{id="Sha3_512.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha3_512.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha3_512.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 72, the SHA3-512 block length in bytes.
+
+::Anchor{id="Sha3_512.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 64, the SHA3-512 digest length in bytes.
+
+::Anchor{id="Sha3_512.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA3-512 object identifier, 2.16.840.1.101.3.4.2.10.
+
+::Anchor{id="Sha3_512.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha3_512.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 64-byte SHA3-512 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Shake128"}
+
+## `Shake128`
+
+```silk
+pub struct Shake128
+```
+
+A streaming SHAKE128 state: an extendable-output function that returns any number of bytes.
+
+Call [`Shake128.update`](#Shake128.impl.update) for each part of the message, then [`Shake128.finishInto`](#Shake128.impl.finishInto) with a slice
+of the output length you need. Use [`Shake128.hash`](#Shake128.impl.hash) when the full message is in one slice.
+The state is a fixed-size value and does not allocate.
+
+### Gotchas
+It does not conform to `Digest`, because the output length is the caller's choice. SHAKE128
+gives at most 64 bits of collision resistance whatever the output length, and
+128-bit preimage resistance only for outputs of at least 16 bytes.
+
+::Anchor{id="Shake128.impl"}
+
+## Implementation `Shake128`
+
+```silk
+impl Shake128
+```
+
+::Anchor{id="Shake128.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Shake128
+```
+
+Returns a SHAKE128 state for an empty message.
+
+::Anchor{id="Shake128.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to the end of the message. Any split of the message into parts gives the same
+output. An empty slice changes nothing.
+
+::Anchor{id="Shake128.impl.copy"}
+
+### Method `copy`
+
+```silk
+pub fn copy(self: &Self) -> Shake128
+```
+
+Returns an independent copy of the state. Updates to either one do not change the other.
+
+::Anchor{id="Shake128.impl.finishInto"}
+
+### Method `finishInto`
+
+```silk
+pub fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Fills `output` with the first `output.length` bytes of the SHAKE128 output and consumes
+the state. An empty slice is allowed. Node's default output length is 16 bytes.
+
+::Anchor{id="Shake128.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> Shake128Reader
+```
+
+Ends the message and returns a reader for the SHAKE128 output, consuming the state.
+Successive [`Shake128Reader.read`](#Shake128Reader.impl.read) calls return successive bytes of the output, so their
+concatenation equals what [`Shake128.finishInto`](#Shake128.impl.finishInto) writes for the same total length.
+
+::Anchor{id="Shake128.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8], output: &mut [u8]) -> ()
+```
+
+Fills `output` with the SHAKE128 output of `bytes`.
+
+::Anchor{id="Shake128.impl.objectIdentifier"}
+
+### Associated function `objectIdentifier`
+
+```silk
+pub fn objectIdentifier() -> &'static [u8]
+```
+
+Returns the content bytes of the SHAKE128 object identifier, 2.16.840.1.101.3.4.2.11.
+
+::Anchor{id="Shake128Reader"}
+
+## `Shake128Reader`
+
+```silk
+pub struct Shake128Reader
+```
+
+The output side of a finished [`Shake128`](#Shake128): reads the SHAKE128 output a part at a time.
+
+Get one from [`Shake128.finish`](#Shake128.impl.finish). Each [`Shake128Reader.read`](#Shake128Reader.impl.read) continues where the last one stopped,
+with any part sizes, for as many bytes as the caller wants. Use it where the needed length is
+not known up front, as in the rejection sampling of ML-KEM and ML-DSA. It does not allocate.
+
+::Anchor{id="Shake128Reader.impl"}
+
+## Implementation `Shake128Reader`
+
+```silk
+impl Shake128Reader
+```
+
+::Anchor{id="Shake128Reader.impl.read"}
+
+### Method `read`
+
+```silk
+pub fn read(self: &mut Self, output: &mut [u8]) -> ()
+```
+
+Fills `output` with the next `output.length` bytes of the output. An empty slice is allowed.
+
+::Anchor{id="Shake256"}
+
+## `Shake256`
+
+```silk
+pub struct Shake256
+```
+
+A streaming SHAKE256 state: an extendable-output function that returns any number of bytes.
+
+Call [`Shake256.update`](#Shake256.impl.update) for each part of the message, then [`Shake256.finishInto`](#Shake256.impl.finishInto) with a slice
+of the output length you need. Use [`Shake256.hash`](#Shake256.impl.hash) when the full message is in one slice.
+The state is a fixed-size value and does not allocate.
+
+### Gotchas
+It does not conform to `Digest`, because the output length is the caller's choice. SHAKE256
+gives at most 128 bits of collision resistance whatever the output length, and
+256-bit preimage resistance only for outputs of at least 32 bytes.
+
+::Anchor{id="Shake256.impl"}
+
+## Implementation `Shake256`
+
+```silk
+impl Shake256
+```
+
+::Anchor{id="Shake256.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub fn make() -> Shake256
+```
+
+Returns a SHAKE256 state for an empty message.
+
+::Anchor{id="Shake256.impl.update"}
+
+### Method `update`
+
+```silk
+pub fn update(self: &mut Self, bytes: &[u8]) -> ()
+```
+
+Adds `bytes` to the end of the message. Any split of the message into parts gives the same
+output. An empty slice changes nothing.
+
+::Anchor{id="Shake256.impl.copy"}
+
+### Method `copy`
+
+```silk
+pub fn copy(self: &Self) -> Shake256
+```
+
+Returns an independent copy of the state. Updates to either one do not change the other.
+
+::Anchor{id="Shake256.impl.finishInto"}
+
+### Method `finishInto`
+
+```silk
+pub fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Fills `output` with the first `output.length` bytes of the SHAKE256 output and consumes
+the state. An empty slice is allowed. Node's default output length is 32 bytes.
+
+::Anchor{id="Shake256.impl.finish"}
+
+### Method `finish`
+
+```silk
+pub fn finish(self: Self) -> Shake256Reader
+```
+
+Ends the message and returns a reader for the SHAKE256 output, consuming the state.
+Successive [`Shake256Reader.read`](#Shake256Reader.impl.read) calls return successive bytes of the output, so their
+concatenation equals what [`Shake256.finishInto`](#Shake256.impl.finishInto) writes for the same total length.
+
+::Anchor{id="Shake256.impl.hash"}
+
+### Associated function `hash`
+
+```silk
+pub fn hash(bytes: &[u8], output: &mut [u8]) -> ()
+```
+
+Fills `output` with the SHAKE256 output of `bytes`.
+
+::Anchor{id="Shake256.impl.objectIdentifier"}
+
+### Associated function `objectIdentifier`
+
+```silk
+pub fn objectIdentifier() -> &'static [u8]
+```
+
+Returns the content bytes of the SHAKE256 object identifier, 2.16.840.1.101.3.4.2.12.
+
+::Anchor{id="Shake256Reader"}
+
+## `Shake256Reader`
+
+```silk
+pub struct Shake256Reader
+```
+
+The output side of a finished [`Shake256`](#Shake256): reads the SHAKE256 output a part at a time.
+
+Get one from [`Shake256.finish`](#Shake256.impl.finish). Each [`Shake256Reader.read`](#Shake256Reader.impl.read) continues where the last one stopped,
+with any part sizes, for as many bytes as the caller wants. Use it where the needed length is
+not known up front, as in the rejection sampling of ML-KEM and ML-DSA. It does not allocate.
+
+::Anchor{id="Shake256Reader.impl"}
+
+## Implementation `Shake256Reader`
+
+```silk
+impl Shake256Reader
+```
+
+::Anchor{id="Shake256Reader.impl.read"}
+
+### Method `read`
+
+```silk
+pub fn read(self: &mut Self, output: &mut [u8]) -> ()
+```
+
+Fills `output` with the next `output.length` bytes of the output. An empty slice is allowed.
 
 Category: Cryptography.
 

@@ -255,6 +255,22 @@ where &mut A provides &Allocator from &mut Allocator
 effect fn allocate(self: &mut Self, layout: Layout) -> Intrinsic.Allocation ! OutOfMemoryError
 ```
 
+::Anchor{id="Arena.impl.Allocator.allocateZeroed"}
+
+### Operation `allocateZeroed`
+
+```silk
+effect fn allocateZeroed(self: &mut Self, layout: Layout) -> Intrinsic.Allocation ! OutOfMemoryError
+```
+
+::Anchor{id="Arena.impl.Allocator.takeBlock"}
+
+### Operation `takeBlock`
+
+```silk
+unsafe effect fn takeBlock(self: &mut Self, layout: Layout) -> ?*mut u8
+```
+
 ::Anchor{id="Arena.impl.Drop"}
 
 ## Implementation `Drop for Arena<A>`

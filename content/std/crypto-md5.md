@@ -91,6 +91,84 @@ pub fn hash(bytes: &[u8]) -> [u8; 16]
 
 Returns the 16-byte MD5 digest of `bytes`. It does not allocate.
 
+::Anchor{id="Md5.impl.Digest"}
+
+## Implementation `Digest for Md5`
+
+```silk
+impl Digest for Md5
+```
+
+::Anchor{id="Md5.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Md5.make
+```
+
+Returns a MD5 state for an empty message.
+
+::Anchor{id="Md5.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Md5.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Md5.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 64, the MD5 block length in bytes.
+
+::Anchor{id="Md5.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 16, the MD5 digest length in bytes.
+
+::Anchor{id="Md5.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the MD5 object identifier, 1.2.840.113549.2.5.
+
+::Anchor{id="Md5.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Md5.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 16-byte MD5 digest to the start of `output` and consumes the state.
+
 Category: Cryptography.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

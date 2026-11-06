@@ -17,8 +17,8 @@ owns its DER. If any block fails, the call returns no bundle and releases what i
 
 ## Gotchas
 Decoding checks only the structure. It does not verify the signature, the chain, the names, or
-the dates. Use `silk.tls.certificate_path` for that. The order of a bundle is the order of the file,
-not a chain order.
+the dates. Use `silk.tls.certificate_path` for that. The order of a bundle is the order of the
+file, not a chain order.
 
 ## Examples
 ### Reject an empty file
@@ -70,8 +70,8 @@ between the blocks. For exactly one certificate, use `silk.tls.certificate`.
 ### Gotchas
 
 Decoding checks only the structure. It does not verify the signature, the chain, the names, or
-the dates. Use `silk.tls.certificate_path` for that. The order is the order of the file, not a chain
-order.
+the dates. Use `silk.tls.certificate_path` for that. The order is the order of the file, not a
+chain order.
 
 ::Anchor{id="CertificateBundle.impl"}
 
@@ -103,8 +103,8 @@ count the whitespace and each duplicate.
 - `OutOfMemoryError` if the `Allocator` fails.
 
 #### Gotchas
-Decoding checks only the structure. It does not verify the signature, the chain, the names,
-or the dates. Use `silk.tls.certificate_path` for that. The order is the order of the file, not a
+Decoding checks only the structure. It does not verify the signature, the chain, the names, or
+the dates. Use `silk.tls.certificate_path` for that. The order is the order of the file, not a
 chain order.
 
 ::Anchor{id="CertificateBundle.impl.decodeAnnotatedPem"}

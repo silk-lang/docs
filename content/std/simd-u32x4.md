@@ -183,7 +183,8 @@ Returns a mask with lane `i` set where lane `i` of `left` is less than lane `i` 
 pub fn lanesLessOrEqual(left: simd<u32, 4>, right: simd<u32, 4>) -> mask<4>
 ```
 
-Returns a mask with lane `i` set where lane `i` of `left` is less than or equal to lane `i` of `right`.
+Returns a mask with lane `i` set where lane `i` of `left` is less than or equal to lane `i` of
+`right`.
 
 ::Anchor{id="lanesGreater"}
 
@@ -203,7 +204,8 @@ Returns a mask with lane `i` set where lane `i` of `left` is greater than lane `
 pub fn lanesGreaterOrEqual(left: simd<u32, 4>, right: simd<u32, 4>) -> mask<4>
 ```
 
-Returns a mask with lane `i` set where lane `i` of `left` is greater than or equal to lane `i` of `right`.
+Returns a mask with lane `i` set where lane `i` of `left` is greater than or equal to lane `i`
+of `right`.
 
 ::Anchor{id="select"}
 
