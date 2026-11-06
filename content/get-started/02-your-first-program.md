@@ -9,16 +9,16 @@ silk init hello
 ```
 
 ```
-Initialized Silk project hello at /home/you/hello
+Initialized Silk project hello at /home/you/hello from template silk-lang/examples/default (3d330376eba6f634d1ca384269e46bc3c96727d8)
 ```
 
-`silk init` makes the folder and three files in it. Without a path it uses the current folder. `--name <name>` gives the package a name other than the folder's. It refuses to touch a folder that already has a `silk.toml`:
+`silk init` makes the folder and three files in it, copied from the official `default` template with `git`. Without a network connection, `silk init hello -t minimal` writes the same files offline. Without a path it uses the current folder. `--name <name>` gives the package a name other than the folder's. It refuses to touch a folder that already has a `silk.toml`:
 
 ```
 Refusing to overwrite existing project file /home/you/hello/silk.toml
 ```
 
-`silk init --lib` makes a library package and `silk init --workspace` a workspace; see Projects and packages.
+`silk init --lib` makes a library package and `silk init --workspace` a workspace. `silk init --list` shows the other official templates, and `-t <template>` starts from one of them or from any GitHub repository; see Project templates in Projects and packages.
 
 ## The generated files
 

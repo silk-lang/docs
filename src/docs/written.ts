@@ -385,6 +385,18 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Build plans and generated code',
         'https://github.com/silk-lang/docs/blob/main/content/projects/09-build-plans-and-generated-code.md',
       ),
+      page(
+        'projects',
+        'project-templates',
+        'Project templates',
+        'https://github.com/silk-lang/docs/blob/main/content/projects/10-project-templates.md',
+      ),
+      page(
+        'projects',
+        'hooks-and-scripts',
+        'Hooks and scripts',
+        'https://github.com/silk-lang/docs/blob/main/content/projects/11-hooks-and-scripts.md',
+      ),
     ],
   },
   {

@@ -41,7 +41,7 @@ The root module is `src/main.silk` without saying so: the source starts in `src`
 | `kind` | no | string | What a build makes: `"executable"` (the default), `"library"`, `"static-library"`, `"shared-library"` or `"object"`. See **Build outputs and native linking**. |
 | `silk-version` | no | string | The Silk version the package runs with. `silk init` writes the running compiler's version. The `silk` tool hands every command in the package to that version's compiler; `"0.0.0"` pins nothing. A workspace's own `silk-version` wins. Set it with `silk set`; see "Silk versions" in the Command-line reference. |
 | `exports` | no | array of strings | Modules other packages may import, in import spelling (`"Board"`, `"codec.Json"`). Each must exist. |
-| `description`, `license`, `repository`, `homepage`, `readme` | no | string | Publishing metadata. Builds never read it. |
+| `description`, `license`, `repository`, `homepage`, `readme` | no | string | Publishing metadata. Builds never read it. In a template, `silk init --list` shows the `description`; see Project templates. |
 | `authors`, `keywords` | no | array of strings | Publishing metadata. Builds never read it. |
 
 A `library` is Silk source for other packages to import: `silk build` checks it and makes no file. The other library kinds make an archive or a shared library. `package.include` is reserved and refused as not supported yet.
@@ -94,6 +94,16 @@ Generators that `silk generate` runs. Builds never run them; their outputs are c
 | `outputs` | array of strings | The files it writes, below the manifest's directory. A `*` in the last segment matches any run of bytes. |
 
 A workspace manifest can declare generators too. See Build plans and generated code.
+
+## &#91;&#91;post-init\]\]
+
+Commands a template runs once, when `silk init --template` creates a project from it. `silk init` removes them from the new manifest, and builds never run them.
+
+| Key | Value | Meaning |
+| --- | --- | --- |
+| `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the manifest's directory; a bare name is searched on `PATH`. |
+
+Each command also gets the creating compiler's release and the arguments given to `silk init` after `--`. See Project templates, and Hooks and scripts for every hook a package can have.
 
 ## &#91;component\]
 
@@ -298,7 +308,7 @@ LINE is the line of the key, or of the table header when the problem is the tabl
 
 ## Keys that are not checked
 
-Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `[native]` with its `sources`, `archive` and `override` entries, `platform-supply` and its `support` entries, `[[generate]]` entries, `[component]`, `[unstable]`, `composition` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `descripton` key stops the build, with `did you mean package?` or `did you mean package.description?`.
+Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `[native]` with its `sources`, `archive` and `override` entries, `platform-supply` and its `support` entries, `[[generate]]` and `[[post-init]]` entries, `[component]`, `[unstable]`, `composition` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `descripton` key stops the build, with `did you mean package?` or `did you mean package.description?`.
 
 Two tables are not checked: `[release]`, which builds ignore and `silk change` reads, and `[tool.<name>]`, which belongs to other tools.
 

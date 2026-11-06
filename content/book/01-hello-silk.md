@@ -25,10 +25,10 @@ silk init tasks
 ```
 
 ```
-Initialized Silk project tasks at /home/you/tasks
+Initialized Silk project tasks at /home/you/tasks from template silk-lang/examples/default (3d330376eba6f634d1ca384269e46bc3c96727d8)
 ```
 
-Your path will differ. If you leave out the folder, `silk init` uses the current directory. If you want the package to have a different name from its folder, add `--name`.
+Your path will differ. `silk init` copies the starter from a template, the official `default` one unless you name another with `--template`, so it needs `git` and the network. Offline, `silk init tasks -t minimal` writes the same files without fetching anything. If you leave out the folder, `silk init` uses the current directory. If you want the package to have a different name from its folder, add `--name`.
 
 Move into the new folder:
 
