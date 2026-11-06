@@ -122,9 +122,13 @@ const navLinks = (
 ]
 
 // A details element keeps the phone menu working without JavaScript state.
+// Navigating closes it (see closeNavigationMenus in main.ts).
 const mobileMenu = (current: NavSection, h: HtmlBuilder<Message>): Html =>
   h.details(
-    [h.Class('group relative lg:hidden')],
+    [
+      h.DataAttribute('closes-on-navigate', ''),
+      h.Class('group relative lg:hidden'),
+    ],
     [
       h.summary(
         [

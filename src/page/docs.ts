@@ -371,18 +371,23 @@ const docsLayout = (
           ),
         ],
         [
-          h.details(
+          // On phones the sidebar folds behind a toggle the model owns, so
+          // following a link closes it. From md up it is always shown.
+          h.div(
             [
-              h.Open(true),
               h.Class(
-                'group border-b border-rule bg-panel px-5 md:border-r md:border-b-0 md:px-6 [&>summary]:md:hidden',
+                'border-b border-rule bg-panel px-5 md:border-r md:border-b-0 md:px-6',
               ),
             ],
             [
-              h.summary(
+              h.button(
                 [
+                  h.Type('button'),
+                  h.AriaExpanded(model.isDocsNavOpen),
+                  h.AriaControls('docs-nav'),
+                  h.OnClick(Message.ClickedDocsNavToggle()),
                   h.Class(
-                    'flex cursor-pointer list-none items-center justify-between py-3.5 text-[0.9375rem] font-semibold [&::-webkit-details-marker]:hidden',
+                    'flex w-full cursor-pointer items-center justify-between py-3.5 text-[0.9375rem] font-semibold md:hidden',
                   ),
                 ],
                 [
@@ -391,13 +396,18 @@ const docsLayout = (
                     [Icon.menu('size-4', h), 'Browse the docs'],
                   ),
                   Icon.chevronDown(
-                    'size-3.5 transition-transform group-open:rotate-180',
+                    `size-3.5 transition-transform ${model.isDocsNavOpen ? 'rotate-180' : ''}`,
                     h,
                   ),
                 ],
               ),
               h.div(
-                [h.Class('pb-5 md:sticky md:top-0 md:self-start md:pb-0')],
+                [
+                  h.Id('docs-nav'),
+                  h.Class(
+                    `${model.isDocsNavOpen ? 'block' : 'hidden'} pb-5 md:sticky md:top-0 md:block md:self-start md:pb-0`,
+                  ),
+                ],
                 [sidebar(model, maybeCurrent, h)],
               ),
             ],
