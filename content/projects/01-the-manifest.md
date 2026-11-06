@@ -102,8 +102,9 @@ Commands a template runs once, when `silk init --template` creates a project fro
 | Key | Value | Meaning |
 | --- | --- | --- |
 | `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the manifest's directory; a bare name is searched on `PATH`. |
+| `arguments` | boolean | When `true`, the command also gets the arguments given to `silk init` after `--`. Default `false`. |
 
-Each command also gets the creating compiler's release and the arguments given to `silk init` after `--`. See Project templates, and Hooks and scripts for every hook a package can have.
+Each command runs with `SILK_VERSION` set to the creating compiler's release. See Project templates, and Hooks and scripts for every hook a package can have.
 
 ## &#91;component\]
 

@@ -142,7 +142,11 @@ version = "0.1.0"
 description = "A web server starter"
 
 [[post-init]]
+run = ["git", "init", "--quiet"]
+
+[[post-init]]
 run = ["scripts/setup", "--greeting", "hello"]
+arguments = true
 ```
 
 Keep the template itself a working package: `name` can be anything, because `silk init` replaces it, and `silk check` in the template's directory checks it like any other package. Builds read `[[post-init]]` only to check its shape, so a template builds with its entries in place.
@@ -156,42 +160,47 @@ A `[[post-init]]` entry names one command that `silk init` runs after it has cop
 | Key | Value | Meaning |
 | --- | --- | --- |
 | `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the template's directory, without `.` or `..` segments; a bare name is searched on `PATH`. |
+| `arguments` | boolean | When `true`, the entry also gets every argument given to `silk init` after `--`. Default `false`. |
 
-`run` is the only key. An entry with any other key, or an empty `run`, makes the template's `silk.toml` invalid, and `silk init` refuses the template.
+An entry with any other key, an empty `run`, or an `arguments` that is not `true` or `false` makes the template's `silk.toml` invalid, and `silk init` refuses the template.
 
 Each command:
 
 - Runs in the new project's directory, after every file has been copied.
-- Gets your environment. On Windows, it gets only the variables a program usually needs, such as `PATH`, `TEMP`, `USERPROFILE` and `SILK_HOME`.
-- Gets its own arguments from `run`, then the release of the compiler that is creating the project, then every argument given to `silk init` after `--`.
+- Gets your environment, plus `SILK_VERSION` set to the release of the compiler that is creating the project, such as `0.1.0-dev.56+f7d93cff9716`. On Windows, it gets only the variables a program usually needs, such as `PATH`, `TEMP`, `USERPROFILE` and `SILK_HOME`, plus `SILK_VERSION`.
+- Gets the arguments in its `run`, and nothing else, unless it sets `arguments = true`.
 - Must exit 0.
 
 What the commands print to standard output and standard error is shown before the `Initialized` line.
 
 ### Arguments
 
-With the template above, this command:
+An entry with `arguments = true` gets the arguments given to `silk init` after `--`, after its own. With the template above, this command:
 
 ```sh
 silk init site -t acme/starters/web -- --port 8080
 ```
 
-runs `scripts/setup` like this:
+runs `git init --quiet` as written, then `scripts/setup` like this:
 
 ```
-scripts/setup --greeting hello 0.1.0-dev.56+f7d93cff9716 --port 8080
+scripts/setup --greeting hello --port 8080
 ```
 
-The release lets a script pick versions that match the compiler. The arguments after `--` let a template take options from the person running `silk init`. Every entry gets them, so an entry that runs a program you do not control, such as `git init`, sees them too, and most programs refuse arguments they do not expect. Run such a program from a script of the template instead, which can read its own arguments and drop the rest:
+Arguments after `--` let a template take options from the person running `silk init`. Only the entries that set `arguments = true` see them, so an entry that runs a program you do not control, such as `git init`, keeps exactly the arguments you wrote. A template with no such entry refuses arguments after `--` before it writes anything, rather than dropping them:
+
+```
+Template acme/starters/web takes no arguments after `--`: no [[post-init]] entry of its silk.toml sets `arguments = true`
+```
+
+`SILK_VERSION` lets a script pick versions that match the compiler:
 
 ```sh
 #!/bin/sh
-# $1 and $2 are the entry's own arguments, $3 is the Silk release, the rest came after `--`.
+# $1 and $2 are the entry's own arguments; the rest came after `--`.
 greeting=$2
-release=$3
-shift 3
-git init --quiet
-echo "Created with Silk $release"
+shift 2
+echo "Created with Silk $SILK_VERSION, options: $*"
 ```
 
 ### When an entry fails
@@ -199,7 +208,7 @@ echo "Created with Silk $release"
 A command that exits with a status other than 0, or that cannot be started, stops `silk init`. The project is removed and `silk init` exits 1:
 
 ```
-silk: git init --quiet failed with status 129
+silk: scripts/setup --greeting hello failed with status 1
 silk: the template's [[post-init]] entry failed, so the project was removed
 ```
 

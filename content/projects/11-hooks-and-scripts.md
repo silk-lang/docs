@@ -7,7 +7,7 @@ A package can ask Silk to run commands of its own at three moments: when you run
 | `[[generate]]` | `silk.toml` | When you run `silk generate`, never during a build | You, in the manifest's directory | Yours, plus `SILK_GENERATE=1` |
 | `build.silk` plan | `build.silk` beside `silk.toml` | Every build, inside the compiler | The compiler; it starts no program | None: the plan can only read package files |
 | `build.silk` tool step | `build.silk`, with `Plan.tool` | Every build that needs it, before the package is analyzed | The build, in an operating-system sandbox | `HOME`, `TMPDIR`, `PATH`, `SILK_TOOL=1` and `SILK_PACKAGE_DIR` only |
-| `[[post-init]]` | A template's `silk.toml` | Once, when `silk init --template` creates a project | `silk init`, in the new project's directory | Yours |
+| `[[post-init]]` | A template's `silk.toml` | Once, when `silk init --template` creates a project | `silk init`, in the new project's directory | Yours, plus `SILK_VERSION` |
 
 Every hook that starts a program names it the same way: a path with a `/` is a file of the package, and a bare name is searched on `PATH`. The program must exit 0, or the command that ran it fails.
 
@@ -65,16 +65,17 @@ A template's `[[post-init]]` entries run once, in the new project's directory, a
 ```toml
 [[post-init]]
 run = ["scripts/setup", "--greeting", "hello"]
+arguments = true
 ```
 
-`run` is the only key. Each command gets its own arguments, then the release of the compiler creating the project, then the arguments given to `silk init` after `--`:
+Each command runs with `SILK_VERSION` set to the release of the compiler creating the project. It gets only the arguments in its `run`, unless it sets `arguments = true`: then it also gets the arguments given to `silk init` after `--`:
 
 ```sh
 silk init site -t acme/starters/web -- --port 8080
 ```
 
 ```
-scripts/setup --greeting hello 0.1.0-dev.56+f7d93cff9716 --port 8080
+scripts/setup --greeting hello --port 8080
 ```
 
 When a command fails, `silk init` removes the project it was creating. See "[[post-init]]" in **Project templates**.
