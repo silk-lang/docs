@@ -27,6 +27,7 @@ export const Message = defineMessageUnion({
   FailedLoadDocument: { key: Schema.String },
   PointedAtDocLink: { key: Schema.String },
   ClickedSidebarGroup: { groupKey: Schema.String },
+  ClickedDocsNavToggle: {},
   PressedSearchShortcut: {},
   ClickedOpenSearch: {},
   GotSearchMessage: { message: Search.Message },

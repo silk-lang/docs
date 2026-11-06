@@ -12,6 +12,7 @@ export const testModel = (route: AppRoute): Model =>
     copiedCodeIds: HashSet.empty(),
     doc: DocState.Idle(),
     openGroups: HashSet.empty(),
+    isDocsNavOpen: false,
     maybeActiveSection: Option.none(),
     maybePendingAnchor: Option.none(),
     documents: HashMap.empty(),

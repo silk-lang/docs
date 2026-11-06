@@ -21,6 +21,8 @@ export const Model = Schema.Struct({
   copiedCodeIds: Schema.HashSet(Schema.String),
   doc: DocState,
   openGroups: Schema.HashSet(Schema.String),
+  // The docs sidebar on phones, where it folds behind a toggle.
+  isDocsNavOpen: Schema.Boolean,
   maybeActiveSection: Schema.Option(Schema.String),
   maybePendingAnchor: Schema.Option(Schema.String),
   // Documents already downloaded, by page key, so returning to a page or

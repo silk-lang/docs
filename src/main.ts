@@ -110,6 +110,7 @@ export const init: Runtime.RoutingApplicationInit<
     copiedCodeIds: HashSet.empty(),
     doc: DocState.Idle(),
     openGroups: openGroupsFor(HashSet.empty(), route),
+    isDocsNavOpen: false,
     maybeActiveSection: Option.none(),
     maybePendingAnchor: Option.none(),
     documents: HashMap.empty(),
@@ -147,11 +148,24 @@ export const init: Runtime.RoutingApplicationInit<
 
 // COMMAND
 
+// The phone menu is a details element the view leaves uncontrolled, so a link
+// inside it would stay open over the next page without this.
+const closeNavigationMenus = (): void => {
+  for (const menu of document.querySelectorAll<HTMLDetailsElement>(
+    'details[data-closes-on-navigate]',
+  )) {
+    menu.open = false
+  }
+}
+
 const NavigateInternal = Command.define('NavigateInternal', {
   args: { url: Schema.String },
   messages: [Message.CompletedNavigateInternal],
   execute: ({ url }) =>
-    pushUrl(url).pipe(Effect.as(Message.CompletedNavigateInternal())),
+    Effect.sync(closeNavigationMenus).pipe(
+      Effect.andThen(pushUrl(url)),
+      Effect.as(Message.CompletedNavigateInternal()),
+    ),
 })
 
 const LoadExternal = Command.define('LoadExternal', {
@@ -340,6 +354,7 @@ const changeUrl = (model: Model, url: Url): UpdateReturn => {
   const nextModel = modifyFields(model, {
     route: () => nextRoute,
     openGroups: openGroups => openGroupsFor(openGroups, nextRoute),
+    isDocsNavOpen: () => false,
     maybeActiveSection: maybeActiveSection =>
       isSamePath ? maybeActiveSection : Option.none(),
     maybePendingAnchor: () => Option.none(),
@@ -404,7 +419,7 @@ export const update = (model: Model, message: Message) =>
     ClickedLink: ({ request }) =>
       UrlRequest.match<UpdateReturn>(request, {
         Internal: ({ url }) => ({
-          model,
+          model: modifyFields(model, { isDocsNavOpen: () => false }),
           commands: [
             isStaticFile(url)
               ? LoadExternal({ href: urlToString(url) })
@@ -480,6 +495,11 @@ export const update = (model: Model, message: Message) =>
           HashSet.has(openGroups, groupKey)
             ? HashSet.remove(openGroups, groupKey)
             : HashSet.add(openGroups, groupKey),
+      }),
+    }),
+    ClickedDocsNavToggle: () => ({
+      model: modifyFields(model, {
+        isDocsNavOpen: isDocsNavOpen => !isDocsNavOpen,
       }),
     }),
     PressedSearchShortcut: () => foldSearchOpen(model),
