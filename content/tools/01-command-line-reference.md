@@ -6,7 +6,7 @@ Every `silk` command, its options and its exit status. `silk` is the tool you ty
 
 | Command | What it does |
 | --- | --- |
-| `silk init [path]` | Create a package or a workspace |
+| `silk init [path]` | Create a package or a workspace, from a template or built in |
 | `silk add <path>` | Add a path dependency to the manifest |
 | `silk remove <name>` | Remove a dependency from the manifest |
 | `silk check` | Type-check the package for each target, without producing output |
@@ -72,16 +72,29 @@ Without `--target`, a command uses the targets the manifest selects, or the host
 ## init
 
 ```
-silk init [path] [--name <name>] [--lib | --workspace]
+silk init [path] [--name <name>] [--lib | --workspace | --template <template> [-- <arguments>...]]
+silk init --list [template]
 ```
 
 Creates a package in `path`, or in the current directory. The package name comes from the directory unless you pass `--name`.
 
 | Form | Creates |
 | --- | --- |
-| `silk init app` | An executable: `silk.toml`, `src/main.silk`, `.gitignore` |
-| `silk init --lib util` | A library: `src/lib.silk`, `kind = "library"`, `exports = ["lib"]` |
-| `silk init --workspace ws` | A workspace root with `.gitignore` and one starter executable member, `app`: `[workspace] members = ["app"]`. `--name` names the member |
+| `silk init app` | An executable from the official `default` template, `silk-lang/examples/default`: `silk.toml`, `src/main.silk`, `.gitignore`. Needs `git` and the network |
+| `silk init app -t <template>` | A package or a workspace from a template. `-t` is short for `--template` |
+| `silk init app -t minimal` | The same executable, written by the compiler itself, offline |
+| `silk init --lib util` | A library: `src/lib.silk`, `kind = "library"`, `exports = ["lib"]`. Written by the compiler, offline |
+| `silk init --workspace ws` | A workspace root with `.gitignore` and one starter executable member, `app`: `[workspace] members = ["app"]`. `--name` names the member. Written by the compiler, offline |
+
+A template is `<owner>/<repository>[/<directory>...][@<revision>]` on GitHub; one segment alone, such as `hello`, names a directory of `silk-lang/examples`. A project made from a template reports the commit it came from:
+
+```
+Initialized Silk project app at /home/you/app from template silk-lang/examples/default (3d330376eba6f634d1ca384269e46bc3c96727d8)
+```
+
+The template's `[[post-init]]` commands then run in the new project, each with its own arguments, the compiler's release and the `<arguments>` after `--`. `--template` with `--lib` or `--workspace` exits 2.
+
+`silk init --list` (or `-l`) prints the official templates with their descriptions, or the templates of the repository or directory `template` names, and exits 0. See **Project templates** in Projects and packages.
 
 Inside a workspace, `silk init` also appends the new package to the root's `members`:
 
@@ -90,12 +103,14 @@ Initialized Silk project util at /home/you/ws/util
 Added util to the workspace members in /home/you/ws/silk.toml
 ```
 
-`init` refuses to overwrite an existing `silk.toml` and refuses a directory name that is not a valid package name; both exit 2:
+`init` refuses to overwrite an existing file and refuses a directory name that is not a valid package name; both exit 2:
 
 ```
 Refusing to overwrite existing project file /home/you/hello/silk.toml
 Cannot derive a portable package name from Bad_Name; pass --name
 ```
+
+A malformed template name exits 2. A template that cannot be fetched, names no directory, or whose `[[post-init]]` command fails exits 1, and leaves no project behind.
 
 ## add and remove
 

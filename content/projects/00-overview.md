@@ -15,3 +15,5 @@ These pages cover how Silk code is organized and built, from a single file up to
 | **Targets and profiles** | The six accepted targets (WASI included), cross builds, optimization levels, named profiles and profile-guided optimization. |
 | **Build outputs and native linking** | Artifact kinds, stages, the output layout, native link inputs, C sources and prebuilt archives. |
 | **Build plans and generated code** | Embedding package files, `silk generate`, `build.silk` plans and sandboxed tool steps. |
+| **Project templates** | `silk init --template` and `--list`, naming a template, writing one, and its `[[post-init]]` commands. |
+| **Hooks and scripts** | Every command a package can have Silk run, when each runs, and how to write a hook script. |
