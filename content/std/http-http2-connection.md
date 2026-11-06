@@ -17,7 +17,8 @@ Public declarations: 3.
 pub fn protocol() -> AlpnProtocol<'static>
 ```
 
-Returns the `h2` ALPN identifier. Offer it with `AlpnConfig.Offered` and `required: true` for HTTP/2-only TLS.
+Returns the `h2` ALPN identifier. Offer it with `AlpnConfig.Offered` and `required: true` for
+HTTP/2-only TLS.
 
 ::Anchor{id="requireAlpn"}
 
@@ -28,7 +29,8 @@ pub effect fn requireAlpn(authentication: &Authentication) -> ()
   ! ProtocolError
 ```
 
-Verifies that an authenticated TLS connection selected `h2`. Other protocols fail with PROTOCOL_ERROR.
+Verifies that an authenticated TLS connection selected `h2`. Other protocols fail with
+PROTOCOL_ERROR.
 
 ::Anchor{id="Driver"}
 
@@ -38,7 +40,8 @@ Verifies that an authenticated TLS connection selected `h2`. Other protocols fai
 pub struct Driver
 ```
 
-A buffered driver for one HTTP/2 connection. It borrows the transport through the Effect service.
+A buffered driver for one HTTP/2 connection. It borrows the transport through the Effect
+service.
 
 ::Anchor{id="Driver.impl"}
 
@@ -58,7 +61,8 @@ pub effect fn make(endpoint: Role, limits: Limits) -> Driver
     ? &mut Allocator
 ```
 
-Creates a protocol connection and a 16 KiB transport read buffer. No I/O occurs until `flush` or `next`.
+Creates a protocol connection and a 16 KiB transport read buffer. No I/O occurs until `flush`
+or `next`.
 
 ::Anchor{id="Driver.impl.connection"}
 
@@ -68,7 +72,8 @@ Creates a protocol connection and a 16 KiB transport read buffer. No I/O occurs 
 pub fn connection(self: &mut Self) -> &mut Connection
 ```
 
-Borrows the protocol connection to open streams, send fields or data, return credit, or initiate shutdown.
+Borrows the protocol connection to open streams, send fields or data, return credit, or
+initiate shutdown.
 
 ::Anchor{id="Driver.impl.flush"}
 
@@ -106,8 +111,9 @@ pub effect fn next(self: &mut Self, deadline: Option<Instant>) -> Option<Event>
     ? &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Flushes queued output, then waits for one event. None means clean transport EOF.
-A partial frame or unfinished stream at EOF fails. Protocol errors attempt to flush GOAWAY before returning.
+Flushes queued output, then waits for one event. None means clean transport EOF. A partial
+frame or unfinished stream at EOF fails. Protocol errors attempt to flush GOAWAY before
+returning.
 
 Category: HTTP.
 

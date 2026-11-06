@@ -1,7 +1,11 @@
 // Copies the standard library API reference from a silk-lang/silk checkout into
 // content/std, and writes its sidebar group to src/docs/generated.ts.
 //
-//   pnpm sync-docs ../silk
+//   pnpm sync-docs ../silk [ref]
+//
+// `ref` is the branch or tag the "View the source" links point at, `main` by
+// default. The deploy syncs from the newest release this way, through
+// scripts/versions.ts, which also reads the stdlib of every older release.
 //
 // The source markdown is written for GitHub, so a few constructs are rewritten
 // into the vocabulary @foldkit/markdown accepts: frontmatter and the H1 move
@@ -20,11 +24,9 @@ import {
 } from 'node:fs'
 import { basename, join, posix, resolve } from 'node:path'
 
-import { parseMarkdown } from '@foldkit/markdown/vite'
+import { parseContent } from './parse.ts'
 
-import { islandAttributes } from '../src/docs/islands.ts'
-
-const SOURCE_REPOSITORY = 'https://github.com/silk-lang/silk'
+export const SOURCE_REPOSITORY = 'https://github.com/silk-lang/silk'
 
 const docsRoot = resolve(import.meta.dirname, '..')
 
@@ -36,7 +38,8 @@ type SourcePage = Readonly<{
   sourcePath: string
 }>
 
-type SyncedPage = SourcePage & Readonly<{ title: string; markdown: string }>
+export type SyncedPage = SourcePage &
+  Readonly<{ title: string; markdown: string; sourceUrl: string }>
 
 const publicDeclarations = (path: string): number =>
   Number(
@@ -168,14 +171,15 @@ const inlineCode = (html: string): string =>
   `\`${decodeEntities(html).replace(/\|/g, '\\|')}\``
 
 // Directive markdown reads `word:name` in prose, such as `wasi:logging` in a
-// summary whose backticks the generator escaped, as an inline directive, which
-// the site cannot render. Outside code spans such a colon is escaped, which
-// GFM shows as the same colon.
+// summary whose backticks the generator escaped, or the `:00` of a time such
+// as 00:00:00, as an inline directive, which the site cannot render. Outside
+// code spans and link destinations such a colon is escaped, which GFM shows
+// as the same colon.
 const escapeTextDirectives = (line: string): string =>
   line
-    .split(/((?<!\\)`+[^`]*?(?<!\\)`+)/)
+    .split(/((?<!\\)`+[^`]*?(?<!\\)`+|\]\([^)\s]*\))/)
     .map((part, index) =>
-      index % 2 === 1 ? part : part.replace(/(?<=\w):(?=[A-Za-z])/g, '\\:'),
+      index % 2 === 1 ? part : part.replace(/(?<=\w):(?=[A-Za-z0-9])/g, '\\:'),
     )
     .join('')
 
@@ -280,7 +284,7 @@ const literal = (value: string): string =>
   `'${value.replace(/['\\]/g, '\\$&')}'`
 
 const pageEntry = (page: SyncedPage): string =>
-  `      page(${literal(page.directory)}, ${literal(page.slug)}, ${literal(page.title)}, ${literal(`${SOURCE_REPOSITORY}/blob/main/${page.sourcePath}`)}),`
+  `      page(${literal(page.directory)}, ${literal(page.slug)}, ${literal(page.title)}, ${literal(page.sourceUrl)}),`
 
 const groupEntry = (
   key: string,
@@ -325,58 +329,46 @@ ${groupEntries.join('\n')}
 ]
 `
 
-// MAIN
+// SYNC
 
-const main = (): void => {
-  const silkArgument = process.argv[2]
-  if (silkArgument === undefined) {
-    console.error('usage: pnpm sync-docs <path to a silk-lang/silk checkout>')
-    process.exit(1)
-  }
-  const silkRoot = resolve(silkArgument)
-  if (!existsSync(join(silkRoot, 'reference/index.md'))) {
-    console.error(`${silkRoot} has no reference/index.md`)
-    process.exit(1)
-  }
-
-  const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
-    cwd: silkRoot,
-    encoding: 'utf8',
-  }).trim()
-
-  const synced: ReadonlyArray<SyncedPage> = sourcePages(silkRoot).map(page => {
-    const { title, markdown } = transform(
-      page,
-      readFileSync(join(silkRoot, page.sourcePath), 'utf8'),
-    )
-    try {
-      parseMarkdown(markdown, { islands: islandAttributes })
-    } catch (error) {
-      console.error(`${page.sourcePath} does not parse after the transform:`)
-      throw error
-    }
-    return {
-      ...page,
-      title: stdTitle(title),
-      markdown,
-    }
-  })
-
-  // content/spec held the language specification, which the site no longer
-  // shows; removing it keeps an old checkout from carrying it forward.
-  for (const directory of ['spec', 'std']) {
-    rmSync(join(docsRoot, 'content', directory), {
-      recursive: true,
-      force: true,
-    })
-  }
-  mkdirSync(join(docsRoot, 'content/std'), { recursive: true })
-  for (const page of synced) {
-    writeFileSync(
-      join(docsRoot, 'content', page.directory, `${page.slug}.md`),
-      page.markdown,
-    )
-  }
+// The standard library pages of a checkout, in sidebar order: the overview,
+// then the modules by path. Every page is parsed, so markdown the site cannot
+// render fails here instead of in the build.
+// With `skipUnparsable`, a page that does not parse is left out with a
+// warning instead, for archived releases whose markdown predates a rule.
+export const syncStdlib = (
+  silkRoot: string,
+  ref: string,
+  options: Readonly<{ skipUnparsable?: boolean }> = {},
+): ReadonlyArray<SyncedPage> => {
+  const synced: ReadonlyArray<SyncedPage> = sourcePages(silkRoot).flatMap(
+    page => {
+      const { title, markdown } = transform(
+        page,
+        readFileSync(join(silkRoot, page.sourcePath), 'utf8'),
+      )
+      try {
+        parseContent(markdown)
+      } catch (error) {
+        if (options.skipUnparsable === true) {
+          console.warn(
+            `${ref}: skipped ${page.sourcePath}, which does not parse`,
+          )
+          return []
+        }
+        console.error(`${page.sourcePath} does not parse after the transform:`)
+        throw error
+      }
+      return [
+        {
+          ...page,
+          title: stdTitle(title),
+          markdown,
+          sourceUrl: `${SOURCE_REPOSITORY}/blob/${encodeURIComponent(ref)}/${page.sourcePath}`,
+        },
+      ]
+    },
+  )
 
   const stdOverview = synced.filter(page => page.slug === 'overview')
   // The sidebar lists modules by path, one word at a time (split at `.` and
@@ -387,22 +379,73 @@ const main = (): void => {
   const stdModules = synced
     .filter(page => page.slug !== 'overview')
     .sort((left, right) => compareModulePaths(left.title, right.title))
+  return [...stdOverview, ...stdModules]
+}
 
-  const groupEntries = [
-    groupEntry('std', 'Standard library', true, [
-      ...stdOverview,
-      ...stdModules,
-    ]),
-  ]
+export const hasStdlib = (silkRoot: string): boolean =>
+  existsSync(join(silkRoot, 'reference/index.md')) &&
+  existsSync(join(silkRoot, 'reference/stdlib'))
+
+// Replaces content/std and src/docs/generated.ts with the given pages.
+export const writeStdlib = (
+  pages: ReadonlyArray<SyncedPage>,
+  revision: string,
+): void => {
+  // content/spec held the language specification, which the site no longer
+  // shows; removing it keeps an old checkout from carrying it forward.
+  for (const directory of ['spec', 'std']) {
+    rmSync(join(docsRoot, 'content', directory), {
+      recursive: true,
+      force: true,
+    })
+  }
+  mkdirSync(join(docsRoot, 'content/std'), { recursive: true })
+  for (const page of pages) {
+    writeFileSync(
+      join(docsRoot, 'content', page.directory, `${page.slug}.md`),
+      page.markdown,
+    )
+  }
 
   const generatedPath = join(docsRoot, 'src/docs/generated.ts')
-  writeFileSync(generatedPath, generatedModule(revision, groupEntries))
+  writeFileSync(
+    generatedPath,
+    generatedModule(revision, [
+      groupEntry('std', 'Standard library', true, pages),
+    ]),
+  )
   execFileSync('pnpm', ['exec', 'oxfmt', generatedPath], {
     cwd: docsRoot,
     stdio: 'inherit',
   })
-
-  console.log(`synced ${synced.length} standard library pages from ${revision}`)
 }
 
-main()
+// MAIN
+
+const main = (): void => {
+  const silkArgument = process.argv[2]
+  if (silkArgument === undefined) {
+    console.error(
+      'usage: pnpm sync-docs <path to a silk-lang/silk checkout> [ref]',
+    )
+    process.exit(1)
+  }
+  const silkRoot = resolve(silkArgument)
+  if (!hasStdlib(silkRoot)) {
+    console.error(`${silkRoot} has no reference/index.md`)
+    process.exit(1)
+  }
+
+  const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+    cwd: silkRoot,
+    encoding: 'utf8',
+  }).trim()
+
+  const pages = syncStdlib(silkRoot, process.argv[3] ?? 'main')
+  writeStdlib(pages, revision)
+  console.log(`synced ${pages.length} standard library pages from ${revision}`)
+}
+
+if (import.meta.main) {
+  main()
+}

@@ -2,8 +2,8 @@ Copy bytes from one buffered session to another, and consume only what the desti
 
 ## When to use
 Use [`BufferedTransfer.transferAtMost`](#BufferedTransfer.impl.transferAtMost) or [`BufferedTransfer.transferExact`](#BufferedTransfer.impl.transferExact) inside
-`silk.io.buffered_duplex.withBufferedPairCapacity` to forward a body or a stream, for example in a
-proxy.
+`silk.io.buffered_duplex.withBufferedPairCapacity` to forward a body or a stream, for example in
+a proxy.
 
 ## Details
 The transfer reads into the input buffer of the source and offers those bytes to the output
@@ -62,8 +62,8 @@ The owner type of the transfer operations. It has no fields and is never constru
 ### When to use
 
 Use [`BufferedTransfer.transferAtMost`](#BufferedTransfer.impl.transferAtMost) or [`BufferedTransfer.transferExact`](#BufferedTransfer.impl.transferExact) inside
-`silk.io.buffered_duplex.withBufferedPairCapacity` to forward a body or a stream, for example in a
-proxy.
+`silk.io.buffered_duplex.withBufferedPairCapacity` to forward a body or a stream, for example in
+a proxy.
 
 ::Anchor{id="BufferedTransfer.impl"}
 

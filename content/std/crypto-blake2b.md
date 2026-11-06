@@ -2,8 +2,8 @@ Portable BLAKE2b-512 state for the unkeyed 64-byte cryptographic digest of RFC 7
 
 ## When to use
 Use [`Blake2b512`](#Blake2b512) where a format names BLAKE2b with a 64-byte digest, such as prehashed
-minisign signatures. Use `silk.crypto.sha2` where a protocol names SHA-2. Use `silk.collections.hash` only for
-collection keys. It is not a cryptographic hash.
+minisign signatures. Use `silk.crypto.sha2` where a protocol names SHA-2. Use
+`silk.collections.hash` only for collection keys. It is not a cryptographic hash.
 
 ## Details
 The state supports incremental input through `update`, consuming finalization through `finish`,
@@ -47,8 +47,8 @@ An incremental unkeyed BLAKE2b state with a 64-byte digest (RFC 7693).
 ### When to use
 
 Use it where a format names BLAKE2b with a 64-byte digest, such as prehashed minisign
-signatures. Use `silk.crypto.sha2` where a protocol names SHA-2. Use `silk.collections.hash` only for collection
-keys. It is not a cryptographic hash.
+signatures. Use `silk.crypto.sha2` where a protocol names SHA-2. Use `silk.collections.hash`
+only for collection keys. It is not a cryptographic hash.
 
 ### Details
 
@@ -120,6 +120,84 @@ pub fn hash(bytes: &[u8]) -> [u8; 64]
 ```
 
 Returns the 64-byte BLAKE2b digest of `bytes`.
+
+::Anchor{id="Blake2b512.impl.Digest"}
+
+## Implementation `Digest for Blake2b512`
+
+```silk
+impl Digest for Blake2b512
+```
+
+::Anchor{id="Blake2b512.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Blake2b512.make
+```
+
+Returns a BLAKE2b-512 state for an empty message.
+
+::Anchor{id="Blake2b512.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Blake2b512.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Blake2b512.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 128, the BLAKE2b-512 block length in bytes.
+
+::Anchor{id="Blake2b512.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 64, the BLAKE2b-512 digest length in bytes.
+
+::Anchor{id="Blake2b512.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the BLAKE2b-512 object identifier, 1.3.6.1.4.1.1722.12.2.1.16.
+
+::Anchor{id="Blake2b512.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Blake2b512.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 64-byte BLAKE2b-512 digest to the start of `output` and consumes the state.
 
 Category: Cryptography.
 

@@ -1,7 +1,8 @@
 HTTP/2 wire frame headers, error codes, and frame serialization from RFC 9113.
 
 Use [`FrameHeader.read`](#FrameHeader.impl.read) after collecting nine bytes. A connection must enforce its negotiated
-frame size and stream rules before it accepts the payload. Unknown frame types remain representable.
+frame size and stream rules before it accepts the payload. Unknown frame types remain
+representable.
 
 Import as `FrameHeader` with `import silk.http.http2_frame { FrameHeader }`.
 
@@ -165,7 +166,8 @@ The peer requires HTTP/1.1, wire error code 13.
 pub struct ProtocolError
 ```
 
-An HTTP/2 error. Stream zero identifies a connection error; a nonzero identifier identifies a stream error.
+An HTTP/2 error. Stream zero identifies a connection error; a nonzero identifier identifies a
+stream error.
 
 ::Anchor{id="ProtocolError.code"}
 
@@ -300,7 +302,8 @@ pub effect fn write(self: &Self, output: &mut Bytes, payload: &[u8]) -> ()
     ? &mut Allocator
 ```
 
-Appends this header and payload. Invalid payload length or stream bits fail before output changes.
+Appends this header and payload. Invalid payload length or stream bits fail before output
+changes.
 
 ::Anchor{id="read32"}
 

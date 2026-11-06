@@ -7,6 +7,7 @@ import { DemoTopic, FibersRun, InstallMethod } from './landing'
 import * as Playground from './playground'
 import { AppRoute } from './route'
 import * as Search from './search'
+import { ArchivedCatalog } from './versions/archive'
 
 export const DocState = defineTaggedUnion({
   Idle: {},
@@ -15,6 +16,14 @@ export const DocState = defineTaggedUnion({
   Failed: { key: Schema.String },
 })
 export type DocState = typeof DocState.Type
+
+// The catalog of an archived release, downloaded when a reader opens it.
+export const CatalogState = defineTaggedUnion({
+  Loading: {},
+  Loaded: { catalog: ArchivedCatalog },
+  Failed: {},
+})
+export type CatalogState = typeof CatalogState.Type
 
 export const Model = Schema.Struct({
   route: AppRoute,
@@ -29,6 +38,7 @@ export const Model = Schema.Struct({
   // opening a prefetched one shows it without a loading state.
   documents: Schema.HashMap(Schema.String, Markdown.MarkdownDocument),
   requestedDocumentKeys: Schema.HashSet(Schema.String),
+  versionCatalogs: Schema.HashMap(Schema.String, CatalogState),
   search: Search.Model,
   installMethod: InstallMethod,
   demoTopic: DemoTopic,

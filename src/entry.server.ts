@@ -82,6 +82,8 @@ export const prerenderPaths: ReadonlyArray<string> = [
   '/docs',
   '/releases',
   '/playground',
+  // Also served for every archived page, /v/<version>/docs/... (_redirects).
+  '/v',
   // Copied to 404.html by `pnpm build:site` for Cloudflare's 404 handling.
   '/404',
   ...Catalog.allPages.map(Catalog.pagePath),
@@ -158,6 +160,15 @@ const metaForRoute = (route: AppRoute, flags: Flags): PageMeta =>
         'Prebuilt Silk toolchains for macOS and Linux, newest first, with the notes for every release.',
       card: Og.releasesCard,
     }),
+    Versions: () => ({
+      path: '/v',
+      description:
+        'The Silk docs as they were for every release, with the standard library reference of each one.',
+      card: Og.docsCard,
+    }),
+    // Archived pages are not prerendered; the client renders them.
+    VersionedDocs: () => homeMeta,
+    VersionedDocPage: () => homeMeta,
     NotFound: () => homeMeta,
   })
 

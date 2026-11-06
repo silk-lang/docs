@@ -244,8 +244,8 @@ A child that ended with an exit code.
 pub code: i32
 ```
 
-The code the child returned. Any value, including a nonzero one, is ordinary data.
-Windows preserves all 32 bits in this signed representation. A high bit does not prove a crash.
+The code the child returned. Any value, including a nonzero one, is ordinary data. Windows
+preserves all 32 bits in this signed representation. A high bit does not prove a crash.
 
 ::Anchor{id="Exited.output"}
 

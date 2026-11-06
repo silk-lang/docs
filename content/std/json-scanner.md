@@ -4,7 +4,8 @@ Read JSON as a sequence of tokens, without building a tree and without allocatin
 Use [`JsonScanner`](#JsonScanner) to read a complete document that is in one slice, token by token. It is the
 input of `Deserialize` implementations. Use [`JsonScanState`](#JsonScanState) when the bytes arrive in pieces
 and you keep the parts of each token yourself. To read from a `BufferedInput`, use
-`silk.json.reader.JsonReader`. To get a tree, use `silk.json.value.Json.parse`.
+`silk.json.reader.JsonReader`. To get a tree, use `silk.json.value.Json.parse`. To write a parser
+that tracks the grammar itself, use the token checks of [`JsonSyntax`](#JsonSyntax).
 
 ## Details
 The scanner checks the full JSON grammar (RFC 8259) as it reads, including UTF-8 in strings and
@@ -59,7 +60,7 @@ pub fn main() -> i32 {
 
 Import as `JsonScanner` with `import silk.json.scanner { JsonScanner }`.
 
-Public declarations: 9.
+Public declarations: 10.
 
 ::Anchor{id="MAX_DEPTH"}
 
@@ -178,16 +179,6 @@ DuplicateKey
 ```
 
 An object has the same key two times.
-
-::Anchor{id="JsonReason.InvalidValue"}
-
-### `InvalidValue`
-
-```silk
-InvalidValue
-```
-
-A value in a tree has a child of the wrong kind.
 
 ::Anchor{id="JsonReason.TypeMismatch"}
 
@@ -811,6 +802,75 @@ pub fn slice(self: &JsonScanner<'input>, span: JsonSpan) -> &'input [u8]
 ```
 
 Returns the source bytes of `span`, such as the text of a string or number token.
+
+::Anchor{id="JsonSyntax"}
+
+## `JsonSyntax`
+
+```silk
+pub struct JsonSyntax
+```
+
+The owner type of the byte-level checks the scanner uses for single tokens. It has no fields and
+is never constructed.
+
+### When to use
+
+Use it to write a parser that reads a complete document in one slice and keeps track of the
+grammar itself, such as a recursive-descent tree parser. Use [`JsonScanner`](#JsonScanner) when you want the
+scanner to check the grammar for you.
+
+::Anchor{id="JsonSyntax.impl"}
+
+## Implementation `JsonSyntax`
+
+```silk
+impl JsonSyntax
+```
+
+::Anchor{id="JsonSyntax.impl.skipWhitespace"}
+
+### Associated function `skipWhitespace`
+
+```silk
+pub fn skipWhitespace(bytes: &[u8], at: usize) -> usize
+```
+
+Returns the index of the first byte of `bytes` from `at` that is not JSON whitespace (space,
+tab, line feed, or carriage return), or `bytes.length` if there is none.
+
+::Anchor{id="JsonSyntax.impl.stringEnd"}
+
+### Associated function `stringEnd`
+
+```silk
+pub fn stringEnd(bytes: &[u8], start: usize, escaped: &mut bool) -> usize
+```
+
+Returns the index after the closing quote of the valid JSON string whose contents start at
+`start`, the index after the opening quote. Returns 0 if the string is not valid or has no
+closing quote.
+
+#### Details
+
+A valid string has no control bytes, only valid UTF-8, and only valid escapes, and a high
+surrogate escape is followed by a low one. `escaped` is set to `true` if the string has an
+escape, and is not changed otherwise.
+
+::Anchor{id="JsonSyntax.impl.numberEnd"}
+
+### Associated function `numberEnd`
+
+```silk
+pub fn numberEnd(bytes: &[u8], at: usize) -> usize
+```
+
+Returns the index after the valid JSON number that starts at `at`, or 0 if there is no valid
+number there.
+
+#### Details
+
+The number must be followed by whitespace, `,`, `]`, `}`, or the end of `bytes`.
 
 Category: Data formats.
 

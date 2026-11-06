@@ -1,4 +1,4 @@
-A TLS 1.3 client state machine that authenticates an HTTPS server over a byte transport that you
+A TLS 1.2 and TLS 1.3 client state machine that authenticates an HTTPS server over a byte transport that you
 drive.
 
 ## When to use
@@ -8,10 +8,31 @@ Make it with [`Client.make`](#Client.impl.make), then move bytes between it and 
 `Authenticated`, and then read and write application data.
 
 ## Details
-The client supports TLS 1.3 only, with the cipher suites ChaCha20-Poly1305, AES-128-GCM, and
-AES-256-GCM, and the key exchange groups X25519 and P-256. It checks the certificate chain
+The client offers the versions that `ClientConfig.versions` allows. In TLS 1.3 it supports the
+cipher suites ChaCha20-Poly1305, AES-128-GCM, and AES-256-GCM, and the key exchange groups X25519
+and P-256. In TLS 1.2 (RFC 5246) it supports the ECDHE suites with ECDSA or RSA keys and
+ChaCha20-Poly1305, AES-128-GCM, or AES-256-GCM, and the groups X25519, P-256, and P-384. It
+requires the extended master secret (RFC 7627) and secure renegotiation from a TLS 1.2 server,
+and when TLS 1.3 is also allowed, it rejects a TLS 1.2 ServerHello with the RFC 8446 downgrade
+mark. It checks the certificate chain
 against your `TrustSnapshot`, the host name of your `ReferenceIdentity`, the CertificateVerify
 signature, and the Finished message. It gives no application data before all checks pass.
+
+When the server sends a CertificateRequest, the client answers with the [`ClientCredential`](#ClientCredential)
+given to [`Client.make`](#Client.impl.make): the chain and a CertificateVerify signed with its key, using a scheme
+that the server lists. In TLS 1.2 the key must sign a digest, so it is ECDSA or RSA, and the
+scheme's hash may differ from the suite's. With `ClientCredential.None`, or when no listed scheme
+fits the key, it sends an empty Certificate message, and the server decides whether to go on.
+
+With [`Resumption`](#Resumption) `Enabled`, the client asks for session tickets and returns each one as a
+[`Session`](#Session) from [`Client.takeSession`](#Client.impl.takeSession). A later client given that session offers it as a PSK
+with (EC)DHE, and when the server accepts, the handshake skips the certificate messages.
+[`Session.encode`](#Session.impl.encode) and [`Session.decode`](#Session.impl.decode) let you keep sessions across processes.
+
+A session whose ticket allows early data also lets the client send the `Resumption` `earlyData`
+bytes as 0-RTT data, right after the ClientHello and before the server answers.
+[`Client.earlyData`](#Client.impl.earlyData) tells you whether the server accepted them. When it rejected them, write
+them again after `Authenticated`.
 
 Each call returns a [`Progress`](#Progress): how many bytes it took or wrote, and the next [`Demand`](#Demand).
 Output works in two steps: write [`Client.pendingOutput`](#Client.impl.pendingOutput) to the transport, and then call
@@ -25,7 +46,9 @@ Output works in two steps: write [`Client.pendingOutput`](#Client.impl.pendingOu
 
 ## Gotchas
 You provide the trust, the time, the random source, and the transport. The client supports one
-TLS 1.3 profile, not all of the Web PKI. Dropping the client does not send `close_notify`. Call
+profile, not all of the Web PKI. In TLS 1.2 it does not resume sessions, has no KeyUpdate,
+sends an empty Certificate for an Ed25519 credential, and ignores a HelloRequest, so the server
+cannot renegotiate. Dropping the client does not send `close_notify`. Call
 [`Client.closeWrite`](#Client.impl.closeWrite) first. Secrets are not erased.
 
 ## Examples
@@ -38,7 +61,8 @@ import silk.collections.list { List }
 import silk.system.random { Random }
 import silk.core.result { Result }
 import silk.system.system_clock { SystemClock }
-import silk.tls.client { AlpnConfig, Client, ClientConfig, ClientLimits, Progress, TlsError }
+import silk.tls.client { AlpnConfig, Client, ClientConfig, ClientCredential, ClientLimits, Progress, Resumption, TlsError }
+import silk.tls.record { VersionPolicy }
 import silk.tls.trust_anchor { TrustAnchor }
 import silk.tls.trust_snapshot { SnapshotLimits, TrustSnapshot, TrustSourceError }
 import silk.num.usize
@@ -81,9 +105,11 @@ pub effect fn main() -> i32
   let config = ClientConfig {
     reference: reference,
     alpn: AlpnConfig.defaults(),
+    resumption: Resumption.Disabled,
+    versions: VersionPolicy.defaults(),
     limits: ClientLimits.defaults()
   }
-  let made = run Client.make(&config, move trust, SystemClock.make(1789156800, 0))
+  let made = run Client.make(&config, move trust, SystemClock.make(1789156800, 0), ClientCredential.None)
     |> Effect.provideMut<Random>(&mut random)
     |> Effect.provideMut<Allocator>(&mut allocator)
   let mut client = match move made {
@@ -107,7 +133,7 @@ pub effect fn main() -> i32
 
 Import as `Client` with `import silk.tls.client { Client }`.
 
-Public declarations: 15.
+Public declarations: 19.
 
 ::Anchor{id="NamedGroup"}
 
@@ -138,6 +164,16 @@ P256
 ```
 
 The NIST P-256 curve with a 65-byte uncompressed encoded point.
+
+::Anchor{id="NamedGroup.P384"}
+
+### `P384`
+
+```silk
+P384
+```
+
+The NIST P-384 curve with a 97-byte uncompressed encoded point, in TLS 1.2 only.
 
 ::Anchor{id="AlpnProtocol"}
 
@@ -414,6 +450,26 @@ pub path: ValidationLimits
 
 Certificate-path policy.
 
+::Anchor{id="ClientLimits.credentialCertificates"}
+
+### Field `credentialCertificates`
+
+```silk
+pub credentialCertificates: usize
+```
+
+Maximum certificate count in a [`ClientCredential`](#ClientCredential) chain, at most 16.
+
+::Anchor{id="ClientLimits.credentialBytes"}
+
+### Field `credentialBytes`
+
+```silk
+pub credentialBytes: usize
+```
+
+Maximum aggregate DER bytes in a [`ClientCredential`](#ClientCredential) chain.
+
 ::Anchor{id="ClientLimits.impl.Copy"}
 
 ## Implementation `Copy for ClientLimits`
@@ -470,6 +526,26 @@ pub alpn: AlpnConfig<'a>
 
 ALPN policy, with opaque protocols in caller preference order.
 
+::Anchor{id="ClientConfig.resumption"}
+
+### Field `resumption`
+
+```silk
+pub resumption: Resumption<'a>
+```
+
+Whether the client asks for session tickets, and which session it offers.
+
+::Anchor{id="ClientConfig.versions"}
+
+### Field `versions`
+
+```silk
+pub versions: VersionPolicy
+```
+
+The TLS versions the client offers. `VersionPolicy.defaults()` offers TLS 1.2 and TLS 1.3.
+
 ::Anchor{id="ClientConfig.limits"}
 
 ### Field `limits`
@@ -479,6 +555,389 @@ pub limits: ClientLimits
 ```
 
 Finite connection limits and nested certificate policies.
+
+::Anchor{id="Resumption"}
+
+## `Resumption`
+
+```silk
+pub union Resumption<'a>
+```
+
+Whether a [`Client`](#Client) resumes sessions, in [`ClientConfig.resumption`](#ClientConfig.resumption).
+
+::Anchor{id="Resumption.Disabled"}
+
+### `Disabled`
+
+```silk
+Disabled
+```
+
+The client does not send `psk_key_exchange_modes`, so servers send no tickets, and it drops
+any ticket that a server sends anyway.
+
+::Anchor{id="Resumption.Enabled"}
+
+### `Enabled`
+
+```silk
+Enabled
+```
+
+The client asks for tickets, which [`Client.takeSession`](#Client.impl.takeSession) returns as sessions.
+
+::Anchor{id="Resumption.Enabled.session"}
+
+#### Field `session`
+
+```silk
+pub session: Option<&'a Session>
+```
+
+A session to resume, from [`Client.takeSession`](#Client.impl.takeSession) or [`Session.decode`](#Session.impl.decode), or `None` for a
+full handshake. [`Client.make`](#Client.impl.make) copies it. The client offers it only before it expires and
+only to the server name of the connection it came from. Otherwise it does a full handshake.
+
+::Anchor{id="Resumption.Enabled.earlyData"}
+
+#### Field `earlyData`
+
+```silk
+pub earlyData: &'a [u8]
+```
+
+Bytes to send as 0-RTT data with `session`, at most 16384, or an empty slice for none.
+[`Client.make`](#Client.impl.make) copies them. The client sends them only when it offers the session and the
+session's [`Session.maxEarlyData`](#Session.impl.maxEarlyData) is at least their length.
+
+##### Gotchas
+An attacker can replay 0-RTT data to the server, so send only requests that are safe to
+repeat.
+
+::Anchor{id="EarlyDataStatus"}
+
+## `EarlyDataStatus`
+
+```silk
+pub enum EarlyDataStatus
+```
+
+What happened to the 0-RTT data of a connection, from [`Client.earlyData`](#Client.impl.earlyData) or `Server.earlyData`.
+
+::Anchor{id="EarlyDataStatus.NotOffered"}
+
+### `NotOffered`
+
+```silk
+NotOffered
+```
+
+No early data was offered.
+
+::Anchor{id="EarlyDataStatus.Pending"}
+
+### `Pending`
+
+```silk
+Pending
+```
+
+The client sent early data and waits for the server's answer. A server never reports it.
+
+::Anchor{id="EarlyDataStatus.Accepted"}
+
+### `Accepted`
+
+```silk
+Accepted
+```
+
+The server accepted the early data.
+
+::Anchor{id="EarlyDataStatus.Rejected"}
+
+### `Rejected`
+
+```silk
+Rejected
+```
+
+The server rejected the early data, which it did not read.
+
+::Anchor{id="EarlyDataStatus.impl.Debug"}
+
+## Implementation `Debug for EarlyDataStatus`
+
+```silk
+impl Debug for EarlyDataStatus
+```
+
+::Anchor{id="EarlyDataStatus.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `Accepted`.
+
+::Anchor{id="Resumption.impl.Copy"}
+
+## Implementation `Copy for Resumption<'a>`
+
+```silk
+impl<'a> Copy for Resumption<'a>
+```
+
+::Anchor{id="ClientCredential"}
+
+## `ClientCredential`
+
+```silk
+pub union ClientCredential<'a>
+```
+
+The certificate that a [`Client`](#Client) sends when the server asks for one, in [`Client.make`](#Client.impl.make).
+
+::Anchor{id="ClientCredential.None"}
+
+### `None`
+
+```silk
+None
+```
+
+The client answers a CertificateRequest with an empty Certificate message.
+
+::Anchor{id="ClientCredential.Certificate"}
+
+### `Certificate`
+
+```silk
+Certificate
+```
+
+The client sends `certificates`, leaf first, and signs CertificateVerify with `key`, the
+leaf's private key. It signs only with a scheme that the server's CertificateRequest lists;
+otherwise it sends an empty Certificate message.
+
+::Anchor{id="ClientCredential.Certificate.certificates"}
+
+#### Field `certificates`
+
+```silk
+pub certificates: &'a [CertificateDer<'a>]
+```
+
+The chain, leaf first. [`Client.make`](#Client.impl.make) copies it.
+
+::Anchor{id="ClientCredential.Certificate.key"}
+
+#### Field `key`
+
+```silk
+pub key: SigningKey
+```
+
+The private key of the leaf.
+
+::Anchor{id="Session"}
+
+## `Session`
+
+```silk
+pub struct Session
+```
+
+A TLS 1.3 session from a server's NewSessionTicket, for resuming with
+`ClientConfig.session`.
+
+### Details
+[`Client.takeSession`](#Client.impl.takeSession) returns one for each ticket the server sends after the handshake. A
+session holds the resumption secret, the ticket, the cipher suite, the server name and ALPN
+protocol of its connection, and the leaf certificate that the full handshake authenticated.
+[`Session.encode`](#Session.impl.encode) and [`Session.decode`](#Session.impl.decode) save and load it.
+
+### Gotchas
+The encoded session holds the resumption secret. Store it as you would a key. A server can
+refuse a ticket at any time, and the client then does a full handshake.
+
+::Anchor{id="SessionError"}
+
+## `SessionError`
+
+```silk
+pub enum SessionError
+```
+
+Why [`Session.encode`](#Session.impl.encode) or [`Session.decode`](#Session.impl.decode) fails.
+
+::Anchor{id="SessionError.InvalidEncoding"}
+
+### `InvalidEncoding`
+
+```silk
+InvalidEncoding
+```
+
+The bytes are not a session that [`Session.encode`](#Session.impl.encode) wrote.
+
+::Anchor{id="SessionError.OutputTooShort"}
+
+### `OutputTooShort`
+
+```silk
+OutputTooShort
+```
+
+The output is shorter than [`Session.encodedLength`](#Session.impl.encodedLength).
+
+::Anchor{id="SessionError.impl.Debug"}
+
+## Implementation `Debug for SessionError`
+
+```silk
+impl Debug for SessionError
+```
+
+::Anchor{id="SessionError.impl.Debug.debug"}
+
+### Operation `debug`
+
+```silk
+effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
+```
+
+Writes the name of the variant, such as `InvalidEncoding`.
+
+::Anchor{id="Session.impl"}
+
+## Implementation `Session`
+
+```silk
+impl Session
+```
+
+::Anchor{id="Session.impl.suite"}
+
+### Method `suite`
+
+```silk
+pub fn suite(self: &Self) -> CipherSuite
+```
+
+Returns the cipher suite of the connection that issued the session.
+
+::Anchor{id="Session.impl.ticket"}
+
+### Method `ticket`
+
+```silk
+pub fn ticket<'a>(self: &'a Self) -> &'a [u8]
+```
+
+Borrows the opaque ticket that the server issued.
+
+::Anchor{id="Session.impl.lifetime"}
+
+### Method `lifetime`
+
+```silk
+pub fn lifetime(self: &Self) -> usize
+```
+
+Returns the ticket lifetime that the server gave, in seconds.
+
+::Anchor{id="Session.impl.issuedAt"}
+
+### Method `issuedAt`
+
+```silk
+pub fn issuedAt(self: &Self) -> Instant
+```
+
+Returns the time the client received the ticket, from the client's validation time.
+
+::Anchor{id="Session.impl.isExpired"}
+
+### Method `isExpired`
+
+```silk
+pub fn isExpired(self: &Self, at: &Instant) -> bool
+```
+
+Returns whether the lifetime has passed at `at`.
+
+::Anchor{id="Session.impl.maxEarlyData"}
+
+### Method `maxEarlyData`
+
+```silk
+pub fn maxEarlyData(self: &Self) -> usize
+```
+
+Returns the most early data in bytes that the server accepts with this session, or 0.
+
+::Anchor{id="Session.impl.alpn"}
+
+### Method `alpn`
+
+```silk
+pub fn alpn<'a>(self: &'a Self) -> Option<&'a [u8]>
+```
+
+Borrows the ALPN protocol of the connection that issued the session, if it had one.
+
+::Anchor{id="Session.impl.leafDer"}
+
+### Method `leafDer`
+
+```silk
+pub fn leafDer<'a>(self: &'a Self) -> &'a [u8]
+```
+
+Borrows the DER of the leaf certificate that the full handshake authenticated.
+
+::Anchor{id="Session.impl.encodedLength"}
+
+### Method `encodedLength`
+
+```silk
+pub fn encodedLength(self: &Self) -> usize
+```
+
+Returns the length of [`Session.encode`](#Session.impl.encode)'s output.
+
+::Anchor{id="Session.impl.encode"}
+
+### Method `encode`
+
+```silk
+pub fn encode(self: &Self, output: &mut [u8]) -> Result<usize, SessionError>
+```
+
+Writes the session to the start of `output`, and returns the number of bytes written.
+
+#### Errors
+- `OutputTooShort` if `output` is shorter than [`Session.encodedLength`](#Session.impl.encodedLength).
+
+::Anchor{id="Session.impl.decode"}
+
+### Associated function `decode`
+
+```silk
+pub effect fn decode(bytes: &[u8]) -> Result<Session, SessionError>
+  ! OutOfMemoryError
+  ? &mut Allocator
+```
+
+Reads a session that [`Session.encode`](#Session.impl.encode) wrote.
+
+#### Errors
+- `InvalidEncoding` if `bytes` is not exactly one encoded session.
+- `OutOfMemoryError` if the `Allocator` fails.
 
 ::Anchor{id="Demand"}
 
@@ -757,7 +1216,8 @@ An extension is duplicated, unsolicited, misplaced, or malformed.
 ServerHello
 ```
 
-ServerHello does not select the admitted TLS 1.3 profile.
+ServerHello does not select an offered version and profile, or a TLS 1.2 ServerHello carries
+the downgrade mark while TLS 1.3 is allowed.
 
 ::Anchor{id="ProtocolReason.HelloRetryRequest"}
 
@@ -1037,6 +1497,36 @@ CertificateProfile
 
 The configured semantic certificate-profile policy.
 
+::Anchor{id="TlsLimitKind.CredentialCertificates"}
+
+### `CredentialCertificates`
+
+```silk
+CredentialCertificates
+```
+
+Certificate count in the client's credential chain.
+
+::Anchor{id="TlsLimitKind.CredentialBytes"}
+
+### `CredentialBytes`
+
+```silk
+CredentialBytes
+```
+
+DER bytes in the client's credential chain.
+
+::Anchor{id="TlsLimitKind.EarlyDataBytes"}
+
+### `EarlyDataBytes`
+
+```silk
+EarlyDataBytes
+```
+
+The `Resumption` `earlyData` bytes.
+
 ::Anchor{id="TlsLimitKind.impl.Debug"}
 
 ## Implementation `Debug for TlsLimitKind`
@@ -1122,94 +1612,6 @@ effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &m
 ```
 
 Writes the name of the variant and its fields, such as `Decode { ... }`.
-
-::Anchor{id="CertificateVerifyFailure"}
-
-## `CertificateVerifyFailure`
-
-```silk
-pub union CertificateVerifyFailure
-```
-
-A server CertificateVerify failure with its selected signature implementation.
-
-::Anchor{id="CertificateVerifyFailure.Ecdsa"}
-
-### `Ecdsa`
-
-```silk
-Ecdsa
-```
-
-ECDSA-P256/SHA-256 verification failed.
-
-::Anchor{id="CertificateVerifyFailure.Ecdsa.error"}
-
-#### Field `error`
-
-```silk
-pub error: P256SignatureError
-```
-
-The exact primitive failure.
-
-::Anchor{id="CertificateVerifyFailure.EcdsaP384"}
-
-### `EcdsaP384`
-
-```silk
-EcdsaP384
-```
-
-ECDSA-P384/SHA-384 verification failed.
-
-::Anchor{id="CertificateVerifyFailure.EcdsaP384.error"}
-
-#### Field `error`
-
-```silk
-pub error: P384SignatureError
-```
-
-The exact primitive failure.
-
-::Anchor{id="CertificateVerifyFailure.Rsa"}
-
-### `Rsa`
-
-```silk
-Rsa
-```
-
-RSA-PSS-RSAE/SHA-256 verification failed.
-
-::Anchor{id="CertificateVerifyFailure.Rsa.error"}
-
-#### Field `error`
-
-```silk
-pub error: RsaError
-```
-
-The exact primitive failure.
-
-::Anchor{id="CertificateVerifyFailure.impl.Debug"}
-
-## Implementation `Debug for CertificateVerifyFailure`
-
-```silk
-impl Debug for CertificateVerifyFailure
-```
-
-::Anchor{id="CertificateVerifyFailure.impl.Debug.debug"}
-
-### Operation `debug`
-
-```silk
-effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &mut Writer
-```
-
-Writes the name of the variant and its fields, such as `Ecdsa { ... }`.
 
 ::Anchor{id="TlsError"}
 
@@ -1347,7 +1749,7 @@ Server CertificateVerify did not authenticate the transcript with the selected l
 #### Field `error`
 
 ```silk
-pub error: CertificateVerifyFailure
+pub error: SignatureFailure
 ```
 
 The exact selected primitive failure.
@@ -1462,6 +1864,66 @@ NoApplicationProtocol
 
 The server omits a required ALPN selection or selects a protocol that was not offered.
 
+::Anchor{id="TlsError.EmptyCredential"}
+
+### `EmptyCredential`
+
+```silk
+EmptyCredential
+```
+
+The [`ClientCredential`](#ClientCredential) has no certificates.
+
+::Anchor{id="TlsError.CredentialDecode"}
+
+### `CredentialDecode`
+
+```silk
+CredentialDecode
+```
+
+The [`ClientCredential`](#ClientCredential) leaf certificate did not decode.
+
+::Anchor{id="TlsError.CredentialDecode.error"}
+
+#### Field `error`
+
+```silk
+pub error: DecodeError
+```
+
+The decoder failure.
+
+::Anchor{id="TlsError.CredentialKeyMismatch"}
+
+### `CredentialKeyMismatch`
+
+```silk
+CredentialKeyMismatch
+```
+
+The [`ClientCredential`](#ClientCredential) key is not the key of its leaf certificate.
+
+::Anchor{id="TlsError.Signing"}
+
+### `Signing`
+
+```silk
+Signing
+```
+
+The credential key could not sign CertificateVerify.
+
+::Anchor{id="TlsError.Signing.error"}
+
+#### Field `error`
+
+```silk
+pub error: SigningError
+```
+
+The signing failure.
+
 ::Anchor{id="TlsError.impl.Debug"}
 
 ## Implementation `Debug for TlsError`
@@ -1479,14 +1941,6 @@ effect fn debug(self: &Self, formatter: &mut Formatter) -> () ! WriterError ? &m
 ```
 
 Writes the name of the variant and its fields, such as `PeerAlert { ... }`.
-
-::Anchor{id="CertificateVerifyFailure.impl.Copy"}
-
-## Implementation `Copy for CertificateVerifyFailure`
-
-```silk
-impl Copy for CertificateVerifyFailure
-```
 
 ::Anchor{id="Authentication"}
 
@@ -1514,7 +1968,17 @@ impl<'a> Authentication<'a>
 pub fn suite(self: &Self) -> CipherSuite
 ```
 
-Returns the negotiated TLS 1.3 cipher suite.
+Returns the negotiated cipher suite.
+
+::Anchor{id="Authentication.impl.version"}
+
+### Method `version`
+
+```silk
+pub fn version(self: &Self) -> TlsVersion
+```
+
+Returns the negotiated TLS version.
 
 ::Anchor{id="Authentication.impl.group"}
 
@@ -1596,6 +2060,18 @@ pub fn sanIndex(self: &Self) -> usize
 
 Returns the matching SAN's original certificate index.
 
+::Anchor{id="Authentication.impl.resumed"}
+
+### Method `resumed`
+
+```silk
+pub fn resumed(self: &Self) -> bool
+```
+
+Returns whether the handshake resumed a [`Session`](#Session). Then the server sent no certificate, and
+the leaf, anchor index, and SAN index are those of the full handshake that issued the session.
+The intermediate indices are empty.
+
 ::Anchor{id="Client"}
 
 ## `Client`
@@ -1604,7 +2080,7 @@ Returns the matching SAN's original certificate index.
 pub struct Client
 ```
 
-A TLS 1.3 client state machine that does no I/O.
+A TLS 1.2 and TLS 1.3 client state machine that does no I/O.
 
 ### When to use
 Most programs use `silk.tls.connection`, which drives this client over a `ByteDuplex`. Use it
@@ -1618,9 +2094,10 @@ works in two steps: write [`Client.pendingOutput`](#Client.impl.pendingOutput) t
 [`Client.ackWritten`](#Client.impl.ackWritten) with the number of bytes written. The client does not keep your buffers.
 [`ClientLimits`](#ClientLimits) bound all memory and work.
 
-It supports TLS 1.3 only, with the cipher suites ChaCha20-Poly1305, AES-128-GCM, and
-AES-256-GCM, the key exchange groups X25519 and P-256, and server keys ECDSA P-256, ECDSA P-384,
-and RSA (PSS with SHA-256). It checks the certificate chain against your `TrustSnapshot`, the
+It supports TLS 1.3 with the cipher suites ChaCha20-Poly1305, AES-128-GCM, and AES-256-GCM, and
+the key exchange groups X25519 and P-256. It supports TLS 1.2 with the ECDHE versions of those
+ciphers and the groups X25519, P-256, and P-384. Server keys can be ECDSA P-256, ECDSA P-384,
+or RSA (PSS, and in TLS 1.2 also PKCS #1 v1.5). It checks the certificate chain against your `TrustSnapshot`, the
 host name of your `ReferenceIdentity`, the CertificateVerify signature, and the Finished
 message. It gives no application data before all checks pass.
 
@@ -1645,6 +2122,7 @@ pub effect fn make<'a>(
     config: &ClientConfig<'a>,
     trust: TrustSnapshot,
     validationTime: Instant,
+    credential: ClientCredential<'a>,
   ) -> Result<Client, TlsError>
   ! OutOfMemoryError
   ? &mut Allocator | &mut Random
@@ -1653,11 +2131,15 @@ pub effect fn make<'a>(
 Returns a new client for `config` and `trust`, with the ClientHello already queued as pending
 output.
 
-`validationTime` is the time used to check certificate dates. The client copies `config` and
-consumes `trust`. A DNS name is sent as SNI in lowercase. An IP address sends no SNI.
+`validationTime` is the time used to check certificate dates. `credential` is what the client
+sends when the server asks for a certificate. The client copies `config` and the credential's
+chain, and consumes `trust` and the credential's key. A DNS name is sent as SNI in lowercase.
+An IP address sends no SNI.
 
 #### Errors
-- `Failure` with a `TlsError` if `config` is not valid.
+- `Failure` with a `TlsError` if `config` is not valid, or if the credential has no
+  certificates (`EmptyCredential`), a leaf that does not decode (`CredentialDecode`), a key
+  that is not the leaf's (`CredentialKeyMismatch`), or a chain over the credential limits.
 - `OutOfMemoryError` if the `Allocator` fails.
 
 #### Gotchas
@@ -1675,6 +2157,17 @@ pub fn pendingOutput<'a>(self: &'a Self) -> &'a [u8]
 Returns the TLS output to send to the server. After you send some of it, call
 [`Client.ackWritten`](#Client.impl.ackWritten).
 
+::Anchor{id="Client.impl.closeNotified"}
+
+### Method `closeNotified`
+
+```silk
+pub fn closeNotified(self: &Self) -> bool
+```
+
+Returns whether the server sent `close_notify`. Plaintext that came before it can still be
+read.
+
 ::Anchor{id="Client.impl.authentication"}
 
 ### Method `authentication`
@@ -1685,6 +2178,31 @@ pub fn authentication<'a>(self: &'a Self) -> Option<Authentication<'a>>
 
 Returns the result of authentication, after the `Authenticated` action. Before that, returns
 `None`.
+
+::Anchor{id="Client.impl.earlyData"}
+
+### Method `earlyData`
+
+```silk
+pub fn earlyData(self: &Self) -> EarlyDataStatus
+```
+
+Returns what happened to the `Resumption` `earlyData` bytes. It is `Pending` from
+[`Client.make`](#Client.impl.make) until the server's EncryptedExtensions, and final by `Authenticated`.
+
+::Anchor{id="Client.impl.takeSession"}
+
+### Method `takeSession`
+
+```silk
+pub fn takeSession(self: &mut Self) -> Option<Session>
+```
+
+Removes and returns the oldest [`Session`](#Session) from the server's NewSessionTicket messages, or
+`None` when no new one has arrived.
+
+The client keeps at most `limits.tickets` sessions over the connection. A ticket with a zero
+lifetime gives no session.
 
 ::Anchor{id="Client.impl.feedInput"}
 

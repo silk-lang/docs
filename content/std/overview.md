@@ -13,8 +13,11 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.color.color`](/docs/std/color-color) | Color | `Color` | Colors in the CSS Color 4 color spaces, with conversion, gamut mapping, mixing, adjustment, and contrast measurement. |
 | [`silk.color.rgba`](/docs/std/color-rgba) | Color | `Rgba` | Red, green, blue, and alpha channels with straight or premultiplied alpha, over any number type. |
 | [`silk.color.srgb`](/docs/std/color-srgb) | Color | `srgb` | The sRGB transfer function: conversion between gamma-encoded sRGB channels and linear light. |
-| [`silk.compress.checksum`](/docs/std/compress-checksum) | Data formats | `CompressionChecksum` | CRC checksums used by gzip and XZ containers. |
-| [`silk.compress.deflate`](/docs/std/compress-deflate) | Data formats | `Deflate` | Compress bytes as raw DEFLATE, zlib, or gzip with a bounded LZ77 match table. |
+| [`silk.compress.brotli`](/docs/std/compress-brotli) | Data formats | `Brotli` | Decompress Brotli data (RFC 7932) in steps, with fixed memory and limits that you set. |
+| [`silk.compress.brotli_encode`](/docs/std/compress-brotli-encode) | Data formats | `BrotliEncoder` | Compress bytes as Brotli streams (RFC 7932), in steps or all at once, with qualities 0 to 11. |
+| [`silk.compress.brotli_tables`](/docs/std/compress-brotli-tables) | Data formats | Not applicable | The static dictionary, word transforms, and literal context lookup table of Brotli (RFC 7932). |
+| [`silk.compress.checksum`](/docs/std/compress-checksum) | Data formats | `CompressionChecksum` | CRC-32, Adler-32, and CRC-64 checksums used by gzip, zlib, ZIP, and XZ containers. |
+| [`silk.compress.deflate`](/docs/std/compress-deflate) | Data formats | `Encoder` | Compress bytes as raw DEFLATE, zlib, or gzip, in steps or all at once, with zlib's levels, strategies, and flush modes. |
 | [`silk.compress.inflate`](/docs/std/compress-inflate) | Data formats | `Decoder` | Decompress raw DEFLATE, zlib, and gzip data in steps, with fixed memory and limits that you set. |
 | [`silk.compress.limits`](/docs/std/compress-limits) | Data formats | `compression` | Resource limits and failures for complete-buffer compression codecs. |
 | [`silk.compress.lzma`](/docs/std/compress-lzma) | Data formats | `Lzma` | Decode complete LZMA-alone streams into caller-owned byte buffers. |
@@ -24,15 +27,17 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.compress.xz`](/docs/std/compress-xz) | Data formats | `Xz` | Decode XZ containers and verify their blocks, index, and footer. |
 | [`silk.compress.zstd`](/docs/std/compress-zstd) | Data formats | `Zstd` | Decompress Zstandard data (RFC 8878) in steps, with fixed memory and limits that you set. |
 | [`silk.compress.zstd_block`](/docs/std/compress-zstd-block) | Data formats | `BlockState` | Internal bounded zstd compressed-block decoding with retained entropy tables. |
-| [`silk.compress.zstd_checksum`](/docs/std/compress-zstd-checksum) | Data formats | `Xxh64` | Incremental seed-zero XXH64 state for zstd frame checksum validation. |
+| [`silk.compress.zstd_checksum`](/docs/std/compress-zstd-checksum) | Data formats | `Xxh64` | Incremental seed-zero XXH64 state for zstd frame checksums. |
+| [`silk.compress.zstd_encode`](/docs/std/compress-zstd-encode) | Data formats | `ZstdEncoder` | Compress bytes as Zstandard frames (RFC 8878), in steps or all at once, with levels 1 to 22. |
 | [`silk.concurrency.atomic`](/docs/std/concurrency-atomic) | Concurrency | `Atomic` | Atomic memory operations on raw pointers, with explicit memory orderings. |
+| [`silk.concurrency.channel`](/docs/std/concurrency-channel) | Concurrency | `Channel` | Bounded channels that pass values between fibers on one thread. |
 | [`silk.concurrency.execution`](/docs/std/concurrency-execution) | Concurrency | `Execution` | Lazy computations with their own storage, which an owner drives and resumes. |
 | [`silk.concurrency.execution_storage`](/docs/std/concurrency-execution-storage) | Concurrency | `ExecutionStorage` | Storage for the private execution frames that the compiler makes. |
 | [`silk.concurrency.execution_storage`](/docs/std/concurrency-execution-storage) | Concurrency | `ExecutionStorage` | Storage for the private execution frames that the compiler makes. |
 | [`silk.concurrency.fiber`](/docs/std/concurrency-fiber) | Concurrency | `Fiber` | Fibers: handles to child tasks, with typed outcomes and one observer each. |
 | [`silk.concurrency.local_scheduler`](/docs/std/concurrency-local-scheduler) | Concurrency | `LocalScheduler` | A deterministic, single-threaded scheduler for structured Fibers. |
 | [`silk.concurrency.scheduler`](/docs/std/concurrency-scheduler) | Concurrency | `Scheduler` | The provider protocol that prepares child Fibers and publishes them atomically. |
-| [`silk.concurrency.sync`](/docs/std/concurrency-sync) | Concurrency | `Arc` | Shared ownership, locks and thread parking for values that several native threads use. |
+| [`silk.concurrency.sync`](/docs/std/concurrency-sync) | Concurrency | `Arc` | Shared ownership, locks, condition variables and thread parking for values that several native threads use. |
 | [`silk.concurrency.thread`](/docs/std/concurrency-thread) | Concurrency | `Transferable` | The normal names of the sealed thread properties \`Transferable\` and \`Concurrent\`. |
 | [`silk.concurrency.thread_native`](/docs/std/concurrency-thread-native) | Concurrency | `NativeThread` | Operating-system threads that each run one \`Transferable\` closure and return its result. |
 | [`silk.concurrency.thread_pool`](/docs/std/concurrency-thread-pool) | Concurrency | `ThreadPool` | A work-stealing pool of native threads that runs fibers in parallel. |
@@ -51,22 +56,57 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.core.static_sequence`](/docs/std/core-static-sequence) | Core | `StaticSequence` | Immutable lists of values that exist only during static evaluation. |
 | [`silk.core.static_text`](/docs/std/core-static-text) | Core | `StaticText` | Operations on string literals during static evaluation: length, byte access, concatenation, and slices. |
 | [`silk.core.target`](/docs/std/core-target) | Core | `Target` | Facts about the target machine of the current compilation: architecture, operating system, ABI, and pointer width. |
-| [`silk.crypto.aes_gcm`](/docs/std/crypto-aes-gcm) | Cryptography | `AesGcm` | Encrypt and authenticate data with AES-128-GCM or AES-256-GCM (NIST SP 800-38D). |
+| [`silk.crypto.aes`](/docs/std/crypto-aes) | Cryptography | `Aes` | Encrypt data with the AES block cipher (FIPS 197) in ECB, CBC, CTR, CFB, or OFB mode (NIST SP 800-38A). |
+| [`silk.crypto.aes_ccm`](/docs/std/crypto-aes-ccm) | Cryptography | `AesCcm` | Encrypt and authenticate data with AES-CCM (NIST SP 800-38C, RFC 3610). |
+| [`silk.crypto.aes_gcm`](/docs/std/crypto-aes-gcm) | Cryptography | `AesGcm` | Encrypt and authenticate data with AES-128-GCM, AES-192-GCM, or AES-256-GCM (NIST SP 800-38D). |
+| [`silk.crypto.aes_ocb`](/docs/std/crypto-aes-ocb) | Cryptography | `AesOcbEncryptor` | Encrypt and authenticate data with AES-OCB3 (RFC 7253), for a message in parts. |
 | [`silk.crypto.aes_round`](/docs/std/crypto-aes-round) | Cryptography | `aes` | The steps of an AES round on one 16-byte state, computed with portable code: SubBytes, ShiftRows and MixColumns, and their inverses. |
+| [`silk.crypto.aes_wrap`](/docs/std/crypto-aes-wrap) | Cryptography | `AesKeyWrap` | Wrap keys with the AES key wrap algorithms of RFC 3394 and RFC 5649 (NIST SP 800-38F KW, KWP). |
+| [`silk.crypto.aes_xts`](/docs/std/crypto-aes-xts) | Cryptography | `AesXts` | Encrypt storage sectors with AES-XTS (IEEE 1619, NIST SP 800-38E). |
+| [`silk.crypto.aria`](/docs/std/crypto-aria) | Cryptography | `Aria` | Encrypt with the ARIA block cipher (RFC 5794, KS X 1213). |
 | [`silk.crypto.blake2b`](/docs/std/crypto-blake2b) | Cryptography | `Blake2b512` | Portable BLAKE2b-512 state for the unkeyed 64-byte cryptographic digest of RFC 7693. |
-| [`silk.crypto.chacha20_poly1305`](/docs/std/crypto-chacha20-poly1305) | Cryptography | `ChaCha20Poly1305` | Encrypt and authenticate data with ChaCha20-Poly1305 (RFC 8439). |
-| [`silk.crypto.ed25519`](/docs/std/crypto-ed25519) | Cryptography | `Ed25519PublicKey` | Ed25519 signature verification for 32-byte public keys and 64-byte signatures (RFC 8032). |
-| [`silk.crypto.hkdf`](/docs/std/crypto-hkdf) | Cryptography | `HkdfSha256` | Derive keys with HKDF (RFC 5869) over SHA-256 or SHA-384. |
-| [`silk.crypto.hmac`](/docs/std/crypto-hmac) | Cryptography | `HmacSha256` | Compute HMAC tags (RFC 2104) with SHA-256 or SHA-384. |
+| [`silk.crypto.blake2s`](/docs/std/crypto-blake2s) | Cryptography | `Blake2s256` | Portable BLAKE2s-256 state for the unkeyed 32-byte cryptographic digest of RFC 7693. |
+| [`silk.crypto.block_cipher`](/docs/std/crypto-block-cipher) | Cryptography | `BlockCipher` | Run any block cipher in the standard modes: ECB, CBC, CTR, CFB, CFB-8, CFB-1, and OFB. |
+| [`silk.crypto.camellia`](/docs/std/crypto-camellia) | Cryptography | `Camellia` | Encrypt with the Camellia block cipher (RFC 3713, ISO/IEC 18033-3). |
+| [`silk.crypto.chacha20_poly1305`](/docs/std/crypto-chacha20-poly1305) | Cryptography | `ChaCha20Poly1305` | Encrypt and authenticate data with ChaCha20-Poly1305, and encrypt with raw ChaCha20 (RFC 8439). |
+| [`silk.crypto.digest`](/docs/std/crypto-digest) | Cryptography | `Digest` | The interface of every streaming hash in \`silk.crypto\`, so generic code such as HMAC and PBKDF2 can take the hash as a type argument. |
+| [`silk.crypto.des`](/docs/std/crypto-des) | Cryptography | `TripleDes` | Encrypt with Triple DES (TDEA, NIST SP 800-67), the \`des-ede3\` and \`des-ede\` ciphers. |
+| [`silk.crypto.des_wrap`](/docs/std/crypto-des-wrap) | Cryptography | `TripleDesKeyWrap` | Wrap keys with the Triple DES key wrap of RFC 3217 (CMS \`id-alg-CMS3DESwrap\`). |
+| [`silk.crypto.curve448`](/docs/std/crypto-curve448) | Cryptography | `X448` | Agree on a shared secret with X448 (RFC 7748), and sign with Ed448 (RFC 8032), on the Goldilocks curve, Curve448. |
+| [`silk.crypto.dh`](/docs/std/crypto-dh) | Cryptography | `DhPrivateKey` | Finite-field Diffie-Hellman key agreement (DH) over a prime modulus. |
+| [`silk.crypto.dsa`](/docs/std/crypto-dsa) | Cryptography | `DsaPrivateKey` | DSA keys and signatures (FIPS 186-4): parameter and key generation, signing, verification, and the DER forms that OpenSSL and Node.js use. |
+| [`silk.crypto.ec`](/docs/std/crypto-ec) | Cryptography | `EcPrivateKey` | Elliptic-curve keys, ECDSA, and ECDH on every named curve over a prime field that OpenSSL and Node.js list, such as \`brainpoolP256r1\`, \`secp256k1\`, \`secp224r1\`, and \`SM2\`. |
+| [`silk.crypto.ec_key`](/docs/std/crypto-ec-key) | Cryptography | `EcKeyDer` | Read and write elliptic-curve keys in DER: SEC1 private keys, PKCS #8 private keys, and SubjectPublicKeyInfo public keys, for the named curves of \[\`EcCurve\`\]. |
+| [`silk.crypto.ed25519`](/docs/std/crypto-ed25519) | Cryptography | `Ed25519PublicKey` | Ed25519 signatures with 32-byte keys and 64-byte signatures (RFC 8032). |
+| [`silk.crypto.hkdf`](/docs/std/crypto-hkdf) | Cryptography | `HkdfSha256` | Derive keys with HKDF (RFC 5869) over any hash of \`silk.crypto\`. |
+| [`silk.crypto.hmac`](/docs/std/crypto-hmac) | Cryptography | `HmacSha256` | Compute HMAC tags (RFC 2104) with any hash of \`silk.crypto\`. |
+| [`silk.crypto.legacy_pem`](/docs/std/crypto-legacy-pem) | Cryptography | `LegacyPem` | Encrypt and decrypt PEM keys with the legacy OpenSSL scheme of the \`Proc-Type\` and \`DEK-Info\` headers (RFC 1421 framing). |
 | [`silk.crypto.md5`](/docs/std/crypto-md5) | Cryptography | `Md5` | Compute MD5 digests for legacy formats, including UUID version 3. |
-| [`silk.crypto.p256`](/docs/std/crypto-p256) | Cryptography | `P256` | Key agreement (ECDH) and ECDSA signature verification on the NIST P-256 curve (secp256r1). |
-| [`silk.crypto.p384`](/docs/std/crypto-p384) | Cryptography | `EcdsaP384Sha384` | Verify ECDSA signatures on the NIST P-384 curve (secp384r1) with SHA-384. |
-| [`silk.crypto.rsa`](/docs/std/crypto-rsa) | Cryptography | `RsaPublicKey` | Verify RSA signatures with SHA-256: RSASSA-PSS and, for certificates, PKCS #1 v1.5. |
+| [`silk.crypto.md5_sha1`](/docs/std/crypto-md5-sha1) | Cryptography | `Md5Sha1` | Compute the 36-byte MD5-SHA1 digest that TLS 1.0 and 1.1 use: MD5 followed by SHA-1. |
+| [`silk.crypto.ml_dsa`](/docs/std/crypto-ml-dsa) | Cryptography | `MlDsa` | Sign and verify with ML-DSA (FIPS 204), the module-lattice signature scheme, at the levels ML-DSA-44, ML-DSA-65, and ML-DSA-87. |
+| [`silk.crypto.ml_kem`](/docs/std/crypto-ml-kem) | Cryptography | `MlKem` | Agree on a shared secret with ML-KEM (FIPS 203), the module-lattice key encapsulation mechanism, at the levels ML-KEM-512, ML-KEM-768, and ML-KEM-1024. |
+| [`silk.crypto.ml_key`](/docs/std/crypto-ml-key) | Cryptography | `MlKeyDer` | Read and write ML-KEM and ML-DSA keys in DER: PKCS #8 private keys and SubjectPublicKeyInfo public keys, in the IETF LAMPS profiles for X.509 (draft-ietf-lamps-dilithium-certificates and draft-ietf-lamps-kyber-certificates). |
+| [`silk.crypto.modular`](/docs/std/crypto-modular) |  | `Modulus` | Constant-time arithmetic on unsigned integers of up to 8192 bits, and modulo an odd number. |
+| [`silk.crypto.okp_key`](/docs/std/crypto-okp-key) | Cryptography | `OkpKeyDer` | Read and write X25519, X448, Ed25519, and Ed448 keys in DER: PKCS #8 private keys and SubjectPublicKeyInfo public keys, as RFC 8410 defines them. |
+| [`silk.crypto.p256`](/docs/std/crypto-p256) | Cryptography | `P256` | Key agreement (ECDH) and ECDSA signatures on the NIST P-256 curve (secp256r1). |
+| [`silk.crypto.p384`](/docs/std/crypto-p384) | Cryptography | `P384` | Key agreement (ECDH) and ECDSA signatures on the NIST P-384 curve (secp384r1). |
+| [`silk.crypto.p521`](/docs/std/crypto-p521) | Cryptography | `P521` | Key agreement (ECDH) and ECDSA signatures on the NIST P-521 curve (secp521r1). |
+| [`silk.crypto.pbkdf2`](/docs/std/crypto-pbkdf2) | Cryptography | `Pbkdf2` | Derive keys from passwords with PBKDF2 (RFC 8018 section 5.2) over HMAC with any hash. |
+| [`silk.crypto.pkcs8`](/docs/std/crypto-pkcs8) | Cryptography | `EncryptedPkcs8` | Encrypt and decrypt private keys in the PKCS #8 \`EncryptedPrivateKeyInfo\` format with PBES2 (RFC 8018, RFC 5958). |
+| [`silk.crypto.prime`](/docs/std/crypto-prime) | Cryptography | `Prime` | Test numbers for primality and generate random primes, including safe primes. |
+| [`silk.crypto.ripemd160`](/docs/std/crypto-ripemd160) | Cryptography | `Ripemd160` | Compute RIPEMD-160 digests for formats that name them, such as Bitcoin addresses. |
+| [`silk.crypto.rsa`](/docs/std/crypto-rsa) | Cryptography | `RsaPublicKey` | RSA keys, signatures, and encryption: PKCS #1 v1.5 and PSS signatures, OAEP and PKCS #1 v1.5 encryption, and key generation (RFC 8017). |
+| [`silk.crypto.scrypt`](/docs/std/crypto-scrypt) | Cryptography | `Scrypt` | Derive keys from passwords with scrypt (RFC 7914), a memory-hard function. |
+| [`silk.crypto.secp256k1`](/docs/std/crypto-secp256k1) | Cryptography | `Secp256k1` | Key agreement (ECDH) and ECDSA signatures on the curve secp256k1 of SEC 2. |
 | [`silk.crypto.sha1`](/docs/std/crypto-sha1) | Cryptography | `Sha1` | Compute SHA-1 digests (20 bytes) for old protocols and file formats. |
 | [`silk.crypto.sha2`](/docs/std/crypto-sha2) | Cryptography | `Sha256` | Compute SHA-2 digests: SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/224, and SHA-512/256. |
-| [`silk.crypto.sha3`](/docs/std/crypto-sha3) | Cryptography | `Sha3_256` | Compute SHA-3 digests: SHA3-224, SHA3-256, SHA3-384, and SHA3-512 (FIPS 202). |
+| [`silk.crypto.sha3`](/docs/std/crypto-sha3) | Cryptography | `Sha3_256` | Compute SHA-3 digests (SHA3-224, SHA3-256, SHA3-384, SHA3-512) and the SHAKE128 and SHAKE256 extendable-output functions (FIPS 202). |
+| [`silk.crypto.sm3`](/docs/std/crypto-sm3) | Cryptography | `Sm3` | Compute SM3 digests (GB/T 32905-2016), the hash of the Chinese commercial cryptography suite. |
+| [`silk.crypto.sm4`](/docs/std/crypto-sm4) | Cryptography | `Sm4` | Encrypt with the SM4 block cipher (GB/T 32907-2016, ISO/IEC 18033-3). |
 | [`silk.crypto.x25519`](/docs/std/crypto-x25519) | Cryptography | `X25519` | Agree on a shared secret with X25519 (RFC 7748) Diffie-Hellman. |
 | [`silk.encoding.base64`](/docs/std/encoding-base64) | Data formats | `Base64` | Encode and decode standard Base64 (RFC 4648, with padding) into byte slices that you supply. |
+| [`silk.encoding.endian`](/docs/std/encoding-endian) | Encoding | `endian` | Read and write 16-, 32- and 64-bit integers as little-endian or big-endian bytes in a slice. |
+| [`silk.encoding.pem`](/docs/std/encoding-pem) | Encoding | `Pem` | Read and write PEM, the Base64 text armor for keys and certificates (RFC 7468). |
 | [`silk.encoding.uuid`](/docs/std/encoding-uuid) | Data formats | `Uuid` | UUID values and constructors for versions 1 through 8, with RFC 9562 byte order. |
 | [`silk.geometry.affine`](/docs/std/geometry-affine) | Geometry | `Affine2` | Two-dimensional affine transforms: scale, rotation, skew, and translation in one matrix. |
 | [`silk.geometry.corners`](/docs/std/geometry-corners) | Geometry | `Corners` | A value for each of the four corners of a box, over any number type. |
@@ -112,7 +152,10 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.http.server_wasi`](/docs/std/http-server-wasi) | HTTP | `WasiHttpServer` | HTTP requests delivered to a WASI Preview 2 component. |
 | [`silk.http.target`](/docs/std/http-target) | HTTP | `RequestTarget` | The target of an HTTP request, the authority in it, and the \`Host\` field. |
 | [`silk.http.transport`](/docs/std/http-transport) | HTTP | `HttpTransport` | The byte transport under an HTTP connection: plain bytes or TLS. |
-| [`silk.http.websocket_server`](/docs/std/http-websocket-server) | HTTP | `WebSocketServer` | WebSocket messages on the server side, over a channel from an accepted handshake. |
+| [`silk.http.websocket`](/docs/std/http-websocket) | HTTP | `WebSocketCodec` | WebSocket frames (RFC 6455) for clients and servers, without I/O. |
+| [`silk.http.websocket_client`](/docs/std/http-websocket-client) | HTTP | `WebSocketClient` | The client side of the WebSocket opening handshake (RFC 6455, version 13). |
+| [`silk.http.websocket_native`](/docs/std/http-websocket-native) | HTTP | `WebSocketNative` | Native WebSocket clients and split sessions over TCP and TLS. |
+| [`silk.http.websocket_stream`](/docs/std/http-websocket-stream) | HTTP | `WebSocket` | WebSocket sessions over a byte duplex, for clients and servers, with a split form for fibers. |
 | [`silk.http.websocket_upgrade`](/docs/std/http-websocket-upgrade) | HTTP | `WebSocketUpgrade` | The server side of the WebSocket opening handshake (RFC 6455, version 13). |
 | [`silk.io.buffered_duplex`](/docs/std/io-buffered-duplex) | Input and output | `BufferedDuplex` | A buffered session that reads and writes one \`ByteDuplex\` transport inside a callback. |
 | [`silk.io.buffered_input`](/docs/std/io-buffered-input) | Input and output | `BufferedInput` | A fixed-size input buffer for parsers that must look at bytes before they use them. |
@@ -127,6 +170,8 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.io.logger_wasi`](/docs/std/io-logger-wasi) | Input and output | `WasiLogger` | A \`Logger\` provider for Preview 2 components whose host offers \`wasi\:logging\`: \[\`WasiLogger\`\] passes each message to \`wasi\:logging/logging.log\`. |
 | [`silk.io.logger_wasi`](/docs/std/io-logger-wasi) | Input and output | `WasiLogger` | A \`Logger\` provider for Preview 2 components whose host offers \`wasi\:logging\`: \[\`WasiLogger\`\] passes each message to \`wasi\:logging/logging.log\`. |
 | [`silk.io.memory_byte_duplex`](/docs/std/io-memory-byte-duplex) | Input and output | `MemoryByteDuplex` | A scripted \`ByteDuplex\` transport in memory, for tests of protocol code. |
+| [`silk.io.reactor`](/docs/std/io-reactor) | Input and output | `Reactor` | Wait for many native descriptors at once: one blocking call reports which ones are readable or writable, and another thread can wake the wait. |
+| [`silk.io.reactor`](/docs/std/io-reactor) | Input and output | `Reactor` | Wait for many native descriptors at once: one blocking call reports which ones are readable or writable, and another thread can wake the wait. |
 | [`silk.io.standard_input`](/docs/std/io-standard-input) | Input and output | `StandardInput` | The \`StandardInput\` effect: read raw bytes from standard input. |
 | [`silk.io.standard_input_native`](/docs/std/io-standard-input-native) | Input and output | `OsStandardInput` | The native provider of the \`StandardInput\` effect: it reads the standard input of the process. |
 | [`silk.io.standard_input_native`](/docs/std/io-standard-input-native) | Input and output | `OsStandardInput` | The native provider of the \`StandardInput\` effect: it reads the standard input of the process. |
@@ -154,12 +199,19 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.mem.slot`](/docs/std/mem-slot) | Memory | `Slot` | Initialization-state changes for one element slot of raw storage. |
 | [`silk.mem.stack`](/docs/std/mem-stack) | Memory | `Stack` | The native stack of the running thread: the address of the current frame, and scratch storage that lives on the stack instead of in an allocator. |
 | [`silk.net.address`](/docs/std/net-address) | Networking | `NetworkAddress` | IP addresses, ports, endpoints, and the host of a URI, as checked values that do not allocate. |
+| [`silk.net.datagram_native`](/docs/std/net-datagram-native) | Networking | `NativeUdpSocket` | Nonblocking UDP sockets on the native system: send and receive whole datagrams. |
+| [`silk.net.datagram_native`](/docs/std/net-datagram-native) | Networking | `NativeUdpSocket` | Nonblocking UDP sockets on the native system: send and receive whole datagrams. |
 | [`silk.net.datagram_wasi`](/docs/std/net-datagram-wasi) | Networking | `UdpSocket` | Owned UDP sockets and complete datagrams through WASI Preview 2. |
 | [`silk.net.datagram_wasi`](/docs/std/net-datagram-wasi) | Networking | `UdpSocket` | Owned UDP sockets and complete datagrams through WASI Preview 2. |
+| [`silk.net.dns.client_native`](/docs/std/net-dns-client-native) | Networking | `NativeDnsClient` | Ask DNS servers questions from a native program, with system UDP and TCP sockets. |
+| [`silk.net.dns.config`](/docs/std/net-dns-config) | Networking | `ResolverConfig` | Read the DNS client settings of a system: name servers, search domains and query options. |
+| [`silk.net.dns.message`](/docs/std/net-dns-message) | Networking | `Message` | Read and write DNS messages in the wire format of RFC 1035. |
+| [`silk.net.dns.query`](/docs/std/net-dns-query) | Networking | `Exchange` | Send one DNS question to the servers of a configuration, with retries and TCP fallback, without doing any input or output. |
 | [`silk.net.resolver`](/docs/std/net-resolver) | Networking | `Resolver` | Turn a host and a port into a list of endpoints to connect to. |
 | [`silk.net.resolver_native`](/docs/std/net-resolver-native) | Networking | `NativeSystemResolver` | The native \`Resolver\` provider using the system's \`getaddrinfo\`, or \`GetAddrInfoW\` on Windows. |
 | [`silk.net.resolver_wasi`](/docs/std/net-resolver-wasi) | Networking | `WasiResolver` | DNS resolution through a WASI Preview 2 network capability. |
 | [`silk.net.resolver_wasi`](/docs/std/net-resolver-wasi) | Networking | `WasiResolver` | DNS resolution through a WASI Preview 2 network capability. |
+| [`silk.net.socket_native`](/docs/std/net-socket-native) | Networking | `NativeSocket` | TCP and Unix socket connections and listeners, as \`ByteDuplex\` providers. |
 | [`silk.net.socket_native`](/docs/std/net-socket-native) | Networking | `NativeSocket` | TCP and Unix socket connections and listeners, as \`ByteDuplex\` providers. |
 | [`silk.net.socket_wasi`](/docs/std/net-socket-wasi) | Networking | `wasi_socket` | TCP connections and listeners through WASI Preview 2 network capabilities. |
 | [`silk.net.socket_wasi`](/docs/std/net-socket-wasi) | Networking | `wasi_socket` | TCP connections and listeners through WASI Preview 2 network capabilities. |
@@ -189,10 +241,15 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.platform.native.descriptor`](/docs/std/platform-native-descriptor) | Native platform | `NativeDescriptor` | Reads and writes on file descriptors that the caller owns, for native providers. |
 | [`silk.platform.native.diagnostics`](/docs/std/platform-native-diagnostics) | Native platform | `NativeDiagnostics` | The observer of native and wasm programs that reports unhandled errors and traps, with their call path. |
 | [`silk.platform.native.diagnostics`](/docs/std/platform-native-diagnostics) | Native platform | `NativeDiagnostics` | The observer of native and wasm programs that reports unhandled errors and traps, with their call path. |
+| [`silk.platform.native.file`](/docs/std/platform-native-file) | Native platform | `NativeFile` | POSIX file and directory operations on host paths and descriptors, for native providers and runtimes that need the full file model of the system. |
+| [`silk.platform.native.file`](/docs/std/platform-native-file) | Native platform | `NativeFile` | POSIX file and directory operations on host paths and descriptors, for native providers and runtimes that need the full file model of the system. |
+| [`silk.platform.native.file`](/docs/std/platform-native-file) | Native platform | `NativeFile` | POSIX file and directory operations on host paths and descriptors, for native providers and runtimes that need the full file model of the system. |
 | [`silk.platform.native.filesystem`](/docs/std/platform-native-filesystem) | Native platform | `NativeFileSystem` | The system calls for files and directories, for the native \`FileSystem\` provider. |
 | [`silk.platform.native.filesystem`](/docs/std/platform-native-filesystem) | Native platform | `NativeFileSystem` | The system calls for files and directories, for the native \`FileSystem\` provider. |
 | [`silk.platform.native.host_input`](/docs/std/platform-native-host-input) | Native platform | `NativeHostInput` | Owned copies of the command-line arguments and the environment of the process. |
 | [`silk.platform.native.host_input`](/docs/std/platform-native-host-input) | Native platform | `NativeHostInput` | Owned copies of the command-line arguments and the environment of the process. |
+| [`silk.platform.native.kqueue`](/docs/std/platform-native-kqueue) | Native platform | `KernelEvent` | The Darwin kqueue system calls and their C types, shared by the native providers that use them. |
+| [`silk.platform.native.kqueue`](/docs/std/platform-native-kqueue) | Native platform | `KernelEvent` | The Darwin kqueue system calls and their C types, shared by the native providers that use them. |
 | [`silk.platform.native.process`](/docs/std/platform-native-process) | Native platform | `NativeProcess` | Runs a child process with the system calls, for the native \`ChildProcess\` provider. |
 | [`silk.platform.native.process`](/docs/std/platform-native-process) | Native platform | `NativeProcess` | Runs a child process with the system calls, for the native \`ChildProcess\` provider. |
 | [`silk.platform.native.report`](/docs/std/platform-native-report) | Native platform | `NativeReport` | Writes the report of an unhandled error or a trap to a descriptor, with fixed limits. |
@@ -223,8 +280,8 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.platform.wasm.heap`](/docs/std/platform-wasm-heap) | Native platform | Not applicable | The linear-memory heap of every wasm module, and the report buffer of a module without WASI. |
 | [`silk.platform.wasm.thread`](/docs/std/platform-wasm-thread) | Native platform | Not applicable | The wasi-threads records of a multi-threaded wasm32 module. |
 | [`silk.platform.wasm.thread`](/docs/std/platform-wasm-thread) | Native platform | Not applicable | The wasi-threads records of a multi-threaded wasm32 module. |
-| [`silk.platform.wasm.support`](/docs/std/platform-wasm-support) | Native platform | Not applicable | The C library of every wasm32 executable: the heap entry points, the byte routines, the 128-bit multiply, the floating remainder and the fused multiply-add. |
-| [`silk.platform.wasm.support`](/docs/std/platform-wasm-support) | Native platform | Not applicable | The C library of every wasm32 executable: the heap entry points, the byte routines, the 128-bit multiply, the floating remainder and the fused multiply-add. |
+| [`silk.platform.wasm.support`](/docs/std/platform-wasm-support) | Native platform | Not applicable | The C library of every wasm32 executable: the heap entry points, the byte routines, the 128-bit multiply and shifts, the floating remainder and the fused multiply-add. |
+| [`silk.platform.wasm.support`](/docs/std/platform-wasm-support) | Native platform | Not applicable | The C library of every wasm32 executable: the heap entry points, the byte routines, the 128-bit multiply and shifts, the floating remainder and the fused multiply-add. |
 | [`silk.platform.wasm.start`](/docs/std/platform-wasm-start) | Native platform | `WasmStart` | The program entry for the standalone LLVM-to-WebAssembly profile. |
 | [`silk.platform.windows.clock`](/docs/std/platform-windows-clock) | Windows platform | `WindowsClock` | Windows wall and monotonic clocks without a C runtime. |
 | [`silk.platform.windows.clock`](/docs/std/platform-windows-clock) | Windows platform | `WindowsClock` | Windows wall and monotonic clocks without a C runtime. |
@@ -254,7 +311,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.platform.windows.winsock`](/docs/std/platform-windows-winsock) |  | `Winsock` | Scoped ownership of a Windows Winsock initialization reference. |
 | [`silk.platform.windows.wtf8`](/docs/std/platform-windows-wtf8) | Windows platform | `Wtf8` | Lossless conversion between Windows UTF-16 code units and canonical WTF-8 bytes. |
 | [`silk.simd.aarch64`](/docs/std/simd-aarch64) | SIMD | `aarch64` | AArch64 NEON instructions that the portable \`silk.simd.simd\` operations do not express: table lookups, dot products, pairwise sums, and AES round steps. |
-| [`silk.simd.cpu`](/docs/std/simd-cpu) | SIMD | `CpuFeatures` | Runtime detection of the CPU features that the running machine has. |
+| [`silk.simd.cpu`](/docs/std/simd-cpu) | SIMD | `CpuFeatures` | Runtime detection of the CPU features that the running machine has, to choose a kernel at run time. |
 | [`silk.simd.f32x4`](/docs/std/simd-f32x4) | SIMD | `f32x4` | Operations on \`simd\<f32, 4\>\`: four 32-bit float lanes in one 128-bit vector. |
 | [`silk.simd.f32x8`](/docs/std/simd-f32x8) | SIMD | `f32x8` | Operations on \`simd\<f32, 8\>\`: eight 32-bit float lanes in one 256-bit vector. |
 | [`silk.simd.f64x2`](/docs/std/simd-f64x2) | SIMD | `f64x2` | Operations on \`simd\<f64, 2\>\`: two 64-bit float lanes in one 128-bit vector. |
@@ -308,9 +365,18 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.system.monotonic_clock_native`](/docs/std/system-monotonic-clock-native) | System | `OsMonotonicClock` | The native provider of the \`MonotonicClock\` effect: a clock that never goes back. |
 | [`silk.system.random`](/docs/std/system-random) | System | `Random` | The \`Random\` effect: random bytes that are safe for secrets. |
 | [`silk.system.random_native`](/docs/std/system-random-native) | System | `OsRandom` | The native provider of the \`Random\` effect: secure random bytes from the operating system. |
+| [`silk.system.signal_watch`](/docs/std/system-signal-watch) | System | `SignalWatch` | Receive process signals, such as an interrupt or a terminal resize, through a descriptor that an event loop can watch. |
+| [`silk.system.signal_watch`](/docs/std/system-signal-watch) | System | `SignalWatch` | Receive process signals, such as an interrupt or a terminal resize, through a descriptor that an event loop can watch. |
+| [`silk.system.subprocess`](/docs/std/system-subprocess) | System | `Subprocess` | Start a child process whose standard streams stay open while it runs, send it signals, and learn when it ends through a descriptor that an event loop can watch. |
+| [`silk.system.subprocess`](/docs/std/system-subprocess) | System | `Subprocess` | Start a child process whose standard streams stay open while it runs, send it signals, and learn when it ends through a descriptor that an event loop can watch. |
 | [`silk.system.system_clock`](/docs/std/system-system-clock) | System | `SystemClock` | The \`SystemClock\` effect: the current date and time as Unix time, and the \[\`Instant\`\] type that both clocks use. |
 | [`silk.system.system_clock_native`](/docs/std/system-system-clock-native) | System | `OsSystemClock` | The native provider of the \`SystemClock\` effect: the time of day, as seconds since 1970. |
 | [`silk.system.system_clock_native`](/docs/std/system-system-clock-native) | System | `OsSystemClock` | The native provider of the \`SystemClock\` effect: the time of day, as seconds since 1970. |
+| [`silk.system.system_info`](/docs/std/system-system-info) | System | `SystemInfo` | The \`SystemInfo\` effect: facts about the computer and the running process that the operating system reports, such as the host name, the memory, the processors, the network interfaces, the current user, and the resource usage of the process. |
+| [`silk.system.system_info_native`](/docs/std/system-system-info-native) | System | `OsSystemInfo` | The native provider of the \`SystemInfo\` effect: facts about the computer and the process from the C library and the kernel. |
+| [`silk.system.system_info_native`](/docs/std/system-system-info-native) | System | `OsSystemInfo` | The native provider of the \`SystemInfo\` effect: facts about the computer and the process from the C library and the kernel. |
+| [`silk.system.terminal`](/docs/std/system-terminal) | System | `Terminal` | Read the size of a terminal, and switch it between its normal mode and raw mode. |
+| [`silk.system.terminal`](/docs/std/system-terminal) | System | `Terminal` | Read the size of a terminal, and switch it between its normal mode and raw mode. |
 | [`silk.testing.exchange`](/docs/std/testing-exchange) | Testing | `TestExchange` | The binary plan and receipt formats that let \`silk test\` control the test runner. |
 | [`silk.testing.runner`](/docs/std/testing-runner) | Testing | `TestRunner` | The built-in test runner that \`silk test\` selects. It runs tests one at a time. |
 | [`silk.testing.testing`](/docs/std/testing-testing) | Testing | `Testing` | Assertions for tests, and the filter rules that the test runner uses to select tests. |
@@ -331,21 +397,25 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.text.utf8_scan`](/docs/std/text-utf8-scan) | Text | `utf8_scan` | Random-access decoding of one Unicode scalar from UTF-8 bytes, for text algorithms that scan by byte offset. |
 | [`silk.text.vertical_text`](/docs/std/text-vertical-text) | Text | `vertical_text` | Character orientation in vertical text (UAX #50), with data from Unicode 18.0.0. |
 | [`silk.text.word_dictionary`](/docs/std/text-word-dictionary) | Text | `IcuDictionary` | Dictionary word segmentation for Thai, Lao, Khmer and Myanmar text, for line breaking, with the dictionaries of ICU 78.1. |
-| [`silk.text.word_dictionary_khmer`](/docs/std/text-word-dictionary-khmer) | Text | `word_dictionary_khmer` | The ICU Khmer word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
-| [`silk.text.word_dictionary_lao`](/docs/std/text-word-dictionary-lao) | Text | `word_dictionary_lao` | The ICU Lao word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
-| [`silk.text.word_dictionary_myanmar`](/docs/std/text-word-dictionary-myanmar) | Text | `word_dictionary_myanmar` | The ICU Burmese (Myanmar) word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
-| [`silk.text.word_dictionary_thai`](/docs/std/text-word-dictionary-thai) | Text | `word_dictionary_thai` | The ICU Thai word dictionary for \`silk.text.word\_dictionary\`, as a packed minimal trie. |
+| [`silk.text.word_dictionary_khmer`](/docs/std/text-word-dictionary-khmer) | Text | `word_dictionary_khmer` | The packed ICU Khmer word dictionary trie for \`silk.text.word\_dictionary\`. |
+| [`silk.text.word_dictionary_lao`](/docs/std/text-word-dictionary-lao) | Text | `word_dictionary_lao` | The packed ICU Lao word dictionary trie for \`silk.text.word\_dictionary\`. |
+| [`silk.text.word_dictionary_myanmar`](/docs/std/text-word-dictionary-myanmar) | Text | `word_dictionary_myanmar` | The packed ICU Burmese (Myanmar) word dictionary trie for \`silk.text.word\_dictionary\`. |
+| [`silk.text.word_dictionary_thai`](/docs/std/text-word-dictionary-thai) | Text | `word_dictionary_thai` | The packed ICU Thai word dictionary trie for \`silk.text.word\_dictionary\`. |
 | [`silk.tls.certificate`](/docs/std/tls-certificate) | TLS and certificates | `Certificate` | Decode one X.509 certificate from DER or PEM, and read its fields. |
 | [`silk.tls.certificate_bundle`](/docs/std/tls-certificate-bundle) | TLS and certificates | `CertificateBundle` | Decode a PEM file with one or more certificates, such as a certificate chain or a CA bundle. |
 | [`silk.tls.certificate_identities`](/docs/std/tls-certificate-identities) | TLS and certificates | `CertificateSan` | Decode the subject alternative names (SAN) of a certificate: the DNS names and IP addresses that it is for. |
-| [`silk.tls.certificate_path`](/docs/std/tls-certificate-path) | TLS and certificates | `CertificatePath` | Validate the certificate chain of a TLS server, from its leaf certificate to a trust anchor. |
+| [`silk.tls.certificate_path`](/docs/std/tls-certificate-path) | TLS and certificates | `CertificatePath` | Validate the certificate chain of a TLS server or client, from its leaf certificate to a trust anchor. |
 | [`silk.tls.certificate_pem`](/docs/std/tls-certificate-pem) | TLS and certificates | `Pem` | Internal strict PEM framing and canonical base64 for owned certificate decoders. |
 | [`silk.tls.certificate_profile`](/docs/std/tls-certificate-profile) | TLS and certificates | `CertificateProfile` | Check one certificate against the TLS server certificate profile, and read its extensions. |
-| [`silk.tls.client`](/docs/std/tls-client) | TLS and certificates | `Client` | A TLS 1.3 client state machine that authenticates an HTTPS server over a byte transport that you drive. |
-| [`silk.tls.connection`](/docs/std/tls-connection) | TLS and certificates | `OwnedConnection` | An authenticated TLS 1.3 connection over a \`ByteDuplex\` transport, with timeouts and close handling. |
+| [`silk.tls.certificate_text`](/docs/std/tls-certificate-text) | TLS and certificates | `CertificateText` | Text forms of certificate fields as OpenSSL prints them: object names, distinguished names, validity times, and serial numbers. |
+| [`silk.tls.client`](/docs/std/tls-client) | TLS and certificates | `Client` | A TLS 1.2 and TLS 1.3 client state machine that authenticates an HTTPS server over a byte transport that you drive. |
+| [`silk.tls.connection`](/docs/std/tls-connection) | TLS and certificates | `OwnedConnection` | An authenticated TLS 1.2 or TLS 1.3 connection over a \`ByteDuplex\` transport, with timeouts and close handling. |
 | [`silk.tls.hkdf`](/docs/std/tls-hkdf) | TLS and certificates | `TlsHkdfSha256` | The TLS 1.3 key schedule functions \`HKDF-Expand-Label\` and \`Derive-Secret\` (RFC 8446, section 7.1). |
 | [`silk.tls.https_identity`](/docs/std/tls-https-identity) | TLS and certificates | `HttpsIdentity` | Check that a server certificate is for the host name or IP address in an HTTPS URL (RFC 6125 and RFC 9110). |
-| [`silk.tls.record`](/docs/std/tls-record) | TLS and certificates | `TlsRecordSender` | Frame and protect TLS 1.3 records (RFC 8446, section 5) over a byte transport that you drive. |
+| [`silk.tls.prf`](/docs/std/tls-prf) | TLS and certificates | `TlsPrf` | The TLS 1.2 pseudorandom function (RFC 5246 section 5) and the secrets that TLS 1.2 derives with it: the extended master secret (RFC 7627), the key block, and Finished. |
+| [`silk.tls.record`](/docs/std/tls-record) | TLS and certificates | `TlsRecordSender` | Frame and protect TLS 1.3 records (RFC 8446, section 5) and TLS 1.2 AEAD records (RFC 5246, section 6.2) over a byte transport that you drive. |
+| [`silk.tls.server`](/docs/std/tls-server) | TLS and certificates | `Server` | A TLS 1.2 and TLS 1.3 server state machine that does the handshake and protects application data over a byte transport that you drive. |
+| [`silk.tls.signature`](/docs/std/tls-signature) | TLS and certificates | `HandshakeSignature` | Check a TLS 1.3 or TLS 1.2 handshake signature with the public key of a peer's leaf certificate, and sign one with a leaf's private key. |
 | [`silk.tls.trust_anchor`](/docs/std/tls-trust-anchor) | TLS and certificates | `TrustAnchor` | A trust anchor: a CA certificate that you trust, with optional limits that you add. |
 | [`silk.tls.trust_snapshot`](/docs/std/tls-trust-snapshot) | TLS and certificates | `TrustSnapshot` | A fixed list of trust anchors: the root CAs that certificate path validation starts from. |
 | [`silk.tls.trust_source`](/docs/std/tls-trust-source) | TLS and certificates | `TrustSource` | The \`TrustSource\` effect: where a program gets its trust anchors. |
@@ -363,6 +433,7 @@ Each page describes the selected source API for the listed profiles. Distinct su
 | [`silk.uri.percent`](/docs/std/uri-percent) | Data formats | `UriPercent` | Percent-encode bytes for a URI component, and decode \`%XX\` escapes. |
 | [`silk.uri.reference`](/docs/std/uri-reference) | Data formats | `UriReference` | Parse a URI or a relative reference (RFC 3986) and read its components without allocation. |
 | [`silk.uri.uri`](/docs/std/uri-uri) | Data formats | `Uri` | Parse an absolute URI (RFC 3986), and resolve relative references against it. |
+| [`silk.xml.document`](/docs/std/xml-document) | Data formats | `XmlDocument` | Parse an XML 1.0 document into an owned, namespace-aware tree of elements, text, comments, and processing instructions. |
 
 Profile identities:
 

@@ -112,7 +112,7 @@ pub fn main() -> i32 {
 
 Import as `HttpExchangeNative` with `import silk.http.exchange_native as HttpExchangeNative`.
 
-Public declarations: 16.
+Public declarations: 17.
 
 ::Anchor{id="NativeRoute"}
 
@@ -381,6 +381,16 @@ pub tls: ClientLimits
 
 The storage limits of the TLS client.
 
+::Anchor{id="Options.tlsVersions"}
+
+### Field `tlsVersions`
+
+```silk
+pub tlsVersions: VersionPolicy
+```
+
+The TLS versions the client offers.
+
 ::Anchor{id="Options.trust"}
 
 ### Field `trust`
@@ -420,7 +430,7 @@ pub fn defaults() -> Options
 Returns the default settings.
 
 They are: 16 addresses, any family, Nagle on, a 1 ms poll interval, 64 attempts, no deadline,
-30 seconds for the handshake, and `OptionalHttp11`.
+30 seconds for the handshake, TLS 1.2 and TLS 1.3, and `OptionalHttp11`.
 
 ::Anchor{id="NativeTransport"}
 
@@ -741,6 +751,36 @@ connection and to the `CONNECT` exchange.
 - `NativeExchangeError.TrustRequired` if the origin uses `https` and `preparedTrust` is none.
 - The errors of resolution, the socket, TLS, and the handler.
 
+::Anchor{id="NativeTransportHalves"}
+
+## `NativeTransportHalves`
+
+```silk
+pub struct NativeTransportHalves
+```
+
+The two halves of a [`NativeTransport`](#NativeTransport), from [`NativeTransport.split`](#NativeTransport.impl.split).
+
+::Anchor{id="NativeTransportHalves.reader"}
+
+### Field `reader`
+
+```silk
+pub reader: NativeTransport
+```
+
+The half to read from.
+
+::Anchor{id="NativeTransportHalves.writer"}
+
+### Field `writer`
+
+```silk
+pub writer: NativeTransport
+```
+
+The half to write to.
+
 ::Anchor{id="NativeTransport.impl"}
 
 ## Implementation `NativeTransport`
@@ -758,6 +798,38 @@ pub fn route(self: &Self) -> NativeRoute
 ```
 
 Returns the route of the transport.
+
+::Anchor{id="NativeTransport.impl.plain"}
+
+### Associated function `plain`
+
+```silk
+pub fn plain(connection: NativeConnection) -> NativeTransport
+```
+
+Returns a transport over a plain socket, for example one that a listener accepted.
+
+::Anchor{id="NativeTransport.impl.split"}
+
+### Method `split`
+
+```silk
+pub effect fn split(self: Self) -> NativeTransportHalves ! OutOfMemoryError ? &mut Allocator
+```
+
+Splits the transport into a half to read from and a half to write to, so that one fiber can
+wait for input while another one writes. A TLS transport is split too.
+
+#### Details
+Use `reader` only to read and `writer` only to write. With TLS, records that the reader must
+answer, such as a key update, go out with the next write. The socket closes when both halves
+are closed or dropped.
+
+#### Errors
+`OutOfMemoryError` if the shared state cannot be allocated.
+
+#### Gotchas
+A half cannot be split again. That traps.
 
 ::Anchor{id="NativeTransport.impl.HttpTransport"}
 

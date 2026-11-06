@@ -17,8 +17,8 @@ the system returned a count that is not valid.
 - The caller keeps the descriptor open and controls access from other threads.
 - [`NativeDescriptor.writeAll`](#NativeDescriptor.impl.writeAll) and [`NativeDescriptor.writeAllGather`](#NativeDescriptor.impl.writeAllGather) can fail after part of
   the bytes were written.
-- The module is empty on targets other than Darwin on x86_64 or aarch64, and Linux with GNU libc on x86_64
-  or aarch64.
+- The module is empty on targets other than Darwin on x86_64 or aarch64, and Linux with GNU libc
+  on x86_64 or aarch64.
 
 ## Examples
 ### Make empty transfers
@@ -54,7 +54,7 @@ Public declarations: 5.
 ## `read`
 
 ```silk
-@foreign(noCapture: ("buffer",))
+@foreign(noCapture: .("buffer"))
 pub unsafe extern "C" fn read(fd: i32, buffer: ?[*]mut u8, count: usize) -> isize
 ```
 
@@ -69,7 +69,7 @@ error code at once.
 ## `write`
 
 ```silk
-@foreign(noCapture: ("buffer",))
+@foreign(noCapture: .("buffer"))
 pub unsafe extern "C" fn write(fd: i32, buffer: ?[*]const u8, count: usize) -> isize
 ```
 
@@ -110,8 +110,9 @@ pub struct NativeDescriptor
 Safe reads and writes on a descriptor that the caller owns, for native providers.
 
 ### When to use
-Use it to build a native provider, such as `silk.io.writer_native` or `silk.io.standard_input_native`.
-Application code uses the `Writer` and `StandardInput` effects instead.
+Use it to build a native provider, such as `silk.io.writer_native` or
+`silk.io.standard_input_native`. Application code uses the `Writer` and `StandardInput` effects
+instead.
 
 ### Details
 One system call transfers at most 0x7ffff000 bytes. A call that a signal interrupts is made
@@ -121,8 +122,8 @@ system returned a count that is not valid.
 
 ### Gotchas
 - The caller keeps the descriptor open and controls access from other threads.
-- The type is empty on targets other than Darwin on x86_64 or aarch64, and Linux with GNU libc on x86_64
-  or aarch64.
+- The type is empty on targets other than Darwin on x86_64 or aarch64, and Linux with GNU libc
+  on x86_64 or aarch64.
 
 ::Anchor{id="NativeDescriptor.impl"}
 

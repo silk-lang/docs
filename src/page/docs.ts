@@ -7,8 +7,14 @@ import * as Icon from '../icon'
 import * as Layout from '../layout'
 import { Message } from '../message'
 import { DocState, type Model } from '../model'
-import { docsRouter } from '../route'
+import { versionsRouter } from '../route'
 import * as Search from '../search'
+import {
+  VERSIONED_DIRECTORY,
+  archivedPagePath,
+  versionedUrl,
+} from '../versions/archive'
+import * as Versions from '../versions/list'
 
 // SIDEBAR
 
@@ -21,19 +27,25 @@ const sidebarTitle = (title: string, h: HtmlBuilder<Message>) =>
       index === 0 ? [segment] : ['.', h.wbr([]), segment],
     )
 
+const isSamePage = (left: Catalog.DocPage, right: Catalog.DocPage): boolean =>
+  left.directory === right.directory && left.slug === right.slug
+
 const sidebarItem = (
+  context: Catalog.DocsContext,
   page: Catalog.DocPage,
   maybeCurrent: Option.Option<Catalog.DocPage>,
   h: HtmlBuilder<Message>,
 ): Html => {
-  const isCurrent = Option.exists(maybeCurrent, current => current === page)
+  const isCurrent = Option.exists(maybeCurrent, current =>
+    isSamePage(current, page),
+  )
   return h.keyed('li')(
     Catalog.pageKey(page),
     [],
     [
       h.a(
         [
-          h.Href(Catalog.pagePath(page)),
+          h.Href(context.pagePath(page)),
           ...(isCurrent ? [h.AriaCurrent('page')] : []),
           h.Class(
             isCurrent
@@ -48,6 +60,7 @@ const sidebarItem = (
 }
 
 const sidebarGroup = (
+  context: Catalog.DocsContext,
   group: Catalog.DocGroup,
   pages: ReadonlyArray<Catalog.DocPage>,
   isOpen: boolean,
@@ -88,7 +101,9 @@ const sidebarGroup = (
       isOpen
         ? h.ul(
             [h.Id(`docs-group-${group.key}`), h.Class('flex flex-col')],
-            Array.map(pages, page => sidebarItem(page, maybeCurrent, h)),
+            Array.map(pages, page =>
+              sidebarItem(context, page, maybeCurrent, h),
+            ),
           )
         : h.empty,
     ],
@@ -124,18 +139,234 @@ export const searchTrigger = (h: HtmlBuilder<Message>): Html =>
     ],
   )
 
+// VERSION PICKER
+
+const shortDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+
+// Where a version's copy of the page a reader is on lives: the same page when
+// the version has it (an archived page that is missing says so), or the
+// version's standard library overview.
+const versionHref = (
+  maybeVersion: Option.Option<string>,
+  maybeCurrent: Option.Option<Catalog.DocPage>,
+): string =>
+  Option.match(maybeVersion, {
+    onNone: () =>
+      pipe(
+        maybeCurrent,
+        Option.flatMap(page => Catalog.findPage(page.directory, page.slug)),
+        Option.match({
+          onNone: () => '/docs',
+          onSome: page => Catalog.pagePath(page),
+        }),
+      ),
+    onSome: version =>
+      pipe(
+        maybeCurrent,
+        Option.filter(page => page.directory === VERSIONED_DIRECTORY),
+        Option.match({
+          onNone: () =>
+            archivedPagePath(version, {
+              directory: VERSIONED_DIRECTORY,
+              slug: 'overview',
+            }),
+          onSome: page => archivedPagePath(version, page),
+        }),
+      ),
+  })
+
+const pickerItem = (
+  label: string,
+  detail: string,
+  href: string,
+  isCurrent: boolean,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.keyed('li')(
+    href,
+    [],
+    [
+      h.a(
+        [
+          h.Href(href),
+          ...(isCurrent ? [h.AriaCurrent('page')] : []),
+          h.Class(
+            `flex items-baseline justify-between gap-3 rounded px-2.5 py-1.5 text-sm hover:bg-panel ${isCurrent ? 'font-semibold text-ink' : 'text-body'}`,
+          ),
+        ],
+        [
+          h.span([h.Class('font-mono')], [label]),
+          h.span([h.Class('text-xs text-muted')], [detail]),
+        ],
+      ),
+    ],
+  )
+
+// Picks the release the standard library reference describes, on its pages.
+// The current docs follow the newest release; every release has an archived
+// copy under /v/. Hand-written pages are not versioned, so they show no
+// picker. The menu is keyed by the page, so it closes when a reader picks a
+// version.
+export const versionPicker = (
+  context: Catalog.DocsContext,
+  maybeCurrent: Option.Option<Catalog.DocPage>,
+  h: HtmlBuilder<Message>,
+): Html => {
+  const isVersionedPage =
+    Option.isSome(context.maybeVersion) ||
+    Option.exists(maybeCurrent, page => page.directory === VERSIONED_DIRECTORY)
+  if (!Array.isReadonlyArrayNonEmpty(Versions.versions) || !isVersionedPage) {
+    return h.empty
+  }
+  const isLatest = Option.isNone(context.maybeVersion)
+  const currentLabel = Option.getOrElse(
+    Option.orElse(context.maybeVersion, () =>
+      Option.map(Versions.maybeLatest, latest => latest.version),
+    ),
+    () => 'Latest',
+  )
+  const pagePathKey = Option.match(maybeCurrent, {
+    onNone: () => context.indexPath,
+    onSome: page => context.pagePath(page),
+  })
+  return h.keyed('details')(
+    pagePathKey,
+    [h.Class('group/versions relative')],
+    [
+      h.summary(
+        [
+          h.AriaLabel(
+            `Docs version: ${currentLabel}${isLatest ? ', the latest' : ''}`,
+          ),
+          h.Class(
+            'flex cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-rule bg-paper px-3 py-2 text-sm leading-tight hover:border-ink [&::-webkit-details-marker]:hidden',
+          ),
+        ],
+        [
+          h.span(
+            [h.Class('flex min-w-0 items-baseline gap-2')],
+            [
+              h.span(
+                [h.Class('label text-[0.625rem] text-muted')],
+                [isLatest ? 'Latest' : 'Version'],
+              ),
+              h.span(
+                [h.Class('truncate font-mono text-[0.8125rem] text-ink')],
+                [currentLabel],
+              ),
+            ],
+          ),
+          Icon.chevronDown(
+            'size-3.5 shrink-0 transition-transform group-open/versions:rotate-180',
+            h,
+          ),
+        ],
+      ),
+      h.div(
+        [
+          h.Class(
+            'absolute inset-x-0 top-full z-20 mt-1 flex max-h-80 flex-col overflow-y-auto overscroll-contain rounded-md border border-rule bg-paper p-1.5 shadow-lg',
+          ),
+        ],
+        [
+          h.ul(
+            [h.Class('flex flex-col')],
+            [
+              pickerItem(
+                'Latest',
+                Option.match(Versions.maybeLatest, {
+                  onNone: () => '',
+                  onSome: latest => latest.version,
+                }),
+                versionHref(Option.none(), maybeCurrent),
+                Option.isNone(context.maybeVersion),
+                h,
+              ),
+              ...Array.map(Versions.versions, entry =>
+                pickerItem(
+                  entry.version,
+                  shortDate(entry.publishedAt),
+                  versionHref(Option.some(entry.version), maybeCurrent),
+                  Option.contains(context.maybeVersion, entry.version),
+                  h,
+                ),
+              ),
+            ],
+          ),
+          h.a(
+            [
+              h.Href(versionsRouter()),
+              h.Class(
+                'mt-1 border-t border-rule px-2.5 pt-2 pb-1 text-xs text-muted hover:text-ink',
+              ),
+            ],
+            ['All versions'],
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+// Says which release an archived page describes, with the way back to the
+// current docs.
+const archiveBanner = (
+  context: Catalog.DocsContext,
+  maybeCurrent: Option.Option<Catalog.DocPage>,
+  h: HtmlBuilder<Message>,
+): Html =>
+  Option.match(context.maybeVersion, {
+    onNone: () => h.empty,
+    onSome: version =>
+      h.p(
+        [
+          h.Role('note'),
+          h.Class(
+            'rounded-md border border-rule bg-panel px-4 py-3 text-sm leading-snug text-body',
+          ),
+        ],
+        [
+          'You are reading the standard library reference for Silk ',
+          h.span([h.Class('font-mono text-ink')], [version]),
+          Option.match(Versions.findVersion(version), {
+            onNone: () => '',
+            onSome: entry => `, released ${shortDate(entry.publishedAt)}`,
+          }),
+          '. ',
+          h.a(
+            [
+              h.Href(versionHref(Option.none(), maybeCurrent)),
+              h.Class(
+                'font-semibold text-ink underline decoration-signal underline-offset-4 hover:text-signal',
+              ),
+            ],
+            ['Read the latest'],
+          ),
+        ],
+      ),
+  })
+
 const sidebar = (
   model: Model,
+  context: Catalog.DocsContext,
   maybeCurrent: Option.Option<Catalog.DocPage>,
   h: HtmlBuilder<Message>,
 ): Html =>
   h.nav(
     [
       h.AriaLabel('Documentation'),
-      h.Class('flex flex-col gap-6 md:max-h-screen md:py-8'),
+      h.Class('flex flex-col gap-4 md:max-h-screen md:py-8'),
     ],
     [
-      // Only the page list scrolls, so the search stays put above it.
+      versionPicker(context, maybeCurrent, h),
+      // Only the page list scrolls, so the search stays put above it. Search
+      // covers the current docs.
       searchTrigger(h),
       h.ul(
         [
@@ -143,8 +374,9 @@ const sidebar = (
             'flex flex-col md:min-h-0 md:scrollbar-none md:overflow-y-auto md:overscroll-contain',
           ),
         ],
-        Array.map(Catalog.groups, group =>
+        Array.map(context.groups, group =>
           sidebarGroup(
+            context,
             group,
             group.pages,
             HashSet.has(model.openGroups, group.key),
@@ -203,6 +435,7 @@ const onThisPage = (
 // ARTICLE
 
 const breadcrumb = (
+  context: Catalog.DocsContext,
   maybeGroup: Option.Option<Catalog.DocGroup>,
   page: Catalog.DocPage,
   h: HtmlBuilder<Message>,
@@ -210,7 +443,11 @@ const breadcrumb = (
   h.nav(
     [h.AriaLabel('Breadcrumb'), h.Class('label text-muted')],
     [
-      h.a([h.Href(docsRouter()), h.Class('hover:text-ink')], ['Docs']),
+      h.a([h.Href(context.indexPath), h.Class('hover:text-ink')], ['Docs']),
+      ...Option.match(context.maybeVersion, {
+        onNone: () => [],
+        onSome: version => [' ', h.span([h.Class('font-mono')], [version])],
+      }),
       ' / ',
       ...Option.match(maybeGroup, {
         onNone: () => [],
@@ -221,6 +458,7 @@ const breadcrumb = (
   )
 
 const pagerCard = (
+  context: Catalog.DocsContext,
   label: string,
   page: Catalog.DocPage,
   direction: 'Previous' | 'Next',
@@ -228,7 +466,7 @@ const pagerCard = (
 ): Html =>
   h.a(
     [
-      h.Href(Catalog.pagePath(page)),
+      h.Href(context.pagePath(page)),
       h.Rel(direction === 'Previous' ? 'prev' : 'next'),
       h.Class(
         `flex flex-1 flex-col gap-1.5 rounded-md border px-5 py-4.5 hover:border-ink ${direction === 'Next' ? 'items-end border-ink text-right' : 'border-rule'}`,
@@ -245,18 +483,23 @@ const pagerCard = (
     ],
   )
 
-const pager = (page: Catalog.DocPage, h: HtmlBuilder<Message>): Html => {
-  const { maybePrevious, maybeNext } = Catalog.neighbors(page)
+const pager = (
+  context: Catalog.DocsContext,
+  page: Catalog.DocPage,
+  h: HtmlBuilder<Message>,
+): Html => {
+  const { maybePrevious, maybeNext } = Catalog.neighborsIn(context, page)
   return h.nav(
     [h.AriaLabel('Pages'), h.Class('flex flex-col gap-5 sm:flex-row')],
     [
       Option.match(maybePrevious, {
         onNone: () => h.div([h.Class('hidden flex-1 sm:block')]),
-        onSome: previous => pagerCard('Previous', previous, 'Previous', h),
+        onSome: previous =>
+          pagerCard(context, 'Previous', previous, 'Previous', h),
       }),
       Option.match(maybeNext, {
         onNone: () => h.div([h.Class('hidden flex-1 sm:block')]),
-        onSome: next => pagerCard('Next', next, 'Next', h),
+        onSome: next => pagerCard(context, 'Next', next, 'Next', h),
       }),
     ],
   )
@@ -304,10 +547,11 @@ const loadingSkeleton = (h: HtmlBuilder<Message>): Html =>
 
 const articleBody = (
   model: Model,
+  context: Catalog.DocsContext,
   page: Catalog.DocPage,
   h: HtmlBuilder<Message>,
 ): Html => {
-  const key = Catalog.pageKey(page)
+  const key = context.documentKey(page)
   return DocState.match(model.doc, {
     Idle: () => loadingSkeleton(h),
     Loading: () => loadingSkeleton(h),
@@ -331,7 +575,19 @@ const articleBody = (
           }),
           h.div(
             [h.Class('min-w-0 *:flex *:flex-col *:gap-5')],
-            [DocsMarkdown.view(body, key, model.copiedCodeIds, h)],
+            [
+              DocsMarkdown.view(
+                body,
+                key,
+                model.copiedCodeIds,
+                h,
+                Option.match(context.maybeVersion, {
+                  onNone: () => (url: string) => url,
+                  onSome: version => (url: string) =>
+                    versionedUrl(version, url),
+                }),
+              ),
+            ],
           ),
         ],
       )
@@ -341,6 +597,7 @@ const articleBody = (
 
 const loadedTableOfContents = (
   model: Model,
+  context: Catalog.DocsContext,
   page: Catalog.DocPage,
 ): ReadonlyArray<DocsMarkdown.TocEntry> =>
   DocState.match(model.doc, {
@@ -348,13 +605,14 @@ const loadedTableOfContents = (
     Loading: () => [],
     Failed: () => [],
     Loaded: ({ key, document }) =>
-      key === Catalog.pageKey(page)
+      key === context.documentKey(page)
         ? DocsMarkdown.tableOfContents(document)
         : [],
   })
 
 const docsLayout = (
   model: Model,
+  context: Catalog.DocsContext,
   maybeCurrent: Option.Option<Catalog.DocPage>,
   article: Html,
   aside: Html,
@@ -408,7 +666,7 @@ const docsLayout = (
                     `${model.isDocsNavOpen ? 'block' : 'hidden'} pb-5 md:sticky md:top-0 md:block md:self-start md:pb-0`,
                   ),
                 ],
-                [sidebar(model, maybeCurrent, h)],
+                [sidebar(model, context, maybeCurrent, h)],
               ),
             ],
           ),
@@ -438,16 +696,19 @@ const docsLayout = (
 
 export const pageView = (
   model: Model,
+  context: Catalog.DocsContext,
   page: Catalog.DocPage,
   h: HtmlBuilder<Message>,
 ): Html =>
   docsLayout(
     model,
+    context,
     Option.some(page),
     h.article(
       [h.Class('flex flex-col gap-6')],
       [
-        breadcrumb(Catalog.findGroup(page), page, h),
+        archiveBanner(context, Option.some(page), h),
+        breadcrumb(context, Catalog.findGroupIn(context, page), page, h),
         h.h1(
           [
             h.Class(
@@ -456,7 +717,7 @@ export const pageView = (
           ],
           [page.title, h.span([h.Class('text-signal')], ['.'])],
         ),
-        articleBody(model, page, h),
+        articleBody(model, context, page, h),
         Option.match(page.maybeSourceUrl, {
           onNone: () => h.empty,
           onSome: sourceUrl =>
@@ -478,20 +739,30 @@ export const pageView = (
               ],
             ),
         }),
-        h.div([h.Class('pt-4')], [pager(page, h)]),
+        h.div([h.Class('pt-4')], [pager(context, page, h)]),
       ],
     ),
-    onThisPage(loadedTableOfContents(model, page), model.maybeActiveSection, h),
+    onThisPage(
+      loadedTableOfContents(model, context, page),
+      model.maybeActiveSection,
+      h,
+    ),
     h,
   )
 
-export const indexView = (model: Model, h: HtmlBuilder<Message>): Html =>
+export const indexView = (
+  model: Model,
+  context: Catalog.DocsContext,
+  h: HtmlBuilder<Message>,
+): Html =>
   docsLayout(
     model,
+    context,
     Option.none(),
     h.article(
       [h.Class('flex flex-col gap-10')],
       [
+        archiveBanner(context, Option.none(), h),
         h.div(
           [h.Class('flex flex-col gap-6')],
           [
@@ -514,7 +785,7 @@ export const indexView = (model: Model, h: HtmlBuilder<Message>): Html =>
         ),
         h.div(
           [h.Class('grid gap-5 sm:grid-cols-2')],
-          Array.map(Catalog.groups, group =>
+          Array.map(context.groups, group =>
             h.keyed('section')(
               group.key,
               [h.Class('flex flex-col gap-3 border-t-2 border-ink pt-5')],
@@ -545,7 +816,7 @@ export const indexView = (model: Model, h: HtmlBuilder<Message>): Html =>
                         [
                           h.a(
                             [
-                              h.Href(Catalog.pagePath(page)),
+                              h.Href(context.pagePath(page)),
                               h.Class(
                                 'text-muted hover:text-ink hover:underline',
                               ),
@@ -570,5 +841,94 @@ export const indexView = (model: Model, h: HtmlBuilder<Message>): Html =>
       ],
     ),
     h.empty,
+    h,
+  )
+
+// ARCHIVED VERSIONS
+
+const archiveStatusView = (
+  model: Model,
+  context: Catalog.DocsContext,
+  title: string,
+  body: Html,
+  h: HtmlBuilder<Message>,
+): Html =>
+  docsLayout(
+    model,
+    context,
+    Option.none(),
+    h.article(
+      [h.Class('flex flex-col gap-6')],
+      [
+        archiveBanner(context, Option.none(), h),
+        h.h1(
+          [
+            h.Class(
+              'text-[2.75rem] leading-none font-extrabold tracking-tighter md:text-[4rem]',
+            ),
+          ],
+          [title, h.span([h.Class('text-signal')], ['.'])],
+        ),
+        body,
+      ],
+    ),
+    h.empty,
+    h,
+  )
+
+// While a version's catalog downloads, the sidebar shows the current docs
+// under that version's name, and the article its skeleton.
+const pendingContext = (version: string): Catalog.DocsContext => ({
+  ...Catalog.currentDocs,
+  groups: [],
+  pages: [],
+  indexPath: '/docs',
+  pagePath: page => archivedPagePath(version, page),
+  maybeVersion: Option.some(version),
+})
+
+export const archiveLoadingView = (
+  model: Model,
+  version: string,
+  h: HtmlBuilder<Message>,
+): Html =>
+  docsLayout(
+    model,
+    pendingContext(version),
+    Option.none(),
+    h.article([h.Class('flex flex-col gap-6')], [loadingSkeleton(h)]),
+    h.empty,
+    h,
+  )
+
+export const archiveMissingView = (
+  model: Model,
+  version: string,
+  h: HtmlBuilder<Message>,
+): Html =>
+  archiveStatusView(
+    model,
+    pendingContext(version),
+    'Version not found',
+    statusMessage(
+      `There are no archived docs for ${version}. Pick a version from the list, or check your connection and reload.`,
+      h,
+    ),
+    h,
+  )
+
+export const missingPageView = (
+  model: Model,
+  context: Catalog.DocsContext,
+  h: HtmlBuilder<Message>,
+): Html =>
+  archiveStatusView(
+    model,
+    context,
+    'Not in this version',
+    statusMessage(
+      'This page is not part of the docs for this release. Browse the sidebar for what it had.',
+      h,
+    ),
     h,
   )

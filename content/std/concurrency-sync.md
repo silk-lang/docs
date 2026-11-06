@@ -1,8 +1,9 @@
-Shared ownership, locks and thread parking for values that several native threads use.
+Shared ownership, locks, condition variables and thread parking for values that several native threads use.
 
 ## When to use
 - [`Arc`](#Arc) gives several threads ownership of one value.
 - [`Mutex`](#Mutex) lets them change the value one thread at a time.
+- [`Condition`](#Condition) lets threads sleep until another thread changes the value under a [`Mutex`](#Mutex).
 - [`Parker`](#Parker) puts a thread to sleep until another thread wakes it.
 
 ## Details
@@ -13,6 +14,8 @@ The last handle to drop, on any thread, drops the value.
 unlock is one atomic operation. A contended lock sleeps in the operating system and does not
 spin.
 
+[`Condition`](#Condition) is a futex sequence counter. Its waits unlock the mutex, sleep, and lock it again.
+
 [`Parker`](#Parker) holds one wakeup token. Thus an unpark that comes before the park is not lost.
 
 Each type keeps its shared state in its own allocation, and reaches it through raw pointers that
@@ -20,8 +23,8 @@ it computed when that allocation was new. Handles and guards only copy those poi
 write to state that other threads can see is atomic or done under the lock.
 
 ## Gotchas
-- These types need the same targets as [`Atomic.wait`](/docs/std/concurrency-atomic#Atomic.impl.wait): Darwin on x86_64 or aarch64, Linux with GNU libc
-  on x86_64 or aarch64, and wasm32.
+- These types need the same targets as [`Atomic.wait`](/docs/std/concurrency-atomic#Atomic.impl.wait): Windows x86_64 MSVC, Darwin on x86_64
+  or aarch64, Linux with GNU libc on x86_64 or aarch64, and WebAssembly.
 - An `Arc<T>` gives only shared borrows. Change the value through a `Mutex` or atomics. Unlike
   `Shared<T>`, `Arc<T>` does not detect reentrant access.
 - A reference cycle of `Arc` handles leaks.
@@ -116,7 +119,7 @@ pub fn main() -> i32 {
 
 Import as `Arc` with `import silk.concurrency.sync { Arc }`.
 
-Public declarations: 5.
+Public declarations: 6.
 
 ::Anchor{id="Arc"}
 
@@ -144,8 +147,8 @@ every handle lets its thread read the value.
 
 - It gives only shared borrows. Unlike `Shared<T>`, it does not detect reentrant access.
 - A reference cycle of `Arc` handles leaks.
-- These types need the same targets as `Atomic.wait`: Darwin on x86_64 or aarch64, Linux with GNU libc on
-x86_64 or aarch64, and wasm32.
+- These types need the same targets as `Atomic.wait`: Windows x86_64 MSVC, Darwin on x86_64 or
+  aarch64, Linux with GNU libc on x86_64 or aarch64, and WebAssembly.
 
 ::Anchor{id="Arc.impl.Transferable"}
 
@@ -252,8 +255,8 @@ system and does not spin.
 ### Gotchas
 
 - Locking a mutex again on the thread that holds it deadlocks.
-- These types need the same targets as `Atomic.wait`: Darwin on x86_64 or aarch64, Linux with GNU libc on
-x86_64 or aarch64, and wasm32.
+- These types need the same targets as `Atomic.wait`: Windows x86_64 MSVC, Darwin on x86_64 or
+  aarch64, Linux with GNU libc on x86_64 or aarch64, and WebAssembly.
 
 ::Anchor{id="Mutex.impl.Transferable"}
 
@@ -379,6 +382,130 @@ impl<'a, T> Drop for MutexGuard<'a, T>
 fn drop(self: &mut MutexGuard<'a, T>) -> ()
 ```
 
+::Anchor{id="Condition"}
+
+## `Condition`
+
+```silk
+pub struct Condition
+```
+
+A condition variable: threads sleep on it until another thread changes shared state under a
+[`Mutex`](#Mutex) and notifies them.
+
+### Details
+[`wait`](#Condition.impl.wait) and [`waitTimeout`](#Condition.impl.waitTimeout) take the guard of a locked [`Mutex`](#Mutex) by `&mut`. They unlock that
+mutex, sleep until a notify, and lock it again before they return, so the guard is valid
+throughout. A notify that comes after a waiter unlocked the mutex, and before it slept, still
+wakes it. [`notifyOne`](#Condition.impl.notifyOne) wakes at least one waiter and [`notifyAll`](#Condition.impl.notifyAll) wakes every waiter. A
+notify with no waiter does nothing. `Condition` is `Transferable` and `Concurrent`; share one by
+putting it in an [`Arc`](#Arc), next to the mutex its waiters use. It is a futex sequence counter: a
+notify is one atomic add plus a wake call, and a waiter sleeps in the operating system.
+
+### Gotchas
+- A wait can also return with no notify. Check your own condition again in a loop, under the lock.
+- A notify wakes only threads already waiting. Change the shared state under the lock before
+  notifying, and check it before waiting, so a wakeup is never needed for a change that came first.
+- These types need the same targets as `Atomic.wait`: Darwin on x86_64 or aarch64, Linux with
+  GNU libc on x86_64 or aarch64, and wasm32.
+
+::Anchor{id="Condition.impl.Transferable"}
+
+## Implementation `Transferable for Condition`
+
+```silk
+impl Transferable for Condition
+```
+
+::Anchor{id="Condition.impl.Concurrent"}
+
+## Implementation `Concurrent for Condition`
+
+```silk
+impl Concurrent for Condition
+```
+
+::Anchor{id="Condition.impl"}
+
+## Implementation `Condition`
+
+```silk
+impl Condition
+```
+
+::Anchor{id="Condition.impl.make"}
+
+### Associated function `make`
+
+```silk
+pub effect fn make() -> Condition ! OutOfMemoryError ? &mut Allocator
+```
+
+Makes a condition variable with no waiters.
+
+::Anchor{id="Condition.impl.wait"}
+
+### Method `wait`
+
+```silk
+pub fn wait<'a, T>(self: &Self, guard: &mut MutexGuard<'a, T>) -> ()
+```
+
+Unlocks `guard`'s mutex, sleeps until a notify, and locks the mutex again.
+
+#### Gotchas
+It can also return with no notify. Check your own condition again in a loop.
+
+::Anchor{id="Condition.impl.waitTimeout"}
+
+### Method `waitTimeout`
+
+```silk
+pub fn waitTimeout<'a, T>(self: &Self, guard: &mut MutexGuard<'a, T>, timeout: u64) -> bool
+```
+
+Unlocks `guard`'s mutex, sleeps until a notify or until `timeout` nanoseconds pass, and locks
+the mutex again. Returns `false` only when the timeout ended the wait.
+
+#### Gotchas
+It can also return `true` with no notify. Check your own condition again in a loop.
+
+::Anchor{id="Condition.impl.notifyOne"}
+
+### Method `notifyOne`
+
+```silk
+pub fn notifyOne(self: &Self) -> ()
+```
+
+Wakes at least one thread waiting on this condition, if any is.
+
+::Anchor{id="Condition.impl.notifyAll"}
+
+### Method `notifyAll`
+
+```silk
+pub fn notifyAll(self: &Self) -> ()
+```
+
+Wakes every thread waiting on this condition.
+
+::Anchor{id="Condition.impl.Drop"}
+
+## Implementation `Drop for Condition`
+
+```silk
+impl Drop for Condition
+```
+
+::Anchor{id="Condition.impl.Drop.drop"}
+
+### Operation `drop`
+
+```silk
+fn drop(self: &mut Condition) -> ()
+```
+
 ::Anchor{id="Parker"}
 
 ## `Parker`
@@ -397,8 +524,8 @@ wake it.
 
 ### Gotchas
 - `park` can also return with no token. Check your own condition again in a loop.
-- These types need the same targets as `Atomic.wait`: Darwin on x86_64 or aarch64, Linux with GNU libc on
-x86_64 or aarch64, and wasm32.
+- These types need the same targets as `Atomic.wait`: Windows x86_64 MSVC, Darwin on x86_64 or
+  aarch64, Linux with GNU libc on x86_64 or aarch64, and WebAssembly.
 
 ::Anchor{id="Unparker"}
 

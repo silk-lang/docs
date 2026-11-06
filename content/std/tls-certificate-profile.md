@@ -20,7 +20,7 @@ the chain, the host name, or revocation.
 
 Import as `CertificateProfile` with `import silk.tls.certificate_profile { CertificateProfile }`.
 
-Public declarations: 10.
+Public declarations: 11.
 
 ::Anchor{id="CertificateRole"}
 
@@ -32,15 +32,15 @@ pub enum CertificateRole
 
 The certificate's intended position in the restricted TLS-server profile.
 
-::Anchor{id="CertificateRole.ServerLeaf"}
+::Anchor{id="CertificateRole.Leaf"}
 
-### `ServerLeaf`
+### `Leaf`
 
 ```silk
-ServerLeaf
+Leaf
 ```
 
-A peer end-entity certificate inspected for admission to later TLS-server validation.
+A peer end-entity certificate: a TLS server's, or a TLS client's.
 
 ::Anchor{id="CertificateRole.Intermediate"}
 
@@ -61,6 +61,37 @@ Anchor
 ```
 
 An explicitly configured trust endpoint outside the returned path.
+
+::Anchor{id="CertificatePurpose"}
+
+## `CertificatePurpose`
+
+```silk
+pub enum CertificatePurpose
+```
+
+What a certificate path authenticates. [`CertificateProfile.checkPurpose`](#CertificateProfile.impl.checkPurpose) checks it against the
+ExtendedKeyUsage extension.
+
+::Anchor{id="CertificatePurpose.ServerAuth"}
+
+### `ServerAuth`
+
+```silk
+ServerAuth
+```
+
+A TLS server, `id-kp-serverAuth`.
+
+::Anchor{id="CertificatePurpose.ClientAuth"}
+
+### `ClientAuth`
+
+```silk
+ClientAuth
+```
+
+A TLS client, `id-kp-clientAuth`.
 
 ::Anchor{id="CertificateKeyKind"}
 
@@ -485,6 +516,16 @@ MissingServerAuth
 
 A present ExtendedKeyUsage omits id-kp-serverAuth.
 
+::Anchor{id="ProfileReason.MissingClientAuth"}
+
+### `MissingClientAuth`
+
+```silk
+MissingClientAuth
+```
+
+A present ExtendedKeyUsage omits id-kp-clientAuth.
+
 ::Anchor{id="ProfileReason.SubjectAltName"}
 
 ### `SubjectAltName`
@@ -868,7 +909,7 @@ impl Copy for KeyUsage
 pub struct ExtendedKeyUsage
 ```
 
-Parsed ExtendedKeyUsage facts used by the restricted TLS-server profile.
+Parsed ExtendedKeyUsage facts used by the restricted TLS certificate profile.
 
 ::Anchor{id="ExtendedKeyUsage.serverAuth"}
 
@@ -880,6 +921,16 @@ pub serverAuth: bool
 
 Whether id-kp-serverAuth occurs.
 
+::Anchor{id="ExtendedKeyUsage.clientAuth"}
+
+### Field `clientAuth`
+
+```silk
+pub clientAuth: bool
+```
+
+Whether id-kp-clientAuth occurs.
+
 ::Anchor{id="ExtendedKeyUsage.anyExtendedKeyUsage"}
 
 ### Field `anyExtendedKeyUsage`
@@ -888,7 +939,7 @@ Whether id-kp-serverAuth occurs.
 pub anyExtendedKeyUsage: bool
 ```
 
-Whether anyExtendedKeyUsage occurs. It never substitutes for serverAuth.
+Whether anyExtendedKeyUsage occurs. It never substitutes for serverAuth or clientAuth.
 
 ::Anchor{id="ExtendedKeyUsage.purposeCount"}
 
@@ -1051,6 +1102,20 @@ pub fn extendedKeyUsage(self: &Self) -> Option<ExtendedKeyUsage>
 ```
 
 Returns admitted ExtendedKeyUsage facts when the extension was present.
+
+::Anchor{id="CertificateProfile.impl.checkPurpose"}
+
+### Method `checkPurpose`
+
+```silk
+pub fn checkPurpose(self: &Self, purpose: CertificatePurpose) -> Result<(), ProfileError>
+```
+
+Checks that the ExtendedKeyUsage extension, when present, allows `purpose`. A certificate
+without the extension allows every purpose.
+
+#### Errors
+- `Failure` with `MissingServerAuth` or `MissingClientAuth`, at the extension.
 
 ::Anchor{id="CertificateProfile.impl.subjectAltNamesDer"}
 

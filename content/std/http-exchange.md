@@ -260,7 +260,7 @@ pub fn main() -> i32 {
 
 Import as `Exchange` with `import silk.http.exchange { Exchange }`.
 
-Public declarations: 44.
+Public declarations: 46.
 
 ::Anchor{id="ConnectionPhase"}
 
@@ -291,6 +291,16 @@ Active
 ```
 
 An exchange is running.
+
+::Anchor{id="ConnectionPhase.Upgraded"}
+
+### `Upgraded`
+
+```silk
+Upgraded
+```
+
+The server switched protocols. Take the transport with [`intoUpgraded`](#intoUpgraded).
 
 ::Anchor{id="ConnectionPhase.Closed"}
 
@@ -372,6 +382,17 @@ Tunnel
 ```
 
 A `CONNECT` succeeded. Call [`withTunnel`](#withTunnel).
+
+::Anchor{id="ExchangePhase.Upgraded"}
+
+### `Upgraded`
+
+```silk
+Upgraded
+```
+
+The server sent 101 Switching Protocols to a request with `Upgrade`. Check the head, return
+from the callback, then call [`intoUpgraded`](#intoUpgraded).
 
 ::Anchor{id="ExchangePhase.Finished"}
 
@@ -845,7 +866,8 @@ The connection ended before a complete response head.
 UnsupportedUpgrade
 ```
 
-The server sent 101 Switching Protocols, which this module does not support.
+The server sent 101 Switching Protocols to a request without `Upgrade` and `Connection:
+upgrade`.
 
 ::Anchor{id="ExchangeError.ContinueTimeout"}
 
@@ -1362,6 +1384,16 @@ pub tls: ClientLimits
 
 The limits of the TLS client.
 
+::Anchor{id="RouteSettings.tlsVersions"}
+
+### Field `tlsVersions`
+
+```silk
+pub tlsVersions: VersionPolicy
+```
+
+The TLS versions the client offers.
+
 ::Anchor{id="RouteSettings.handshakeDurationNanoseconds"}
 
 ### Field `handshakeDurationNanoseconds`
@@ -1767,7 +1799,8 @@ where
   &mut P provides &HttpTransport from &mut HttpTransport | &mut MonotonicClock | &mut Allocator | &mut Random
 ```
 
-Reads response heads until one is not 1xx, and returns its status.
+Reads response heads until one is not 1xx or is 101 Switching Protocols, and returns its
+status.
 
 ### Details
 It does not copy the head and does not read the body. Get the head with [`Exchange.head`](#Exchange.impl.head).
@@ -1897,6 +1930,55 @@ pub fn abort<'exchange, P>(exchange: &mut Exchange<'exchange, P>) -> ()
 ```
 
 Stops the exchange. The connection cannot be used again. Nothing is sent or read.
+
+::Anchor{id="Upgraded"}
+
+## `Upgraded`
+
+```silk
+pub struct Upgraded<P>
+```
+
+The transport of a connection after 101 Switching Protocols, with the bytes the server sent
+after the response head.
+
+::Anchor{id="Upgraded.transport"}
+
+### Field `transport`
+
+```silk
+pub transport: P
+```
+
+The transport. You own it now, and close it when you are done.
+
+::Anchor{id="Upgraded.buffered"}
+
+### Field `buffered`
+
+```silk
+pub buffered: Bytes
+```
+
+The bytes that came after the 101 response head. They belong to the new protocol.
+
+::Anchor{id="intoUpgraded"}
+
+## `intoUpgraded`
+
+```silk
+pub effect fn intoUpgraded<P>(connection: Connection<P>) -> Upgraded<P>
+! ExchangeError | OutOfMemoryError
+? &mut Allocator
+where &mut P provides &HttpTransport from &mut HttpTransport
+```
+
+Takes the transport out of a connection whose exchange got 101 Switching Protocols.
+
+### Details
+The connection must be in the `Upgraded` phase, so the exchange callback must have returned
+after [`receive`](#receive) gave 101. Other phases fail with `InvalidState` and close the transport, and
+so does `OutOfMemoryError` when the buffered bytes cannot be copied.
 
 ::Anchor{id="Tunnel"}
 

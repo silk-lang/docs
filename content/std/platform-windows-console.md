@@ -21,9 +21,10 @@ An unbuffered `Writer` for a Windows standard handle, without ownership of that 
 ### Details
 
 Redirection writes bytes unchanged with `WriteFile`. A real console receives UTF-16 through
-`WriteConsoleW`, independent of its output code page. Each console write requires complete canonical
-WTF-8 bytes; malformed or incomplete input fails. Lone surrogates are passed as UTF-16 code units.
-Flush does nothing. Writes have no inter-thread message lock and can make partial progress before failure.
+`WriteConsoleW`, independent of its output code page. Each console write requires complete
+canonical WTF-8 bytes; malformed or incomplete input fails. Lone surrogates are passed as
+UTF-16 code units. Flush does nothing. Writes have no inter-thread message lock and can make
+partial progress before failure.
 
 ::Anchor{id="WindowsConsole.impl"}
 
@@ -98,14 +99,16 @@ Writes all bytes to standard handle 1 or 2, and returns whether all writes succe
 
 #### Details
 
-Redirection preserves bytes. A real console receives decoded UTF-16 without a code-page change.
-Each real-console call requires complete canonical WTF-8. The operation does not allocate or close handles.
-On failure, `error` receives the Windows error, 6 for an invalid selector, 1113 for invalid
-WTF-8, or 29 for zero or invalid progress. Successful calls set `error` to zero.
+Redirection preserves bytes. A real console receives decoded UTF-16 without a code-page
+change. Each real-console call requires complete canonical WTF-8. The operation does not
+allocate or close handles. On failure, `error` receives the Windows error, 6 for an invalid
+selector, 1113 for invalid WTF-8, or 29 for zero or invalid progress. Successful calls set
+`error` to zero.
 
 #### Gotchas
 
-Some output can precede a failure. Concurrent writes can interleave. Empty input makes no host call.
+Some output can precede a failure. Concurrent writes can interleave. Empty input makes no
+host call.
 
 ::Anchor{id="WindowsConsole.impl.Writer"}
 

@@ -9,6 +9,7 @@ import { ogImages } from './scripts/og-images.ts'
 import { playground } from './scripts/playground.ts'
 import { releases } from './scripts/releases.ts'
 import { searchIndex } from './scripts/search-index.ts'
+import { versions } from './scripts/versions-plugin.ts'
 import { islandAttributes } from './src/docs/islands.ts'
 
 // The playground's language server needs a cross-origin isolated page, as
@@ -49,6 +50,7 @@ export default defineConfig({
     searchIndex(),
     ogImages(),
     llmsTxt(),
+    versions(),
   ],
   optimizeDeps: {
     entries: ['src/entry.ts'],

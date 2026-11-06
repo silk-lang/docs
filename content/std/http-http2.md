@@ -1,12 +1,12 @@
 A transport-independent HTTP/2 connection for clients and servers (RFC 9113).
 
-Feed incoming bytes to `Connection.receive`, send `Connection.output`, and acknowledge sent bytes
-with `Connection.consumeOutput`. Each call returns at most one application event. Keep calling
-with the unconsumed input. SETTINGS and PING acknowledgments are queued automatically.
+Feed incoming bytes to `Connection.receive`, send `Connection.output`, and acknowledge sent
+bytes with `Connection.consumeOutput`. Each call returns at most one application event. Keep
+calling with the unconsumed input. SETTINGS and PING acknowledgments are queued automatically.
 
 DATA uses connection and stream flow control. Call `Connection.release` only after consuming
-received data. A zero return from `Connection.sendData` means flow control or queued output blocks progress.
-Streams can progress independently. Field blocks remain contiguous on the wire.
+received data. A zero return from `Connection.sendData` means flow control or queued output
+blocks progress. Streams can progress independently. Field blocks remain contiguous on the wire.
 
 Use prior knowledge on cleartext transports. On TLS, select `h2` with ALPN before creating this
 connection. The obsolete HTTP/1.1 Upgrade handshake is not part of RFC 9113.
@@ -66,7 +66,8 @@ Public declarations: 5.
 pub enum Role
 ```
 
-The endpoint role. Clients allocate odd stream identifiers; servers allocate even identifiers for push.
+The endpoint role. Clients allocate odd stream identifiers; servers allocate even identifiers
+for push.
 
 ::Anchor{id="Role.Client"}
 
@@ -186,7 +187,8 @@ Maximum unsent wire bytes. Drain output before queuing more application data.
 pub push: bool
 ```
 
-Whether a client accepts push for the exact authority and scheme of the associated request. Servers ignore this field.
+Whether a client accepts push for the exact authority and scheme of the associated request.
+Servers ignore this field.
 
 ::Anchor{id="Limits.impl.Copy"}
 
@@ -597,8 +599,9 @@ pub effect<'call> fn receive<'call>(self: &'call mut Self, input: &'call [u8]) -
     ? &mut Allocator
 ```
 
-Consumes a wire fragment and returns at most one event. Partial frames are retained within the frame limit.
-Stream errors queue RST_STREAM; connection errors queue GOAWAY and reject subsequent input.
+Consumes a wire fragment and returns at most one event. Partial frames are retained within the
+frame limit. Stream errors queue RST_STREAM; connection errors queue GOAWAY and reject
+subsequent input.
 
 ::Anchor{id="Connection.impl.finishInput"}
 
@@ -609,7 +612,8 @@ pub effect fn finishInput(self: &mut Self) -> ()
     ! ProtocolError
 ```
 
-Reports EOF. A truncated preface, frame, field block, or open stream fails with PROTOCOL_ERROR.
+Reports EOF. A truncated preface, frame, field block, or open stream fails with
+PROTOCOL_ERROR.
 
 ::Anchor{id="Connection.impl.open"}
 
@@ -621,7 +625,8 @@ pub effect fn open(self: &mut Self, fields: &[Field], endStream: bool) -> u32
     ? &mut Allocator
 ```
 
-Opens a client request stream. GOAWAY, exhausted identifiers, and peer stream limits refuse new streams.
+Opens a client request stream. GOAWAY, exhausted identifiers, and peer stream limits refuse
+new streams.
 
 ::Anchor{id="Connection.impl.sendHeaders"}
 
@@ -646,8 +651,8 @@ pub effect fn sendData(self: &mut Self, id: u32, input: &[u8], endStream: bool) 
     ? &mut Allocator
 ```
 
-Queues as many body bytes as flow control, the frame size, and output space allow.
-END_STREAM is sent only when all input bytes fit. A zero return with nonempty input means backpressure.
+Queues as many body bytes as flow control, the frame size, and output space allow. END_STREAM
+is sent only when all input bytes fit. A zero return with nonempty input means backpressure.
 
 ::Anchor{id="Connection.impl.release"}
 
@@ -659,8 +664,9 @@ pub effect fn release(self: &mut Self, id: u32, count: u32) -> ()
     ? &mut Allocator
 ```
 
-Returns consumed DATA credit to the peer. Padding credit is returned automatically.
-The count cannot exceed unreleased body bytes for this stream. Closed streams return connection credit only.
+Returns consumed DATA credit to the peer. Padding credit is returned automatically. The count
+cannot exceed unreleased body bytes for this stream. Closed streams return connection credit
+only.
 
 ::Anchor{id="Connection.impl.reset"}
 
@@ -672,7 +678,8 @@ pub effect fn reset(self: &mut Self, id: u32, code: u32) -> ()
     ? &mut Allocator
 ```
 
-Cancels an existing stream and queues RST_STREAM. Queued incoming body credit is returned to the connection.
+Cancels an existing stream and queues RST_STREAM. Queued incoming body credit is returned to
+the connection.
 
 ::Anchor{id="Connection.impl.ping"}
 
@@ -696,7 +703,8 @@ pub effect fn shutdown(self: &mut Self, code: u32, debug: &[u8]) -> ()
     ? &mut Allocator
 ```
 
-Stops accepting new streams and queues GOAWAY. Existing streams can finish when the code is NO_ERROR.
+Stops accepting new streams and queues GOAWAY. Existing streams can finish when the code is
+NO_ERROR.
 
 ::Anchor{id="Connection.impl.settingsTimeout"}
 
@@ -708,7 +716,8 @@ pub effect fn settingsTimeout(self: &mut Self) -> ()
     ? &mut Allocator
 ```
 
-Fails the connection if the initial SETTINGS acknowledgment has not arrived by the caller's deadline.
+Fails the connection if the initial SETTINGS acknowledgment has not arrived by the caller's
+deadline.
 
 ::Anchor{id="Connection.impl.push"}
 
@@ -720,7 +729,8 @@ pub effect fn push(self: &mut Self, associated: u32, fields: &[Field]) -> u32
     ? &mut Allocator
 ```
 
-Reserves a server push stream and queues PUSH_PROMISE. The request must use GET or HEAD without a body.
+Reserves a server push stream and queues PUSH_PROMISE. The request must use GET or HEAD
+without a body.
 
 Category: HTTP.
 

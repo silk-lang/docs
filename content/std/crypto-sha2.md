@@ -508,6 +508,474 @@ Returns the 32-byte SHA-512/256 digest of `bytes`.
 #### Gotchas
 The program traps if `bytes` is longer than 2^128 - 1 bits.
 
+::Anchor{id="Sha224.impl.Digest"}
+
+## Implementation `Digest for Sha224`
+
+```silk
+impl Digest for Sha224
+```
+
+::Anchor{id="Sha224.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha224.make
+```
+
+Returns a SHA-224 state for an empty message.
+
+::Anchor{id="Sha224.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha224.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha224.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 64, the SHA-224 block length in bytes.
+
+::Anchor{id="Sha224.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 28, the SHA-224 digest length in bytes.
+
+::Anchor{id="Sha224.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA-224 object identifier, 2.16.840.1.101.3.4.2.4.
+
+::Anchor{id="Sha224.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha224.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 28-byte SHA-224 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha256.impl.Digest"}
+
+## Implementation `Digest for Sha256`
+
+```silk
+impl Digest for Sha256
+```
+
+::Anchor{id="Sha256.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha256.make
+```
+
+Returns a SHA-256 state for an empty message.
+
+::Anchor{id="Sha256.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha256.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha256.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 64, the SHA-256 block length in bytes.
+
+::Anchor{id="Sha256.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 32, the SHA-256 digest length in bytes.
+
+::Anchor{id="Sha256.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA-256 object identifier, 2.16.840.1.101.3.4.2.1.
+
+::Anchor{id="Sha256.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha256.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 32-byte SHA-256 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha384.impl.Digest"}
+
+## Implementation `Digest for Sha384`
+
+```silk
+impl Digest for Sha384
+```
+
+::Anchor{id="Sha384.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha384.make
+```
+
+Returns a SHA-384 state for an empty message.
+
+::Anchor{id="Sha384.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha384.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha384.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 128, the SHA-384 block length in bytes.
+
+::Anchor{id="Sha384.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 48, the SHA-384 digest length in bytes.
+
+::Anchor{id="Sha384.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA-384 object identifier, 2.16.840.1.101.3.4.2.2.
+
+::Anchor{id="Sha384.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha384.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 48-byte SHA-384 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha512.impl.Digest"}
+
+## Implementation `Digest for Sha512`
+
+```silk
+impl Digest for Sha512
+```
+
+::Anchor{id="Sha512.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha512.make
+```
+
+Returns a SHA-512 state for an empty message.
+
+::Anchor{id="Sha512.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha512.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha512.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 128, the SHA-512 block length in bytes.
+
+::Anchor{id="Sha512.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 64, the SHA-512 digest length in bytes.
+
+::Anchor{id="Sha512.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA-512 object identifier, 2.16.840.1.101.3.4.2.3.
+
+::Anchor{id="Sha512.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha512.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 64-byte SHA-512 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha512_224.impl.Digest"}
+
+## Implementation `Digest for Sha512_224`
+
+```silk
+impl Digest for Sha512_224
+```
+
+::Anchor{id="Sha512_224.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha512_224.make
+```
+
+Returns a SHA-512/224 state for an empty message.
+
+::Anchor{id="Sha512_224.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha512_224.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha512_224.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 128, the SHA-512/224 block length in bytes.
+
+::Anchor{id="Sha512_224.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 28, the SHA-512/224 digest length in bytes.
+
+::Anchor{id="Sha512_224.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA-512/224 object identifier, 2.16.840.1.101.3.4.2.5.
+
+::Anchor{id="Sha512_224.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha512_224.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 28-byte SHA-512/224 digest to the start of `output` and consumes the state.
+
+::Anchor{id="Sha512_256.impl.Digest"}
+
+## Implementation `Digest for Sha512_256`
+
+```silk
+impl Digest for Sha512_256
+```
+
+::Anchor{id="Sha512_256.impl.Digest.make"}
+
+### Operation `make`
+
+```silk
+make: Sha512_256.make
+```
+
+Returns a SHA-512/256 state for an empty message.
+
+::Anchor{id="Sha512_256.impl.Digest.update"}
+
+### Operation `update`
+
+```silk
+update: Sha512_256.update
+```
+
+Adds `bytes` to the end of the message.
+
+::Anchor{id="Sha512_256.impl.Digest.blockLength"}
+
+### Operation `blockLength`
+
+```silk
+fn blockLength(self: &Self) -> usize
+```
+
+Returns 128, the SHA-512/256 block length in bytes.
+
+::Anchor{id="Sha512_256.impl.Digest.digestLength"}
+
+### Operation `digestLength`
+
+```silk
+fn digestLength(self: &Self) -> usize
+```
+
+Returns 32, the SHA-512/256 digest length in bytes.
+
+::Anchor{id="Sha512_256.impl.Digest.objectIdentifier"}
+
+### Operation `objectIdentifier`
+
+```silk
+fn objectIdentifier(self: &Self) -> &[u8]
+```
+
+Returns the content bytes of the SHA-512/256 object identifier, 2.16.840.1.101.3.4.2.6.
+
+::Anchor{id="Sha512_256.impl.Digest.copy"}
+
+### Operation `copy`
+
+```silk
+fn copy(self: &Self) -> Self
+```
+
+Returns an independent copy of the state.
+
+::Anchor{id="Sha512_256.impl.Digest.finishInto"}
+
+### Operation `finishInto`
+
+```silk
+fn finishInto(self: Self, output: &mut [u8]) -> ()
+```
+
+Writes the 32-byte SHA-512/256 digest to the start of `output` and consumes the state.
+
 Category: Cryptography.
 
 Profiles: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu-no-libc`, `x86_64-unknown-linux-gnu`, `x86_64-unknown-linux-gnu-no-libc`, `wasm32-unknown-unknown`, `wasm32-wasip1`, `wasm32-wasip2`, `x86_64-pc-windows-msvc`, `wasm64-unknown-unknown`.

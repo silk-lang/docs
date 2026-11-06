@@ -1,4 +1,12 @@
-CRC checksums used by gzip and XZ containers.
+CRC-32, Adler-32, and CRC-64 checksums used by gzip, zlib, ZIP, and XZ containers.
+
+## When to use
+Use [`CompressionChecksum.crc32`](#CompressionChecksum.impl.crc32) for gzip and ZIP, [`CompressionChecksum.adler32`](#CompressionChecksum.impl.adler32) for zlib,
+and [`CompressionChecksum.crc64`](#CompressionChecksum.impl.crc64) for XZ. Use the `Update` functions to checksum data that
+arrives in parts.
+
+## Details
+No function allocates. CRC-32 uses a 256-entry table and processes one byte per lookup.
 
 Import as `CompressionChecksum` with `import silk.compress.checksum { CompressionChecksum }`.
 
@@ -30,17 +38,46 @@ impl CompressionChecksum
 pub fn crc32(bytes: &[u8]) -> u32
 ```
 
-Returns the reflected IEEE CRC-32 of the supplied bytes.
+Returns the reflected IEEE CRC-32 of `bytes`, as gzip and ZIP store it.
 
-::Anchor{id="CompressionChecksum.impl.crc32Byte"}
+::Anchor{id="CompressionChecksum.impl.crc32Update"}
 
-### Associated function `crc32Byte`
+### Associated function `crc32Update`
 
 ```silk
-pub fn crc32Byte(state: u32, byte: u8) -> u32
+pub fn crc32Update(crc: u32, bytes: &[u8]) -> u32
 ```
 
-Updates a running reflected CRC-32; initialize and finalize by XOR with 4294967295.
+Returns the CRC-32 of the data that `crc` covers followed by `bytes`.
+
+#### Details
+Pass 0 for the first part, then the result of the previous call. The result is the finished
+checksum of everything so far, as zlib's `crc32` returns it, so
+`crc32Update(crc32(a), b)` equals the CRC-32 of `a` followed by `b`.
+
+::Anchor{id="CompressionChecksum.impl.adler32"}
+
+### Associated function `adler32`
+
+```silk
+pub fn adler32(bytes: &[u8]) -> u32
+```
+
+Returns the Adler-32 of `bytes`, as zlib stores it.
+
+::Anchor{id="CompressionChecksum.impl.adler32Update"}
+
+### Associated function `adler32Update`
+
+```silk
+pub fn adler32Update(adler: u32, bytes: &[u8]) -> u32
+```
+
+Returns the Adler-32 of the data that `adler` covers followed by `bytes`.
+
+#### Details
+Pass 1 for the first part, then the result of the previous call, as with zlib's `adler32`.
+The sums are reduced once per 5552 bytes, the most that cannot overflow 32 bits.
 
 ::Anchor{id="CompressionChecksum.impl.crc64"}
 
