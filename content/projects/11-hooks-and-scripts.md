@@ -7,9 +7,9 @@ A package can ask Silk to run commands of its own at three moments: when you run
 | `[[generate]]` | `silk.toml` | When you run `silk generate`, never during a build | You, in the manifest's directory | Yours, plus `SILK_GENERATE=1` |
 | `build.silk` plan | `build.silk` beside `silk.toml` | Every build, inside the compiler | The compiler; it starts no program | None: the plan can only read package files |
 | `build.silk` tool step | `build.silk`, with `Plan.tool` | Every build that needs it, before the package is analyzed | The build, in an operating-system sandbox | `HOME`, `TMPDIR`, `PATH`, `SILK_TOOL=1` and `SILK_PACKAGE_DIR` only |
-| `[[post-init]]` | A template's `silk.toml` | Once, when `silk init --template` creates a project | `silk init`, in the new project's directory | Yours, plus `SILK_VERSION` |
+| `[[post-init]]` | A template's `silk.toml` | Once, when `silk init --template` creates a project | `silk init`, in the new project's directory, in the same sandbox as tool steps | `PATH`, `HOME`, `TMPDIR` and `SILK_VERSION` only |
 
-Every hook that starts a program names it the same way: a path with a `/` is a file of the package, and a bare name is searched on `PATH`. The program must exit 0, or the command that ran it fails.
+Every hook that starts a program names it the same way: a path with a `/` is a file of the package, and a bare name is searched on `PATH`, which for a sandboxed command is `/usr/local/bin:/usr/bin:/bin`. The program must exit 0, or the command that ran it fails.
 
 Silk has no table of named commands, such as npm's `scripts`. A `[scripts]` table in `silk.toml` is refused like any other unknown table. Keep such commands in a script of the package, or in your task runner.
 
@@ -68,7 +68,7 @@ run = ["scripts/setup", "--greeting", "hello"]
 arguments = true
 ```
 
-Each command runs with `SILK_VERSION` set to the release of the compiler creating the project. It gets only the arguments in its `run`, unless it sets `arguments = true`: then it also gets the arguments given to `silk init` after `--`:
+Each command runs in the build tool sandbox: it can write only the new project and a scratch `HOME`, and it has no network. `SILK_VERSION` is set to the release of the compiler creating the project. It gets only the arguments in its `run`, unless it sets `arguments = true`: then it also gets the arguments given to `silk init` after `--`:
 
 ```sh
 silk init site -t acme/starters/web -- --port 8080
@@ -78,7 +78,7 @@ silk init site -t acme/starters/web -- --port 8080
 scripts/setup --greeting hello --port 8080
 ```
 
-When a command fails, `silk init` removes the project it was creating. See "[[post-init]]" in **Project templates**.
+On a host with no sandbox, `silk init` refuses a template with entries unless you pass `--unsandboxed-post-init`. When a command fails, `silk init` removes the project it was creating. See "[[post-init]]" in **Project templates**.
 
 ## Writing a hook script
 
@@ -87,7 +87,7 @@ A script works in any hook that starts a program. These rules apply to all of th
 - Commit the executable bit with the script: `git update-index --chmod=+x scripts/setup`. A template keeps the bits it finds, and a dependency fetched from git does too.
 - Start it with a `#!` line, such as `#!/bin/sh`. Silk starts the file itself, never through a shell.
 - The path in `run` is relative to the package's directory, without `.` or `..` segments. A program elsewhere goes on `PATH` and is named by its bare name.
-- On Windows, the program must be one Windows can start, such as an `.exe`. Run a script through its interpreter instead, as in `run = ["python", "scripts/setup.py"]`.
+- On Windows, which has no sandbox for tool steps and `[[post-init]]` entries, the program must be one Windows can start, such as an `.exe`. Run a script through its interpreter instead, as in `run = ["python", "scripts/setup.py"]`.
 - Print what you want the user to see. `silk generate` and `silk init` show a command's output, and a failing tool step's output is part of the build error.
 - Exit with a status other than 0 to stop. `silk generate` keeps every output as it was, a build stops with the step's output, and `silk init` removes the project.
 

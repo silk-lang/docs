@@ -72,7 +72,7 @@ Without `--target`, a command uses the targets the manifest selects, or the host
 ## init
 
 ```
-silk init [path] [--name <name>] [--lib | --workspace | --template <template> [-- <arguments>...]]
+silk init [path] [--name <name>] [--lib | --workspace | --template <template> [--unsandboxed-post-init] [-- <arguments>...]]
 silk init --list [template]
 ```
 
@@ -92,7 +92,7 @@ A template is `<owner>/<repository>[/<directory>...][@<revision>]` on GitHub; on
 Initialized Silk project app at /home/you/app from template silk-lang/examples/default (3d330376eba6f634d1ca384269e46bc3c96727d8)
 ```
 
-The template's `[[post-init]]` commands then run in the new project with `SILK_VERSION` set to the compiler's release. The `<arguments>` after `--` go to each entry that sets `arguments = true`; a template with no such entry refuses them. `--template` with `--lib` or `--workspace` exits 2.
+The template's `[[post-init]]` commands then run in the new project, in the build tool sandbox, with `SILK_VERSION` set to the compiler's release. On a host with no sandbox, a template with such commands is refused unless you pass `--unsandboxed-post-init`, which runs them with your full access. The `<arguments>` after `--` go to each entry that sets `arguments = true`; a template with no such entry refuses them. `--template` with `--lib` or `--workspace` exits 2.
 
 `silk init --list` (or `-l`) prints the official templates with their descriptions, or the templates of the repository or directory `template` names, and exits 0. See **Project templates** in Projects and packages.
 

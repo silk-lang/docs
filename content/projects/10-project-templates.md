@@ -159,19 +159,37 @@ A `[[post-init]]` entry names one command that `silk init` runs after it has cop
 
 | Key | Value | Meaning |
 | --- | --- | --- |
-| `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the template's directory, without `.` or `..` segments; a bare name is searched on `PATH`. |
+| `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the template's directory, without `.` or `..` segments; a bare name is searched on `/usr/local/bin:/usr/bin:/bin`. |
 | `arguments` | boolean | When `true`, the entry also gets every argument given to `silk init` after `--`. Default `false`. |
 
 An entry with any other key, an empty `run`, or an `arguments` that is not `true` or `false` makes the template's `silk.toml` invalid, and `silk init` refuses the template.
 
 Each command:
 
-- Runs in the new project's directory, after every file has been copied.
-- Gets your environment, plus `SILK_VERSION` set to the release of the compiler that is creating the project, such as `0.1.0-dev.56+f7d93cff9716`. On Windows, it gets only the variables a program usually needs, such as `PATH`, `TEMP`, `USERPROFILE` and `SILK_HOME`, plus `SILK_VERSION`.
+- Runs in the new project's directory, after every file has been copied, inside a sandbox (see below).
+- Gets only four environment variables: `PATH=/usr/local/bin:/usr/bin:/bin`, `HOME` and `TMPDIR`, which both name a scratch directory, and `SILK_VERSION`, the release of the compiler that is creating the project, such as `0.1.0-dev.56+f7d93cff9716`.
 - Gets the arguments in its `run`, and nothing else, unless it sets `arguments = true`.
 - Must exit 0.
 
 What the commands print to standard output and standard error is shown before the `Initialized` line.
+
+### The sandbox
+
+A template is someone else's code, so its entries run in the same operating-system sandbox as the tool steps of `build.silk`: Landlock on Linux 6.7 and newer, and `sandbox-exec` on macOS. An entry can read the system's programs and libraries and the new project. It can write only the new project and its scratch `HOME`, and it cannot open TCP connections. So a template cannot read your other files, reach the network, or change anything outside the project it creates. A step that needs the network, such as installing packages, belongs in the instructions the template prints, for you to run yourself.
+
+On a host with no sandbox, such as Windows or an older Linux kernel, `silk init` refuses a template that has `[[post-init]]` entries, before it writes anything, and exits 1:
+
+```
+Template acme/starters/web has [[post-init]] entries, and this host has no sandbox to run them in (Linux 6.7 with Landlock, or macOS); add --unsandboxed-post-init to run them with your full access
+```
+
+`--unsandboxed-post-init` runs the entries anyway, with your environment and your full access, after a warning:
+
+```
+silk: warning: running the template's [[post-init]] entries without a sandbox (--unsandboxed-post-init)
+```
+
+Pass it only for a template you trust. A template without entries needs no sandbox.
 
 ### Arguments
 
@@ -220,7 +238,7 @@ silk: [[post-init]][0]: cannot find the program scripts/setup in the template
 
 ### Scripts in a template
 
-The script files of a template are copied into the project like any other file, so they stay there after `silk init`. Commit the executable bit with the script (`git update-index --chmod=+x scripts/setup`), because `silk init` keeps the bits it finds and does not add any. Start a script with a `#!` line; on Windows, name a program that Windows can start, such as an `.exe`, or run a script through an interpreter on `PATH`, as in `run = ["python", "scripts/setup.py"]`.
+The script files of a template are copied into the project like any other file, so they stay there after `silk init`. Commit the executable bit with the script (`git update-index --chmod=+x scripts/setup`), because `silk init` keeps the bits it finds and does not add any. Start a script with a `#!` line whose interpreter is in `/usr/local/bin`, `/usr/bin` or `/bin`, such as `#!/bin/sh`, because those are the only directories on the sandbox's `PATH`.
 
 A script that should not stay in the project can remove itself as its last step.
 
