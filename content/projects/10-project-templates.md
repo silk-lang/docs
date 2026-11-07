@@ -142,7 +142,11 @@ version = "0.1.0"
 description = "A web server starter"
 
 [[post-init]]
+run = ["git", "init", "--quiet"]
+
+[[post-init]]
 run = ["scripts/setup", "--greeting", "hello"]
+arguments = true
 ```
 
 Keep the template itself a working package: `name` can be anything, because `silk init` replaces it, and `silk check` in the template's directory checks it like any other package. Builds read `[[post-init]]` only to check its shape, so a template builds with its entries in place.
@@ -155,43 +159,66 @@ A `[[post-init]]` entry names one command that `silk init` runs after it has cop
 
 | Key | Value | Meaning |
 | --- | --- | --- |
-| `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the template's directory, without `.` or `..` segments; a bare name is searched on `PATH`. |
+| `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the template's directory, without `.` or `..` segments; a bare name is searched on `/usr/local/bin:/usr/bin:/bin`. |
+| `arguments` | boolean | When `true`, the entry also gets every argument given to `silk init` after `--`. Default `false`. |
 
-`run` is the only key. An entry with any other key, or an empty `run`, makes the template's `silk.toml` invalid, and `silk init` refuses the template.
+An entry with any other key, an empty `run`, or an `arguments` that is not `true` or `false` makes the template's `silk.toml` invalid, and `silk init` refuses the template.
 
 Each command:
 
-- Runs in the new project's directory, after every file has been copied.
-- Gets your environment. On Windows, it gets only the variables a program usually needs, such as `PATH`, `TEMP`, `USERPROFILE` and `SILK_HOME`.
-- Gets its own arguments from `run`, then the release of the compiler that is creating the project, then every argument given to `silk init` after `--`.
+- Runs in the new project's directory, after every file has been copied, inside a sandbox (see below).
+- Gets only four environment variables: `PATH=/usr/local/bin:/usr/bin:/bin`, `HOME` and `TMPDIR`, which both name a scratch directory, and `SILK_VERSION`, the release of the compiler that is creating the project, such as `0.1.0-dev.56+f7d93cff9716`.
+- Gets the arguments in its `run`, and nothing else, unless it sets `arguments = true`.
 - Must exit 0.
 
 What the commands print to standard output and standard error is shown before the `Initialized` line.
 
+### The sandbox
+
+A template is someone else's code, so its entries run in the same operating-system sandbox as the tool steps of `build.silk`: Landlock on Linux 6.7 and newer, and `sandbox-exec` on macOS. An entry can read the system's programs and libraries and the new project. It can write only the new project and its scratch `HOME`, and it cannot open TCP connections. So a template cannot read your other files, reach the network, or change anything outside the project it creates. A step that needs the network, such as installing packages, belongs in the instructions the template prints, for you to run yourself.
+
+On a host with no sandbox, such as Windows or an older Linux kernel, `silk init` refuses a template that has `[[post-init]]` entries, before it writes anything, and exits 1:
+
+```
+Template acme/starters/web has [[post-init]] entries, and this host has no sandbox to run them in (Linux 6.7 with Landlock, or macOS); add --unsandboxed-post-init to run them with your full access
+```
+
+`--unsandboxed-post-init` runs the entries anyway, with your environment and your full access, after a warning:
+
+```
+silk: warning: running the template's [[post-init]] entries without a sandbox (--unsandboxed-post-init)
+```
+
+Pass it only for a template you trust. A template without entries needs no sandbox.
+
 ### Arguments
 
-With the template above, this command:
+An entry with `arguments = true` gets the arguments given to `silk init` after `--`, after its own. With the template above, this command:
 
 ```sh
 silk init site -t acme/starters/web -- --port 8080
 ```
 
-runs `scripts/setup` like this:
+runs `git init --quiet` as written, then `scripts/setup` like this:
 
 ```
-scripts/setup --greeting hello 0.1.0-dev.56+f7d93cff9716 --port 8080
+scripts/setup --greeting hello --port 8080
 ```
 
-The release lets a script pick versions that match the compiler. The arguments after `--` let a template take options from the person running `silk init`. Every entry gets them, so an entry that runs a program you do not control, such as `git init`, sees them too, and most programs refuse arguments they do not expect. Run such a program from a script of the template instead, which can read its own arguments and drop the rest:
+Arguments after `--` let a template take options from the person running `silk init`. Only the entries that set `arguments = true` see them, so an entry that runs a program you do not control, such as `git init`, keeps exactly the arguments you wrote. A template with no such entry refuses arguments after `--` before it writes anything, rather than dropping them:
+
+```
+Template acme/starters/web takes no arguments after `--`: no [[post-init]] entry of its silk.toml sets `arguments = true`
+```
+
+`SILK_VERSION` lets a script pick versions that match the compiler:
 
 ```sh
 #!/bin/sh
-# $1 and $2 are the entry's own arguments, $3 is the Silk release, the rest came after `--`.
+# $1 and $2 are the entry's own arguments; the rest came after `--`.
 greeting=$2
-release=$3
-shift 3
-git init --quiet
-echo "Created with Silk $release"
+shift 2
+echo "Created with Silk $SILK_VERSION, options: $*"
 ```
 
 ### When an entry fails
@@ -199,7 +226,7 @@ echo "Created with Silk $release"
 A command that exits with a status other than 0, or that cannot be started, stops `silk init`. The project is removed and `silk init` exits 1:
 
 ```
-silk: git init --quiet failed with status 129
+silk: scripts/setup --greeting hello failed with status 1
 silk: the template's [[post-init]] entry failed, so the project was removed
 ```
 
@@ -211,7 +238,7 @@ silk: [[post-init]][0]: cannot find the program scripts/setup in the template
 
 ### Scripts in a template
 
-The script files of a template are copied into the project like any other file, so they stay there after `silk init`. Commit the executable bit with the script (`git update-index --chmod=+x scripts/setup`), because `silk init` keeps the bits it finds and does not add any. Start a script with a `#!` line; on Windows, name a program that Windows can start, such as an `.exe`, or run a script through an interpreter on `PATH`, as in `run = ["python", "scripts/setup.py"]`.
+The script files of a template are copied into the project like any other file, so they stay there after `silk init`. Commit the executable bit with the script (`git update-index --chmod=+x scripts/setup`), because `silk init` keeps the bits it finds and does not add any. Start a script with a `#!` line whose interpreter is in `/usr/local/bin`, `/usr/bin` or `/bin`, such as `#!/bin/sh`, because those are the only directories on the sandbox's `PATH`.
 
 A script that should not stay in the project can remove itself as its last step.
 
