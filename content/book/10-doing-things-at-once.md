@@ -391,7 +391,7 @@ fn snapshot(fired: &Fired) -> Fired {
 }
 
 // Runs the reminders for up to MAX_REMINDERS open tasks and reports which went off.
-effect fn runReminders(board: &Board, budget: u64) -> Fired
+effect fn runReminders(board: &Board<'_>, budget: u64) -> Fired
 ! OutOfMemoryError | TaskIdExhaustedError | StalledError
 ? &mut MonotonicClock | &mut Allocator {
   let mut reminders = List<Reminder>.make()
@@ -463,7 +463,7 @@ fn titleOf<'text>(board: &Board<'text>, id: u32) -> string<'text> {
   return "?"
 }
 
-effect fn remindTasks(board: &mut Board, budget: u64) -> ()
+effect fn remindTasks(board: &mut Board<'_>, budget: u64) -> ()
 ! LogError | OutOfMemoryError | TaskIdExhaustedError | StalledError
 ? &mut Logger | &mut MonotonicClock | &mut Allocator {
   run board.tasks.sort()

@@ -106,7 +106,7 @@ impl<'text> Board<'text> {
 
 Only the headers change. One `'text` covers the whole board: every title in a `Board<'text>` borrows from text that is valid during `'text`. `add` accepts only a `Draft<'text>`, so you can't slip in a title that borrows from something shorter-lived. The bodies of `add`, `complete` and `openCount` stay exactly as they were.
 
-The functions outside the impls barely notice. `statusMark(task: &Task)`, `show(task: &Task)` and `showBoard(board: &Board)` still compile with no lifetime written. In a parameter type, a lifetime you leave out becomes a fresh one, so `&Task` means "a reference to a task that borrows from any text at all". These functions only read the task for the length of the call, so they don't care which text it is. `priorityLabel` keeps its `string<'static>` result: it takes no borrowed input, so the only place its text can come from is the program itself.
+The functions outside the impls change only a little. A signature always shows that a type borrows, so `&Task` alone is refused with SEM0210. You don't have to name the lifetime, though: write `'_` in its place, as in `statusMark(task: &Task<'_>)`, `show(task: &Task<'_>)` and `showBoard(board: &Board<'_>)`. In a parameter type, `'_` is a fresh lifetime, so `&Task<'_>` means "a reference to a task that borrows from any text at all". These functions only read the task for the length of the call, so they don't care which text it is. `priorityLabel` keeps its `string<'static>` result: it takes no borrowed input, so the only place its text can come from is the program itself.
 
 See **Lifetimes** in the reference for declaring lifetime parameters on structs, impls and functions.
 
@@ -192,12 +192,14 @@ You might wonder why the stdlib functions you just called have no lifetimes in s
 
 That is *elision*: leaving out lifetimes the compiler can work out from simple rules. In a function signature:
 
-- Each lifetime you leave out of a parameter becomes a fresh lifetime of its own.
+- Each lifetime you leave out of a parameter, or write as `'_`, becomes a fresh lifetime of its own.
 - A result with no lifetime borrows from the receiver (`self`), when the receiver is a borrow.
-- Otherwise it borrows from the one parameter that is a borrow, if there is exactly one.
+- Otherwise, if the parameters show exactly one lifetime, the result borrows with that one. A `&Task<'_>` shows two: the reference's and the task's.
 - Otherwise you must write it.
 
-`utf8Bytes` has exactly one borrowed parameter, so its result borrows from `value`. Your `part` has exactly one borrowed parameter too, so you could write it with no lifetimes at all:
+A reference, a slice or a `string` may leave its lifetime out. A struct with lifetime parameters, like `Task<'text>`, may not: a signature writes each of them, by name or as `'_`, so a reader always sees that the value borrows. A function type such as `fn(&Task) -> bool`, and a function literal's parameters, may still leave them out.
+
+`utf8Bytes` shows exactly one lifetime, the one in `value`, so its result borrows from `value`. Your `part` shows exactly one lifetime too, so you could write it with no lifetimes at all:
 
 ```silk
 fn part(text: string, start: usize, end: usize) -> string {
@@ -584,14 +586,14 @@ fn priorityLabel(priority: Priority) -> string<'static> {
   }
 }
 
-fn statusMark(task: &Task) -> string<'static> {
+fn statusMark(task: &Task<'_>) -> string<'static> {
   if task.isOpen() {
     return "[ ]"
   }
   return "[x]"
 }
 
-effect fn show(task: &Task) -> ()
+effect fn show(task: &Task<'_>) -> ()
   ! LogError
   ? &mut Logger {
   run Effect.log(
@@ -605,7 +607,7 @@ effect fn show(task: &Task) -> ()
   )
 }
 
-effect fn showBoard(board: &Board) -> ()
+effect fn showBoard(board: &Board<'_>) -> ()
   ! LogError
   ? &mut Logger {
   let mut index: usize = 0
@@ -635,7 +637,8 @@ pub effect fn main() -> ()
 
 - A `string` is a borrowed view, and its lifetime says how long the text it points at stays valid. Literals are `string<'static>`.
 - A struct that holds a borrow declares a lifetime parameter, `struct Task<'text>`, and its impl repeats it, `impl<'text> Task<'text>`.
-- Lifetimes in signatures can often be left out. With no receiver and several borrowed inputs (SEM0210), name the one the result borrows from.
+- Lifetimes in signatures can often be left out. With no receiver and several input lifetimes (SEM0210), name the one the result borrows from.
+- A type that holds a borrow always shows it in a signature, as `&Task<'_>` when you don't name the lifetime.
 - An elided result on a method borrows from `self`. Name the lifetime when the result points into something `self` only refers to.
 - OWN0019 means a borrow is used after its source was dropped: keep the source alive longer, or finish with the borrow sooner.
 - When lifetime inference fails on a new value (SEM0012), annotate the `let`.
