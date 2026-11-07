@@ -1,6 +1,6 @@
 # Text and formatting
 
-This guide builds `textinfo`, a small program that looks at text the way Silk sees it: as UTF-8 bytes, as Unicode scalars, and as values you write through a template. Along the way you check bytes for valid UTF-8, decode bytes that arrive in pieces, compare two spellings of the same word, parse numbers back out of text, and teach a type of your own to print itself.
+This guide builds `textinfo`, a small program that looks at text the way Silk sees it: as UTF-8 bytes, as Unicode scalars, and as values you write through a template. Along the way you check bytes for valid UTF-8, decode bytes that arrive in pieces, compare two spellings of the same word, measure how far apart two spellings are, parse numbers back out of text, and teach a type of your own to print itself.
 
 Start a project and replace `src/main.silk` as you go:
 
@@ -290,6 +290,23 @@ effect fn normalize() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mu
 
 Normalization returns a new owned `String`, so it needs `? &mut Allocator` and can fail with `OutOfMemoryError`. `String.view` borrows it back as a `string`. `normalizeNfd` gives the decomposed form. The module does canonical forms only: no NFKC or NFKD, no case folding, no locale-aware comparison. Of the Unicode character properties, it exposes only the canonical combining class (`Unicode.canonicalCombiningClass`). There are no queries such as "is this a letter".
 
+## How far apart two spellings are
+
+To suggest the closest known name for a misspelled one, or to rank fuzzy matches, count the edits that turn one text into the other with `silk/text/edit_distance`:
+
+```silk
+// Edit distances between misspellings and the words they meant.
+effect fn distances() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut Allocator {
+  run Format.format("nmae -> name: {d}\n", &.{ d: run edit_distance.damerauLevenshtein("nmae", "name") })
+  run Format.format("ca -> abc: {d} (Damerau-Levenshtein), {o} (optimal string alignment)\n", &.{
+    d: run edit_distance.damerauLevenshtein("ca", "abc"),
+    o: run edit_distance.optimalStringAlignment("ca", "abc"),
+  })
+}
+```
+
+An edit inserts, deletes or replaces one character, or swaps two neighbouring ones, so `nmae` is one edit from `name`. `damerauLevenshtein` lets a later edit change what an earlier one made: `ca` becomes `ac` by a swap, then `abc` by an insert, two edits. `optimalStringAlignment` never edits the same text twice, so it counts three, and it is faster on long inputs. Many libraries call that second one "Damerau-Levenshtein". Both count Unicode scalars; `damerauLevenshteinBytes` and `optimalStringAlignmentBytes` count bytes, which is faster and right for ASCII names. They allocate for inputs longer than 64 characters, so they need `? &mut Allocator`.
+
 ## Searching, splitting and trimming
 
 `silk/text/string` can take text apart without copying it. Each of these functions returns a view of the text you pass, with the same lifetime:
@@ -390,6 +407,7 @@ effect fn report() -> () ! WriterError | OutOfMemoryError ? &mut Writer | &mut A
   let chunks: [&[u8]; 2] = [b"caf\xC3", b"\xA9!"]
   run decodeChunks(&chunks)
   run normalize()
+  run distances()
   run settings(" name = naïve , lang=silk,draft ")
   let hello = run greeting("naïve reader")
   run describe(String.view(&hello))
@@ -417,6 +435,7 @@ The imports at the top of the file:
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.text.char
+import silk.text.edit_distance
 import silk.core.effect { Effect }
 import silk.text.format { Display, Format, Formatter, NotANumber, OutOfRange }
 import silk.core.option { Option }
@@ -453,7 +472,9 @@ valid: café
 invalid UTF-8 at byte 3
 U+0063 U+0061 U+0066 (chunk 0 ends mid-scalar) U+00E9 U+0021 done
 raw equal: false
-NFC equal: true (Unicode 17.0.0)
+NFC equal: true (Unicode 18.0.0)
+nmae -> name: 1
+ca -> abc: 2 (Damerau-Levenshtein), 3 (optimal string alignment)
 [name] = [naïve]
 [lang] = [silk]
 [draft] has no value
@@ -473,6 +494,7 @@ Read it against the code. The price column pads `2.50` to 8 columns, `{:.3}` cut
 - `silk/text/char`: `fromU32`, `toU32`
 - `silk/text/utf8_decoder`: `Utf8Decoder`, `Utf8Step`
 - `silk/text/unicode`: `Unicode`
+- `silk/text/edit_distance`: `damerauLevenshtein`, `damerauLevenshteinBytes`, `optimalStringAlignment`, `optimalStringAlignmentBytes`
 - `silk/text/format`: `Format`, `FormatOptions`, `Display`, `Debug`, `Formatter`, `ParseError`
 - `silk/io/writer`: `Writer`, `WriterError`
 - `silk/io/writer_native`: `StdoutWriter`
