@@ -60,7 +60,7 @@ union Status {
 `finishTask` asks the clock for the current instant. `SystemClock.now()` is a service operation: calling it builds an effect, and `run` performs it. Because it runs a clock operation, `finishTask` must list `&mut SystemClock` in its own row:
 
 ```silk
-effect fn finishTask(board: &mut Board, id: TaskId) -> () ! NoSuchTask | LogError ? &mut Logger | &mut SystemClock {
+effect fn finishTask(board: &mut Board<'_>, id: TaskId) -> () ! NoSuchTask | LogError ? &mut Logger | &mut SystemClock {
   let now = run SystemClock.now()
   run board.complete(id, SystemClock.seconds(&now))
   run Effect.log("finished {id}\n", &.{ id: id })
@@ -72,7 +72,7 @@ effect fn finishTask(board: &mut Board, id: TaskId) -> () ! NoSuchTask | LogErro
 ```silk
 const DAY: i64 = 86400
 
-effect fn show(task: &Task, now: i64) -> () ! LogError ? &mut Logger {
+effect fn show(task: &Task<'_>, now: i64) -> () ! LogError ? &mut Logger {
   match &task.status {
     Status.Open => {
       run Effect.log("[ ] {id} {title} ({priority})\n", &.{
@@ -101,7 +101,7 @@ effect fn show(task: &Task, now: i64) -> () ! LogError ? &mut Logger {
   }
 }
 
-effect fn showBoard(board: &Board) -> () ! LogError ? &mut Logger | &mut SystemClock {
+effect fn showBoard(board: &Board<'_>) -> () ! LogError ? &mut Logger | &mut SystemClock {
   let now = run SystemClock.now()
   let mut index: usize = 0
   while index < board.count {
@@ -181,7 +181,7 @@ effect fn load(path: &Path) -> Bytes
   return Bytes.make()
 }
 
-effect fn save(path: &Path, board: &Board) -> ()
+effect fn save(path: &Path, board: &Board<'_>) -> ()
 ! FileError | OutOfMemoryError
 ? &mut FileSystem | &mut Allocator {
   let bytes = run render(board)

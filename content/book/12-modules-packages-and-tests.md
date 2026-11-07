@@ -416,7 +416,7 @@ SEM0016 is a binding conflict: the name `Board` is bound twice, once to the modu
 import taskcore.Board as Boards
 import taskcore.Board { Board, DuplicateTask, NoSuchTask }
 
-fn openCount(board: &Board) -> i32 {
+fn openCount(board: &Board<'_>) -> i32 {
   return Boards.count(board, &Boards.OpenTasks {})
 }
 ```

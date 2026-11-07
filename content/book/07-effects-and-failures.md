@@ -11,7 +11,7 @@ Most languages give you two ways to report such problems, and both have a cost. 
 Silk takes a different route. A function that does more than compute a value is an *effect function*, and its signature says everything it does:
 
 ```silk
-effect fn show(task: &Task) -> () ! LogError ? &mut Logger {
+effect fn show(task: &Task<'_>) -> () ! LogError ? &mut Logger {
 ```
 
 You have been writing lines like this since chapter 1. Now you can read them. `-> ()` is the success type. `! LogError` is the *failure row*: the ways this can fail. `? &mut Logger` is the *requirement row*: what it needs from its surroundings. The compiler checks all three. If you run something that can fail with `NoSuchTask`, your function must either declare `! NoSuchTask` or handle it. Nothing slips through unannounced.
@@ -340,7 +340,7 @@ effect fn addTask<'text>(board: &mut Board<'text>, draft: Draft<'text>) -> () ! 
   run Effect.log("added {id}\n", &.{ id: id })
 }
 
-effect fn finishTask(board: &mut Board, id: TaskId) -> () ! NoSuchTask | LogError ? &mut Logger {
+effect fn finishTask(board: &mut Board<'_>, id: TaskId) -> () ! NoSuchTask | LogError ? &mut Logger {
   run board.complete(id, 7)
   run Effect.log("finished {id}\n", &.{ id: id })
 }

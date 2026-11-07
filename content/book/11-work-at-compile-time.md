@@ -584,7 +584,7 @@ Each repetition is type-checked on its own, with that field's type. For `Row`, t
 Now fill a `Row` per task:
 
 ```silk
-effect fn exportBoard(board: &Board) -> () ! LogError ? &mut Logger {
+effect fn exportBoard(board: &Board<'_>) -> () ! LogError ? &mut Logger {
   run csvHeader<Row>()
   let tasks = board.tasks.asSlice()
   let mut index: usize = 0

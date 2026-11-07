@@ -362,7 +362,7 @@ A long list reads better with open tasks first, the important ones on top. `List
 
 ```silk
 // Listing order: open tasks first, then higher priority first, then by id.
-fn compareTasks(left: &Task, right: &Task) -> Ordering {
+fn compareTasks(left: &Task<'_>, right: &Task<'_>) -> Ordering {
   if left.isOpen() != right.isOpen() {
     if left.isOpen() {
       return Ordering.Less
@@ -386,7 +386,7 @@ The priority line swaps `right` and `left`, so higher priorities come first. Ids
 Sorting rearranges the list in place, so `showBoard` now takes `&mut Board`. Sorting may also need scratch memory, so it needs the allocator:
 
 ```silk
-effect fn showBoard(board: &mut Board) -> () ! LogError | OutOfMemoryError ? &mut Logger | &mut SystemClock | &mut Allocator {
+effect fn showBoard(board: &mut Board<'_>) -> () ! LogError | OutOfMemoryError ? &mut Logger | &mut SystemClock | &mut Allocator {
   run board.tasks.sort()
   let now = run SystemClock.now()
   let tasks = board.tasks.asSlice()
@@ -461,7 +461,7 @@ Now each line of the file is one template:
 
 ```silk
 // One line per task, written with the same templates the logger uses.
-effect fn renderLines(board: &Board) -> () ! WriterError ? &mut Writer {
+effect fn renderLines(board: &Board<'_>) -> () ! WriterError ? &mut Writer {
   let tasks = board.tasks.asSlice()
   let mut index: usize = 0
   while index < tasks.length {
@@ -484,7 +484,7 @@ effect fn renderLines(board: &Board) -> () ! WriterError ? &mut Writer {
   }
 }
 
-effect fn render(board: &Board) -> Bytes ! WriterError {
+effect fn render(board: &Board<'_>) -> Bytes ! WriterError {
   let mut writer = TextWriter.make()
   run renderLines(board) |> Effect.provideMut<Writer>(&mut writer)
   return move writer.out
@@ -496,7 +496,7 @@ effect fn render(board: &Board) -> Bytes ! WriterError {
 `render` provides the `Writer` itself, so it needs no services at all. Its only failure is `WriterError`. That ripples outward in a pleasant way. `save` no longer needs the allocator:
 
 ```silk
-effect fn save(path: &Path, board: &Board) -> ()
+effect fn save(path: &Path, board: &Board<'_>) -> ()
 ! FileError | WriterError
 ? &mut FileSystem {
   let bytes = run render(board)

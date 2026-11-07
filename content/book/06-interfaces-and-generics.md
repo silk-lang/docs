@@ -7,7 +7,7 @@ At the end of chapter 5, `tasks` parses a board out of text and prints it. To pr
 Here is the line that prints one task, as chapter 5 left it:
 
 ```silk
-effect fn show(task: &Task) -> () ! LogError ? &mut Logger {
+effect fn show(task: &Task<'_>) -> () ! LogError ? &mut Logger {
   run Effect.log("{mark} #{id} {title} ({priority})\n", &.{
     mark: statusMark(task),
     id: task.id.0,
@@ -108,7 +108,7 @@ import silk.io.writer { Writer, WriterError }
 Now `show` can pass the values themselves. The `#` moved into `TaskId`, so the template loses it:
 
 ```silk
-effect fn show(task: &Task) -> () ! LogError ? &mut Logger {
+effect fn show(task: &Task<'_>) -> () ! LogError ? &mut Logger {
   run Effect.log("{mark} {id} {title} ({priority})\n", &.{
     mark: statusMark(task),
     id: task.id,
@@ -236,7 +236,7 @@ An interface can name that test. Call it `Filter`: anything that can decide whet
 ```silk
 // A filter decides which tasks to keep. Any type can be a filter by implementing it.
 interface Filter {
-  fn keep(filter: &Self, task: &Task) -> bool
+  fn keep(filter: &Self, task: &Task<'_>) -> bool
 }
 ```
 
@@ -246,7 +246,7 @@ The receiver is an ordinary parameter. Its name is up to you, and here `filter` 
 struct OpenTasks {}
 
 impl Filter for OpenTasks {
-  fn keep(filter: &Self, task: &Task) -> bool {
+  fn keep(filter: &Self, task: &Task<'_>) -> bool {
     return task.isOpen()
   }
 }
@@ -258,7 +258,7 @@ The second keeps tasks at or above a priority. It carries the threshold as a fie
 struct AtLeast { priority: Priority }
 
 impl Filter for AtLeast {
-  fn keep(filter: &Self, task: &Task) -> bool {
+  fn keep(filter: &Self, task: &Task<'_>) -> bool {
     return &task.priority >= &filter.priority
   }
 }
@@ -298,7 +298,7 @@ Now write the counting loop once. It takes any filter:
 
 ```silk
 // Generic over any Filter: one copy of this function is compiled per filter type.
-fn count<F: Filter>(board: &Board, filter: &F) -> i32 {
+fn count<F: Filter>(board: &Board<'_>, filter: &F) -> i32 {
   let mut total = 0
   let mut index: usize = 0
   while index < board.count {
@@ -357,7 +357,7 @@ Interfaces are the right tool when a rule has a name and maybe some data, like `
 
 ```silk
 // The lightweight version: pass a function value or a closure.
-fn countWhere(board: &Board, keep: fn(&Task) -> bool) -> i32 {
+fn countWhere(board: &Board<'_>, keep: fn(&Task) -> bool) -> i32 {
   let mut total = 0
   let mut index: usize = 0
   while index < board.count {
