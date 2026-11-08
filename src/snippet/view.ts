@@ -14,7 +14,7 @@ import {
   currentAnnotations,
 } from './model'
 import { cutLineCount, scene, size } from './scene'
-import { CANVAS_ID, imageFileName } from './update'
+import { CANVAS_ID, ReadAddress, imageFileName } from './update'
 
 const fieldLabel = (text: string, h: HtmlBuilder<Message>): Html =>
   h.span([h.Class('label text-muted')], [text])
@@ -386,6 +386,7 @@ const preview = (model: Model, h: HtmlBuilder<Message>): Html => {
 export const view = Submodel.defineView<Model, Message>((model, h): Html =>
   h.section(
     [
+      h.OnMount(ReadAddress()),
       h.Class(
         'mx-auto flex max-w-[90rem] flex-col gap-10 px-5 py-12 md:px-20 md:py-16',
       ),
