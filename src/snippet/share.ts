@@ -1,5 +1,6 @@
 // The snippet's settings in the page address, so a link opens the same image:
-// /snippet?s=<settings as JSON, in base64url>.
+// /snippet?s=<settings as JSON, deflated, in base64url>. The browser's own
+// CompressionStream does the deflating, which is asynchronous.
 
 import { Option, Schema, pipe } from 'effect'
 import { Base64Url } from 'effect/encoding'
@@ -8,32 +9,47 @@ import { LIMITS, SCALES, Settings, initialModel } from './model'
 
 const PARAM = 's'
 
+const FORMAT = 'deflate-raw'
+
+// The settings as JSON, which is also how two settings are compared.
+export const toJson = (settings: Settings): string =>
+  JSON.stringify(Schema.encodeSync(Settings)(settings))
+
+const DEFAULTS = toJson(initialModel.settings)
+
+const deflate = async (text: string): Promise<Uint8Array> =>
+  new Uint8Array(
+    await new Response(
+      new Blob([text]).stream().pipeThrough(new CompressionStream(FORMAT)),
+    ).arrayBuffer(),
+  )
+
+const inflate = (bytes: Uint8Array<ArrayBuffer>): Promise<string> =>
+  new Response(
+    new Blob([bytes]).stream().pipeThrough(new DecompressionStream(FORMAT)),
+  ).text()
+
+export const encode = async (settings: Settings): Promise<string> =>
+  Base64Url.encode(await deflate(toJson(settings)))
+
 const clamp = (
   { min, max }: Readonly<{ min: number; max: number }>,
   value: number,
 ): number => Math.round(Math.min(max, Math.max(min, value)))
 
-// ponytail: plain base64 of the JSON; a long snippet makes a long address.
-// Compress it (CompressionStream) if addresses ever get too long to share.
-export const encode = (settings: Settings): string =>
-  Base64Url.encode(JSON.stringify(Schema.encodeSync(Settings)(settings)))
-
-// Settings from an address. A link from before a setting existed lacks it,
-// so missing fields take their defaults; sizes outside the page's limits
-// are brought back within them.
-export const decode = (encoded: string): Option.Option<Settings> =>
-  pipe(
-    Option.getSuccess(Base64Url.decodeString(encoded)),
-    Option.flatMap(Option.liftThrowable(JSON.parse)),
-    Option.filter(
-      (value): value is object => typeof value === 'object' && value !== null,
-    ),
-    Option.flatMap(value =>
-      Schema.decodeOption(Settings)({
-        ...Schema.encodeSync(Settings)(initialModel.settings),
-        ...value,
-      }),
-    ),
+// Settings from an address, or none when it holds something else. Sizes
+// outside the page's limits are brought back within them.
+export const decode = async (
+  encoded: string,
+): Promise<Option.Option<Settings>> => {
+  const bytes = Option.getSuccess(Base64Url.decode(encoded))
+  if (Option.isNone(bytes)) {
+    return Option.none()
+  }
+  const json = await inflate(new Uint8Array(bytes.value)).catch(() => '')
+  return pipe(
+    Option.liftThrowable(JSON.parse)(json),
+    Option.flatMap(Schema.decodeUnknownOption(Settings)),
     Option.map(settings => ({
       ...settings,
       width: clamp(LIMITS.width, settings.width),
@@ -43,17 +59,16 @@ export const decode = (encoded: string): Option.Option<Settings> =>
         : initialModel.settings.scale,
     })),
   )
+}
 
-export const fromSearch = (search: string): Option.Option<Settings> =>
-  pipe(
-    Option.fromNullishOr(new URLSearchParams(search).get(PARAM)),
-    Option.flatMap(decode),
-  )
+export const fromSearch = (search: string): Promise<Option.Option<Settings>> =>
+  Option.match(Option.fromNullishOr(new URLSearchParams(search).get(PARAM)), {
+    onNone: () => Promise.resolve(Option.none()),
+    onSome: decode,
+  })
 
 // The page's address for the settings. The defaults need no parameter.
-const DEFAULTS = encode(initialModel.settings)
-
-export const snippetPath = (settings: Settings): string => {
-  const encoded = encode(settings)
-  return encoded === DEFAULTS ? '/snippet' : `/snippet?${PARAM}=${encoded}`
-}
+export const snippetPath = async (settings: Settings): Promise<string> =>
+  toJson(settings) === DEFAULTS
+    ? '/snippet'
+    : `/snippet?${PARAM}=${await encode(settings)}`
