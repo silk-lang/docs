@@ -8,6 +8,7 @@ import {
   homeRouter,
   playgroundRouter,
   releasesRouter,
+  snippetRouter,
 } from './route'
 import * as Search from './search'
 
@@ -242,6 +243,7 @@ export const siteFooter = <Message>(h: HtmlBuilder<Message>): Html =>
                 h,
               ),
               footerLink('Playground', playgroundRouter(), h),
+              footerLink('Code image', snippetRouter(), h),
               footerLink('Releases', releasesRouter(), h),
               footerLink('GitHub', GITHUB_URL, h),
             ],

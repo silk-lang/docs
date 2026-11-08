@@ -24,8 +24,6 @@ type PageMeta = Readonly<{
   path: string
   description: string
   card: Og.OgCard
-  // Kept out of search engines, for pages nothing links to.
-  isHidden?: boolean
 }>
 
 const escapeAttribute = (value: string): string =>
@@ -58,7 +56,6 @@ const metaTags = (title: string, meta: PageMeta): string => {
     ['name', 'twitter:description', meta.description],
     ['name', 'twitter:image', image],
     ['name', 'twitter:image:alt', alt],
-    ...(meta.isHidden === true ? [['name', 'robots', 'noindex']] : []),
   ]
     .map(
       ([key, name, content]) =>
@@ -160,9 +157,9 @@ const metaForRoute = (route: AppRoute, flags: Flags): PageMeta =>
     }),
     Snippet: () => ({
       path: '/snippet',
-      description: 'Make an image of Silk code.',
+      description:
+        'Paste Silk code and download it as an image, with errors and types from the language server.',
       card: Og.playgroundCard,
-      isHidden: true,
     }),
     Releases: () => ({
       path: '/releases',

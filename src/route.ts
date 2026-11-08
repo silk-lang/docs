@@ -39,7 +39,7 @@ export const playgroundRouter = pipe(
   Route.mapTo(AppRoute.Playground),
 )
 
-// A page for making images of code. Nothing links to it.
+// A page for making images of code, linked from the footer.
 export const snippetRouter = pipe(
   literal('snippet'),
   Route.mapTo(AppRoute.Snippet),
