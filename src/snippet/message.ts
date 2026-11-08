@@ -1,6 +1,7 @@
 import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
+import { Annotations } from '../annotate/model'
 import { Theme } from './model'
 
 export const Message = defineMessageUnion({
@@ -14,6 +15,9 @@ export const Message = defineMessageUnion({
   SelectedScale: { value: Schema.String },
   ClickedLineNumbers: {},
   ClickedWindow: {},
+  ClickedErrors: {},
+  ClickedInlayHints: {},
+  ReceivedAnnotations: { code: Schema.String, annotations: Annotations },
   ClickedFitWidth: {},
   ClickedFormat: {},
   SucceededFormat: { code: Schema.String },

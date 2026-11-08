@@ -1,5 +1,7 @@
-import { Schema } from 'effect'
+import { Option, Schema } from 'effect'
 import { defineTaggedUnion } from 'foldkit/schema'
+
+import { Annotations, EMPTY } from '../annotate/model'
 
 // The card's colors: a dark card as in the design, or a light one.
 export const Theme = Schema.Literals(['Dark', 'Light'])
@@ -25,6 +27,10 @@ export const Settings = Schema.Struct({
   theme: Theme,
   showLineNumbers: Schema.Boolean,
   showWindow: Schema.Boolean,
+  // Errors and inlay hints from the language server. Hovers show where a
+  // `^?` marker pins them.
+  showErrors: Schema.Boolean,
+  showInlayHints: Schema.Boolean,
   scale: Schema.Number,
 })
 export type Settings = typeof Settings.Type
@@ -35,6 +41,10 @@ export const Model = Schema.Struct({
   // The canvas draws text in whatever font is loaded, so it paints again
   // once JetBrains Mono is in.
   areFontsReady: Schema.Boolean,
+  // What the language server said, and about which code.
+  maybeAnnotated: Schema.Option(
+    Schema.Struct({ code: Schema.String, annotations: Annotations }),
+  ),
 })
 export type Model = typeof Model.Type
 
@@ -57,53 +67,56 @@ export const LIMITS = {
   padding: { min: 0, max: 200 },
 }
 
-const SAMPLE = `//! The counter: a number and two buttons.
-import look { surface, button }
-import ui_app.app { App, Context, NoCommand }
-import ui_app.ui { Ui }
+const SAMPLE = `//! Counts the open tasks and prints how many are left.
+import silk.core.effect { Effect }
+import silk.io.logger { LogError }
+import silk.io.logger_native { StdoutLogger }
 
-pub struct Counter {
-  pub count: i64,
-}
-
-pub union Message {
-  Increment,
-  Decrement,
-}
-
-impl App<Message, NoCommand> for Counter {
-  fn view(self: &Self, ui: &mut Ui<Message>) -> () {
-    surface(&mut ui)
-    button(&mut ui, "-", false, || Message.Decrement)
-    ui.number(self.count)
-    button(&mut ui, "+", false, || Message.Increment)
-  }
-
-  fn update(self: &mut Self, message: Message, cx: &mut Context<NoCommand>) -> () {
-    match move message {
-      Message.Increment => {
-        self.count = self.count + 1
-      }
-      Message.Decrement => {
-        self.count = self.count - 1
-      }
+fn countOpen(finished: &[bool]) -> i32 {
+  let mut open = 0
+  let mut index: usize = 0
+  while index < finished.length {
+    if !finished[index] {
+      open = open + 1
     }
+    index = index + 1
   }
+  return open
+}
+
+pub effect fn main() -> ()
+  ! LogError {
+  let mut logger = StdoutLogger.make()
+  let open = countOpen(&[true, false, false])
+  //  ^?
+  run Effect.log("{} tasks open\\n", &.(open)) |> Effect.provideMut(&mut logger)
 }
 `
 
 export const initialModel: Model = {
   settings: {
     code: SAMPLE,
-    fileName: 'counter.silk',
+    fileName: 'tasks.silk',
     width: 960,
     padding: 64,
     background: '#009689',
     theme: 'Dark',
     showLineNumbers: true,
     showWindow: true,
+    showErrors: true,
+    showInlayHints: false,
     scale: 2,
   },
   formatState: FormatState.Idle(),
   areFontsReady: false,
+  maybeAnnotated: Option.none(),
 }
+
+// The annotations of the code as it is now. Older ones would point at the
+// wrong places, so the image waits for the next check instead.
+export const currentAnnotations = (model: Model): Annotations =>
+  Option.match(model.maybeAnnotated, {
+    onNone: () => EMPTY,
+    onSome: ({ code, annotations }) =>
+      code === model.settings.code ? annotations : EMPTY,
+  })

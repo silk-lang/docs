@@ -5,6 +5,13 @@
 import { Array, Match, pipe } from 'effect'
 import * as Canvas from 'foldkit/canvas'
 
+import { parse } from '../annotate/markers'
+import {
+  type Annotations,
+  type Diagnostic,
+  type Hover,
+  type InlayHint,
+} from '../annotate/model'
 import { type Token, type TokenClass, tokenize } from '../code'
 import { type Settings, TRANSPARENT, type Theme } from './model'
 
@@ -21,7 +28,6 @@ const BODY = { top: 28, bottom: 36, left: 20, right: 40 }
 const NO_GUTTER_LEFT = 28
 const HEADER_HEIGHT = 52
 const RADIUS = 14
-const TAB = '  '
 
 type Palette = Readonly<{
   card: string
@@ -37,6 +43,13 @@ type Palette = Readonly<{
   type: string
   literal: string
   function: string
+  hint: string
+  error: string
+  errorTint: string
+  warning: string
+  warningTint: string
+  hoverCard: string
+  cardBorder: string
 }>
 
 const PALETTES: Record<Theme, Palette> = {
@@ -54,6 +67,13 @@ const PALETTES: Record<Theme, Palette> = {
     type: '#FFFFFF',
     literal: '#E8C996',
     function: '#F3F3F1',
+    hint: '#5C5C62',
+    error: '#F06A62',
+    errorTint: 'rgba(240, 106, 98, 0.12)',
+    warning: '#E0B44C',
+    warningTint: 'rgba(224, 180, 76, 0.12)',
+    hoverCard: '#161618',
+    cardBorder: '#2A2A2E',
   },
   Light: {
     card: '#FFFFFF',
@@ -69,6 +89,13 @@ const PALETTES: Record<Theme, Palette> = {
     type: '#0B0B0C',
     literal: '#9A6416',
     function: '#0B0B0C',
+    hint: '#A0A0A6',
+    error: '#D1342B',
+    errorTint: 'rgba(209, 52, 43, 0.08)',
+    warning: '#B7791F',
+    warningTint: 'rgba(183, 121, 31, 0.1)',
+    hoverCard: '#FAFAF9',
+    cardBorder: '#E4E4E1',
   },
 }
 
@@ -121,6 +148,7 @@ const font = (size: number, weight: number, isItalic: boolean): string =>
 
 // Every font the image draws with.
 export const FONTS: ReadonlyArray<string> = [
+  font(12, 400, false),
   font(CODE_SIZE, 400, false),
   font(CODE_SIZE, 400, true),
   font(CODE_SIZE, 600, false),
@@ -168,10 +196,43 @@ const unjoined = (run: Run): ReadonlyArray<Run> =>
     style: run.style,
   }))
 
-const normalize = (code: string): string =>
-  code.replaceAll('\r\n', '\n').replaceAll('\t', TAB).replace(/\n+$/, '')
+// What the image draws: the code without its markers, and the annotations
+// the settings ask for. Hovers show only where `^?` pins them.
+type Drawn = Readonly<{
+  lines: ReadonlyArray<string>
+  annotations: Annotations
+}>
 
-const lineCount = (code: string): number => normalize(code).split('\n').length
+const drawn = (settings: Settings, annotations: Annotations): Drawn => ({
+  lines: parse(settings.code).shown.split('\n'),
+  annotations: {
+    diagnostics: settings.showErrors ? annotations.diagnostics : [],
+    hovers: annotations.hovers.filter(hover => hover.isPinned),
+    hints: settings.showInlayHints ? annotations.hints : [],
+  },
+})
+
+// How far the inlay hints before a column push it right, in characters. A
+// hint sits before the character at its column.
+const hintShift = (
+  hints: ReadonlyArray<InlayHint>,
+  line: number,
+  column: number,
+  isInclusive: boolean,
+): number =>
+  hints
+    .filter(
+      hint =>
+        hint.line === line &&
+        (isInclusive ? hint.column <= column : hint.column < column),
+    )
+    .reduce((sum, hint) => sum + hint.label.length, 0)
+
+const shownColumn = (
+  hints: ReadonlyArray<InlayHint>,
+  line: number,
+  column: number,
+): number => column + hintShift(hints, line, column, true)
 
 const codeLeft = (settings: Settings): number =>
   settings.showLineNumbers
@@ -191,42 +252,122 @@ const columnsThatFit = (settings: Settings): number =>
     ),
   )
 
-const longestLine = (code: string): number =>
-  Math.max(
-    0,
-    ...normalize(code)
-      .split('\n')
-      .map(line => line.length),
+const lineWidths = (drawing: Drawn): ReadonlyArray<number> =>
+  drawing.lines.map(
+    (text, line) =>
+      text.length +
+      hintShift(
+        drawing.annotations.hints,
+        line,
+        Number.POSITIVE_INFINITY,
+        true,
+      ),
   )
 
 // The narrowest width that shows every line whole.
-export const widthToFit = (settings: Settings): number =>
+export const widthToFit = (
+  settings: Settings,
+  annotations: Annotations,
+): number =>
   Math.ceil(
     2 * settings.padding +
       codeLeft(settings) +
-      longestLine(settings.code) * CHAR_WIDTH +
+      Math.max(0, ...lineWidths(drawn(settings, annotations))) * CHAR_WIDTH +
       BODY.right,
   )
 
 // The lines too long for the width, which the image cuts off.
-export const cutLineCount = (settings: Settings): number => {
+export const cutLineCount = (
+  settings: Settings,
+  annotations: Annotations,
+): number => {
   const fit = columnsThatFit(settings)
-  return normalize(settings.code)
-    .split('\n')
-    .filter(line => line.length > fit).length
+  return lineWidths(drawn(settings, annotations)).filter(width => width > fit)
+    .length
 }
 
-const cardHeight = (settings: Settings): number =>
+const MESSAGE_SIZE = 12
+const MESSAGE_CHAR = MESSAGE_SIZE * 0.6
+const MESSAGE_LINE = 18
+const CARD_LINE = 20
+const BOX = { x: 12, y: 7, gap: 6 }
+
+type Row =
+  | Readonly<{ kind: 'Code'; line: number }>
+  | Readonly<{ kind: 'Hover'; hover: Hover; lines: ReadonlyArray<string> }>
+  | Readonly<{
+      kind: 'Error'
+      diagnostic: Diagnostic
+      lines: ReadonlyArray<string>
+    }>
+
+// Words onto lines of at most `columns` characters.
+const wrap = (text: string, columns: number): ReadonlyArray<string> =>
+  text.split(/\s+/).reduce<ReadonlyArray<string>>((lines, word) => {
+    const last = lines[lines.length - 1]
+    return last === undefined
+      ? [word]
+      : last.length + 1 + word.length <= columns
+        ? [...lines.slice(0, -1), `${last} ${word}`]
+        : [...lines, word]
+  }, [])
+
+const messageColumns = (settings: Settings): number =>
+  Math.max(
+    16,
+    Math.floor(
+      (settings.width -
+        2 * settings.padding -
+        codeLeft(settings) -
+        BODY.right / 2 -
+        2 * BOX.x) /
+        MESSAGE_CHAR,
+    ),
+  )
+
+// Each code line, then the pinned hovers and the errors under it.
+const rows = (settings: Settings, drawing: Drawn): ReadonlyArray<Row> =>
+  drawing.lines.flatMap((_, line): ReadonlyArray<Row> => [
+    { kind: 'Code', line },
+    ...drawing.annotations.hovers
+      .filter(hover => hover.line === line)
+      .map((hover): Row => ({
+        kind: 'Hover',
+        hover,
+        lines: hover.text.split('\n'),
+      })),
+    ...drawing.annotations.diagnostics
+      .filter(diagnostic => diagnostic.line === line)
+      .map((diagnostic): Row => ({
+        kind: 'Error',
+        diagnostic,
+        lines: wrap(
+          `${diagnostic.message}  ${diagnostic.code}`.trim(),
+          messageColumns(settings),
+        ),
+      })),
+  ])
+
+const rowHeight = (row: Row): number =>
+  row.kind === 'Code'
+    ? LINE_HEIGHT
+    : row.kind === 'Hover'
+      ? 2 * BOX.gap + 2 * BOX.y + row.lines.length * CARD_LINE
+      : 2 * BOX.gap + 2 * BOX.y + row.lines.length * MESSAGE_LINE
+
+const cardHeight = (settings: Settings, drawing: Drawn): number =>
   (settings.showWindow ? HEADER_HEIGHT + 1 : 0) +
   BODY.top +
-  lineCount(settings.code) * LINE_HEIGHT +
+  rows(settings, drawing).reduce((sum, row) => sum + rowHeight(row), 0) +
   BODY.bottom
 
 export const size = (
   settings: Settings,
+  annotations: Annotations,
 ): Readonly<{ width: number; height: number }> => ({
   width: settings.width,
-  height: cardHeight(settings) + 2 * settings.padding,
+  height:
+    cardHeight(settings, drawn(settings, annotations)) + 2 * settings.padding,
 })
 
 const roundedRect = (
@@ -341,66 +482,265 @@ const header = (
   }),
 ]
 
+// A wavy line under `x0..x1`, as editors draw errors.
+const squiggle = (
+  x0: number,
+  x1: number,
+  y: number,
+  color: string,
+): Canvas.Shape => {
+  const steps = Math.max(2, Math.round((x1 - x0) / 2))
+  return Canvas.Path({
+    instructions: [
+      Canvas.MoveTo({ x: x0, y }),
+      ...Array.makeBy(steps, index =>
+        Canvas.LineTo({
+          x: x0 + ((index + 1) * (x1 - x0)) / steps,
+          y: y + (index % 2 === 0 ? 1.5 : -1.5),
+        }),
+      ),
+    ],
+    stroke: color,
+    lineWidth: 1.2,
+    lineCap: 'Round',
+    lineJoin: 'Round',
+  })
+}
+
+const codeText = (
+  runs: ReadonlyArray<Run>,
+  left: number,
+  middle: number,
+  columnOf: (column: number) => number,
+  fit: number,
+): ReadonlyArray<Canvas.Shape> =>
+  pipe(
+    runs,
+    Array.flatMap(unjoined),
+    Array.filter(run => columnOf(run.column) < fit),
+    Array.map(run =>
+      Canvas.Text({
+        x: left + columnOf(run.column) * CHAR_WIDTH,
+        y: middle,
+        content: run.text.slice(0, fit - columnOf(run.column)),
+        font: font(CODE_SIZE, run.style.weight, run.style.isItalic),
+        fill: run.style.color,
+        align: 'Left',
+        baseline: 'Middle',
+      }),
+    ),
+  )
+
+const codeRow = (
+  settings: Settings,
+  palette: Palette,
+  drawing: Drawn,
+  runs: ReadonlyArray<Run>,
+  line: number,
+  x: number,
+  top: number,
+): ReadonlyArray<Canvas.Shape> => {
+  const fit = columnsThatFit(settings)
+  const left = x + codeLeft(settings)
+  const middle = top + LINE_HEIGHT / 2
+  const { hints, diagnostics } = drawing.annotations
+  const columnOf = (column: number): number => shownColumn(hints, line, column)
+  const number = settings.showLineNumbers
+    ? [
+        Canvas.Text({
+          x: x + BODY.left + GUTTER_WIDTH,
+          y: middle,
+          content: `${line + 1}`,
+          font: font(GUTTER_SIZE, 400, false),
+          fill: palette.gutter,
+          align: 'Right',
+          baseline: 'Middle',
+        }),
+      ]
+    : []
+  const hintTexts = hints
+    .filter(hint => hint.line === line)
+    .map(hint => ({
+      column: hint.column + hintShift(hints, line, hint.column, false),
+      label: hint.label,
+    }))
+    .filter(hint => hint.column < fit)
+    .map(hint =>
+      Canvas.Text({
+        x: left + hint.column * CHAR_WIDTH,
+        y: middle,
+        content: hint.label.slice(0, fit - hint.column),
+        font: font(CODE_SIZE, 400, true),
+        fill: palette.hint,
+        align: 'Left',
+        baseline: 'Middle',
+      }),
+    )
+  const squiggles = diagnostics
+    .filter(diagnostic => diagnostic.line === line)
+    .map(diagnostic =>
+      squiggle(
+        left + columnOf(diagnostic.start) * CHAR_WIDTH,
+        left + Math.min(fit, columnOf(diagnostic.end)) * CHAR_WIDTH,
+        middle + 9,
+        diagnostic.severity === 'Error' ? palette.error : palette.warning,
+      ),
+    )
+  return [
+    ...number,
+    ...codeText(runs, left, middle, columnOf, fit),
+    ...hintTexts,
+    ...squiggles,
+  ]
+}
+
+// A pinned hover: a card under its name, with a caret pointing up at it.
+const hoverRow = (
+  settings: Settings,
+  palette: Palette,
+  drawing: Drawn,
+  row: Readonly<{ hover: Hover; lines: ReadonlyArray<string> }>,
+  x: number,
+  cardWidth: number,
+  top: number,
+): ReadonlyArray<Canvas.Shape> => {
+  const left = x + codeLeft(settings)
+  const anchor =
+    left +
+    shownColumn(drawing.annotations.hints, row.hover.line, row.hover.start) *
+      CHAR_WIDTH
+  const width =
+    Math.max(...row.lines.map(text => text.length)) * CHAR_WIDTH + 2 * BOX.x
+  const right = x + cardWidth - BODY.right / 2
+  const boxX = Math.max(left - BOX.x, Math.min(anchor - BOX.x, right - width))
+  const boxY = top + BOX.gap
+  const height = 2 * BOX.y + row.lines.length * CARD_LINE
+  const caret = anchor + CHAR_WIDTH
+  const text = toLines(tokenize(row.lines.join('\n'), 'silk'), palette)
+  return [
+    Canvas.Path({
+      instructions: roundedRect(boxX, boxY, width, height, 6),
+      fill: palette.hoverCard,
+      stroke: palette.cardBorder,
+      lineWidth: 1,
+    }),
+    Canvas.Path({
+      instructions: [
+        Canvas.MoveTo({ x: caret - 5, y: boxY + 0.5 }),
+        Canvas.LineTo({ x: caret, y: boxY - 4.5 }),
+        Canvas.LineTo({ x: caret + 5, y: boxY + 0.5 }),
+      ],
+      fill: palette.hoverCard,
+      stroke: palette.cardBorder,
+      lineWidth: 1,
+    }),
+    ...text.flatMap((runs, index) =>
+      codeText(
+        runs,
+        boxX + BOX.x,
+        boxY + BOX.y + index * CARD_LINE + CARD_LINE / 2,
+        column => column,
+        Number.POSITIVE_INFINITY,
+      ),
+    ),
+  ]
+}
+
+// An error's message in a tinted box under its line.
+const errorRow = (
+  settings: Settings,
+  palette: Palette,
+  row: Readonly<{ diagnostic: Diagnostic; lines: ReadonlyArray<string> }>,
+  x: number,
+  cardWidth: number,
+  top: number,
+): ReadonlyArray<Canvas.Shape> => {
+  const left = x + codeLeft(settings) - BOX.x
+  const width = x + cardWidth - BODY.right / 2 - left
+  const boxY = top + BOX.gap
+  const height = 2 * BOX.y + row.lines.length * MESSAGE_LINE
+  const isError = row.diagnostic.severity === 'Error'
+  return [
+    Canvas.Rect({
+      x: left,
+      y: boxY,
+      width,
+      height,
+      fill: isError ? palette.errorTint : palette.warningTint,
+    }),
+    Canvas.Rect({
+      x: left,
+      y: boxY,
+      width: 2,
+      height,
+      fill: isError ? palette.error : palette.warning,
+    }),
+    ...row.lines.map((text, index) =>
+      Canvas.Text({
+        x: left + BOX.x,
+        y: boxY + BOX.y + index * MESSAGE_LINE + MESSAGE_LINE / 2,
+        content: text,
+        font: font(MESSAGE_SIZE, 400, false),
+        fill: palette.plain,
+        align: 'Left',
+        baseline: 'Middle',
+      }),
+    ),
+  ]
+}
+
 const body = (
   settings: Settings,
   palette: Palette,
+  drawing: Drawn,
   x: number,
+  cardWidth: number,
   y: number,
 ): ReadonlyArray<Canvas.Shape> => {
-  const fit = columnsThatFit(settings)
-  const lines = toLines(tokenize(normalize(settings.code), 'silk'), palette)
-  const left = x + codeLeft(settings)
-  return Array.flatMap(lines, (runs, index) => {
-    const middle = y + BODY.top + index * LINE_HEIGHT + LINE_HEIGHT / 2
-    const number = settings.showLineNumbers
-      ? [
-          Canvas.Text({
-            x: x + BODY.left + GUTTER_WIDTH,
-            y: middle,
-            content: `${index + 1}`,
-            font: font(GUTTER_SIZE, 400, false),
-            fill: palette.gutter,
-            align: 'Right',
-            baseline: 'Middle',
-          }),
-        ]
-      : []
-    const code = pipe(
-      runs,
-      Array.filter(run => run.column < fit),
-      Array.flatMap(run =>
-        unjoined({ ...run, text: run.text.slice(0, fit - run.column) }),
-      ),
-      Array.map(run =>
-        Canvas.Text({
-          x: left + run.column * CHAR_WIDTH,
-          y: middle,
-          content: run.text,
-          font: font(CODE_SIZE, run.style.weight, run.style.isItalic),
-          fill: run.style.color,
-          align: 'Left',
-          baseline: 'Middle',
-        }),
-      ),
-    )
-    return [...number, ...code]
-  })
+  const code = toLines(tokenize(drawing.lines.join('\n'), 'silk'), palette)
+  const laidOut = rows(settings, drawing).reduce<
+    Readonly<{ top: number; shapes: ReadonlyArray<Canvas.Shape> }>
+  >(
+    ({ top, shapes }, row) => ({
+      top: top + rowHeight(row),
+      shapes: [
+        ...shapes,
+        ...(row.kind === 'Code'
+          ? codeRow(
+              settings,
+              palette,
+              drawing,
+              code[row.line] ?? [],
+              row.line,
+              x,
+              top,
+            )
+          : row.kind === 'Hover'
+            ? hoverRow(settings, palette, drawing, row, x, cardWidth, top)
+            : errorRow(settings, palette, row, x, cardWidth, top)),
+      ],
+    }),
+    { top: y + BODY.top, shapes: [] },
+  )
+  return laidOut.shapes
 }
 
 // The whole image at 1x, scaled by `settings.scale`.
 export const scene = (
   settings: Settings,
+  annotations: Annotations,
 ): Readonly<{
   width: number
   height: number
   shapes: ReadonlyArray<Canvas.Shape>
 }> => {
   const palette = PALETTES[settings.theme]
-  const { width, height } = size(settings)
+  const drawing = drawn(settings, annotations)
+  const { width, height } = size(settings, annotations)
   const cardX = settings.padding
   const cardY = settings.padding
   const cardWidth = width - 2 * settings.padding
-  const cardTall = cardHeight(settings)
+  const cardTall = cardHeight(settings, drawing)
   const hasBackground = settings.background !== TRANSPARENT
   const bodyY = cardY + (settings.showWindow ? HEADER_HEIGHT + 1 : 0)
   const shapes: ReadonlyArray<Canvas.Shape> = [
@@ -417,7 +757,7 @@ export const scene = (
     ...(settings.showWindow
       ? header(settings, palette, cardX, cardY, cardWidth)
       : []),
-    ...body(settings, palette, cardX, bodyY),
+    ...body(settings, palette, drawing, cardX, cardWidth, bodyY),
   ]
   return {
     width: width * settings.scale,

@@ -13,6 +13,7 @@
 import { readFileSync } from 'node:fs'
 import { type Plugin } from 'vite'
 
+import { stripTwoslashFences } from '../src/annotate/markers.ts'
 import {
   type DocGroup,
   type DocPage,
@@ -44,11 +45,12 @@ const baseUrl = (): string => {
 
 const markdownPath = (page: DocPage): string => `${pagePath(page)}.md`
 
-// Island directives are site markup, so they are dropped. Links to an anchor
+// Island directives are site markup, so they are dropped, as are the markers
+// in annotated code blocks. Links to an anchor
 // on the same page become links to the page, which keeps them meaningful once
 // the pages share one file.
 const pageMarkdown = (page: DocPage, source: string): string => {
-  const body = source
+  const body = stripTwoslashFences(source)
     .split('\n')
     .filter(line => !/^::\w+\{.*\}\s*$/.test(line))
     .join('\n')

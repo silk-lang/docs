@@ -8,7 +8,7 @@ Your `tasks` program prints one fixed line. Before it can track anything, it nee
 
 Here is the shape of `src/main.silk` for this first step:
 
-```silk
+```silk twoslash
 import silk.core.effect { Effect }
 import silk.io.logger { Logger, LogError }
 import silk.io.logger_native { StdoutLogger }
@@ -18,6 +18,7 @@ effect fn report() -> ()
   ? &mut Logger {
   // Three tasks for now: an estimate in minutes, and whether each is finished.
   let estimates = [25, 90, 40]
+  //  ^?
   let finished = [true, false, false]
 
   let mut open = 0
@@ -111,8 +112,14 @@ A `let` binding cannot change after it is made. To change it, you ask for that u
 
 Leave the `mut` off `open` and see what the compiler says:
 
-```silk
+```silk twoslash
+fn count() -> i32 {
+  // ---cut---
   let open = 0
+  open = open + 1
+  // ---cut-after---
+  return open
+}
 ```
 
 ```
@@ -195,9 +202,10 @@ Integer division drops the remainder, so `percent(1, 3)` is 33. Dividing by zero
 
 `noun` can also choose its word with an `if` that produces a value:
 
-```silk
+```silk twoslash
 fn noun(count: i32) -> string<'static> {
   let word = if count == 1 { "task" } else { "tasks" }
+  //  ^?
   return word
 }
 ```

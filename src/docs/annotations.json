@@ -1,0 +1,504 @@
+{
+  "silkVersion": "0.1.0-dev.56+f7d93cff9716",
+  "blocks": {
+    "cb28b060-78": {
+      "diagnostics": [],
+      "hovers": [
+        {
+          "line": 1,
+          "start": 6,
+          "end": 10,
+          "text": "word: string",
+          "isPinned": true
+        },
+        {
+          "line": 0,
+          "start": 3,
+          "end": 7,
+          "text": "fn noun(count: i32) -> string<'static>",
+          "isPinned": false
+        },
+        {
+          "line": 0,
+          "start": 8,
+          "end": 13,
+          "text": "count: i32",
+          "isPinned": false
+        },
+        {
+          "line": 0,
+          "start": 15,
+          "end": 18,
+          "text": "i32",
+          "isPinned": false
+        },
+        {
+          "line": 0,
+          "start": 23,
+          "end": 29,
+          "text": "string",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 13,
+          "end": 54,
+          "text": "string",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 16,
+          "end": 21,
+          "text": "count: i32",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 29,
+          "end": 35,
+          "text": "string",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 45,
+          "end": 52,
+          "text": "string",
+          "isPinned": false
+        },
+        {
+          "line": 2,
+          "start": 9,
+          "end": 13,
+          "text": "word: string",
+          "isPinned": false
+        }
+      ],
+      "hints": [
+        {
+          "line": 1,
+          "column": 10,
+          "label": ": string"
+        }
+      ]
+    },
+    "d0be3568-68": {
+      "diagnostics": [
+        {
+          "line": 1,
+          "start": 2,
+          "end": 6,
+          "severity": "Error",
+          "code": "SEM0035",
+          "message": "Cannot assign through immutable binding open"
+        }
+      ],
+      "hovers": [
+        {
+          "line": 0,
+          "start": 6,
+          "end": 10,
+          "text": "open: i32",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 2,
+          "end": 6,
+          "text": "open: i32",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 9,
+          "end": 13,
+          "text": "open: i32",
+          "isPinned": false
+        }
+      ],
+      "hints": [
+        {
+          "line": 0,
+          "column": 10,
+          "label": ": i32"
+        }
+      ]
+    },
+    "f0e37540-32b": {
+      "diagnostics": [],
+      "hovers": [
+        {
+          "line": 8,
+          "start": 6,
+          "end": 15,
+          "text": "estimates: [i32; 3]",
+          "isPinned": true
+        },
+        {
+          "line": 0,
+          "start": 7,
+          "end": 23,
+          "text": "module `silk.core.effect`",
+          "isPinned": false
+        },
+        {
+          "line": 0,
+          "start": 26,
+          "end": 32,
+          "text": "pub struct Effect {}",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 7,
+          "end": 21,
+          "text": "module `silk.io.logger`",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 24,
+          "end": 30,
+          "text": "pub service Logger {\n  /// Formats `template` with `args` and logs it at `level`.\n  ///\n  /// # Details\n  ///\n  /// The template rules are those of `silk.text.format.Format.format`, and the compiler checks\n  /// them. The call adds no newline, level label, or timestamp. The provider can add them.\n  ///\n  /// # Errors\n  ///\n  /// - [`LogError`] if the provider cannot log the message.\n  effect fn log<Args>(\n    level: LogLevel,\n    static template: string<'static>,\n    args: &Args\n  ) -> () ! LogError ? &mut Logger\n}",
+          "isPinned": false
+        },
+        {
+          "line": 1,
+          "start": 32,
+          "end": 40,
+          "text": "pub struct LogError {\n  code: i32,\n}",
+          "isPinned": false
+        },
+        {
+          "line": 2,
+          "start": 7,
+          "end": 28,
+          "text": "module `silk.io.logger_native`",
+          "isPinned": false
+        },
+        {
+          "line": 2,
+          "start": 31,
+          "end": 43,
+          "text": "pub struct StdoutLogger {}",
+          "isPinned": false
+        },
+        {
+          "line": 4,
+          "start": 10,
+          "end": 16,
+          "text": "effect fn report() -> ()\n  ! LogError\n  ? &mut Logger",
+          "isPinned": false
+        },
+        {
+          "line": 5,
+          "start": 4,
+          "end": 12,
+          "text": "pub struct LogError {\n  code: i32,\n}",
+          "isPinned": false
+        },
+        {
+          "line": 6,
+          "start": 9,
+          "end": 15,
+          "text": "pub service Logger {\n  /// Formats `template` with `args` and logs it at `level`.\n  ///\n  /// # Details\n  ///\n  /// The template rules are those of `silk.text.format.Format.format`, and the compiler checks\n  /// them. The call adds no newline, level label, or timestamp. The provider can add them.\n  ///\n  /// # Errors\n  ///\n  /// - [`LogError`] if the provider cannot log the message.\n  effect fn log<Args>(\n    level: LogLevel,\n    static template: string<'static>,\n    args: &Args\n  ) -> () ! LogError ? &mut Logger\n}",
+          "isPinned": false
+        },
+        {
+          "line": 9,
+          "start": 6,
+          "end": 14,
+          "text": "finished: [bool; 3]",
+          "isPinned": false
+        },
+        {
+          "line": 9,
+          "start": 18,
+          "end": 22,
+          "text": "bool",
+          "isPinned": false
+        },
+        {
+          "line": 9,
+          "start": 24,
+          "end": 29,
+          "text": "bool",
+          "isPinned": false
+        },
+        {
+          "line": 9,
+          "start": 31,
+          "end": 36,
+          "text": "bool",
+          "isPinned": false
+        },
+        {
+          "line": 11,
+          "start": 10,
+          "end": 14,
+          "text": "open: i32",
+          "isPinned": false
+        },
+        {
+          "line": 12,
+          "start": 10,
+          "end": 21,
+          "text": "minutesLeft: i32",
+          "isPinned": false
+        },
+        {
+          "line": 13,
+          "start": 10,
+          "end": 15,
+          "text": "index: usize",
+          "isPinned": false
+        },
+        {
+          "line": 13,
+          "start": 17,
+          "end": 22,
+          "text": "usize",
+          "isPinned": false
+        },
+        {
+          "line": 14,
+          "start": 8,
+          "end": 13,
+          "text": "index: usize",
+          "isPinned": false
+        },
+        {
+          "line": 14,
+          "start": 16,
+          "end": 25,
+          "text": "estimates: [i32; 3]",
+          "isPinned": false
+        },
+        {
+          "line": 15,
+          "start": 8,
+          "end": 16,
+          "text": "finished: [bool; 3]",
+          "isPinned": false
+        },
+        {
+          "line": 15,
+          "start": 17,
+          "end": 22,
+          "text": "index: usize",
+          "isPinned": false
+        },
+        {
+          "line": 16,
+          "start": 6,
+          "end": 10,
+          "text": "open: i32",
+          "isPinned": false
+        },
+        {
+          "line": 16,
+          "start": 13,
+          "end": 17,
+          "text": "open: i32",
+          "isPinned": false
+        },
+        {
+          "line": 17,
+          "start": 6,
+          "end": 17,
+          "text": "minutesLeft: i32",
+          "isPinned": false
+        },
+        {
+          "line": 17,
+          "start": 20,
+          "end": 31,
+          "text": "minutesLeft: i32",
+          "isPinned": false
+        },
+        {
+          "line": 17,
+          "start": 34,
+          "end": 43,
+          "text": "estimates: [i32; 3]",
+          "isPinned": false
+        },
+        {
+          "line": 17,
+          "start": 44,
+          "end": 49,
+          "text": "index: usize",
+          "isPinned": false
+        },
+        {
+          "line": 19,
+          "start": 4,
+          "end": 9,
+          "text": "index: usize",
+          "isPinned": false
+        },
+        {
+          "line": 19,
+          "start": 12,
+          "end": 17,
+          "text": "index: usize",
+          "isPinned": false
+        },
+        {
+          "line": 22,
+          "start": 2,
+          "end": 97,
+          "text": "()",
+          "isPinned": false
+        },
+        {
+          "line": 22,
+          "start": 6,
+          "end": 12,
+          "text": "pub struct Effect {}",
+          "isPinned": false
+        },
+        {
+          "line": 22,
+          "start": 13,
+          "end": 16,
+          "text": "pub effect fn log<Args>(\n    static template: string<'static>,\n    args: &Args\n  ) -> () ! LogError ? &mut Logger",
+          "isPinned": false
+        },
+        {
+          "line": 22,
+          "start": 62,
+          "end": 66,
+          "text": "open: i32",
+          "isPinned": false
+        },
+        {
+          "line": 22,
+          "start": 68,
+          "end": 72,
+          "text": "open: i32",
+          "isPinned": false
+        },
+        {
+          "line": 22,
+          "start": 74,
+          "end": 81,
+          "text": "minutes: i32",
+          "isPinned": false
+        },
+        {
+          "line": 22,
+          "start": 83,
+          "end": 94,
+          "text": "minutesLeft: i32",
+          "isPinned": false
+        },
+        {
+          "line": 25,
+          "start": 14,
+          "end": 18,
+          "text": "pub effect fn main() -> ()\n  ! LogError",
+          "isPinned": false
+        },
+        {
+          "line": 26,
+          "start": 4,
+          "end": 12,
+          "text": "pub struct LogError {\n  code: i32,\n}",
+          "isPinned": false
+        },
+        {
+          "line": 27,
+          "start": 10,
+          "end": 16,
+          "text": "logger: StdoutLogger",
+          "isPinned": false
+        },
+        {
+          "line": 27,
+          "start": 19,
+          "end": 31,
+          "text": "pub struct StdoutLogger {}",
+          "isPinned": false
+        },
+        {
+          "line": 27,
+          "start": 32,
+          "end": 36,
+          "text": "pub fn make() -> StdoutLogger",
+          "isPinned": false
+        },
+        {
+          "line": 28,
+          "start": 2,
+          "end": 48,
+          "text": "()",
+          "isPinned": false
+        },
+        {
+          "line": 28,
+          "start": 6,
+          "end": 12,
+          "text": "effect fn report() -> ()\n  ! LogError\n  ? &mut Logger",
+          "isPinned": false
+        },
+        {
+          "line": 28,
+          "start": 18,
+          "end": 24,
+          "text": "pub struct Effect {}",
+          "isPinned": false
+        },
+        {
+          "line": 28,
+          "start": 25,
+          "end": 35,
+          "text": "pub effect fn provideMut<'env, ?S, A, P, E, ?R>(\n    self: once Effect<'env; A ! E ? R>,\n    provider: &'env mut P\n  ) -> A ! E ? Without<R, S>\n  where &'env mut P provides S from R",
+          "isPinned": false
+        },
+        {
+          "line": 28,
+          "start": 36,
+          "end": 47,
+          "text": "&mut StdoutLogger",
+          "isPinned": false
+        },
+        {
+          "line": 28,
+          "start": 41,
+          "end": 47,
+          "text": "logger: StdoutLogger",
+          "isPinned": false
+        }
+      ],
+      "hints": [
+        {
+          "line": 8,
+          "column": 15,
+          "label": ": [i32; 3]"
+        },
+        {
+          "line": 9,
+          "column": 14,
+          "label": ": [bool; 3]"
+        },
+        {
+          "line": 11,
+          "column": 14,
+          "label": ": i32"
+        },
+        {
+          "line": 12,
+          "column": 21,
+          "label": ": i32"
+        },
+        {
+          "line": 27,
+          "column": 16,
+          "label": ": StdoutLogger"
+        }
+      ]
+    }
+  }
+}

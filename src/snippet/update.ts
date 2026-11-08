@@ -11,6 +11,7 @@ import {
   type Model,
   SCALES,
   type Settings,
+  currentAnnotations,
   initialModel,
 } from './model'
 import { widthToFit } from './scene'
@@ -167,10 +168,28 @@ export const update = (model: Model, message: Message) =>
       changeSettings(model, settings =>
         modifyFields(settings, { showWindow: showWindow => !showWindow }),
       ),
+    ClickedErrors: () =>
+      changeSettings(model, settings =>
+        modifyFields(settings, { showErrors: showErrors => !showErrors }),
+      ),
+    ClickedInlayHints: () =>
+      changeSettings(model, settings =>
+        modifyFields(settings, {
+          showInlayHints: showInlayHints => !showInlayHints,
+        }),
+      ),
+    ReceivedAnnotations: ({ code, annotations }) => ({
+      model: modifyFields(model, {
+        maybeAnnotated: () => Option.some({ code, annotations }),
+      }),
+    }),
     ClickedFitWidth: () =>
       changeSettings(model, settings =>
         modifyFields(settings, {
-          width: () => clamp(LIMITS.width)(widthToFit(settings)),
+          width: () =>
+            clamp(LIMITS.width)(
+              widthToFit(settings, currentAnnotations(model)),
+            ),
         }),
       ),
     ClickedFormat: () =>
