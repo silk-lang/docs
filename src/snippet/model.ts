@@ -41,6 +41,9 @@ export const Model = Schema.Struct({
   // The canvas draws text in whatever font is loaded, so it paints again
   // once JetBrains Mono is in.
   areFontsReady: Schema.Boolean,
+  // Whether the settings in the page address, if any, have been read. The
+  // address is only written after, so it is not replaced by the defaults.
+  isAddressRead: Schema.Boolean,
   // What the language server said, and about which code.
   maybeAnnotated: Schema.Option(
     Schema.Struct({ code: Schema.String, annotations: Annotations }),
@@ -109,6 +112,7 @@ export const initialModel: Model = {
   },
   formatState: FormatState.Idle(),
   areFontsReady: false,
+  isAddressRead: false,
   maybeAnnotated: Option.none(),
 }
 

@@ -1,3 +1,5 @@
+import { Option } from 'effect'
+import { Base64Url } from 'effect/encoding'
 import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
@@ -5,7 +7,15 @@ import { type Annotations, EMPTY } from '../annotate/model'
 import { Message } from './message'
 import { FormatState, TRANSPARENT, currentAnnotations } from './model'
 import { cutLineCount, scene, size } from './scene'
-import { FormatCode, imageFileName, init, update } from './update'
+import { decode, encode, fromSearch, snippetPath } from './share'
+import {
+  FormatCode,
+  WaitToWriteAddress,
+  WriteAddress,
+  imageFileName,
+  init,
+  update,
+} from './update'
 
 const initModel = init().model
 
@@ -217,6 +227,84 @@ describe('snippet annotations', () => {
       )?.x ?? 0
     expect(equalsX(ANNOTATIONS) - equalsX(EMPTY)).toBeCloseTo(
       ': i32'.length * 14 * 0.6,
+    )
+  })
+})
+
+describe('snippet address', () => {
+  const settings = {
+    ...initModel.settings,
+    code: 'fn main() -> () {\n  // héllo ✓\n}\n',
+    background: '#123456',
+    showLineNumbers: false,
+  }
+
+  test('settings survive the trip through the address', () => {
+    expect(decode(encode(settings))).toEqual(Option.some(settings))
+  })
+
+  test('the defaults need no parameter', () => {
+    expect(snippetPath(initModel.settings)).toBe('/snippet')
+    expect(fromSearch(snippetPath(settings).replace('/snippet', ''))).toEqual(
+      Option.some(settings),
+    )
+  })
+
+  test('missing fields take their defaults and sizes stay within limits', () => {
+    const partial = Base64Url.encode(
+      JSON.stringify({ code: 'x', width: 99999 }),
+    )
+    expect(decode(partial)).toEqual(
+      Option.some({ ...initModel.settings, code: 'x', width: 2400 }),
+    )
+  })
+
+  test('an address that is not settings is ignored', () => {
+    expect(decode('not base64 at all!')).toEqual(Option.none())
+    expect(decode(Base64Url.encode('{"width": "wide"}'))).toEqual(Option.none())
+  })
+
+  test('reading the address replaces the settings once', () => {
+    story(
+      update,
+      given(initModel),
+      message(Message.ReadAddress({ maybeSettings: Option.some(settings) })),
+      model(model => {
+        expect(model.settings).toEqual(settings)
+        expect(model.isAddressRead).toBe(true)
+      }),
+      Command.resolve(
+        WaitToWriteAddress,
+        Message.CompletedWaitToWriteAddress({ path: snippetPath(settings) }),
+      ),
+      Command.resolve(WriteAddress, Message.CompletedWriteAddress()),
+    )
+  })
+
+  test('the address follows the settings once they settle', () => {
+    const read = { ...initModel, isAddressRead: true }
+    story(
+      update,
+      given(read),
+      message(Message.ChangedCode({ code: 'fn a() -> () {}' })),
+      Command.resolve(
+        WaitToWriteAddress,
+        Message.CompletedWaitToWriteAddress({
+          path: snippetPath({ ...initModel.settings, code: 'fn a() -> () {}' }),
+        }),
+      ),
+      Command.resolve(WriteAddress, Message.CompletedWriteAddress()),
+    )
+  })
+
+  test('an address for settings that changed again is not written', () => {
+    story(
+      update,
+      given({ ...initModel, isAddressRead: true }),
+      message(Message.CompletedWaitToWriteAddress({ path: '/snippet?s=old' })),
+      model(model => {
+        expect(model.settings).toEqual(initModel.settings)
+      }),
     )
   })
 })

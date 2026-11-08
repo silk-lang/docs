@@ -2,7 +2,7 @@ import { Schema } from 'effect'
 import { defineMessageUnion } from 'foldkit/message'
 
 import { Annotations } from '../annotate/model'
-import { Theme } from './model'
+import { Settings, Theme } from './model'
 
 export const Message = defineMessageUnion({
   ChangedCode: { code: Schema.String },
@@ -25,5 +25,8 @@ export const Message = defineMessageUnion({
   ClickedDownload: {},
   CompletedDownload: {},
   LoadedFonts: {},
+  ReadAddress: { maybeSettings: Schema.Option(Settings) },
+  CompletedWaitToWriteAddress: { path: Schema.String },
+  CompletedWriteAddress: {},
 })
 export type Message = typeof Message.Type

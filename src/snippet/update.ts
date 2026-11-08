@@ -1,5 +1,6 @@
-import { Effect, Option, Schema, pipe } from 'effect'
-import { Command, type Update } from 'foldkit'
+import { Duration, Effect, Option, Schema, pipe } from 'effect'
+import { Command, Mount, type Update } from 'foldkit'
+import { replaceUrl } from 'foldkit/navigation'
 import { modifyFields } from 'foldkit/struct'
 import toolchain from 'virtual:silk-playground'
 
@@ -15,6 +16,7 @@ import {
   initialModel,
 } from './model'
 import { widthToFit } from './scene'
+import { fromSearch, snippetPath } from './share'
 
 type UpdateReturn = Update.Return<Model, Message, PlaygroundService>
 
@@ -109,7 +111,61 @@ export const imageFileName = (fileName: string): string => {
   return `${base === '' ? 'snippet' : base}.png`
 }
 
-export const update = (model: Model, message: Message) =>
+// The settings a link carries, read from the address of the document the
+// page's section is mounted in. Mounting comes after hydration, so the first
+// render matches the prerendered page, and it also covers arriving from
+// another page without a reload.
+export const ReadAddress = Mount.define('ReadAddress', {
+  messages: [Message.ReadAddress],
+  execute: ({ element }) =>
+    Effect.sync(() =>
+      Message.ReadAddress({
+        maybeSettings: fromSearch(element.ownerDocument.location.search),
+      }),
+    ),
+})
+
+// How long the settings have to stay the same before the address follows.
+// Browsers limit how often a page may replace its address.
+const ADDRESS_SETTLE = Duration.millis(400)
+
+export const WaitToWriteAddress = Command.define('WaitToWriteAddress', {
+  args: { path: Schema.String },
+  messages: [Message.CompletedWaitToWriteAddress],
+  execute: ({ path }) =>
+    Effect.sleep(ADDRESS_SETTLE).pipe(
+      Effect.as(Message.CompletedWaitToWriteAddress({ path })),
+    ),
+})
+
+// Replaces the history entry, so editing does not add one per change. A
+// reader who left the page keeps the page they went to.
+export const WriteAddress = Command.define('WriteAddress', {
+  args: { path: Schema.String },
+  messages: [Message.CompletedWriteAddress],
+  execute: ({ path }) =>
+    Effect.suspend(() =>
+      window.location.pathname === '/snippet' &&
+      `${window.location.pathname}${window.location.search}` !== path
+        ? replaceUrl(path)
+        : Effect.void,
+    ).pipe(Effect.as(Message.CompletedWriteAddress())),
+})
+
+// The address follows the settings once it has been read, so a link is
+// not replaced by the defaults before it loads.
+export const update = (model: Model, message: Message): UpdateReturn => {
+  const result = step(model, message)
+  const path = snippetPath(result.model.settings)
+  return result.model.isAddressRead && path !== snippetPath(model.settings)
+    ? {
+        ...result,
+        commands: [...(result.commands ?? []), WaitToWriteAddress({ path })],
+      }
+    : result
+}
+
+const step = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
     ChangedCode: ({ code }) =>
       changeSettings(
@@ -218,6 +274,17 @@ export const update = (model: Model, message: Message) =>
       ],
     }),
     CompletedDownload: () => ({ model }),
+    ReadAddress: ({ maybeSettings }) => ({
+      model: modifyFields(model, {
+        isAddressRead: () => true,
+        settings: settings => Option.getOrElse(maybeSettings, () => settings),
+      }),
+    }),
+    CompletedWaitToWriteAddress: ({ path }) =>
+      path === snippetPath(model.settings)
+        ? { model, commands: [WriteAddress({ path })] }
+        : { model },
+    CompletedWriteAddress: () => ({ model }),
     LoadedFonts: () => ({
       model: modifyFields(model, { areFontsReady: () => true }),
     }),
