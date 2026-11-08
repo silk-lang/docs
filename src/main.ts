@@ -32,6 +32,7 @@ import * as Releases from './page/releases'
 import * as Playground from './playground'
 import { AppRoute, homeRouter, urlToAppRoute } from './route'
 import * as Search from './search'
+import * as Snippet from './snippet'
 import { archivedPagePath, versionPrefix } from './versions/archive'
 import { archivedDocs } from './versions/context'
 import {
@@ -73,6 +74,7 @@ const routeDocs = (
     DocPage: () => Option.some(Catalog.currentDocs),
     Releases: () => Option.none(),
     Playground: () => Option.none(),
+    Snippet: () => Option.none(),
     Versions: () => Option.none(),
     VersionedDocs: ({ version }) => archived(version),
     VersionedDocPage: ({ version }) => archived(version),
@@ -108,6 +110,7 @@ const routePath = (route: AppRoute): string =>
     DocPage: page => Catalog.pagePath(page),
     Releases: () => '/releases',
     Playground: () => '/playground',
+    Snippet: () => '/snippet',
     Versions: () => '/v',
     VersionedDocs: ({ version }) => `${versionPrefix(version)}/docs`,
     VersionedDocPage: ({ version, directory, slug }) =>
@@ -223,6 +226,7 @@ export const init: Runtime.RoutingApplicationInit<
     demoTopic: DemoTopic.Fibers(),
     fibersRun: FibersRun.Idle(),
     playground: Playground.init().model,
+    snippet: Snippet.init().model,
   }
 
   if (Option.isSome(maybeMissingCatalog)) {
@@ -424,6 +428,22 @@ const foldPlayground = Update.foldChild({
   read: readPlayground,
   write: writePlayground,
   toParentMessage: toGotPlaygroundMessage,
+})
+
+const readSnippet = (model: Model): Option.Option<Snippet.Model> =>
+  Option.some(model.snippet)
+
+const writeSnippet = (model: Model, nextSnippet: Snippet.Model): Model =>
+  modifyFields(model, { snippet: () => nextSnippet })
+
+const toGotSnippetMessage = (message: Snippet.Message): Message =>
+  Message.GotSnippetMessage({ message })
+
+const foldSnippet = Update.foldChild({
+  update: Snippet.update,
+  read: readSnippet,
+  write: writeSnippet,
+  toParentMessage: toGotSnippetMessage,
 })
 
 const foldSearchRouteChanged = Update.foldChildStep({
@@ -715,6 +735,7 @@ export const update = (model: Model, message: Message) =>
     ClickedOpenSearch: () => foldSearchOpen(model),
     GotSearchMessage: ({ message }) => foldSearch(model, message),
     GotPlaygroundMessage: ({ message }) => foldPlayground(model, message),
+    GotSnippetMessage: ({ message }) => foldSnippet(model, message),
     ChangedActiveSection: ({ sectionId }) => ({
       model: modifyFields(model, {
         maybeActiveSection: () => Option.some(sectionId),
@@ -867,6 +888,10 @@ export const subscriptions = Subscription.aggregate(
     read: readPlayground,
     toParentMessage: toGotPlaygroundMessage,
   }),
+  Subscription.lift(Snippet.subscriptions)({
+    read: readSnippet,
+    toParentMessage: toGotSnippetMessage,
+  }),
 )
 
 // VIEW
@@ -884,6 +909,7 @@ const routeTitle = (route: AppRoute): string =>
       }),
     Releases: () => `Download Silk | ${SITE_NAME}`,
     Playground: () => `Playground | ${SITE_NAME}`,
+    Snippet: () => `Code image | ${SITE_NAME}`,
     Versions: () => `Docs for every release | ${SITE_NAME}`,
     VersionedDocs: ({ version }) => `Docs for ${version} | ${SITE_NAME}`,
     VersionedDocPage: ({ version, directory, slug }) =>
@@ -995,6 +1021,19 @@ const pageView = (model: Model, h: HtmlBuilder<Message>): Html =>
             model: model.playground,
             view: Playground.view,
             toParentMessage: toGotPlaygroundMessage,
+          }),
+        ],
+        h,
+      ),
+    Snippet: () =>
+      Layout.page(
+        'Home',
+        [
+          h.submodel({
+            slotId: 'snippet',
+            model: model.snippet,
+            view: Snippet.view,
+            toParentMessage: toGotSnippetMessage,
           }),
         ],
         h,

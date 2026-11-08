@@ -8,6 +8,7 @@ import * as Markdown from '@foldkit/markdown'
 import { DemoTopic, InstallMethod } from './landing'
 import * as Playground from './playground'
 import * as Search from './search'
+import * as Snippet from './snippet'
 import { ArchivedCatalog } from './versions/archive'
 
 export const Message = defineMessageUnion({
@@ -44,5 +45,6 @@ export const Message = defineMessageUnion({
   SucceededRunFibers: { value: Schema.Number, milliseconds: Schema.Number },
   FailedRunFibers: {},
   GotPlaygroundMessage: { message: Playground.Message },
+  GotSnippetMessage: { message: Snippet.Message },
 })
 export type Message = typeof Message.Type

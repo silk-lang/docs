@@ -24,6 +24,8 @@ type PageMeta = Readonly<{
   path: string
   description: string
   card: Og.OgCard
+  // Kept out of search engines, for pages nothing links to.
+  isHidden?: boolean
 }>
 
 const escapeAttribute = (value: string): string =>
@@ -56,6 +58,7 @@ const metaTags = (title: string, meta: PageMeta): string => {
     ['name', 'twitter:description', meta.description],
     ['name', 'twitter:image', image],
     ['name', 'twitter:image:alt', alt],
+    ...(meta.isHidden === true ? [['name', 'robots', 'noindex']] : []),
   ]
     .map(
       ([key, name, content]) =>
@@ -82,6 +85,7 @@ export const prerenderPaths: ReadonlyArray<string> = [
   '/docs',
   '/releases',
   '/playground',
+  '/snippet',
   // Also served for every archived page, /v/<version>/docs/... (_redirects).
   '/v',
   // Copied to 404.html by `pnpm build:site` for Cloudflare's 404 handling.
@@ -153,6 +157,12 @@ const metaForRoute = (route: AppRoute, flags: Flags): PageMeta =>
       description:
         'Write Silk and run it in your browser. The compiler runs on the page as WebAssembly, with no server.',
       card: Og.playgroundCard,
+    }),
+    Snippet: () => ({
+      path: '/snippet',
+      description: 'Make an image of Silk code.',
+      card: Og.playgroundCard,
+      isHidden: true,
     }),
     Releases: () => ({
       path: '/releases',

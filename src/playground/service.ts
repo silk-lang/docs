@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Queue, Stream } from 'effect'
 
 import {
+  type FormatResponse,
   type ProgramFile,
   type RunProgress,
   type RunResponse,
@@ -21,6 +22,11 @@ type PlaygroundApi = Readonly<{
   // The output of the running program as it writes it, for as long as the
   // stream is open. The run's response still carries all of it.
   progress: Stream.Stream<RunProgress>
+  // Formats one Silk file with the playground's compiler.
+  format: (
+    toolchain: Toolchain,
+    source: string,
+  ) => Effect.Effect<FormatResponse>
 }>
 
 const isResponse = (value: unknown): value is RunResponse =>
@@ -28,6 +34,15 @@ const isResponse = (value: unknown): value is RunResponse =>
   value !== null &&
   'id' in value &&
   typeof value.id === 'number' &&
+  'outcome' in value
+
+const isFormatResponse = (value: unknown): value is FormatResponse =>
+  typeof value === 'object' &&
+  value !== null &&
+  'id' in value &&
+  typeof value.id === 'number' &&
+  'kind' in value &&
+  value.kind === 'format' &&
   'outcome' in value
 
 const isProgress = (value: unknown): value is RunProgress =>
@@ -65,7 +80,16 @@ const makePlayground = (): PlaygroundApi => {
     nextId: 1,
   }
   const pending: Pending = new Map()
+  const pendingFormats = new Map<number, (response: FormatResponse) => void>()
   const listeners = new Set<(progress: RunProgress) => void>()
+
+  const failFormats = (text: string): void => {
+    const waiting = [...pendingFormats]
+    pendingFormats.clear()
+    waiting.forEach(([id, resume]) =>
+      resume({ id, kind: 'format', outcome: { tag: 'Failed', message: text } }),
+    )
+  }
 
   const stopWorker = (): void => {
     state.worker?.terminate()
@@ -81,6 +105,12 @@ const makePlayground = (): PlaygroundApi => {
     })
     created.addEventListener('message', event => {
       const response: unknown = event.data
+      if (isFormatResponse(response)) {
+        const resume = pendingFormats.get(response.id)
+        pendingFormats.delete(response.id)
+        resume?.(response)
+        return
+      }
       if (isProgress(response)) {
         listeners.forEach(listener => listener(response))
         return
@@ -94,6 +124,7 @@ const makePlayground = (): PlaygroundApi => {
     })
     created.addEventListener('error', event => {
       stopWorker()
+      failFormats(event.message || 'The playground worker stopped.')
       failAll(pending, id =>
         ended(id, {
           tag: 'ToolchainFailed',
@@ -116,7 +147,15 @@ const makePlayground = (): PlaygroundApi => {
     stop: Effect.sync(() => {
       stopWorker()
       failAll(pending, id => ended(id, { tag: 'Stopped' }))
+      failFormats('Stopped.')
     }),
+    format: (toolchain, source) =>
+      Effect.callback<FormatResponse>(resume => {
+        const id = state.nextId
+        state.nextId += 1
+        pendingFormats.set(id, response => resume(Effect.succeed(response)))
+        worker().postMessage({ id, kind: 'format', toolchain, source })
+      }),
     progress: Stream.callback<RunProgress>(queue =>
       Effect.acquireRelease(
         Effect.sync(() => {
