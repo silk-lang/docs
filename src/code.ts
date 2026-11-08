@@ -14,9 +14,12 @@ const highlighter = createHighlighter({
   fallbackLanguage: 'plaintext',
 })
 
-type TokenClass = NonNullable<
-  ReturnType<typeof highlighter.tokenize>['tokens'][number]['className']
->
+export type Token = ReturnType<typeof highlighter.tokenize>['tokens'][number]
+
+export type TokenClass = NonNullable<Token['className']>
+
+export const tokenize = (code: string, lang: string): ReadonlyArray<Token> =>
+  highlighter.tokenize(code, { lang }).tokens
 
 // Token categories mapped onto the design's syntax tokens.
 const tokenClassName = (className: TokenClass): string =>

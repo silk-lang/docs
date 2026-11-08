@@ -45,3 +45,21 @@ export type RunResponse = Readonly<{
   compileMilliseconds: number
   runMilliseconds: number
 }>
+
+// Formats one Silk file with `silkc format`, for the snippet page.
+export type FormatRequest = Readonly<{
+  id: number
+  kind: 'format'
+  toolchain: Toolchain
+  source: string
+}>
+
+export type FormatOutcome =
+  | Readonly<{ tag: 'Formatted'; source: string }>
+  | Readonly<{ tag: 'Failed'; message: string }>
+
+export type FormatResponse = Readonly<{
+  id: number
+  kind: 'format'
+  outcome: FormatOutcome
+}>

@@ -104,6 +104,19 @@
 }
 
 /* Scrolls without showing a scrollbar, for the docs sidebar and table of contents. */
+/* A light checkerboard behind images that can be transparent, as on the
+   snippet page. */
+@utility checkerboard {
+  background-color: var(--color-paper);
+  background-image: conic-gradient(
+    var(--color-rule) 25%,
+    transparent 0 50%,
+    var(--color-rule) 0 75%,
+    transparent 0
+  );
+  background-size: 16px 16px;
+}
+
 @utility scrollbar-none {
   scrollbar-width: none;
 

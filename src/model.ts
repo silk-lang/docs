@@ -7,6 +7,7 @@ import { DemoTopic, FibersRun, InstallMethod } from './landing'
 import * as Playground from './playground'
 import { AppRoute } from './route'
 import * as Search from './search'
+import * as Snippet from './snippet'
 import { ArchivedCatalog } from './versions/archive'
 
 export const DocState = defineTaggedUnion({
@@ -44,6 +45,7 @@ export const Model = Schema.Struct({
   demoTopic: DemoTopic,
   fibersRun: FibersRun,
   playground: Playground.Model,
+  snippet: Snippet.Model,
 })
 export type Model = typeof Model.Type
 

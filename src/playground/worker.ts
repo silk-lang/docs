@@ -5,6 +5,8 @@
 import { WORK_FILE, WORK_MANIFEST, WORK_ROOT } from './language-protocol'
 import {
   type Chunk,
+  type FormatRequest,
+  type FormatResponse,
   type Outcome,
   type RunProgress,
   type RunRequest,
@@ -341,6 +343,75 @@ const run = async (
 const isTarget = (value: unknown): value is Target =>
   value === 'wasm32-wasip1' || value === 'wasm32-unknown-unknown'
 
+// Formats the request's source in place with `silkc format` and answers the
+// result, or the compiler's complaint when the source does not parse.
+const format = async (
+  loaded: Promise<Loaded>,
+  request: FormatRequest,
+): Promise<FormatResponse> => {
+  const failed = (text: string): FormatResponse => ({
+    id: request.id,
+    kind: 'format',
+    outcome: { tag: 'Failed', message: text },
+  })
+  const toolchain = await loaded.then(
+    value => value,
+    (error: unknown) => message(error),
+  )
+  if (typeof toolchain === 'string') {
+    return failed(toolchain)
+  }
+  const root = fork(toolchain.base)
+  const encoder = new TextEncoder()
+  writeFile(root, WORK_FILE, encoder.encode(request.source))
+  const decoder = new TextDecoder()
+  const complaints: Array<string> = []
+  const status = (() => {
+    try {
+      return runCommand(
+        toolchain.compiler,
+        ['silkc', 'format', WORK_FILE],
+        root,
+        () => undefined,
+        bytes => {
+          complaints.push(decoder.decode(bytes))
+        },
+      )
+    } catch (error) {
+      complaints.push(message(error))
+      return -1
+    }
+  })()
+  const formatted = readFile(root, WORK_FILE)
+  if (status !== 0 || formatted === undefined) {
+    return failed(
+      complaints
+        .join('')
+        .replace(ANSI_ESCAPE, '')
+        .replaceAll(`${WORK_FILE}: `, '')
+        .trim() || `The formatter stopped with status ${status}.`,
+    )
+  }
+  return {
+    id: request.id,
+    kind: 'format',
+    outcome: { tag: 'Formatted', source: decoder.decode(formatted) },
+  }
+}
+
+const isFormatRequest = (value: unknown): value is FormatRequest =>
+  typeof value === 'object' &&
+  value !== null &&
+  'id' in value &&
+  typeof value.id === 'number' &&
+  'kind' in value &&
+  value.kind === 'format' &&
+  'source' in value &&
+  typeof value.source === 'string' &&
+  'toolchain' in value &&
+  typeof value.toolchain === 'object' &&
+  value.toolchain !== null
+
 const isRequest = (value: unknown): value is RunRequest =>
   typeof value === 'object' &&
   value !== null &&
@@ -361,7 +432,7 @@ type WorkerScope = Readonly<{
     type: 'message',
     listener: (event: MessageEvent) => void,
   ) => void
-  postMessage: (message: RunResponse | RunProgress) => void
+  postMessage: (message: RunResponse | RunProgress | FormatResponse) => void
 }>
 
 const start = (scope: WorkerScope): void => {
@@ -371,7 +442,7 @@ const start = (scope: WorkerScope): void => {
   const queue: { tail: Promise<void> } = { tail: Promise.resolve() }
   scope.addEventListener('message', event => {
     const request: unknown = event.data
-    if (!isRequest(request)) {
+    if (!isRequest(request) && !isFormatRequest(request)) {
       return
     }
     cache.loaded ??= loadToolchain(request.toolchain).catch(
@@ -384,7 +455,9 @@ const start = (scope: WorkerScope): void => {
     const loaded = cache.loaded
     queue.tail = queue.tail.then(async () => {
       scope.postMessage(
-        await run(loaded, request, progress => scope.postMessage(progress)),
+        isFormatRequest(request)
+          ? await format(loaded, request)
+          : await run(loaded, request, progress => scope.postMessage(progress)),
       )
     })
   })

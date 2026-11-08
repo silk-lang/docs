@@ -5,6 +5,7 @@ import { DocState, Model } from './model'
 import * as Playground from './playground'
 import { type AppRoute } from './route'
 import * as Search from './search'
+import * as Snippet from './snippet'
 
 export const testModel = (route: AppRoute): Model =>
   Model.make({
@@ -23,4 +24,5 @@ export const testModel = (route: AppRoute): Model =>
     demoTopic: DemoTopic.Fibers(),
     fibersRun: FibersRun.Idle(),
     playground: Playground.init().model,
+    snippet: Snippet.init().model,
   })
