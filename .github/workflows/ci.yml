@@ -23,6 +23,8 @@ jobs:
       - run: pnpm exec oxfmt --check .
       - name: Sidebar matches content/
         run: pnpm catalog && git diff --exit-code src/docs/written.ts
+      - name: Every twoslash code block has annotations
+        run: node scripts/annotate.ts --check
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test

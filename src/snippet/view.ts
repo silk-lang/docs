@@ -11,6 +11,7 @@ import {
   SCALES,
   TRANSPARENT,
   type Theme,
+  currentAnnotations,
 } from './model'
 import { cutLineCount, scene, size } from './scene'
 import { CANVAS_ID, imageFileName } from './update'
@@ -193,6 +194,18 @@ const controls = (model: Model, h: HtmlBuilder<Message>): Html => {
           ),
         ],
       ),
+      h.p(
+        [h.Class('text-xs leading-relaxed text-muted')],
+        [
+          'Put ',
+          h.code([h.Class('text-ink')], ['//  ^?']),
+          ' under a name to pin its type, ',
+          h.code([h.Class('text-ink')], ['// ---cut---']),
+          ' after setup lines to hide them, and ',
+          h.code([h.Class('text-ink')], ['// ---cut-after---']),
+          ' before closing lines to hide those.',
+        ],
+      ),
       formatStatus(model, h),
       field(
         'File name',
@@ -284,6 +297,18 @@ const controls = (model: Model, h: HtmlBuilder<Message>): Html => {
             Message.ClickedWindow(),
             h,
           ),
+          checkbox(
+            'Errors from the language server',
+            settings.showErrors,
+            Message.ClickedErrors(),
+            h,
+          ),
+          checkbox(
+            'Inlay hints',
+            settings.showInlayHints,
+            Message.ClickedInlayHints(),
+            h,
+          ),
         ],
       ),
       segmented<number>(
@@ -299,9 +324,10 @@ const controls = (model: Model, h: HtmlBuilder<Message>): Html => {
 
 const preview = (model: Model, h: HtmlBuilder<Message>): Html => {
   const { settings } = model
-  const { width, height } = size(settings)
-  const cut = cutLineCount(settings)
-  const image = scene(settings)
+  const annotations = currentAnnotations(model)
+  const { width, height } = size(settings, annotations)
+  const cut = cutLineCount(settings, annotations)
+  const image = scene(settings, annotations)
   return h.div(
     [h.Class('flex min-w-0 flex-col gap-4')],
     [

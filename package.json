@@ -14,6 +14,7 @@
     "lint": "oxlint src && effect-tsgo patch --no-typescript --oxlint && oxlint --config .oxlintrc.effect.json --deny-warnings src",
     "sync-docs": "node scripts/sync-silk-docs.ts",
     "catalog": "node scripts/catalog-written.ts",
+    "annotate": "node scripts/annotate.ts",
     "build:site": "vite build && cp dist/client/404/index.html dist/client/404.html",
     "deploy": "alchemy deploy --stage prod --yes"
   },

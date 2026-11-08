@@ -3,10 +3,12 @@ import { type Html, type HtmlBuilder } from 'foldkit/html'
 
 import * as Markdown from '@foldkit/markdown'
 
+import { isTwoslash, strip } from '../annotate/markers'
 import * as Code from '../code'
 import { type CopiedCodeIds, copyButtonFor } from '../copy'
 import * as Icon from '../icon'
 import { type Message } from '../message'
+import { annotationsFor } from './annotations'
 import { headingId, headingIds, headingText } from './headings'
 import { islandAttributes } from './islands'
 
@@ -139,19 +141,30 @@ export const view = (
         ),
       Strong: (_, content) => h.strong([h.Class('font-bold')], content),
       Emphasis: (_, content) => h.em([h.Class('italic')], content),
-      CodeBlock: ({ maybeLanguage, value }, occurrenceIndex) =>
-        Code.codeBlock(
-          {
-            code: value,
-            lang: codeLanguage(maybeLanguage),
-            copy: copyButtonFor(
-              copiedCodeIds,
-              `${documentKey}#${occurrenceIndex}`,
-              value,
+      CodeBlock: ({ maybeLanguage, maybeMeta, value }, occurrenceIndex) => {
+        const lang = codeLanguage(maybeLanguage)
+        const copy = (text: string) =>
+          copyButtonFor(
+            copiedCodeIds,
+            `${documentKey}#${occurrenceIndex}`,
+            text,
+          )
+        if (lang !== 'silk' || !isTwoslash(maybeMeta)) {
+          return Code.codeBlock({ code: value, lang, copy: copy(value) }, h)
+        }
+        // An annotated block shows its code without the markers, and with
+        // what the language server said when `pnpm annotate` last ran.
+        const shown = strip(value)
+        return Option.match(annotationsFor(value), {
+          onNone: () =>
+            Code.codeBlock({ code: shown, lang, copy: copy(shown) }, h),
+          onSome: annotations =>
+            Code.codeBlock(
+              { code: shown, lang, copy: copy(shown), annotations },
+              h,
             ),
-          },
-          h,
-        ),
+        })
+      },
       List: ({ isOrdered }, items) =>
         (isOrdered ? h.ol : h.ul)(
           [
