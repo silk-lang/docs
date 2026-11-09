@@ -1,5 +1,4 @@
 import { Option } from 'effect'
-import { Base64Url } from 'effect/encoding'
 import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
@@ -7,7 +6,7 @@ import { type Annotations, EMPTY } from '../annotate/model'
 import { Message } from './message'
 import { FormatState, TRANSPARENT, currentAnnotations } from './model'
 import { cutLineCount, scene, size } from './scene'
-import { decode, encode, fromSearch, snippetPath } from './share'
+import { decode, encode, fromSearch, snippetPath, toJson } from './share'
 import {
   FormatCode,
   WaitToWriteAddress,
@@ -239,29 +238,33 @@ describe('snippet address', () => {
     showLineNumbers: false,
   }
 
-  test('settings survive the trip through the address', () => {
-    expect(decode(encode(settings))).toEqual(Option.some(settings))
+  test('settings survive the trip through the address', async () => {
+    expect(await decode(await encode(settings))).toEqual(Option.some(settings))
   })
 
-  test('the defaults need no parameter', () => {
-    expect(snippetPath(initModel.settings)).toBe('/snippet')
-    expect(fromSearch(snippetPath(settings).replace('/snippet', ''))).toEqual(
+  test('the address is shorter than the JSON it holds', async () => {
+    const long = { ...settings, code: initModel.settings.code.repeat(4) }
+    expect((await encode(long)).length).toBeLessThan(toJson(long).length / 2)
+  })
+
+  test('the defaults need no parameter', async () => {
+    expect(await snippetPath(initModel.settings)).toBe('/snippet')
+    const path = await snippetPath(settings)
+    expect(await fromSearch(path.replace('/snippet', ''))).toEqual(
       Option.some(settings),
     )
   })
 
-  test('missing fields take their defaults and sizes stay within limits', () => {
-    const partial = Base64Url.encode(
-      JSON.stringify({ code: 'x', width: 99999 }),
-    )
-    expect(decode(partial)).toEqual(
-      Option.some({ ...initModel.settings, code: 'x', width: 2400 }),
+  test('sizes stay within limits', async () => {
+    const wide = { ...settings, width: 99999, padding: -5, scale: 7 }
+    expect(await decode(await encode(wide))).toEqual(
+      Option.some({ ...settings, width: 2400, padding: 0, scale: 2 }),
     )
   })
 
-  test('an address that is not settings is ignored', () => {
-    expect(decode('not base64 at all!')).toEqual(Option.none())
-    expect(decode(Base64Url.encode('{"width": "wide"}'))).toEqual(Option.none())
+  test('an address that is not settings is ignored', async () => {
+    expect(await decode('not base64 at all!')).toEqual(Option.none())
+    expect(await decode('aGVsbG8')).toEqual(Option.none())
   })
 
   test('reading the address replaces the settings once', () => {
@@ -275,23 +278,21 @@ describe('snippet address', () => {
       }),
       Command.resolve(
         WaitToWriteAddress,
-        Message.CompletedWaitToWriteAddress({ path: snippetPath(settings) }),
+        Message.CompletedWaitToWriteAddress({ settings }),
       ),
       Command.resolve(WriteAddress, Message.CompletedWriteAddress()),
     )
   })
 
   test('the address follows the settings once they settle', () => {
-    const read = { ...initModel, isAddressRead: true }
+    const changed = { ...initModel.settings, code: 'fn a() -> () {}' }
     story(
       update,
-      given(read),
-      message(Message.ChangedCode({ code: 'fn a() -> () {}' })),
+      given({ ...initModel, isAddressRead: true }),
+      message(Message.ChangedCode({ code: changed.code })),
       Command.resolve(
         WaitToWriteAddress,
-        Message.CompletedWaitToWriteAddress({
-          path: snippetPath({ ...initModel.settings, code: 'fn a() -> () {}' }),
-        }),
+        Message.CompletedWaitToWriteAddress({ settings: changed }),
       ),
       Command.resolve(WriteAddress, Message.CompletedWriteAddress()),
     )
@@ -301,7 +302,7 @@ describe('snippet address', () => {
     story(
       update,
       given({ ...initModel, isAddressRead: true }),
-      message(Message.CompletedWaitToWriteAddress({ path: '/snippet?s=old' })),
+      message(Message.CompletedWaitToWriteAddress({ settings })),
       model(model => {
         expect(model.settings).toEqual(initModel.settings)
       }),

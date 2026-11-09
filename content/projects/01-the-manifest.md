@@ -41,10 +41,12 @@ The root module is `src/main.silk` without saying so: the source starts in `src`
 | `kind` | no | string | What a build makes: `"executable"` (the default), `"library"`, `"static-library"`, `"shared-library"` or `"object"`. See **Build outputs and native linking**. |
 | `silk-version` | no | string | The Silk version the package runs with. `silk init` writes the running compiler's version. The `silk` tool hands every command in the package to that version's compiler; `"0.0.0"` pins nothing. A workspace's own `silk-version` wins. Set it with `silk set`; see "Silk versions" in the Command-line reference. |
 | `exports` | no | array of strings | Modules other packages may import, in import spelling (`"Board"`, `"codec.Json"`). Each must exist. |
+| `include` | no | array of strings | Files and directories outside the source root that `silk pack` puts in the source archive, relative to the package directory, such as `["assets"]`. See **Packaging releases**. |
+| `publish` | no | boolean | `false` keeps the package out of `silk pack`: a workspace pack skips it and packing it by name is refused. Default `true`. |
 | `description`, `license`, `repository`, `homepage`, `readme` | no | string | Publishing metadata. Builds never read it. In a template, `silk init --list` shows the `description`; see Project templates. |
 | `authors`, `keywords` | no | array of strings | Publishing metadata. Builds never read it. |
 
-A `library` is Silk source for other packages to import: `silk build` checks it and makes no file. The other library kinds make an archive or a shared library. `package.include` is reserved and refused as not supported yet.
+A `library` is Silk source for other packages to import: `silk build` checks it and makes no file. The other library kinds make an archive or a shared library.
 
 The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, `[config]` values and symbol maps use it.
 
@@ -160,16 +162,19 @@ One entry per dependency. The key is the name the package imports it by. A path 
 pricing = { path = "../pricing" }
 text_utils = { path = "../text-utils", package = "text-utils" }
 vector = { git = "https://example.com/geometry.git", rev = "fb09a5d023a80e50a973adb896a198ab4daab4db", path = "vector" }
+greet = { url = "https://example.com/greet-0.1.0.tar.gz", sha256 = "b9b86606bfddde5c73ded12c082aca71c9578b9d09c42f7646202a29051367e2" }
 ```
 
 | Key | Required | Meaning |
 | --- | --- | --- |
-| `path` | yes, without `git` | Path dependency: directory of the dependency's `silk.toml`, relative to this manifest. Git dependency: directory of the package inside the repository, relative to its root. Default: the repository root. |
+| `path` | yes, without `git` or `url` | Path dependency: directory of the dependency's `silk.toml`, relative to this manifest. Git or URL dependency: directory of the package inside the repository or archive, relative to its root. Default: the repository root, or the archive's root or its one top directory. |
 | `git` | for a git dependency | The repository: a URL, an scp-style `host:path`, or an absolute path. |
 | `rev` | with `git` | The full commit hash, 40 or 64 lowercase hexadecimal digits. |
+| `url` | for a URL dependency | Where the package's archive is: an `https://` or `file:///` URL of a `.tar.gz`, `.tar` or ZIP file. |
+| `sha256` | with `url` | The archive's SHA-256, 64 lowercase hexadecimal digits. |
 | `package` | no | The dependency's `[package].name`. When given, it must match. |
 
-The other sources and their settings (`url`, `version`, `tag`, `branch`, `hash`, `optional`, `workspace`) are refused as not supported yet. A git dependency is pinned with `rev`, never with `tag` or `branch`. See **Dependencies** for git dependencies, fetching and the naming rules.
+The other settings (`version`, `tag`, `branch`, `hash`, `optional`, `workspace`) are refused as not supported yet. A git dependency is pinned with `rev`, never with `tag` or `branch`, and a URL dependency with `sha256`. See **Dependencies** for git and archive dependencies, fetching and the naming rules.
 
 ## &#91;profiles.\<name>\]
 
@@ -270,7 +275,7 @@ Invalid Silk project manifest /home/you/hello/silk.toml:2: package.nmae is not a
 | Only `[workspace]`, for a command that needs a package | `this manifest only defines a workspace; run the command in one of its member directories` |
 | An earlier spelling, such as `[build].artifact` | `LINE: build.artifact is an earlier spelling; write package.kind` |
 | A reserved table, such as `[dev-dependencies]` | `LINE: dev-dependencies is not supported yet` |
-| A reserved key, such as `package.include` or a dependency's `tag` | `LINE: package.include is not supported yet` |
+| A reserved key, such as a dependency's `tag` | ``LINE: dependency `<name>` of <package@version>: tag is not supported yet; a dependency takes only path, git, rev, url, sha256 and package; pin a git dependency to a full commit hash with rev`` |
 | Unknown top-level key or table, such as `[packge]` | `LINE: packge is not a supported field; did you mean package?` |
 | Unknown `[package]` key | `LINE: package.<key> is not a supported field`, plus `; did you mean package.<close key>?` when there is one, as for every unknown key below |
 | Unknown key in a dependency entry | `LINE: dependencies.<name>.<key> is not a supported field` |
