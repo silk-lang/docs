@@ -11,12 +11,12 @@ import {
   LIMITS,
   type Model,
   SCALES,
-  type Settings,
+  Settings,
   currentAnnotations,
   initialModel,
 } from './model'
 import { widthToFit } from './scene'
-import { fromSearch, snippetPath } from './share'
+import { fromSearch, snippetPath, toJson } from './share'
 
 type UpdateReturn = Update.Return<Model, Message, PlaygroundService>
 
@@ -111,17 +111,25 @@ export const imageFileName = (fileName: string): string => {
   return `${base === '' ? 'snippet' : base}.png`
 }
 
-// The settings a link carries, read from the address of the document the
-// page's section is mounted in. Mounting comes after hydration, so the first
-// render matches the prerendered page, and it also covers arriving from
-// another page without a reload.
+// The address of the document the page's section is mounted in. Mounting
+// comes after hydration, so the first render matches the prerendered page,
+// and it also covers arriving from another page without a reload. The Mount
+// only reads the address; a hydrated element can be replaced, which would
+// cut its work short, so the decoding runs as a Command.
 export const ReadAddress = Mount.define('ReadAddress', {
-  messages: [Message.ReadAddress],
+  messages: [Message.MountedPage],
   execute: ({ element }) =>
     Effect.sync(() =>
-      Message.ReadAddress({
-        maybeSettings: fromSearch(element.ownerDocument.location.search),
-      }),
+      Message.MountedPage({ search: element.ownerDocument.location.search }),
+    ),
+})
+
+export const DecodeAddress = Command.define('DecodeAddress', {
+  args: { search: Schema.String },
+  messages: [Message.ReadAddress],
+  execute: ({ search }) =>
+    Effect.promise(() => fromSearch(search)).pipe(
+      Effect.map(maybeSettings => Message.ReadAddress({ maybeSettings })),
     ),
 })
 
@@ -130,37 +138,43 @@ export const ReadAddress = Mount.define('ReadAddress', {
 const ADDRESS_SETTLE = Duration.millis(400)
 
 export const WaitToWriteAddress = Command.define('WaitToWriteAddress', {
-  args: { path: Schema.String },
+  args: { settings: Settings },
   messages: [Message.CompletedWaitToWriteAddress],
-  execute: ({ path }) =>
+  execute: ({ settings }) =>
     Effect.sleep(ADDRESS_SETTLE).pipe(
-      Effect.as(Message.CompletedWaitToWriteAddress({ path })),
+      Effect.as(Message.CompletedWaitToWriteAddress({ settings })),
     ),
 })
 
 // Replaces the history entry, so editing does not add one per change. A
 // reader who left the page keeps the page they went to.
 export const WriteAddress = Command.define('WriteAddress', {
-  args: { path: Schema.String },
+  args: { settings: Settings },
   messages: [Message.CompletedWriteAddress],
-  execute: ({ path }) =>
-    Effect.suspend(() =>
-      window.location.pathname === '/snippet' &&
-      `${window.location.pathname}${window.location.search}` !== path
-        ? replaceUrl(path)
-        : Effect.void,
-    ).pipe(Effect.as(Message.CompletedWriteAddress())),
+  execute: ({ settings }) =>
+    Effect.promise(() => snippetPath(settings)).pipe(
+      Effect.flatMap(path =>
+        window.location.pathname === '/snippet' &&
+        `${window.location.pathname}${window.location.search}` !== path
+          ? replaceUrl(path)
+          : Effect.void,
+      ),
+      Effect.as(Message.CompletedWriteAddress()),
+    ),
 })
 
 // The address follows the settings once it has been read, so a link is
 // not replaced by the defaults before it loads.
 export const update = (model: Model, message: Message): UpdateReturn => {
   const result = step(model, message)
-  const path = snippetPath(result.model.settings)
-  return result.model.isAddressRead && path !== snippetPath(model.settings)
+  return result.model.isAddressRead &&
+    toJson(result.model.settings) !== toJson(model.settings)
     ? {
         ...result,
-        commands: [...(result.commands ?? []), WaitToWriteAddress({ path })],
+        commands: [
+          ...(result.commands ?? []),
+          WaitToWriteAddress({ settings: result.model.settings }),
+        ],
       }
     : result
 }
@@ -274,15 +288,19 @@ const step = (model: Model, message: Message) =>
       ],
     }),
     CompletedDownload: () => ({ model }),
+    MountedPage: ({ search }) => ({
+      model,
+      commands: [DecodeAddress({ search })],
+    }),
     ReadAddress: ({ maybeSettings }) => ({
       model: modifyFields(model, {
         isAddressRead: () => true,
         settings: settings => Option.getOrElse(maybeSettings, () => settings),
       }),
     }),
-    CompletedWaitToWriteAddress: ({ path }) =>
-      path === snippetPath(model.settings)
-        ? { model, commands: [WriteAddress({ path })] }
+    CompletedWaitToWriteAddress: ({ settings }) =>
+      toJson(settings) === toJson(model.settings)
+        ? { model, commands: [WriteAddress({ settings })] }
         : { model },
     CompletedWriteAddress: () => ({ model }),
     LoadedFonts: () => ({
