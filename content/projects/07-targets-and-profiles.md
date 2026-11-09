@@ -172,6 +172,40 @@ Named/full profiles conflict with target and optimization flags
 
 - A profile can also set package parameter values with `config.main.port = 9090`; they win over `[config]`. See **Package parameters** in the reference and chapter 11 of the book.
 
+### Entries, artifacts and dependencies
+
+A profile can build a different program from the same package. `main` names its root module, resolved against `[package].source` like `[package].main`, and `artifact` names its output form, whatever `[package].kind` says. A library can so carry its own command-line tool:
+
+```toml
+[package]
+name = "tiny"
+kind = "library"
+main = "lib.silk"
+
+[profiles.cli]
+main = "cli.silk"
+artifact = "executable"
+
+[profiles.cli.dependencies]
+args = { path = "../args" }
+```
+
+```sh
+silk run --profile cli -- --help
+```
+
+`[profiles.<name>.dependencies]` takes the same entries as `[dependencies]` and adds them only when that profile builds the package you run the command in: an entry replaces a `[dependencies]` entry of the same name, and other builds never fetch or see them. A dependency's own profiles are never read, so its profile dependencies never reach you. `main` must stay below the source directory, without `.` or `..` segments.
+
+Two names have a meaning of their own:
+
+- `tasks` builds the package's tasks for `silk task`. It needs no table: when the manifest declares none, it builds an executable for the host, in debug mode, from `tasks.silk`. See "Tasks: silk task" in **Hooks and scripts**.
+- `test`, when the manifest declares it, is the profile `silk test` uses when it is given no `--profile`, `--profile-input`, `--target`, `--release` or `--optimization`. Declare it to give tests dependencies the package itself does not need:
+
+```toml
+[profiles.test.dependencies]
+fixtures = { path = "../fixtures" }
+```
+
 ## Profile fields
 
 The manifest page lists every field and its values. The native build applies these:
@@ -188,7 +222,7 @@ The manifest page lists every field and its values. The native build applies the
 | `cpu` | `features` turns on each listed CPU feature in Clang. `model` accepts the target's default, `x86-64` on x86-64 targets and `generic` elsewhere; x86-64 targets also take the levels `x86-64-v2`, `x86-64-v3` and `x86-64-v4`. |
 | `code-model` | `large` passes `-mcmodel=large`. x86-64 targets only. |
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
-| `artifact` | Must name the same form as `[package].kind`. Set the output form there. |
+| `artifact` | The output form: `executable`, `static-archive`, `loadable-module` or `object`. It defaults to the form `[package].kind` builds and may differ from it. |
 | `backend` | `llvm`, the default, or `direct` for WebAssembly without Clang (see The direct WebAssembly backend). `--backend` on the command line sets it too. |
 | `threading` | `multi` on `wasm32-unknown-unknown` builds with atomics and a shared memory (see below). Refused on other targets. |
 | `max-memory` | WebAssembly only (`wasm32` and `wasm64`): the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
@@ -272,7 +306,6 @@ These combinations are refused when the manifest is read:
 | `max-memory` on a target that is not WebAssembly | `UnsupportedCombination: profiles.hostmem.max-memory = "256MiB"` |
 | `cpu.model` other than the target's default | `UnsupportedCombination: profiles.fast.cpu.model = "znver3"` |
 | a `cpu.features` entry the target does not have | `UnsupportedCombination: profiles.fast.cpu.features` |
-| `artifact` different from `[package].kind` | `UnsupportedCombination: profiles.fast.artifact = "object" differs from [package].kind = "executable"; set [package].kind to choose the artifact, and omit the profile's artifact or write it as "executable"` |
 
 The profile names in these messages are the ones used to produce them; yours shows its own. LINE is the line of the field, or of the `[profiles.<name>]` header when the field is missing, as for the thread sanitizer without `threading`. A field inside an inline table written over several lines, such as `features` in `cpu = { model = "x86-64",` followed by `features = ["avx512"] }` on the next line, is reported at the line that writes it.
 
