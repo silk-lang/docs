@@ -1651,7 +1651,7 @@ Fix: Initialize each field once. See Structs, tuples and arrays, Enums and union
 
 ### SEM0024
 
-A struct literal that omits a declared field.
+A struct literal that omits a declared field whose type does not implement `Omittable`. An `Option` field may be left out; it then holds `None`.
 
 ```silk
 struct Point { x: i32, y: i32 }
@@ -1667,7 +1667,7 @@ pub fn main() -> i32 {
 src/main.silk:3:11: error[SEM0024] `Point { ... }` omits field `y`
 ```
 
-Fix: Initialize every field. See Structs, tuples and arrays, Enums and unions.
+Fix: Initialize every field that is not optional. See Structs, tuples and arrays, Enums and unions.
 
 ### SEM0025
 
