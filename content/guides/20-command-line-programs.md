@@ -506,7 +506,7 @@ error: unknown option --regoin; did you mean --region?
 $ deploy push web -v
 error: unknown option -v
 $ deploy pushh
-error: unknown command pushh for deploy
+error: unknown command pushh for deploy; did you mean push?
 $ deploy releases
 error: deploy releases needs a command
 $ deploy push web extra
@@ -519,7 +519,7 @@ $ deploy push web --replicas
 error: --replicas needs a value
 ```
 
-A misspelled option gets the closest name when one is close, as `--regoin` did. `-v` belongs to `deploy`, not to `push`, so it must come before the subcommand: each option is read at the level of the command that declares it. The messages are the `CliError` variants in `silk.cli.parse`:
+A misspelled option or subcommand gets the closest name when one is close, as `--regoin` and `pushh` did. `-v` belongs to `deploy`, not to `push`, so it must come before the subcommand: each option is read at the level of the command that declares it. The messages are the `CliError` variants in `silk.cli.parse`:
 
 | `CliError` | Message |
 | --- | --- |
@@ -532,7 +532,7 @@ A misspelled option gets the closest name when one is close, as `--regoin` did. 
 | `MissingRequired` | `missing <target>` |
 | `UnexpectedArgument` | `unexpected argument extra` |
 | `MissingCommand` | `deploy releases needs a command` |
-| `UnknownCommand` | `unknown command pushh for deploy` |
+| `UnknownCommand` | `unknown command pushh for deploy; did you mean push?` |
 
 ## Mistakes the compiler catches
 
@@ -555,17 +555,17 @@ impl CommandLine for Prune {
 $ silk build
 [x86_64-unknown-linux-gnu]
 src/main.silk:16:25: error[SEM0022] main.Prune has no field kept
-src/main.silk:24:20: error[SEM0022] main.Prune has no field kept
-Failed typo in 0.11s
+Failed typo in 0.13s
 ```
 
-The compiler reports the name where you wrote it, line 16, and again at line 24, where `main` calls `Cli.read<Prune>()`. Other mistakes stop the build with a message too: describing a field twice, two options with the same name or alias, an alias longer than one letter, an alias or an environment variable on a positional argument, positional arguments next to a subcommand, and more than one subcommand field. `-h` always means help, so `Opt.short("h")` is an error. This kind of check runs when the description is used, so the message points at the `Cli.read` call:
+The compiler reports the name where you wrote it, on line 16. Other mistakes stop the build with a message too: describing a field twice, two options with the same name or alias, an alias longer than one letter, an alias or an environment variable on a positional argument, positional arguments next to a subcommand, and more than one subcommand field. `-h` always means help, so `Opt.short("h")` is an error. The message points at the `Opt.short` call on line 16, and its note points at line 24, the `Cli.read<Prune>()` call in `main` where the description is put to use:
 
 ```
 $ silk build
 [x86_64-unknown-linux-gnu]
-src/main.silk:24:20: error[SEM0177] -h is the help option
-Failed alias in 0.16s
+src/main.silk:16:33: error[SEM0177] -h is the help option
+  note: src/main.silk:24:20: related location
+Failed alias in 0.12s
 ```
 
 ## Handling help and errors yourself
@@ -643,14 +643,14 @@ silk test
 
 ```
   main::explainsAMisspelledOption
-    PASS  73 us
+    PASS  59 us
   main::readsAPush
-    PASS  40 us
+    PASS  30 us
   main::readsTheRegionFromTheEnvironment
-    PASS  7 us
+    PASS  9 us
 
 Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
-Time   913 us
+Time   1 ms
 ```
 
 The first test checks that a push gets its target, the default region, the replica count and the tag. The second hands `parseWith` an environment and checks that `DEPLOY_REGION` was read. The third checks the exact message a user would see, with `Cli.message`.
@@ -874,7 +874,7 @@ Options:
 Arguments:
   <version>                 The version to release (required)
 $ silk task relase 1.0
-error: unknown command relase for tasks
+error: unknown command relase for tasks; did you mean release?
 ```
 
 `release` calls `codegen` first, then runs two more commands. `Task.silk` runs the compiler that built the tasks, so `silk test` and `silk build --release` use the same compiler as the `silk task` that started them. The build gets `--no-hooks` because `release` has just run `codegen` itself; the next section explains hooks. Their output goes straight to the terminal:
@@ -884,7 +884,7 @@ $ silk task release 1.0.0
 wrote src/Pages.silk
 
 Tests  0 passed, 0 failed (0 cached, 0 executed, 0 selected, 0 discovered)
-Time   18 us
+Time   19 us
 released site 1.0.0
 ```
 
