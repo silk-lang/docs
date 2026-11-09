@@ -579,6 +579,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Writing effect combinators',
         'https://github.com/silk-lang/docs/blob/main/content/guides/18-writing-effect-combinators.md',
       ),
+      page(
+        'guides',
+        'command-line-programs',
+        'Command-line programs',
+        'https://github.com/silk-lang/docs/blob/main/content/guides/20-command-line-programs.md',
+      ),
     ],
   },
   {

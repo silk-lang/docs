@@ -24,3 +24,4 @@ The guides sit between the book and the reference. The book teaches the language
 16. **Testing with providers**: replacing real providers with fakes and checking failures as well as successes.
 17. **Concurrent I/O patterns**: many connections at once, parallel requests, producer and consumer fibers, and timeouts.
 18. **Writing effect combinators**: effects that take effects, generic rows, your own retry and budget, and borrowing while an effect is alive.
+20. **Command-line programs**: describing a command line as a type with `silk.cli`, subcommands, defaults, environment variables, choices and checks, help and errors, testing, shell completions, and project tasks with `silk.cli.task`.
