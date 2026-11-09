@@ -52,11 +52,11 @@ Read it piece by piece:
 | --- | --- | --- |
 | Target header | `[x86_64-unknown-linux-gnu]` | The target being checked. The diagnostics below it belong to that target |
 | Location | `src/main.silk:7:15` | File, line and column, both counted from 1. Column 15 is the start of `count`. The file is relative to the package folder, or to the workspace root for a workspace member, so it reads the same wherever you run the command. A file outside that folder, such as a std lib module, is printed in full |
-| Severity | `error` | `error` fails the command. `warning` reports something the program does not need, such as an unused import, and the command still succeeds |
+| Severity | `error` | `error` fails the command. `warning` reports something the program does not need, such as an unused import. It fails the command too, unless you pass `--ignore-warnings` |
 | Code | `SEM0012` | A stable identifier. Search for it in the Appendix |
 | Message | `Expected i32 but received i64` | What went wrong, with the names and types filled in |
 
-Three diagnostics are warnings: an unused import (MOD0007), an unused local binding (SEM0255) and a `&mut` requirement that the body only reads (SEM0254). They print `warning[CODE]` and do not fail the check:
+Three diagnostics are warnings: an unused import (MOD0007), an unused local binding (SEM0255) and a `&mut` requirement that the body only reads (SEM0254). They print `warning[CODE]`, and they fail the check just as errors do:
 
 ```silk
 pub fn main() -> i32 {
@@ -67,14 +67,17 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     161 modules, 1 in package         0.01s
-  check    2 modules                         0.00s
+  load     162 modules, 1 in package         0.05s
+  check    failed: 2 modules                 0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:2:7: warning[SEM0255] `unused` is never used; remove it, or start its name with `_` to keep it
-Finished hello in 0.03s
+silk: warnings fail this command; fix them, or pass --ignore-warnings to allow them
+Failed hello in 0.11s
 ```
 
-The exit status is 0. A name that starts with `_` is never reported, so `let _unused = 5` keeps the binding on purpose. `silk build` prints the same warnings and still writes the program, and the language server shows them in the editor.
+The exit status is 1. A name that starts with `_` is never reported, so `let _unused = 5` keeps the binding on purpose. `silk build`, `silk run` and `silk test` fail for the same warnings, and the build writes no program. The language server shows them in the editor.
+
+To let a command succeed with warnings, pass `--ignore-warnings`. The warnings still print, and the exit status is 0 when there is no error. Reach for it while a change is in progress, not to keep warnings in a finished package. `silk check --json` writes warnings with `"severity":"warning"` and no closing line.
 
 Some diagnostics also point at a second place that matters. Each such place follows the diagnostic on its own indented `note:` line. Declaring `half` twice names the first declaration:
 

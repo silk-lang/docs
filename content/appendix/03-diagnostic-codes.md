@@ -8,7 +8,7 @@ A diagnostic prints as `path:line:column: error[CODE] message`. When the compile
 
 The message is either a filled-in template, such as `Unknown type Size`, or, when the compiler cannot fill the template, the code's one-line meaning, such as `Invoking a stored callable through too weak an aggregate receiver access`. The meaning names the rule but not the names or values involved; read the line and column. Entries below give the template when the printed message is the meaning.
 
-Three codes are warnings, not errors: MOD0007 (an unused import), SEM0254 (a `&mut` requirement the body only reads) and SEM0255 (an unused local binding). A warning prints `warning[CODE]` in place of `error[CODE]`. It does not fail the command: `silk check` and `silk build` still exit with status 0 and the build still writes its output. The language server shows warnings too.
+Three codes are warnings, not errors: MOD0007 (an unused import), SEM0254 (a `&mut` requirement the body only reads) and SEM0255 (an unused local binding). A warning prints `warning[CODE]` in place of `error[CODE]`, and it fails the command as an error does: `silk check` and `silk build` exit with status 1, and the build writes no output. With `--ignore-warnings` they print the warnings and succeed. The language server shows warnings too.
 
 A construct the compiler parses but cannot compile yet is not a coded error. It prints `unsupported: this construct is not supported by the native compiler yet` or `unsupported[Reason] not supported by the native compiler yet`, and the command exits with status 2.
 
@@ -742,7 +742,7 @@ pub fn main() -> i32 {
 src/main.silk:1:27: warning[MOD0007] Import `Option` is never used; remove it
 ```
 
-The column is the unused name inside the braces. Each unused name of an import list gets its own warning. The check still passes and exits with status 0.
+The column is the unused name inside the braces. Each unused name of an import list gets its own warning, and the check exits with status 1. An imported interface is not reported, because calling its operations with method syntax uses it without spelling its name.
 
 Fix: Remove the name from the import list, or the whole `import` line when no name of it is used. See Modules and imports.
 
@@ -5582,7 +5582,7 @@ pub fn main() -> i32 {
 src/main.silk:6:5: warning[SEM0254] This function only needs shared access to `Random`; require `&Random` instead of `&mut Random`
 ```
 
-The column is the `&mut` entry of the requirement row. The check still passes. Only rows a function declares are checked; the rows of service and interface operations are contracts, so they are not.
+The column is the `&mut` entry of the requirement row. Like every warning, it fails the check unless you pass `--ignore-warnings`. Only rows a function declares are checked; the rows of service and interface operations are contracts, so they are not.
 
 Fix: Require `&Random`. Callers can then provide the service through a shared borrow. See Services and providers.
 

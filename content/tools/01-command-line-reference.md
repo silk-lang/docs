@@ -67,6 +67,7 @@ A manifest that has `[workspace]` and no `[package]` is a workspace root. At a r
 | `--stdlib <directory>` | Use this std lib instead of the one installed beside `silk`. A directory without `compositions.json` exits 1 |
 | `--backend <llvm\|direct>` | `build` and `run` only. `direct` builds a WebAssembly target without Clang. See **Targets and profiles** |
 | `--clang <path>` | `build`, `run` and `test` only. Use this Clang; a bare name is looked up on `PATH`. See **Build outputs and native linking** |
+| `--ignore-warnings` | Let the command succeed with warnings. Without it, a warning fails the command as an error does. See **Diagnostics and silk check** |
 
 Without `--target`, a command uses the targets the manifest selects, or the host. Targets, profiles and output paths are described in **Targets and profiles** and **Build outputs and native linking**.
 
