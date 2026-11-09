@@ -14,6 +14,7 @@ Every `silk` command, its options and its exit status. `silk` is the tool you ty
 | `silk run [args]` | Build the host executable and run it |
 | `silk debug [args]` | Build the host executable and start it under a debugger |
 | `silk test` | Build the test runner and run the tests |
+| `silk task [name] [args]` | Build the package's tasks and run one, or list them |
 | `silk clean` | Delete the build output directory |
 | `silk generate` | Run the package's generators, or check their committed output |
 | `silk format [paths]` | Rewrite source files in the standard layout |
@@ -66,6 +67,7 @@ A manifest that has `[workspace]` and no `[package]` is a workspace root. At a r
 | `--stdlib <directory>` | Use this std lib instead of the one installed beside `silk`. A directory without `compositions.json` exits 1 |
 | `--backend <llvm\|direct>` | `build` and `run` only. `direct` builds a WebAssembly target without Clang. See **Targets and profiles** |
 | `--clang <path>` | `build`, `run` and `test` only. Use this Clang; a bare name is looked up on `PATH`. See **Build outputs and native linking** |
+| `--no-hooks` | `build`, `run`, `debug` and `test` only. Run none of the manifest's `[tasks]` hooks. See **Hooks and scripts** |
 
 Without `--target`, a command uses the targets the manifest selects, or the host. Targets, profiles and output paths are described in **Targets and profiles** and **Build outputs and native linking**.
 
@@ -245,7 +247,21 @@ Builds the test runner under `build/test/` and runs the selected tests. When not
 | `--timeout <seconds>` | Fail a test that runs longer than this; 60 by default, `0` for no limit |
 | `--no-cache` | Build the runner again even when nothing changed |
 
-`--root` and `--file` name files of one package, so in a workspace they need `-p`. See **Testing**.
+`--root` and `--file` name files of one package, so in a workspace they need `-p`. When the manifest declares `[profiles.test]` and the command names no `--profile`, `--profile-input`, `--target`, `--release` or `--optimization`, the runner builds with that profile, and with its dependencies. See **Testing**, and "Entries, artifacts and dependencies" in **Targets and profiles**.
+
+## task
+
+```
+silk task [project options] [name] [arguments...]
+```
+
+Builds the package's `tasks` profile, an executable for this machine from `src/tasks.silk` unless `[profiles.tasks]` says otherwise, and runs it in the package's directory with the task's name and the arguments after it. With no name, it lists the tasks. Options before the name are the compiler's, such as `--stdlib`; everything from the name on is the task's.
+
+```
+$ silk task release 1.2.0
+```
+
+The program runs with your environment plus `SILK_PROJECT_ROOT`, the package's directory, `SILK_INVOCATION_DIRECTORY`, where you ran the command, and `SILK_COMPILER`, the compiler that built it. The exit status is the task's own; when the tasks do not build, it exits as `silk build` would, and no task runs. `--profile`, `--profile-input`, `--target`, `--release`, `--optimization`, `-p` and `--workspace` are refused, because the `tasks` profile decides the build. Use `--manifest-path` to pick a workspace member's tasks. See "Tasks: silk task" in **Hooks and scripts**.
 
 ## clean
 

@@ -106,6 +106,22 @@ Commands a template runs once, when `silk init --template` creates a project fro
 
 Each command runs in the build tool sandbox, with `SILK_VERSION` set to the creating compiler's release. See Project templates, and Hooks and scripts for every hook a package can have.
 
+## &#91;tasks\]
+
+Tasks of the package's `tasks` profile that run around Silk's commands, each as `silk task <name>` from the package's directory. Every key holds an array of task names, which run in order; a failing task stops the command.
+
+| Key | Runs |
+| --- | --- |
+| `before-build` | Before `silk build` does any work |
+| `after-build` | After `silk build` succeeds |
+| `before-run` | Before `silk run` or `silk debug` builds |
+| `before-test` | Before `silk test` builds |
+| `after-test` | After `silk test` passes |
+| `before-pack` | Before `silk pack` writes anything |
+| `after-pack` | After `silk pack` succeeds, with its `--json` object in `SILK_HOOK_RESULT` |
+
+A task name is lowercase letters and digits in `-`-separated words, such as `check-licenses`. Only the manifest of the package a command runs in is read, so a dependency's table never runs. `--no-hooks` skips them. See Hooks and scripts.
+
 ## &#91;component\]
 
 Only a `wasm32-wasip2` executable reads it. Without the table, the component uses the WASI command world the std lib carries.
@@ -165,7 +181,8 @@ A named profile is a complete build configuration. Select it with `--profile <na
 | `optimization` | `"none"`, `"speed"`, `"size"` | `"none"` |
 | `debug` | `true`, `false` | `true` |
 | `libc` | `"gnu"`, `"system"`, `"none"` | per target |
-| `artifact` | `"executable"`, `"static-archive"`, `"loadable-module"`, `"object"` | `"executable"` |
+| `main` | the profile's root module, a path below `[package].source` | `[package].main` (the `tasks` profile: `"tasks.silk"`) |
+| `artifact` | `"executable"`, `"static-archive"`, `"loadable-module"`, `"object"` | the form `[package].kind` builds |
 | `link` | `"static"`, `"dynamic"` | `"dynamic"` (wasm: `"static"`) |
 | `relocation` | `"pic"`, `"static"` | `"static"` for a Linux executable, `"pic"` otherwise (wasm: `"static"`) |
 | `code-model` | `"small"`, `"large"` | `"small"` |
@@ -179,8 +196,11 @@ A named profile is a complete build configuration. Select it with `--profile <na
 | `entry` | `{ kind = "default" }`, `{ kind = "none" }`, `{ kind = "named", name = "..." }` | default |
 | `runtime` | same shape as `entry` | default |
 | `config` | parameter values, as in `[config]`: `config.main.port = 9090` | none |
+| `dependencies` | a table of dependencies, as in `[dependencies]`, added only when this profile builds the root package | none |
 
 Profile names start with an ASCII letter, then letters, digits, `_` or `-`. Targets and profiles explains what each field does today and which combinations are refused.
+
+The `tasks` profile builds the package's tasks for `silk task` and exists without a table, as an executable for the host built in debug mode from `tasks.silk`. A declared `[profiles.test]` is the profile `silk test` uses by default. See "Entries, artifacts and dependencies" in Targets and profiles.
 
 ## &#91;workspace\]
 
