@@ -47,7 +47,7 @@ To bring in a package that already exists, move it into the folder and add it to
 | Outside the workspace | ``workspace.members entry `../elsewhere` must name a directory inside the workspace`` |
 | Same package name | ``workspace.members entry `loose/stray2` names a package whose name another member already has`` |
 | Unknown key, such as `ouput-dir` on line 3 | `3: workspace.ouput-dir is not a supported field; did you mean workspace.output-dir?` |
-| A `silk-version` that is not a version | `workspace.silk-version must be a valid semantic version` |
+| A `silk-version` that is not a version | `workspace.silk-version must be a full semantic version, such as 0.1.0; it is "x"` |
 
 ## Members still depend explicitly
 

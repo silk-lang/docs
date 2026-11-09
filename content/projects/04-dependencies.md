@@ -283,13 +283,13 @@ Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `vector` of 
 And a short hash:
 
 ```
-Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `vector` of app@0.1.0: rev must be a full commit hash: 40 or 64 lowercase hexadecimal digits
+Invalid Silk project manifest /home/you/app/silk.toml:7: dependencies.vector.rev must be a full commit hash: 40 or 64 lowercase hexadecimal digits; it is "fb09a5d"
 ```
 
-`tag` and `branch` are refused before the graph is read, at their line, like other keys that are not supported yet:
+`tag` and `branch` are refused before the graph is read, at their line, like any key a dependency entry does not take:
 
 ```
-Invalid Silk project manifest /home/you/app/silk.toml:7: dependencies.vector.tag is not supported yet
+Invalid Silk project manifest /home/you/app/silk.toml:7: dependencies.vector.tag is not a supported field
 ```
 
 Pin the commit with `rev` instead. `git rev-parse v1.2.0^{commit}` in the repository prints the full hash of a tag's commit.
@@ -302,10 +302,20 @@ text_utils = { path = "../text-utils", package = "text-utils", version = "1" }
 ```
 
 ```
-Invalid Silk project manifest /home/you/app/silk.toml:7: dependencies.text_utils.version is not supported yet
+Invalid Silk project manifest /home/you/app/silk.toml:7: dependencies.text_utils.version is not a supported field
 ```
 
-When the entry's table spans several lines, the line is the one with that key, not the one with the dependency name. Any other key the entry does not take is refused the same way, as "is not a supported field", with a suggestion when one is close: `dependencies.text_utils.pth is not a supported field; did you mean dependencies.text_utils.path?`.
+When the entry's table spans several lines, the line is the one with that key, not the one with the dependency name. Any other key the entry does not take is refused the same way, with a suggestion when one is close: `dependencies.text_utils.pth is not a supported field; did you mean dependencies.text_utils.path?`.
+
+## A dependency's own manifest
+
+A dependency's `silk.toml` is read when the graph is built. Its `silk-version` names the release line it was written for, and a Silk that is not on that line refuses it first. Before 1.0 the line is the minor version, so `0.3.2` builds with 0.3.2 and later 0.3 patches; from 1.0 on it is the major version. A dev release builds only packages written for that same dev release, and `0.0.0` builds with any Silk:
+
+```
+Invalid Silk project manifest /home/you/geometry/silk.toml:4: dependency `vector` of app@0.1.0: it was written for Silk 0.3.0 (its silk-version), which this Silk 0.2.1 cannot build. Build with Silk 0.3.0 (silk set 0.3.0), or set the dependency's silk-version to 0.2.1 if it builds with this Silk
+```
+
+Then the dependency's manifest is checked against the manifest schema like the package's own, and a shape error names the dependency's manifest and line, as in `` dependency `vector` of app@0.1.0: its silk.toml is invalid: package.nmae is not a supported field; did you mean package.name? ``. See Errors in **The manifest**.
 
 ## See also
 
