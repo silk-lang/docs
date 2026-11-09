@@ -7,13 +7,14 @@ Every `silk` command, its options and its exit status. `silk` is the tool you ty
 | Command | What it does |
 | --- | --- |
 | `silk init [path]` | Create a package or a workspace, from a template or built in |
-| `silk add <path>` | Add a path dependency to the manifest |
+| `silk add <path or url>` | Add a path dependency, or a URL dependency on a package archive, to the manifest |
 | `silk remove <name>` | Remove a dependency from the manifest |
 | `silk check` | Type-check the package for each target, without producing output |
 | `silk build` | Build the package for each target |
 | `silk run [args]` | Build the host executable and run it |
 | `silk debug [args]` | Build the host executable and start it under a debugger |
 | `silk test` | Build the test runner and run the tests |
+| `silk pack` | Check the package and write its release archives, documentation, checksums and signatures |
 | `silk clean` | Delete the build output directory |
 | `silk generate` | Run the package's generators, or check their committed output |
 | `silk format [paths]` | Rewrite source files in the standard layout |
@@ -116,10 +117,11 @@ A malformed template name exits 2. A template that cannot be fetched, names no d
 
 ```
 silk add <path> [--name <name>] [--manifest-path <path>]
+silk add <url> [--sha256 <hex>] [--name <name>] [--manifest-path <path>]
 silk remove <name> [--manifest-path <path>]
 ```
 
-`add` adds the package at `path` as a path dependency, after checking the dependency graph. It cannot add a git dependency; write that entry by hand. It never fetches, so a manifest whose git dependencies are not fetched yet is refused until `silk check` or a build fetches them. The dependency name is the package's name with `-` turned into `_`, or `--name`:
+`add` adds the package at `path` as a path dependency, after checking the dependency graph. Given an `https://` or `file:///` URL of a `.tar.gz`, `.tar` or ZIP archive, it downloads the archive, finds the package in it, and adds a URL dependency pinned with the archive's SHA-256, as `greet = { url = "...", sha256 = "..." }`. With `--sha256` it refuses a download that has another SHA-256. It cannot add a git dependency; write that entry by hand. It never fetches, so a manifest whose git dependencies are not fetched yet is refused until `silk check` or a build fetches them. The dependency name is the package's name with `-` turned into `_`, or `--name`:
 
 ```
 Added dependency util = { path = "../util" } to /home/you/ws/app/silk.toml
@@ -246,6 +248,23 @@ Builds the test runner under `build/test/` and runs the selected tests. When not
 | `--no-cache` | Build the runner again even when nothing changed |
 
 `--root` and `--file` name files of one package, so in a workspace they need `-p`. See **Testing**.
+
+## pack
+
+```
+silk pack [--list] [--output <dir>] [--json] [--bin] [--sign <file>] [shared project options]
+silk pack --new-key <path>
+```
+
+`pack` checks the package as `check` does, then writes its release files in `build/package/`, or `--output`: the source archive `<name>-<version>.tar.gz`, the documentation `<name>-<version>.docs.json`, and `SHA256SUMS`. `--bin` also builds each target's executable, with the release profile unless a profile option chooses another, and writes `<name>-<version>-<target>.tar.gz`. `--sign <file>`, or the key text in `SILK_SIGNING_KEY`, writes a minisign `<file>.minisig` beside every file. `--new-key <path>` writes a new key pair and packs nothing. `--list` prints the files the source archive would hold and writes nothing.
+
+```
+wrote /home/you/greet/build/package/greet-0.1.0.tar.gz (4 files, 432 bytes)
+sha256 b9b86606bfddde5c73ded12c082aca71c9578b9d09c42f7646202a29051367e2
+wrote /home/you/greet/build/package/greet-0.1.0.docs.json
+```
+
+A package that does not check, has no `version`, has a path dependency, or sets `publish = false` is refused with exit status 1; a signing key that cannot be read exits 2 before anything is written. In a workspace it packs every member that does not set `publish = false`. See **Packaging releases** in Projects and packages.
 
 ## clean
 
@@ -498,7 +517,9 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
 | `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
-| `SILK_OFFLINE` | Set, a build that needs a `[native.archive.<name>]` archive it has not fetched fails instead of downloading it |
+| `SILK_OFFLINE` | Set, a build that needs a `[native.archive.<name>]` archive or a URL dependency it has not fetched fails instead of downloading it |
+| `SILK_SIGNING_KEY` | The text of a minisign secret key file, for `silk pack` to sign with when `--sign` is not given |
+| `SILK_SIGNING_PASSWORD` | The password of an encrypted signing key, for `silk pack`; with `--new-key`, encrypts the new key |
 | `SILK_NO_TOOL_SANDBOX` | Set, the host behaves as one with no sandbox for `build.silk` tool steps, so they are refused unless `[build].unsandboxed-tools = true` |
 | `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and profiles** |
 | `SILK_PROFILE_USE` | A merged `.profdata` file: native builds pass `-fprofile-use=<file>` to Clang |
@@ -510,7 +531,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_WASI_ADAPTER` | The Preview 1 command adapter, `wasi_snapshot_preview1.command.wasm`, that a `wasm32-wasip2` executable needs |
 | `SILK_WASI_REACTOR_ADAPTER` | The Preview 1 reactor adapter, for a `wasm32-wasip2` component without a `main` |
 | `SSL_CERT_FILE` | The certificate bundle for `silk change since` and `silk use` when they fetch releases over HTTPS |
-| `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path. For the compiler: git dependencies are checked out in `$SILK_HOME/git`, or `$HOME/.silk/git` when it is unset, pinned native archives are kept in `$SILK_HOME/archives`, and `$SILK_HOME/native-overrides.toml` overrides archives for the machine |
+| `SILK_HOME` | For the tool: where versions, `bin/silk` and `settings.toml` live; default `~/.silk`. Must be an absolute path. For the compiler: git dependencies are checked out in `$SILK_HOME/git`, or `$HOME/.silk/git` when it is unset, pinned native archives and URL dependencies are kept in `$SILK_HOME/archives`, and `$SILK_HOME/native-overrides.toml` overrides archives for the machine |
 | `SILK_TOOLCHAIN` | For the tool: the version to run, overriding the project's pin. The tool sets it to the full version it runs |
 | `SILK_AUTO_INSTALL` | For the tool: `1` installs a missing selected version before running the command |
 | `SILK_TOOLCHAIN_MIRROR` | For the tool: an absolute directory of release assets to install from instead of GitHub |

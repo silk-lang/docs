@@ -397,6 +397,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Hooks and scripts',
         'https://github.com/silk-lang/docs/blob/main/content/projects/11-hooks-and-scripts.md',
       ),
+      page(
+        'projects',
+        'packaging-releases',
+        'Packaging releases',
+        'https://github.com/silk-lang/docs/blob/main/content/projects/12-packaging-releases.md',
+      ),
     ],
   },
   {

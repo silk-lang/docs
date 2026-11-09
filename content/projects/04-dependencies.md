@@ -1,6 +1,6 @@
 # Dependencies
 
-A package uses another package by listing it in `[dependencies]`, either with a path to its directory or with a git repository and a commit. Then it imports that package's exported modules with the dependency name in front. There is no registry yet.
+A package uses another package by listing it in `[dependencies]`: with a path to its directory, with a git repository and a commit, or with the URL and SHA-256 of an archive `silk pack` made. Then it imports that package's exported modules with the dependency name in front. There is no registry yet.
 
 ## Adding one
 
@@ -29,6 +29,8 @@ text_utils = { path = "../text-utils", package = "text-utils" }
 | Command | Effect |
 | --- | --- |
 | `silk add <path>` | Adds the package at `<path>` under its own name, with `-` turned into `_`. Adds `package = "..."` when the two differ. |
+| `silk add <url>` | Downloads the archive at an `https://` or `file:///` URL and adds it as a URL dependency with its SHA-256. See **Archive dependencies**. |
+| `silk add <url> --sha256 <hex>` | Also checks the download against the SHA-256 you already have, and refuses a mismatch. |
 | `silk add <path> --name <name>` | Uses `<name>` as the dependency name. `<name>` must already be an identifier. |
 | `silk add ... --manifest-path <file>` | Edits that manifest instead of the one found from the current directory. |
 | `silk remove <name>` | Removes the entry, and the `[dependencies]` table once it is empty. |
@@ -83,7 +85,7 @@ vector = { git = "https://example.com/geometry.git", rev = "fb09a5d023a80e50a973
 
 `rev` must be the commit itself. A short hash, a branch name or a tag name in `rev` is refused, and so are the `tag` and `branch` keys: branches and tags move, and a short hash can come to match a second commit. The commit pins the whole package, so the same manifest builds the same source every time.
 
-Write the entry by hand. `silk add` only adds path dependencies.
+Write the entry by hand. `silk add` adds path and URL dependencies, not git ones.
 
 ### Fetching
 
@@ -144,6 +146,52 @@ Invalid Silk project manifest /home/you/.silk/git/c459ef60881fc5d487329dfcd82386
 
 Only the packages the build reaches are read, so other packages in the repository may be anything, even broken.
 
+## Archive dependencies
+
+A URL dependency reads a package from an archive hosted anywhere, such as a file `silk pack` wrote and you attached to a GitHub release:
+
+```toml
+[dependencies]
+greet = { url = "https://github.com/you/greet/releases/download/v0.1.0/greet-0.1.0.tar.gz", sha256 = "b9b86606bfddde5c73ded12c082aca71c9578b9d09c42f7646202a29051367e2" }
+```
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `url` | yes | Where the archive is: an `https://` URL, or a `file:///` URL for an archive on this machine. |
+| `sha256` | yes | The SHA-256 of the archive, 64 lowercase hexadecimal digits. |
+| `path` | no | The directory of the package's `silk.toml` inside the archive. Default: the archive's root, or its one top directory when the root holds only a directory, as a `silk pack` archive does. It must stay inside the archive. |
+| `package` | no | The package's `[package].name`. When given, it must match. |
+
+The archive may be a `.tar.gz`, a plain `.tar` or a ZIP file; its first bytes say which. The SHA-256 pins the exact bytes, so the URL can point anywhere: a changed or swapped file fails the build instead of building something else. There is no lock file; `sha256` is the whole record. To upgrade, change `url` and `sha256`, or run `silk add` with the new URL.
+
+`silk add` downloads the archive, computes its SHA-256 and writes the entry:
+
+```sh
+silk add https://github.com/you/greet/releases/download/v0.1.0/greet-0.1.0.tar.gz
+```
+
+```
+Added dependency greet = { url = "https://github.com/you/greet/releases/download/v0.1.0/greet-0.1.0.tar.gz", sha256 = "b9b86606bfddde5c73ded12c082aca71c9578b9d09c42f7646202a29051367e2" } to /home/you/app/silk.toml
+```
+
+With `--sha256`, a download with another SHA-256 is refused and the manifest is left as it was:
+
+```
+silk: invalid dependency `https://github.com/you/greet/releases/download/v0.1.0/greet-0.1.0.tar.gz`: the archive has SHA-256 b9b86606bfddde5c73ded12c082aca71c9578b9d09c42f7646202a29051367e2, not the 0000000000000000000000000000000000000000000000000000000000000000 --sha256 expects
+```
+
+### Fetching archives
+
+`silk build`, `silk check`, `silk test` and `silk run` download each archive that is not on the machine yet, check its SHA-256, and unpack it into `$SILK_HOME/archives/<sha256>`, or `~/.silk/archives/<sha256>` when `SILK_HOME` is not set. This is the same store `[native.archive.<name>]` archives use. A file `<sha256>.fetched` next to it marks the archive complete; an unpack that stopped part way leaves no marker, and the next build downloads it again. An archive is found by its SHA-256 alone, so moving it to another host and changing only `url` downloads nothing.
+
+A download whose SHA-256 differs from the manifest's writes nothing to the store:
+
+```
+Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `greet` of app@0.1.0: archive greet from https://github.com/you/greet/releases/download/v0.1.0/greet-0.1.0.tar.gz has SHA-256 b9b86606bfddde5c73ded12c082aca71c9578b9d09c42f7646202a29051367e2, but its manifest pins a9b86606bfddde5c73ded12c082aca71c9578b9d09c42f7646202a29051367e2; nothing was extracted
+```
+
+Once fetched, builds read the store and need no network, even after the URL is gone. With `SILK_OFFLINE` set, a build that needs an archive it does not have fails instead of downloading it. The editor, `silk doc` and `silk doctest` never download; they read what is already in the store. A package read from an archive reaches other packages by path only inside the same archive, as a package from a git commit does.
+
 ## Naming rules
 
 - The dependency name (the key) must be an identifier: an ASCII letter or `_`, then letters, digits or `_`. `text-utils` is not one, so `silk add` writes `text_utils`.
@@ -198,9 +246,21 @@ Invalid Silk project manifest /home/you/app/silk.toml:8: dependency `Text-Utils`
 | `path of a git dependency must name a directory inside the repository, relative to its root` | Absolute `path`, a `..` segment, or a symbolic link out of the repository |
 | `fetching commit <rev> of <git> failed: the repository has no such commit` | A commit the repository does not have |
 | `fetching commit <rev> of <git> failed: git fetch failed: ` and git's first error line | The repository cannot be reached |
+| `a dependency takes git or url, not both` | Both `git` and `url` |
+| `a url dependency needs sha256, the SHA-256 of the archive; silk add <url> writes it` | `url` without `sha256` |
+| `sha256 pins a url dependency; add url, where the archive is` | `sha256` without `url` |
+| `path of a url dependency must name a directory inside the archive, relative to its root` | Absolute `path`, or one that leaves the archive |
+| `archive <name> from <url> has SHA-256 <hex>, but its manifest pins <hex>; nothing was extracted` | The download is not the archive `sha256` names |
+| `archive <name> is not in the archive store and SILK_OFFLINE is set; build once online to fetch <url>` | Offline, with the archive not fetched yet |
 | `fetching commit <rev> of <git> failed: fetching it needs git, and no git is on PATH` | No `git` on `PATH` |
 | `its checkout cannot be written below <store>` | The `git` folder in `SILK_HOME` cannot be written |
 | `a package from a git dependency reaches packages by path only inside its own repository` | A package from a commit names a path outside its repository. The message names that package's manifest |
+
+A `url` with another scheme, an empty `url`, or a `sha256` that is not 64 lowercase hexadecimal digits fails the manifest's schema first, and the message names the key's path instead of a reason:
+
+```
+Invalid Silk project manifest /home/you/app/silk.toml:7: /dependencies/greet/url: instance does not satisfy the keyword (constraint /properties/dependencies/$ref/additionalProperties/$ref/properties/url/pattern)
+```
 
 For example, a cycle, reported at the entry that closes it:
 
