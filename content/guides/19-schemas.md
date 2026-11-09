@@ -172,9 +172,9 @@ A spec is built with pipes, starting from `Spec<Gateway>.of()`, which renames no
 | `default(field, literal)` | The field may be absent or null, and then holds this value. |
 | `tag(name)` | For a union with fields: the variant's name goes under `name` instead of `type`. |
 
-Field names are checked while the program compiles, so a typo is an error, not a rule that never runs. Writing `"lisen"` instead of `"listen"` stops the build with `error[SEM0022] main.Gateway has no field lisen`, pointing at the string. A pattern is checked too: `"^[a-z"` is `error[SEM0177] invalid regex: unexpected end`.
+Field names are checked while the program compiles, so a typo is an error, not a rule that never runs. Writing `"lisen"` instead of `"listen"` stops the build with `error[SEM0022] main.Gateway has no field lisen`, pointing at the string. A pattern is checked too: `"^[a-z"` is `error[SEM0177] invalid regex: unexpected end`, at the pattern.
 
-A rule runs after the field's value is read. A number rule fits integer fields, `length` and `pattern` fit `String`, and `items` fits `List`. On an `Option` field, the rule applies to the value inside when there is one.
+A rule runs after the field's value is read. A number rule fits integer fields, `length` and `pattern` fit `String`, and `items` fits `List`. On an `Option` field, the rule applies to the value inside when there is one. A rule on a field it cannot fit is a compile error at the field name: `between("name", 1, 32)` stops the build with ``error[SEM0177] this rule needs a field that holds a number, but `name` holds text``.
 
 A default is a `Literal` from `silk/schema/shape`: `Literal.Integer`, `Literal.Number`, `Literal.Boolean` or `Literal.Text`. It is read as if the input held it, so `Literal.Text { value: "Info" }` fills the union `Level` exactly as the JSON text `"Info"` would. A field with a default no longer has to be present. An `Option` field, such as `banner`, never has to be present: a missing key or `null` reads as `None`.
 
@@ -304,6 +304,8 @@ effect fn firstProblem() -> ()
 | `found` | A `ValueKind`: the kind of value the input held. `ValueKind.noun` gives a word for a person, such as `text` or `a number`. |
 | `span` | An `Option<Span>`: the bytes of the input the problem is about, `start` up to but not including `end`. |
 
+A third field, `got`, holds the value found when it is not in the input bytes, such as a command name passed apart from its arguments; otherwise it is `None`.
+
 `path` says where. It is a `SchemaPath` that keeps its steps, so it renders three ways: `text()` with wire names, as a person writes it (`auth.type`, `upstreams[1].port`); `pointer()` as a JSON Pointer into the input (`/auth/type`); and `names()` with the Silk field names (`idleSeconds` rather than `idle_seconds`). The root value has an empty path. To compare without allocating, `matchesText("auth.type")` checks the path against text.
 
 `SchemaReport.writeOne` writes the problem as a snippet of the input with a caret under the bytes, the way the compiler shows its own errors. It needs the input the error came from and a name for it. `decode` stops at the first problem, which is the name:
@@ -366,7 +368,7 @@ Any of them can be `.redacted()`, which writes only the kind of each value it fo
  --> gateway.json:5:16 at upstreams
   |
 5 |   "upstreams": [],
-  |                ^^ expected a list of 1 to 8 elements, got a list
+  |                ^^ expected a list of 1 to 8 elements, got []
  --> gateway.json:6:20 at auth.type
   |
 6 |   "auth": {"type": "Bearer"},
@@ -419,7 +421,7 @@ A quoted value is cut to at most 40 bytes (`MAX_QUOTED` in `silk/schema/report`)
 
 ## Rules about the whole value
 
-`Gateway` also has a `check` function. It runs once the whole value is read, sees all of it, and with `decodeAll` it runs even when a field's own rule failed:
+`Gateway` also has a `check` function. It runs after every field is read and its rules pass, and it sees the whole value:
 
 ```silk
 fn check(self: &Self, checks: &mut Checks<Gateway>) -> () {
@@ -469,10 +471,10 @@ effect fn wholeValue() -> ()
 ```
 
 ```
-dev.json:1:1: expected no upstream on localhost at the gateway's own port, got an object
+dev.json:1:1: expected no upstream on localhost at the gateway's own port, got {"name": "dev", "listen": 9000, "upstrea...
 ```
 
-The problem is about the whole object, so it points at the object's first byte.
+The problem is about the whole object, so it points at the object's first byte and quotes the start of it.
 
 ## A type with its own wire form
 
@@ -678,13 +680,13 @@ effect fn runCommand(name: string, arguments: &[u8]) -> ()
 }
 ```
 
-`SchemaJson.decodeVariant<Command>(name, arguments)` finds the variant whose wire name is `name` and reads its fields from `arguments`, with no tag. It reports every problem, as `decodeAll` does, and a name no variant has is an `UnknownVariant` problem. The step runs three commands: a good one, one with a missing and a mistyped argument, and one that does not exist:
+`SchemaJson.decodeVariant<Command>(name, arguments)` finds the variant whose wire name is `name` and reads its fields from `arguments`, with no tag. It reports every problem, as `decodeAll` does, and a name no variant has is an `UnknownVariant` problem. A missing argument says what it should have held: the field's `expected` text if it has one, else its first rule's text, else its type's, such as `an integer`. The step runs three commands: a good one, one with a missing and a mistyped argument, and one that does not exist:
 
 ```
 draining 10.0.0.5 for 20s
-Drain:1:1: Drain.seconds: expected a value, got nothing
+Drain:1:1: Drain.seconds: expected an integer, got nothing
 Drain:1:10: Drain.host: expected text, got 5
-Restart: expected one of "Reload", "Drain", "SetLevel", got a value
+Restart: expected one of "Reload", "Drain", "SetLevel", got "Restart"
 ```
 
 ## Describe the config as JSON Schema
@@ -943,7 +945,7 @@ The output is the blocks shown in each section, in order.
 
 - JSON is the only format so far. `SchemaReader` and `SchemaWriter` in `silk/schema/schema` are the interfaces a format implements; every `Schema` type then reads and writes it with no change.
 - Types without a `Schema` implementation, such as `f32`, `HashMap`, tuples and fixed-size arrays, cannot be fields. Using one is a compile error such as ``error[SEM0121] `f32: silk.schema.schema.Schema` cannot be proved``. Wrap it in a type of your own with a codec, as `Delay` does.
-- A struct with a private field cannot use the derived `read`, because reading builds the value from outside its module. The error is `SEM0021`, reported where the type is read.
+- A derived `Schema` reads and writes every field, so every field must be `pub`. A private field is a compile error at its declaration, such as ``error[SEM0177] a derived `Schema` reads and writes every field, so `port` must be `pub`, or the type must implement `read` and `write` ``. A type that keeps fields private implements `read` and `write` itself, usually through a codec.
 - `decodeAll` lists at most 64 problems, and one value records at most 16 failed `check`s.
 - Reading never runs past the input: the whole input must be one JSON value, with only white space around it. Anything after it is an `InvalidSyntax` problem.
 - Writing does not check rules, and bytes the `Writer` accepted before a failure stay written.
