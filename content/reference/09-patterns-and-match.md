@@ -7,24 +7,29 @@ A pattern tests the shape of a value and binds names to its parts. Patterns appe
 ```
 MatchExpression = 'match' MatchAccess? Expression '{' MatchArm* '}'
 MatchAccess     = '&' 'mut'? | 'move' | 'place'
-MatchArm        = Pattern ( 'if' Expression )? '=>' ( Block | Expression )
+MatchArm        = ArmPattern ( 'if' Expression )? '=>' ( Block | Expression )
+ArmPattern      = Pattern ( '|' Pattern )*
 
 IfLet           = 'if' 'let' Pattern '=' Expression Block ( 'else' ( IfStatement | Block ) )?
 LetPattern      = 'let' Pattern '=' Expression
 
 Pattern         = '_'
-                | '-'? IntegerLiteral
+                | Literal
+                | Literal ( '..' | '..=' ) Literal?                         // range
+                | '..=' Literal                                             // range from the minimum
                 | TypePath '.' Identifier                                   // enum member or bare variant
                 | TypePath TypeArguments? '.' Identifier FieldPatterns      // record variant
                 | Type Identifier                                           // binder
                 | Type FieldPatterns                                        // struct or member record
 FieldPatterns   = '{' ( FieldPattern ( ',' FieldPattern )* ','? )? '}'
 FieldPattern    = '..' | Identifier ( ':' ( Identifier | Pattern ) )?
+Literal         = '-'? IntegerLiteral | CharLiteral | 'true' | 'false'
 ```
 
 - Arms follow one another with no separator. A comma between arms is PAR0010: "Match arms are not separated by commas; remove the `,`".
 - The subject is parsed without record literals: write `match move (Token { value: 1 }) { … }`, not `match move Token { value: 1 } { … }`.
-- In a field, `name: …` accepts a binding name or a nested variant, enum member or record pattern. It does not accept an integer literal.
+- In a field, `name: …` accepts a binding name or a nested variant, enum member or record pattern. It does not accept a literal, a range or alternatives.
+- Alternatives (`A | B`) form a whole pattern: `match` arms, `if let` and `while let` accept them, as in `if let Light.Red | Light.Amber = light { … }`.
 
 ## Match expressions
 
@@ -40,7 +45,11 @@ FieldPattern    = '..' | Identifier ( ':' ( Identifier | Pattern ) )?
 | Pattern | Matches | Binds |
 | --- | --- | --- |
 | `_` | Anything | Nothing |
-| `3`, `-1` | An integer subject equal to the literal | Nothing |
+| `3`, `-1`, `'a'`, `true` | An integer, `char` or `bool` subject equal to the literal | Nothing |
+| `1..=5`, `'a'..='z'` | A value from the first bound through the second | Nothing |
+| `0..10` | A value from the first bound up to, but not including, the second | Nothing |
+| `128..`, `..=-1` | A value from the bound up to the type's maximum, or from its minimum through the bound | Nothing |
+| `A \| B` | A value either pattern matches | Nothing |
 | `Color.Red` | That enum member | Nothing |
 | `Shape.Empty` | That bare union variant | Nothing |
 | `Shape.Rect { width, .. }` | That record variant | Listed fields |
@@ -51,8 +60,12 @@ FieldPattern    = '..' | Identifier ( ':' ( Identifier | Pattern ) )?
 - There is no plain identifier pattern. `x => …` is PAR0010: "A pattern that takes the whole value names its type, as in `i32 value`, or is `_`". Bind a whole value with the binder form `Type name`, or match `_` and use the subject.
 - The binder form works on struct subjects (`Token held`) and union members.
 - On an integer, `bool`, `char`, `f32`/`f64` or scalar enum subject, a binder of the subject's type binds the whole value and covers every case like `_`: `match n { i32 x => x + 1 }`, `char c => …`, `Color v => …`. A binder of another type, such as `i64 x` on an `i32`, is SEM0042.
-- There are no `bool`, `char`, string, range or tuple patterns. Use guards (`_ if c == 'a'`) for those tests.
-- Integer patterns accept base prefixes (`0x10`).
+- There are no string, float or tuple patterns. Use guards (`_ if name == "x"`) for those tests.
+- Integer patterns and range bounds accept base prefixes (`0x10`, `0x00..=0x1f`).
+- A literal must match the subject's kind: `'a'` against a `u8` is SEM0256. A bound outside the subject's type is SEM0002.
+- A range must select a value: `9..=3` and `3..3` are SEM0257. Range bounds are literals, not constants.
+- Alternatives bind no names (SEM0258); omit a variant's fields with `..` or `_`. Alternatives inside a field pattern are SEM0259.
+- Alternatives are tried left to right, and the arm's guard runs once, whichever matched.
 - Field shorthand `{ value }` binds the field under its own name. `{ value: v }` binds it as `v`. `{ value: _ }` matches the field without using it.
 - A record pattern must name every field or end with `..` (SEM0046). `..` may stand anywhere in the field list. A field may appear only once (SEM0047). An unknown field is SEM0022.
 - Nested patterns work through fields: `Holder { shape: Shape.Circle { radius: r }, tag }`. A field may also name an enum member: `Paint { color: Color.Red, .. }`.
@@ -72,7 +85,8 @@ FieldPattern    = '..' | Identifier ( ':' ( Identifier | Pattern ) )?
 - A `match` must cover every value of its subject (SEM0044).
 - A struct subject is covered by one unguarded `Type { … }` arm with only binding fields.
 - A nominal union is covered by one unguarded arm per variant. A structural union is covered by one per member.
-- An integer subject needs `_` or an unguarded binder such as `i32 x`.
+- An integer, `char` or `bool` subject is covered when its unguarded literal, range and alternative arms select every value, as in `match b { true => 1 false => 0 }`, or `match x { 0..=127 => 0 128.. => 1 }` with `x: u8`. Otherwise it needs `_` or an unguarded binder such as `i32 x`. A `char` holds `'\0'..='\u{D7FF}'` and `'\u{E000}'..`.
+- An arm or alternative whose every value earlier arms select is unreachable (SEM0043).
 - An unguarded binder on an enum subject covers like `_`. An enum arm after it is SEM0160. A `_` or binder after arms that already name every member is unreachable (SEM0043).
 - Struct arms that name enum members in a field are covered only when, together, they cover every member of that field (SEM0044 otherwise).
 - An unguarded `_` covers everything that remains.
@@ -118,7 +132,7 @@ The access mode before the subject says how the arms reach it.
 ## let patterns
 
 - `let Pattern = e` destructures a value. The pattern must be irrefutable (SEM0133). Use `if let` or `match` otherwise.
-- A struct pattern is irrefutable. So is a union variant when the union has one variant.
+- A struct pattern is irrefutable. So is a union variant when the union has one variant, and a range that covers its type, such as `0..` on a `u8`.
 - The initializer chooses the access, as for `if let`. A non-Copy named variable needs `move` or a borrow (OWN0003). A temporary such as a call result or struct literal needs neither.
 - A borrowed `let` pattern keeps its loan to the end of the enclosing block.
 - `let _ = e` is not a pattern binding (SEM0087). Use `drop e`.
@@ -150,9 +164,18 @@ fn tall(shape: Shape) -> i32 {
 
 fn sign(n: i32) -> i32 {
   return match n {
+    ..=-1 => -1
     0 => 0
-    _ if n < 0 => -1
-    _ => 1
+    1.. => 1
+  }
+}
+
+fn kind(c: char) -> i32 {
+  return match c {
+    '0'..='9' => 0
+    'a'..='z' | 'A'..='Z' | '_' => 1
+    ' ' | '\t' | '\n' => 2
+    _ => 3
   }
 }
 
@@ -169,6 +192,9 @@ pub fn main() -> i32 {
   }
   if sign(-7) != -1 || sign(0) != 0 {
     return 4
+  }
+  if kind('7') != 0 || kind('Q') != 1 || kind('\t') != 2 || kind('#') != 3 {
+    return 5
   }
   return 0
 }
@@ -328,6 +354,10 @@ pub fn main() -> i32 {
 | SEM0162 | Integer pattern against an enum |
 | SEM0224 | Unit variant written with braces in a pattern |
 | SEM0226 | `match` or `if let` subject is a reference; match its referent with `&r.*` |
+| SEM0256 | Literal pattern of the wrong kind for the subject, such as `'a'` on a `u8` |
+| SEM0257 | Range pattern selects no value |
+| SEM0258 | Alternatives joined with `\|` bind a name |
+| SEM0259 | Alternatives inside a field pattern |
 
 ## See also
 

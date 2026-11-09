@@ -18,7 +18,7 @@ A construct the compiler parses but cannot compile yet is not a coded error. It 
 | PAR | Parsing | PAR0001-PAR0011 |
 | MOD | Module and package resolution | MOD0001-MOD0007 |
 | OWN | Ownership, moves and loans | OWN0001-OWN0019 |
-| SEM | Names, types, effects and everything else | SEM0001-SEM0255 |
+| SEM | Names, types, effects and everything else | SEM0001-SEM0259 |
 
 There is no LAY family. Gaps in the numbering are codes that were retired, such as SEM0041, SEM0199 and SEM0245; they are never reused.
 
@@ -4299,7 +4299,7 @@ Message template, not filled by this compiler: `Type alias {alias} parameter {pa
 
 Fix: Use every alias parameter, without bounds. See Generics.
 
-## SEM: C interop, impls, lifetimes, directives, lambdas and warnings (SEM0187-SEM0255)
+## SEM: C interop, impls, lifetimes, directives, lambdas, warnings and patterns (SEM0187-SEM0259)
 
 ### SEM0185
 
@@ -5606,6 +5606,110 @@ src/main.silk:2:7: warning[SEM0255] `unused` is never used; remove it, or start 
 The column is the binding's name. Names bound by a pattern, such as a field of `let P { a, b } = ...` or a `match` arm's `i32 other`, and `static for` names are checked the same way. Function parameters are not. A name that starts with `_` is never reported.
 
 Fix: Remove the binding, or rename it `_unused` when it is there on purpose. To run an expression only for what it does, write `drop compute()`.
+
+### SEM0256
+
+A literal pattern whose kind does not fit the subject: a character on an integer, an integer on a `char`, or `true` or `false` on anything but a `bool`.
+
+```silk
+fn kind(b: u8) -> i32 {
+  return match b {
+    'a' => 1
+    _ => 0
+  }
+}
+
+pub fn main() -> i32 { return kind(97) }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:3:5: error[SEM0256] This character pattern cannot match a value of type u8
+```
+
+The column is the literal. The message names the literal's kind and the subject type.
+
+Fix: Write a literal of the subject's kind, `97` here, or convert the subject first.
+
+### SEM0257
+
+A range pattern that selects no value: its lower bound is above an inclusive upper bound, or not below an exclusive one.
+
+```silk
+fn kind(b: u8) -> i32 {
+  return match b {
+    9..=3 => 1
+    _ => 0
+  }
+}
+
+pub fn main() -> i32 { return kind(5) }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:3:5: error[SEM0257] This range selects no value; its lower bound must be below an exclusive upper bound and at most an inclusive one
+```
+
+The column is the range. `3..3` is reported the same way, while `3..=3` selects one value.
+
+Fix: Swap the bounds, `3..=9`, or remove the arm.
+
+### SEM0258
+
+An arm whose alternatives, joined with `|`, bind a name. Only one alternative would set it, so no alternative may bind.
+
+```silk
+union Shape { Dot, Circle { radius: i32 } }
+
+fn size(shape: &Shape) -> i32 {
+  return match &shape.* {
+    Shape.Dot | Shape.Circle { radius } => 1
+  }
+}
+
+pub fn main() -> i32 { return size(&Shape.Dot) }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:5:17: error[SEM0258] Pattern alternatives joined with `|` cannot bind names; match the fields with `..` or `_`, or write one arm for each alternative
+```
+
+The column is the alternative that binds.
+
+Fix: Write `Shape.Circle { .. }`, or give each alternative its own arm.
+
+### SEM0259
+
+Alternatives joined with `|` inside a field pattern. Alternatives form a whole arm pattern only.
+
+```silk
+enum Light { Red, Amber, Green }
+struct Lamp { light: Light }
+
+fn lit(lamp: &Lamp) -> bool {
+  return match &lamp.* {
+    Lamp { light: Light.Red | Light.Amber } => true
+    _ => false
+  }
+}
+
+pub fn main() -> i32 { return 0 }
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:6:19: error[SEM0259] Pattern alternatives joined with `|` can only be a whole pattern, not a field's pattern; write one arm for each alternative
+```
+
+The column is the alternatives.
+
+Fix: Write one arm per member, `Lamp { light: Light.Red } => true` and `Lamp { light: Light.Amber } => true`, or match the field in a nested `match`.
 
 ## Codes this compiler does not report
 

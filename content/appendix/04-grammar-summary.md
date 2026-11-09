@@ -206,17 +206,21 @@ Literal       = IntegerLit | FloatLit | DurationLit | TextLit | ByteStringLit | 
 ## Patterns
 
 ```
-Pattern       = '_'
-              | '-'? IntegerLit
+Pattern       = Single ( '|' Single )*                          (alternatives)
+Single        = '_'
+              | PatternLit
+              | PatternLit ( '..' | '..=' ) PatternLit?            (range: '1..=5', '0..10', '128..')
+              | '..=' PatternLit                                   (range from the minimum)
               | TypePath '.' Identifier                            (enum member or unit variant)
               | TypePath TypeArgs? '.' Identifier FieldPatterns?   (variant)
               | Type Identifier                                    (typed binder: 'i32 k')
               | Type FieldPatterns                                 (struct)
 FieldPatterns = '{' { FieldPattern ',' }? '}'
-FieldPattern  = '..' | Identifier ( ':' ( Identifier | Pattern ) )?
+FieldPattern  = '..' | Identifier ( ':' ( Identifier | Single ) )?
+PatternLit    = '-'? IntegerLit | CharLit | 'true' | 'false'
 ```
 
-A binder always names its type. A bare name such as `k =>` is not a pattern; write `i32 k =>` or `_`.
+A field takes no literal, range or alternatives. A binder always names its type. A bare name such as `k =>` is not a pattern; write `i32 k =>` or `_`.
 
 ## Rules checked by experiment
 
