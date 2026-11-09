@@ -315,7 +315,7 @@ A dependency's `silk.toml` is read when the graph is built. Its `silk-version` n
 Invalid Silk project manifest /home/you/geometry/silk.toml:4: dependency `vector` of app@0.1.0: it was written for Silk 0.3.0 (its silk-version), which this Silk 0.2.1 cannot build. Build with Silk 0.3.0 (silk set 0.3.0), or set the dependency's silk-version to 0.2.1 if it builds with this Silk
 ```
 
-Then the dependency's manifest is checked against the manifest schema like the package's own, and a shape error names the dependency's manifest and line, as in `` dependency `vector` of app@0.1.0: its silk.toml is invalid: package.nmae is not a supported field; did you mean package.name? ``. See Errors in **The manifest**.
+Then the dependency's manifest is checked against the manifest schema like the package's own, and a shape error names the dependency's manifest and line, as in `` dependency `vector` of app@0.1.0: its silk.toml is invalid: package.exprots is not a supported field; did you mean package.exports? ``. See Errors in **The manifest**.
 
 ## See also
 

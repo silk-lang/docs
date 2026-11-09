@@ -223,17 +223,18 @@ First the manifest is checked against the manifest schema, `compiler/manifest.sc
 
 | Problem | Message after `Invalid Silk project manifest <path>:LINE:` |
 | --- | --- |
-| An unknown key or table | `package.nmae is not a supported field; did you mean package.name?` |
+| An unknown key or table | `package.exprots is not a supported field; did you mean package.exports?` |
 | A missing key | `package needs name`, `component needs world` |
 | A value of the wrong type | `build.targets must be an array; it is "host"` |
 | A value outside a fixed list | `package.kind must be "executable", "library", "static-library", "shared-library" or "object"; it is "lib"` |
 | A value of the wrong form | `package.version must be a full semantic version, such as 0.1.0; it is "0.1"` |
 | A number out of range | `profiles.fast.codegen-units must be at least 1; it is 0` |
 | A table that matches none of its forms | `dependencies.vector must be a dependency: { path = ... }, { git = ..., rev = ... } or { url = ..., sha256 = ... }, with an optional package` |
+| A bad value in a table that fits one of its forms | `native.link[0].mode must be "static" or "dynamic"; it is "shared"` |
 | A bad table name | `a name in profiles must be a profile name: an ASCII letter, then letters, digits, _ or -` |
 | No `[package]` and no `[workspace]` | `manifest must be a package or workspace manifest, with a [package] or [workspace] table` |
 
-The suggestion after an unknown key names the key of the same table that is closest, within a third of its length in single-letter edits. `build.artefact` above gets none, since `[build]` has no key that close. An unknown key is reported before any other problem in the manifest, and a value of the wrong type or form before a table that matches none of its forms.
+The suggestion after an unknown key names the key of the same table that is closest and not already set, within a third of its length in single-letter edits. `build.artefact` above gets none, since `[build]` has no key that close. An unknown key is reported before any other problem in the manifest, and a value of the wrong type or form before a table that matches none of its forms.
 
 Every key the schema does not list is an unknown key, whether an earlier release had it or a later one adds it. There are no aliases: `[package].root`, `[build].artifact`, `[changes]`, a profile's `codeModel` and `[dev-dependencies]` are all refused as unknown keys. The suggestion points at the current spelling when it is close, as `profiles.fast.codeModel is not a supported field; did you mean profiles.fast.code-model?`.
 
@@ -260,7 +261,7 @@ Then the compiler checks what the schema cannot, such as paths on disk and combi
 | A `defaults` runtime that `runtimes` does not list | `LINE: unstable.composition.defaults entry "main" names no runtime in unstable.composition.runtimes; it lists "start"` |
 | Any other bad `platform-supply` | `LINE: InvalidConfiguration: platform-supply (<path>:native.platform-supply)` |
 
-Problems in `[dependencies]` beyond their shape, and in `exports`, are manifest errors too, as in `` LINE: dependency `foo` of app@0.1.0: no readable silk.toml at /home/you/nothere `` and `LINE: exports of app@0.1.0: nope is not a module of the package`. A shape error in a dependency's own manifest names that manifest and the dependency, as in `` Invalid Silk project manifest /home/you/text-utils/silk.toml:4: dependency `text_utils` of app@0.1.0: its silk.toml is invalid: package.nmae is not a supported field; did you mean package.name? ``. A bad `[native].link` entry or `function-order` path prints as `silk: invalid native link input: ...` (exit 1); see Build outputs and native linking. See **Dependencies** and **Libraries and exports**.
+Problems in `[dependencies]` beyond their shape, and in `exports`, are manifest errors too, as in `` LINE: dependency `foo` of app@0.1.0: no readable silk.toml at /home/you/nothere `` and `LINE: exports of app@0.1.0: nope is not a module of the package`. A shape error in a dependency's own manifest names that manifest and the dependency, as in `` Invalid Silk project manifest /home/you/text-utils/silk.toml:4: dependency `text_utils` of app@0.1.0: its silk.toml is invalid: package.exprots is not a supported field; did you mean package.exports? ``. A bad `[native].link` entry or `function-order` path prints as `silk: invalid native link input: ...` (exit 1); see Build outputs and native linking. See **Dependencies** and **Libraries and exports**.
 
 Profile problems that pass the schema name the profile and the key, with the refused value after it:
 
