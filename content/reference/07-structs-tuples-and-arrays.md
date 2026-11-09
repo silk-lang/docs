@@ -11,7 +11,7 @@ TupleDecl      = 'pub'? 'tuple' Name TypeParams? '(' ( Type ( ',' Type )* ','? )
 
 RecordLiteral  = TypePath '{' ( FieldInit ( ',' FieldInit )* ','? )? '}'
 ContextRecord  = '.' '{' ( FieldInit ( ',' FieldInit )* ','? )? '}'
-FieldInit      = Name ':' Expression
+FieldInit      = Name ( ':' Expression )?
 TupleLiteral   = '(' Expression ',' Expression ( ',' Expression )* ','? ')'
                | '.(' ( Expression ( ',' Expression )* ','? )? ')'
 UnitLiteral    = '(' ')'
@@ -47,7 +47,7 @@ UnitType       = '(' ')'
 
 - `Name { a: 1, b: 2 }` constructs a struct. Every field is required (SEM0024). Fields may appear in any order.
 - Initializers are separated by commas. A trailing comma is allowed.
-- Each initializer needs `name: value`. There is no field shorthand: `Point { x, y: 2 }` is a parse error.
+- An initializer is `name: value`, or the shorthand `name`, which means `name: name`: `Point { x, y: 2 }` sets `x` from the binding or constant `x` in scope. A shorthand whose name is not in scope is SEM0006, "Unknown value x".
 - There is no struct update syntax (`..base`).
 - An unknown field is SEM0022. A repeated field is SEM0023. A value of the wrong type is SEM0025.
 - Generic arguments may be written or inferred: `Labeled<Point> { … }` or `Labeled { … }`.
