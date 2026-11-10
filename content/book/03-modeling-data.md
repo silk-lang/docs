@@ -134,6 +134,14 @@ Failed tasks in 0.16s
 
 A clear message: the field wants a `TaskId`, and you gave it a number. `main.TaskId` is the full name of the type, `TaskId` in the module `main`. Write `TaskId(1)`.
 
+When a binding already has the field's name, write the name once. `Task { id, title, priority, status }` is short for `Task { id: id, title: title, priority: priority, status: status }`, and the two forms mix freely:
+
+```silk
+  let title = "Buy milk"
+  let priority = Priority.Normal
+  let milk = Task { id: TaskId(1), title, priority, status: Status.Open }
+```
+
 See **Structs, tuples and arrays** and **Enums and unions** in the reference for all the declaration rules.
 
 ## Looking at a status without taking it
