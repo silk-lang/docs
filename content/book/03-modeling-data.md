@@ -121,7 +121,7 @@ Build a task with a struct literal. Its fields are separated by commas too:
   }
 ```
 
-Every field must be given. The new `TaskId` type earns its keep at once. Write `id: 1` by habit, and check:
+Every field must be given, except an optional one: a field of type `Option`, which chapter 7 introduces, may be left out and then holds `None`. The new `TaskId` type earns its keep at once. Write `id: 1` by habit, and check:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
@@ -411,7 +411,7 @@ See **Patterns and match** in the reference for every kind of pattern and the ot
 - An `enum` names a fixed set of choices. Its values copy freely and compare with `==`.
 - A `union` is one of several variants, and variants can carry named fields. You read the fields only by matching.
 - A `tuple` like `TaskId(u32)` gives a plain value its own type, so it cannot be mixed up with other numbers.
-- A `struct` groups named fields. Literals must give every field. Use `string<'static>` for text fields for now.
+- A `struct` groups named fields. Literals must give every field except `Option` fields, which default to `None`. Use `string<'static>` for text fields for now.
 - `match` is an expression that must cover every case. Guards refine an arm but do not count toward coverage.
 - Use `match &x.*` to look at a value behind a reference without moving it.
 

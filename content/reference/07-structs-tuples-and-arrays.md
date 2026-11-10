@@ -45,7 +45,10 @@ UnitType       = '(' ')'
 
 ## Record literals
 
-- `Name { a: 1, b: 2 }` constructs a struct. Every field is required (SEM0024). Fields may appear in any order.
+- `Name { a: 1, b: 2 }` constructs a struct. Fields may appear in any order.
+- Every field is required (SEM0024), except a field whose type implements `Omittable`. Such a field may be left out and holds `Omittable.omitted()` of its type. `Option<T>` implements it with `None`, so every `Option` field is optional: `Server { name: "web" }` leaves `port: Option<u16>` as `None`.
+- A type opts in with `impl Omittable for T { fn omitted() -> Self { ... } }` in its own module. `Omittable` is exported by `silk.core.option`.
+- A literal that a constant or other static evaluation builds must still write every field (SEM0176).
 - Initializers are separated by commas. A trailing comma is allowed.
 - An initializer is `name: value`, or the shorthand `name`, which means `name: name`: `Point { x, y: 2 }` sets `x` from the binding or constant `x` in scope. A shorthand whose name is not in scope is SEM0006, "Unknown value x".
 - There is no struct update syntax (`..base`).
@@ -232,7 +235,7 @@ pub fn main() -> i32 {
 | SEM0021 | Struct cannot be constructed here because a field is not visible |
 | SEM0022 | Record literal names an unknown field |
 | SEM0023 | Record literal initializes a field twice |
-| SEM0024 | Record literal omits a field |
+| SEM0024 | Record literal omits a field whose type does not implement `Omittable` |
 | SEM0025 | Record literal field value has the wrong type |
 | SEM0026 | Field projection on a value that is not a struct |
 | SEM0027 | Unknown field or tuple element, including `.len` for `.length` |

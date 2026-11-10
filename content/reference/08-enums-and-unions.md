@@ -57,7 +57,7 @@ VariantValue      = TypePath TypeArguments? '.' Identifier ( '{' FieldInit ( ','
 - For a generic union, type arguments go on the union: `Maybe<i32>.Some { value: 1 }`.
 - Type arguments may be left off when the fields or the context determine them: `Maybe.Some { value: 1 }`, or `let m: Maybe<i32> = Maybe.None`.
 - A bare variant of a generic union with no context cannot be inferred (SEM0099).
-- Every field must be initialized exactly once (SEM0024, SEM0023). An unknown field is SEM0022.
+- Every field must be initialized exactly once (SEM0024, SEM0023), except that a braced variant literal may leave out a field whose type implements `Omittable`, such as an `Option` field, which then holds `None`. A record variant keeps its braces even when every field may be left out. An unknown field is SEM0022.
 - A variant name the union does not declare is SEM0167.
 - The variant name is always qualified. There is no unqualified `Some { … }`.
 
@@ -99,6 +99,7 @@ pub union Result<A, F> {
 - `Option<T>.some(v)`, `Option<T>.none()`, `Result<A, F>.succeed(v)` and `Result<A, F>.failResult(e)` construct values.
 - Both define `map`, `flatMap` and `unwrapOr`. `Result` also defines `mapError`. All of these consume the value.
 - `Option<T>.isSome(&o)` and `Option<T>.isNone(&o)` test the variant through a borrow.
+- `Option<T>` implements `Omittable`, so a struct or variant literal may leave out an `Option` field, which then holds `None`.
 
 ## Copy and move
 
@@ -213,7 +214,7 @@ pub fn main() -> i32 {
 | SEM0021 | Variant with a private field constructed outside its module |
 | SEM0022 | Variant constructor names an unknown field |
 | SEM0023 | Variant constructor initializes a field twice |
-| SEM0024 | Variant constructor omits a field |
+| SEM0024 | Variant constructor omits a field whose type does not implement `Omittable` |
 | SEM0027 | Field access on a union value |
 | SEM0028 | Pattern names a private field of another module's variant |
 | SEM0039 | Structural union member is not a detached value with finite storage |
