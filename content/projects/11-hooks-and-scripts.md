@@ -1,9 +1,11 @@
 # Hooks and scripts
 
-A package can ask Silk to run commands of its own at three moments: when you run `silk generate`, on every build, and once when `silk init` creates a project from a template. This page compares them and shows where each is set up. The pages linked from each section have the full rules.
+A package can keep its own commands as tasks written in Silk, run them with `silk task`, and have Silk run them around its own commands. It can also ask Silk to run programs at three more moments: when you run `silk generate`, on every build, and once when `silk init` creates a project from a template. This page compares them and shows where each is set up. The pages linked from each section have the full rules.
 
 | Hook | Written in | Runs | Who runs it | Environment |
 | --- | --- | --- | --- | --- |
+| Tasks | `src/tasks.silk` | When you run `silk task <name>` | You, in the package's directory, with your rights | Yours, plus `SILK_PROJECT_ROOT`, `SILK_INVOCATION_DIRECTORY` and `SILK_COMPILER` |
+| `[tasks]` hooks | `silk.toml` | Before or after `silk build`, `run`, `test` and `pack`, in the package you run them in | The command, as `silk task <name>` | As for tasks, plus `SILK_HOOK` and, after `silk pack`, `SILK_HOOK_RESULT` |
 | `[[generate]]` | `silk.toml` | When you run `silk generate`, never during a build | You, in the manifest's directory | Yours, plus `SILK_GENERATE=1` |
 | `build.silk` plan | `build.silk` beside `silk.toml` | Every build, inside the compiler | The compiler; it starts no program | None: the plan can only read package files |
 | `build.silk` tool step | `build.silk`, with `Plan.tool` | Every build that needs it, before the package is analyzed | The build, in an operating-system sandbox | `HOME`, `TMPDIR`, `PATH`, `SILK_TOOL=1` and `SILK_PACKAGE_DIR` only |
@@ -11,7 +13,97 @@ A package can ask Silk to run commands of its own at three moments: when you run
 
 Every hook that starts a program names it the same way: a path with a `/` is a file of the package, and a bare name is searched on `PATH`, which for a sandboxed command is `/usr/local/bin:/usr/bin:/bin`. The program must exit 0, or the command that ran it fails.
 
-Silk has no table of named commands, such as npm's `scripts`. A `[scripts]` table in `silk.toml` is refused like any other unknown table. Keep such commands in a script of the package, or in your task runner.
+Tasks and `[tasks]` hooks run only in the package you are working in. Where the package is a dependency, Silk never builds its tasks, never fetches their dependencies, and never reads its `[tasks]` table.
+
+## Tasks: silk task
+
+A package's tasks are a Silk program in `src/tasks.silk`, built by the package's `tasks` profile. Write them there instead of keeping shell, Python or JavaScript scripts beside the package. The tasks are the variants of a union that describes the command line with `silk.cli`, so each task gets typed options, `silk task` with no name lists them, and a misspelled name gets a suggestion.
+
+```silk
+import silk.cli.command { Command, CommandLine, Opt }
+import silk.cli.task { Task, TaskError, TaskSet }
+import silk.io.writer { WriterError }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.system.child_process { ChildProcess, ProcessError }
+import silk.system.filesystem { FileError, FileSystem }
+import silk.system.host_input { HostInput, HostInputError }
+import silk.text.string { String }
+
+union Tasks {
+  Codegen,
+  Release { pub version: String },
+}
+
+impl CommandLine for Tasks {
+  static fn command() -> Command<Tasks> {
+    return Command<Tasks>.make("tasks", "This project's tasks")
+      |> Command.variant("Codegen", "Regenerate the tables")
+      |> Command.variant("Release", "Test and pack a release")
+      |> Command.arg("version", Opt.about("The version") |> Opt.required)
+  }
+}
+
+impl TaskSet for Tasks {
+  effect fn perform(self: Tasks) -> ()
+    ! TaskError | ProcessError | FileError | HostInputError | OutOfMemoryError | WriterError
+    ? &mut HostInput | &mut Allocator | &mut ChildProcess | &mut FileSystem {
+    match move self {
+      Tasks.Codegen => run Task.exec("scripts/generate", &["--pinned"])
+      Tasks.Release { version: _ } => {
+        run Task.silk(&["test"])
+        run Task.silk(&["pack"])
+      }
+    }
+  }
+}
+
+pub effect fn main() -> i32 ? &mut HostInput {
+  return run Task.main<Tasks>()
+}
+```
+
+```sh
+silk task                     # lists the tasks
+silk task codegen
+silk task release 1.2.0
+```
+
+`silk task` builds the `tasks` profile, then runs the program from the package's directory with the arguments after the task's name. Compiler options, such as `--stdlib`, go before the name. The build is cached like any other, so a task that has not changed starts at once.
+
+| Name | Value |
+| --- | --- |
+| `SILK_PROJECT_ROOT` | The package's directory, where the task runs |
+| `SILK_INVOCATION_DIRECTORY` | The directory you ran `silk task` in |
+| `SILK_COMPILER` | The compiler that built the tasks, for running `silk` again |
+
+The `tasks` profile needs no table in `silk.toml`: when the manifest declares none, it builds an executable for this machine, in debug mode, from `tasks.silk` below `[package].source`. Declare `[profiles.tasks]` to change any of that, such as its `main`, and `[profiles.tasks.dependencies]` to give the tasks dependencies of their own; they are fetched only when the tasks build. See "Named profiles" in **Targets and profiles**.
+
+`Task.main` reads the command line, runs the chosen task, and turns a `TaskError` into a one-line report and an exit status. `Task.exec` runs a program with the terminal and environment of the task, `Task.silk` runs the compiler that built the tasks, and `Task.capture` answers what a program wrote. A task that needs another task calls it, because tasks are ordinary functions. See `silk.cli.task` in the standard library reference.
+
+## Hooks: [tasks]
+
+The root manifest's `[tasks]` table names tasks that run around Silk's own commands, each as `silk task <name>` from the package's directory:
+
+```toml
+[tasks]
+before-build = ["codegen"]
+before-pack = ["check-licenses"]
+after-pack = ["upload"]
+```
+
+| Key | Runs |
+| --- | --- |
+| `before-build` | Before `silk build` does any work |
+| `after-build` | After `silk build` succeeds |
+| `before-run` | Before `silk run` or `silk debug` builds |
+| `before-test` | Before `silk test` builds |
+| `after-test` | After `silk test` passes |
+| `before-pack` | Before `silk pack` writes anything |
+| `after-pack` | After `silk pack` succeeds |
+
+Each key holds task names, which run in order. A failing task stops the command with the task's exit status. While a hook runs, `SILK_HOOK` holds its key, such as `before-build`; after `silk pack`, `SILK_HOOK_RESULT` holds the object `silk pack --json` prints, so an `after-pack` task can read where the archive is.
+
+Only the manifest of the package you run the command in is read, so a dependency's `[tasks]` never runs. `--no-hooks` skips the hooks, and a Silk command that a hook starts, such as a `Task.silk(&["build"])` in a `before-pack` task, runs none.
 
 ## Generators: [[generate]]
 
@@ -93,4 +185,4 @@ A script works in any hook that starts a program. These rules apply to all of th
 
 ## See also
 
-Build plans and generated code, Project templates, The manifest; `generate` and `init` in the Command-line reference.
+Build plans and generated code, Project templates, Targets and profiles, The manifest; `task`, `generate` and `init` in the Command-line reference; `silk.cli.task` in the standard library reference.

@@ -25,3 +25,4 @@ The guides sit between the book and the reference. The book teaches the language
 17. **Concurrent I/O patterns**: many connections at once, parallel requests, producer and consumer fibers, and timeouts.
 18. **Writing effect combinators**: effects that take effects, generic rows, your own retry and budget, and borrowing while an effect is alive.
 19. **Schemas**: reading and writing your own types as JSON with `silk.schema`, wire names, rules and defaults, every problem at once with source snippets, codecs for custom wire forms, commands read by name, and JSON Schema for validators and models.
+20. **Command-line programs**: describing a command line as a type with `silk.cli`, subcommands, defaults, environment variables, choices and checks, help and errors, testing, shell completions, and project tasks with `silk.cli.task`.

@@ -25,8 +25,9 @@ export const Message = defineMessageUnion({
   ClickedDownload: {},
   CompletedDownload: {},
   LoadedFonts: {},
+  MountedPage: { search: Schema.String },
   ReadAddress: { maybeSettings: Schema.Option(Settings) },
-  CompletedWaitToWriteAddress: { path: Schema.String },
+  CompletedWaitToWriteAddress: { settings: Settings },
   CompletedWriteAddress: {},
 })
 export type Message = typeof Message.Type

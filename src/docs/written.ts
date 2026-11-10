@@ -397,6 +397,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Hooks and scripts',
         'https://github.com/silk-lang/docs/blob/main/content/projects/11-hooks-and-scripts.md',
       ),
+      page(
+        'projects',
+        'packaging-releases',
+        'Packaging releases',
+        'https://github.com/silk-lang/docs/blob/main/content/projects/12-packaging-releases.md',
+      ),
     ],
   },
   {
@@ -584,6 +590,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'schemas',
         'Schemas',
         'https://github.com/silk-lang/docs/blob/main/content/guides/19-schemas.md',
+      ),
+      page(
+        'guides',
+        'command-line-programs',
+        'Command-line programs',
+        'https://github.com/silk-lang/docs/blob/main/content/guides/20-command-line-programs.md',
       ),
     ],
   },
