@@ -118,7 +118,7 @@ The SDK reaches Clang as `-isysroot`, with `-mmacosx-version-min` from the profi
 | `{ kind = "explicit", target = "...", root = "...", linker = "...", origin = "...", support = [...] }` | An installed SDK or sysroot at `root` (`-isysroot` on macOS, `--sysroot` on Linux), the linker at `linker` (`--ld-path`), and optional GCC support installations, each `{ root, target, origin }` (`--gcc-install-dir`). `origin` is a label. |
 | `{ kind = "managed", name = "..." }` | Recognized, not supported: `UnsupportedProvider: x (project)`. |
 
-Each kind takes only the keys shown. A key it does not take, here `name` under `kind = "native"`, is refused at its own line, and so is an extra key in a `support` entry (`native.platform-supply.support.<key>`):
+Each kind takes only the keys shown. A key it does not take, here `name` under `kind = "native"`, makes the table match none of the kinds, and the error lists them:
 
 ```toml
 [native.platform-supply]
@@ -127,7 +127,7 @@ name = "x"
 ```
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:8: native.platform-supply.name is not a supported field
+Invalid Silk project manifest /home/you/hello/silk.toml:6: native.platform-supply must be { kind = "automatic" }, { kind = "native" }, { kind = "managed", name = ... } or { kind = "explicit", target = ..., root = ..., linker = ... }
 ```
 
 Any other shape, such as an unknown `kind`, a string instead of a table, or an `explicit` supply for a target it cannot serve, is refused at the line that writes `platform-supply`, or at the `[native.platform-supply]` header:
@@ -334,10 +334,10 @@ An executable starts in a runtime module that sets up the process and calls `mai
 | Key | Meaning |
 | --- | --- |
 | `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
-| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `unstable.composition.defaults entries must be runtime names`. A name not listed in `runtimes` is refused at its line: `unstable.composition.defaults entry "main" names no runtime in unstable.composition.runtimes; it lists "start"`, or `it lists none`. |
-| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `unstable.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `unstable.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. So is one that is not a string (`unstable.composition.components.bindings.operation must be a string: create, acquire, release or destroy`), and an entry with no `operation` at the entry's line (`unstable.composition.components.bindings entry has no operation; use create, acquire, release or destroy`). |
+| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `unstable.composition.defaults[0] must be a string; it is 1`. A name not listed in `runtimes` is refused at its line: `unstable.composition.defaults entry "main" names no runtime in unstable.composition.runtimes; it lists "start"`, or `it lists none`. |
+| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `unstable.composition.components[0].capability must be "execution-storage"; it is "other"`. An `operation` other than those four, or one that is not a string, is refused at its line: `unstable.composition.components[0].bindings[0].operation must be "create", "acquire", "release" or "destroy"; it is "frobnicate"`. So is an entry with no `operation`, at the entry's line (`unstable.composition.components[0].bindings[0] needs operation`). |
 | `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
-| `requirements` | Must be empty: `unstable.composition.requirements is not supported by the native compiler yet`. |
+| `requirements` | Must be empty: `unstable.composition.requirements must be empty, as requirements are not supported yet`. |
 
 Any other key is refused at its line, as in `Invalid Silk project manifest /home/you/hello/silk.toml:7: unstable.composition.bogus is not a supported field`. So is a key the entries of these lists do not take, even inside an array written over several lines:
 
@@ -350,10 +350,10 @@ composition = { runtimes = [
 ```
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:9: unstable.composition.runtimes.modul is not a supported field; did you mean unstable.composition.runtimes.module?
+Invalid Silk project manifest /home/you/hello/silk.toml:9: unstable.composition.runtimes[1].modul is not a supported field; did you mean unstable.composition.runtimes[1].module?
 ```
 
-Line 9 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`unstable.composition.retention.decl is not a supported field`), and in a component's `bindings` entry as `unstable.composition.components.bindings.<key>`.
+Line 9 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`unstable.composition.retention[0].decl is not a supported field`), and in a component's `bindings` entry as `unstable.composition.components[0].bindings[0].<key>`.
 
 For example, `silk/platform/native/start_sync` is a smaller hosted runtime for a `main` that returns `i32` and needs only `HostInput`:
 

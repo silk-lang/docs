@@ -54,7 +54,7 @@ The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, `[co
 
 | Key | Value | Default | Meaning |
 | --- | --- | --- | --- |
-| `stage` | `"final"`, `"llvm-ir"`, `"llvm-bitcode"`, `"assembly"`, `"object"` | `"final"` | Stop after this stage. |
+| `stage` | `"final"`, `"llvm-ir"`, `"llvm-bitcode"`, `"assembly"`, `"object"`, `"wasm-text"` | `"final"` | Stop after this stage. `"wasm-text"` writes a WebAssembly target's module in the text format, as `<name>.wat`. |
 | `output-dir` | string | `"build"` | Output directory, relative to the manifest. Must not leave the package. Refused in a workspace member, which uses `workspace.output-dir`. |
 | `targets` | array of strings | `["host"]` | Targets that `build` and `check` cover when no `--target` is given. Each is `"host"` or a target name. |
 | `profile` | string | none | Default named profile, used when no `--target`, `--profile` or `--profile-input` is given. Must name a `[profiles.<name>]` table. |
@@ -157,7 +157,7 @@ greet = { url = "https://example.com/greet-0.1.0.tar.gz", sha256 = "b9b86606bfdd
 | `sha256` | with `url` | The archive's SHA-256, 64 lowercase hexadecimal digits. |
 | `package` | no | The dependency's `[package].name`. When given, it must match. |
 
-The other settings (`version`, `tag`, `branch`, `hash`, `optional`, `workspace`) are refused as not supported yet. A git dependency is pinned with `rev`, never with `tag` or `branch`, and a URL dependency with `sha256`. See **Dependencies** for git and archive dependencies, fetching and the naming rules.
+Any other key, such as `version`, `tag` or `branch`, is refused as an unknown key. A git dependency is pinned with `rev`, never with `tag` or `branch`, and a URL dependency with `sha256`. See **Dependencies** for git and archive dependencies, fetching and the naming rules.
 
 ## &#91;profiles.\<name>\]
 
@@ -182,6 +182,9 @@ A named profile is a complete build configuration. Select it with `--profile <na
 | `cpu` | table: `model`, `features` | target default |
 | `entry` | `{ kind = "default" }`, `{ kind = "none" }`, `{ kind = "named", name = "..." }` | default |
 | `runtime` | same shape as `entry` | default |
+| `stack-size` | wasm32 only: the main thread's stack, a size such as `"8MiB"` | 1 MiB |
+| `backend` | `"llvm"`, `"direct"` (WebAssembly without Clang) | `"llvm"` |
+| `codegen-units` | an integer from 1 to 256: how many units an optimized native executable splits into | 1 |
 | `config` | parameter values, as in `[config]`: `config.main.port = 9090` | none |
 
 Profile names start with an ASCII letter, then letters, digits, `_` or `-`. Targets and profiles explains what each field does today and which combinations are refused.
@@ -192,42 +195,17 @@ Profile names start with an ASCII letter, then letters, digits, `_` or `-`. Targ
 | --- | --- | --- |
 | `members` | yes | Array of member directories inside the workspace. An entry ending in `/*` adds every child directory. |
 | `output-dir` | no | Shared output directory for all members. Default `"build"`. |
+| `silk-version` | no | The Silk version every member runs with. It wins over a member's own `silk-version`; `silk set` sets it. |
 
 A manifest may hold both `[package]` and `[workspace]`. See **Workspaces**.
 
 ## &#91;release\]
 
-Read only by `silk change`, the release notes command. Its keys (`repository`, `directory`, `version-file`) are described with that command in the Tools section. Builds ignore the table. It was called `[changes]` before; a manifest that still uses that name is refused.
+Read only by `silk change`, the release notes command. Its keys (`repository`, `directory`, `version-file`) are described with that command in the Tools section. Builds ignore the table, but its keys are checked like any other.
 
 ## &#91;tool.\<name>\]
 
 Settings that belong to other tools, such as an editor. The compiler never reads or checks them.
-
-## Reserved tables
-
-`[dev-dependencies]`, `[target]`, `[lints]`, `[test]`, `[bench]` and `[bin]` are names a later release will read. Today they are refused with `LINE: <table> is not supported yet`, so no manifest relies on them being ignored.
-
-## Earlier spellings
-
-Before 0.1.0 some keys had other names. A manifest that still writes one is refused at its line, with the name to use:
-
-| Earlier spelling | Now |
-| --- | --- |
-| `[package].root` | `[package].source` for the source root and `[package].main` for the root module below it |
-| `[package].source-root` | `[package].source` |
-| `[build].artifact` | `[package].kind` |
-| `[build].native-link-inputs` | `[native].link` |
-| `[build].platform-supply` | `[native].platform-supply` |
-| `[build].composition` | `[unstable].composition` |
-| `codeModel`, `maxMemory` in a profile | `code-model`, `max-memory` |
-| `[[build.bindings]]` tables with tagged values | `[config]`, as `main.port = 8080` |
-| `[[profiles.<name>.bindings]]` | `config` in the profile, as `config.main.port = 8080` |
-
-```
-Invalid Silk project manifest /home/you/hello/silk.toml:4: build.artifact is an earlier spelling; write package.kind
-```
-
-`root = "src/main.silk"` becomes nothing at all, since that is the default. `root = "main.silk"` next to the manifest becomes `source = "."`.
 
 ## Errors
 
@@ -237,85 +215,71 @@ The compiler checks the whole manifest before it compiles anything, and stops at
 Invalid Silk project manifest /home/you/hello/silk.toml:8: build.artefact is not a supported field
 ```
 
-Most errors name the line after the path, here line 8 of `silk.toml`. A few, such as a missing `[package]` table, name only the file.
+Most errors name the line after the path, here line 8 of `silk.toml`. A key inside an inline table or array that spans several lines is named at its own line, not at the line that opens the value. The language server reports the same errors in an open `silk.toml`, all of them at once, as you type.
 
-When an unknown key is close to a key the table takes, within a third of its length in single-letter edits, the message names that key:
+### Shape errors
+
+First the manifest is checked against the manifest schema, `compiler/manifest.schema.toml` in the Silk repository. The schema checks the package's own manifest, its workspace's manifest and the manifest of every dependency. An error names the field by its dotted path, with `[0]` for the first entry of an array, and says what is wrong:
+
+| Problem | Message after `Invalid Silk project manifest <path>:LINE:` |
+| --- | --- |
+| An unknown key or table | `package.exprots is not a supported field; did you mean package.exports?` |
+| A missing key | `package needs name`, `component needs world` |
+| A value of the wrong type | `build.targets must be an array; it is "host"` |
+| A value outside a fixed list | `package.kind must be "executable", "library", "static-library", "shared-library" or "object"; it is "lib"` |
+| A value of the wrong form | `package.version must be a full semantic version, such as 0.1.0; it is "0.1"` |
+| A number out of range | `profiles.fast.codegen-units must be at least 1; it is 0` |
+| A table that matches none of its forms | `dependencies.vector must be a dependency: { path = ... }, { git = ..., rev = ... } or { url = ..., sha256 = ... }, with an optional package` |
+| A bad value in a table that fits one of its forms | `native.link[0].mode must be "static" or "dynamic"; it is "shared"` |
+| A bad table name | `a name in profiles must be a profile name: an ASCII letter, then letters, digits, _ or -` |
+| No `[package]` and no `[workspace]` | `manifest must be a package or workspace manifest, with a [package] or [workspace] table` |
+
+The suggestion after an unknown key names the key of the same table that is closest and not already set, within a third of its length in single-letter edits. `build.artefact` above gets none, since `[build]` has no key that close. An unknown key is reported before any other problem in the manifest, and a value of the wrong type or form before a table that matches none of its forms.
+
+Every key the schema does not list is an unknown key, whether an earlier release had it or a later one adds it. There are no aliases: `[package].root`, `[build].artifact`, `[changes]`, a profile's `codeModel` and `[dev-dependencies]` are all refused as unknown keys. The suggestion points at the current spelling when it is close, as `profiles.fast.codeModel is not a supported field; did you mean profiles.fast.code-model?`.
+
+When the manifest's `silk-version` names a Silk that the running compiler cannot stand in for, every shape error says so, since that Silk may take the key:
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:2: package.nmae is not a supported field; did you mean package.name?
+Invalid Silk project manifest /home/you/hello/silk.toml:6: tasks is not a supported field; the manifest pins Silk 0.2.0 with silk-version, and this is Silk 0.1.0: build it with Silk 0.2.0 (silk use installs it)
 ```
 
-`build.artefact` above gets no suggestion, because the close key `build.artifact` is an earlier spelling, not a supported key. Keys inside profiles get no suggestion either. A key inside an inline table or array that spans several lines is named at its own line, not at the line that opens the value.
+The `silk` tool runs the pinned Silk on its own, so this happens only when `SILK_TOOLCHAIN`, `silk +<version>` or a direct `silkc` picks another one. A dependency written for another Silk is refused for its `silk-version` before its shape is checked; see **Dependencies**.
+
+### Other errors
+
+Then the compiler checks what the schema cannot, such as paths on disk and combinations of keys:
 
 | Problem | Message after `Invalid Silk project manifest <path>:` |
 | --- | --- |
 | Not TOML | `LINE: the manifest is not valid TOML: ` and what is wrong, such as `the file ends before a string, array, inline table or table header is closed` |
-| No `[package]` and no `[workspace]` | `missing [package] table` |
 | Only `[workspace]`, for a command that needs a package | `this manifest only defines a workspace; run the command in one of its member directories` |
-| An earlier spelling, such as `[build].artifact` | `LINE: build.artifact is an earlier spelling; write package.kind` |
-| A reserved table, such as `[dev-dependencies]` | `LINE: dev-dependencies is not supported yet` |
-| A reserved key, such as a dependency's `tag` | ``LINE: dependency `<name>` of <package@version>: tag is not supported yet; a dependency takes only path, git, rev, url, sha256 and package; pin a git dependency to a full commit hash with rev`` |
-| Unknown top-level key or table, such as `[packge]` | `LINE: packge is not a supported field; did you mean package?` |
-| Unknown `[package]` key | `LINE: package.<key> is not a supported field`, plus `; did you mean package.<close key>?` when there is one, as for every unknown key below |
-| Unknown key in a dependency entry | `LINE: dependencies.<name>.<key> is not a supported field` |
-| Bad name | `LINE: package.name "Hello" is not a package name: it must start with a lowercase letter and contain only lowercase letters, digits, underscores, or hyphens, and must not be self, silk or silkc` |
-| Bad version | `LINE: package.version "0.1" is not a semantic version; write MAJOR.MINOR.PATCH, as 0.1.0` |
-| Bad `silk-version` | `LINE: package.silk-version "x" is not a semantic version; write MAJOR.MINOR.PATCH, as 1.0.0` |
-| Empty or non-string `source` or `main` | `LINE: package.main must be a non-empty string` (or `package.source`) |
 | `main` outside the source root | `LINE: package.main must name a module below the source root` |
-| Metadata of the wrong type | `LINE: package.description must be a string`, `LINE: package.authors must be an array of strings` |
-| Bad kind | `LINE: package.kind "app" is not a package kind; write executable, library, static-library, shared-library, or object` |
-| Unknown `[build]` key | `LINE: build.<key> is not a supported field` |
-| Unknown `[native]` or `[unstable]` key | `LINE: native.<key> is not a supported field` (or `unstable.<key>`) |
-| `[component]` without a usable `wit` or `world` | `component.wit must name a WIT file or directory below the package directory`, `component.world must name the WIT world to build` |
-| Unknown `[unstable].composition` key | `LINE: unstable.composition.<key> is not a supported field` |
-| Unknown key in a `runtimes`, `components` or `retention` entry | `LINE: unstable.composition.runtimes.<key> is not a supported field` (or `components`, `retention`) |
-| Unknown key in a component's `bindings` entry | `LINE: unstable.composition.components.bindings.<key> is not a supported field` |
-| A `defaults` entry that is not a string | `LINE: unstable.composition.defaults entries must be runtime names` |
-| `composition.requirements` lists anything | `LINE: unstable.composition.requirements is not supported by the native compiler yet` |
-| A component binding `operation` other than `create`, `acquire`, `release` or `destroy` | `LINE: unstable.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy` |
-| A component binding with no `operation` | `LINE: unstable.composition.components.bindings entry has no operation; use create, acquire, release or destroy` |
-| A component binding `operation` that is not a string, such as `operation = 3` | `LINE: unstable.composition.components.bindings.operation must be a string: create, acquire, release or destroy` |
-| A component `capability` other than `"execution-storage"` | `LINE: unstable.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"` |
-| Unknown key in `platform-supply` or in one of its `support` entries | `LINE: native.platform-supply.<key> is not a supported field` (or `native.platform-supply.support.<key>`) |
-| Any other bad `platform-supply` | `LINE: InvalidConfiguration: platform-supply (<path>:native.platform-supply)` |
-| Bad stage | `LINE: build.stage is not an admitted emission stage` |
 | Output dir escapes | `LINE: build.output-dir must be a non-empty manifest-relative directory that does not escape the project` |
-| Bad target list | `LINE: build.targets must be a non-empty array of host or canonical target ids` |
-| Unknown `[workspace]` key | `LINE: workspace.<key> is not a supported field` |
 | `output-dir` in a member | `build.output-dir cannot be set in a workspace member; set workspace.output-dir instead` |
+| `[component]` without a usable `wit` | `component.wit must name a WIT file or directory below the package directory` |
+| A `defaults` runtime that `runtimes` does not list | `LINE: unstable.composition.defaults entry "main" names no runtime in unstable.composition.runtimes; it lists "start"` |
+| Any other bad `platform-supply` | `LINE: InvalidConfiguration: platform-supply (<path>:native.platform-supply)` |
 
-Problems in `[dependencies]` other than an unknown key, and in `exports`, are manifest errors too, as in `` LINE: dependency `foo` of app@0.1.0: no readable silk.toml at /home/you/nothere `` and `LINE: exports of app@0.1.0: nope is not a module of the package`. A bad `[native].link` entry or `function-order` path prints as `silk: invalid native link input: ...` (exit 1); see Build outputs and native linking. See **Dependencies** and **Libraries and exports**.
+Problems in `[dependencies]` beyond their shape, and in `exports`, are manifest errors too, as in `` LINE: dependency `foo` of app@0.1.0: no readable silk.toml at /home/you/nothere `` and `LINE: exports of app@0.1.0: nope is not a module of the package`. A shape error in a dependency's own manifest names that manifest and the dependency, as in `` Invalid Silk project manifest /home/you/text-utils/silk.toml:4: dependency `text_utils` of app@0.1.0: its silk.toml is invalid: package.exprots is not a supported field; did you mean package.exports? ``. A bad `[native].link` entry or `function-order` path prints as `silk: invalid native link input: ...` (exit 1); see Build outputs and native linking. See **Dependencies** and **Libraries and exports**.
 
-Profile problems name the profile and the key. A bad value is quoted after the key:
+Profile problems that pass the schema name the profile and the key, with the refused value after it:
 
 ```
-Invalid Silk project manifest /home/you/hello/silk.toml:9: InvalidInput: profiles.fast.optimization = "fast"
+Invalid Silk project manifest /home/you/hello/silk.toml:9: UnsupportedCombination: profiles.fast.libc = "system"
 ```
 
 | Problem | Message after `Invalid Silk project manifest <path>:LINE:` |
 | --- | --- |
-| A key profiles do not have | `profiles.fast.optimisation is not a supported field; did you mean optimization?`. The suggestion names the key alone. Only top-level profile keys get one |
-| `codeModel` or `maxMemory` | `InvalidInput: profiles.fast.codeModel is an earlier spelling; write code-model` |
-| A key `cpu` does not have | `profiles.fast.cpu.modle is not a supported field` |
-| A key `entry` or `runtime` does not have | `profiles.fast.entry.bogus is not a supported field`. `kind = "default"` and `"none"` take only `kind`; `"named"` takes `kind` and `name`. |
-| A value the field does not take | `InvalidInput: profiles.fast.optimization = "fast"` |
 | A value the target cannot use | `UnsupportedCombination: profiles.fast.libc = "system"` |
 | A value the native compiler cannot build yet | `profiles.fast.safety = "unchecked" is not supported by the native compiler yet` |
 | `[build].profile` names no profile | `InvalidInput: build.profile = "fats" names no [profiles.fats] table` |
-| `[build].profile = ""` | `InvalidInput: build.profile` |
-| A profile's `bindings` | `InvalidInput: profiles.fast.bindings is an earlier spelling; write config` |
-| A `[config]` key with no module, such as `port = 1` | `InvalidInput: config.port: name the module before the parameter, as config.main.port` |
-| A `[config]` value that is a float, date or time | `InvalidInput: config.main.ratio: a package parameter value is an integer, a boolean, a string or an array of them` |
-| A bad profile name, quoted or not | ``InvalidInput: profiles.1fast: a profile name is an ASCII letter, then letters, digits, `_` or `-` `` |
 
-LINE is the line of the key, or of the table header when the problem is the table itself, as for a bad profile name. A `[config]` value of the wrong type, or one for a parameter the module does not declare, is refused with SEM0214 at the line of its key; see **Package parameters** in the reference. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. The message names the key without array indexes. Targets and profiles lists every refused combination.
+LINE is the line of the key, or of the table header when the problem is the table itself. A `[config]` value of the wrong type, or one for a parameter the module does not declare, is refused with SEM0214 at the line of its key; see **Package parameters** in the reference. The compiler finds a key by its whole path, so a key named like one on an earlier line, such as a profile's `runtime = { kind = "default", name = "x" }` below `[package] name`, is reported at its own line. Targets and profiles lists every refused combination.
 
 ## Keys that are not checked
 
-Unknown keys are refused everywhere the compiler reads: the top level, `[package]`, dependency entries, `[build]`, `[native]` with its `sources`, `archive` and `override` entries, `platform-supply` and its `support` entries, `[[generate]]` and `[[post-init]]` entries, `[component]`, `[unstable]`, `composition` and the entries of its lists, `[workspace]`, profiles with their `cpu`, `entry` and `runtime` tables, and bindings with their `value` and `origin` tables. A misspelled `[packge]` table or a `descripton` key stops the build, with `did you mean package?` or `did you mean package.description?`.
-
-Two tables are not checked: `[release]`, which builds ignore and `silk change` reads, and `[tool.<name>]`, which belongs to other tools.
+Unknown keys are refused everywhere in the manifest, in every table and in the entries of every array, except one table: `[tool.<name>]`, which belongs to other tools. The compiler never reads or checks it, so put settings for an editor or another tool there.
 
 ## See also
 

@@ -105,12 +105,13 @@ The value is plain TOML. Silk checks it against the parameter's declared type:
 | `[T; N]` | An array of exactly `N` values of `T`, such as `[3, 4]` for `[i32; 2]` |
 
 - Every value in a manifest is a literal. Values that come from somewhere else, such as a secret or the environment, cannot be written there.
-- A key with no module before the parameter is refused at its line: `InvalidInput: config.port: name the module before the parameter, as config.main.port`.
-- A float, date or time is refused at its line: `InvalidInput: config.main.ratio: a package parameter value is an integer, a boolean, a string or an array of them`.
+- A key with no module before the parameter is refused at its line: `config.port must be a table; it is 1`. Write it as `config.main.port`.
+- A float is refused at its line: `config.main.ratio must be a parameter value: an integer, a boolean, a string, an array of values, or a table of a nested module`.
+- A date or time is refused at its line: `InvalidInput: config.main.when: a package parameter value is an integer, a boolean, a string or an array of them`.
 - A value for an unknown parameter, of the wrong type, or out of range is refused with SEM0214 at the line of its key, naming the parameter, as in ``silk.toml:6: error[SEM0214] invalid package parameter binding: the value bound to `port` does not have its parameter's type``. An unknown name reads "module `main.silk` declares no package parameter `prot`". An array of the wrong length or element type is refused the same way.
 - Every value is type-checked, including one that loses on precedence.
 - `[config]` only reaches the package the manifest describes. A dependency's parameters keep their defaults.
-- Before 0.1.0 values were written as `[[build.bindings]]` tables with tagged values. `build.bindings` and a profile's `bindings` are now refused at their line: `build.bindings is an earlier spelling; write config, as config.main.limit = 42`.
+- Before 0.1.0 values were written as `[[build.bindings]]` tables with tagged values. `build.bindings` and a profile's `bindings` are now unknown keys, refused at their line: `build.bindings is not a supported field`.
 
 `--profile-input` JSON still carries tagged `bindings`, the transport tools use. Each binding has `package` (`"name@version"`), `module` (`"main"`), `parameter`, `value` and `origin`. A value is `{ "kind": "integer", "value": "8080" }`, `{ "kind": "boolean", "value": true }`, `{ "kind": "string", "value": "x" }` or `{ "kind": "array", "values": [ ... ] }`. `origin` is `{ "source": "...", "provenance": "literal" }`, or `"translated-public"` with a `translator`; `"secret"`, `"physical-supply"` and `"runtime"` are refused.
 
