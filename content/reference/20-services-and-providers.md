@@ -45,7 +45,7 @@ Constraint       = Type 'in' Type
 - A shared entry does not satisfy an exclusive use. Running an Effect that needs `&mut S` under `? &S` is SEM0071.
 - A shared borrow of a provider (`Effect.provide`) cannot satisfy an exclusive entry (SEM0131). An exclusive borrow (`Effect.provideMut`) satisfies either kind.
 - One value may be lent shared to several entries at once. Lending it exclusively to two entries at once is a borrow conflict (OWN0010).
-- A `&mut S` entry in a function's own row whose body only ever needs `&S` is warning SEM0254 at the entry: "This function only needs shared access to `Random`; require `&Random` instead of `&mut Random`". The check still passes. The rows of service and interface operations are contracts, so they are not checked.
+- A `&mut S` entry in a function's own row whose body only ever needs `&S` is warning SEM0254 at the entry: "This function only needs shared access to `Random`; require `&Random` instead of `&mut Random`". Like every warning, it fails the check unless `--ignore-warnings` is given. The rows of service and interface operations are contracts, so they are not checked.
 
 ## Declaring a service
 
