@@ -587,6 +587,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
       ),
       page(
         'guides',
+        'schemas',
+        'Schemas',
+        'https://github.com/silk-lang/docs/blob/main/content/guides/19-schemas.md',
+      ),
+      page(
+        'guides',
         'command-line-programs',
         'Command-line programs',
         'https://github.com/silk-lang/docs/blob/main/content/guides/20-command-line-programs.md',
