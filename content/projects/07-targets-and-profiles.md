@@ -482,7 +482,7 @@ Finished build/llvm/wasm32-wasip1/debug/hello in 0.44s
 ```
 
 - There is no `link` row: the module is written as it is generated. The output goes to the same directory as an LLVM build.
-- The direct backend translates each function body once and reuses the result across builds, so an edit rebuilds only what changed. It optimizes less than LLVM: use it for fast edit loops and for building where LLVM is not available, such as in a browser, and use the default backend for a release you ship.
+- The direct backend translates each function body once and reuses the result across builds, so an edit rebuilds only what changed. An optimized direct build, such as `--release`, inlines calls and runs its own optimization passes, and `speed` and `size` give different code. It still optimizes less than LLVM, and its code runs several times slower: use it for fast edit loops and for building where LLVM is not available, such as in a browser, and use the default backend for a release you ship.
 - The module has the same imports and exports as an LLVM build, so `wasm-runner.mjs`, Wasmtime and Node run it the same way. A `wasm32-wasip2` component still needs `wasm-tools` and the Preview 1 adapter.
 - `backend = "direct"` for a macOS, Linux or Windows target is refused: `silk: invalid build profile` (exit 1).
 - The playground on this site builds with the direct backend, with the compiler itself running in the browser.
