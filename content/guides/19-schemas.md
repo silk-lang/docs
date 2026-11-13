@@ -1,6 +1,6 @@
 # Schemas
 
-This guide builds `gateway`, a program that reads the config of a small HTTP gateway from JSON, checks it, writes it back, explains every mistake in a broken copy, accepts commands by name, and describes its own config as a JSON Schema. All of it comes from one library, `silk.schema`, and from types you declare.
+This guide builds `gateway`, a program that reads the config of a small HTTP gateway from JSON, checks it, writes it back, reads it from YAML too, explains every mistake in a broken copy, accepts commands by name, and describes its own config as a JSON Schema. All of it comes from one library, `silk.schema`, and from types you declare.
 
 The idea behind the library is that you declare a type once and everything else is derived from it. A struct becomes a JSON object with the struct's fields, a union of plain names becomes a string, and a union whose variants carry data becomes an object tagged with the variant's name. Reading, writing, error messages, and JSON Schema all come from the same declaration, so they cannot drift apart. Where the declaration does not say enough, a `Spec` adds wire names, rules and defaults, still in one place next to the type.
 
@@ -12,6 +12,7 @@ The idea behind the library is that you declare a type once and everything else 
 | Read a value, collect every problem | `SchemaJson.decodeAll<T>(bytes)` | `SchemaErrors` |
 | Read one variant of a union whose name arrives apart | `SchemaJson.decodeVariant<U>(name, bytes)` | `SchemaErrors` |
 | Write a value as compact JSON | `SchemaJson.encode<T>(&value)` | `SchemaError`, `WriterError` |
+| Read or write YAML instead | `SchemaYaml.decode<T>`, `SchemaYaml.decodeAll<T>`, `SchemaYaml.encode<T>` | as for JSON |
 | Show problems to a person or a tool | `SchemaReport.write`, `SchemaReport.writeOne` | `WriterError` |
 | Describe a type as JSON Schema | `Schemas.shape<T>()`, then `JsonSchemas.write` | `JsonSchemaError` |
 
@@ -45,6 +46,7 @@ import silk.schema.json_schema {
 }
 import silk.schema.report { ReportOptions, SchemaReport }
 import silk.schema.schema { Checks, Schema, SchemaReader, SchemaWriter, Schemas, Spec }
+import silk.schema.yaml { SchemaYaml }
 import silk.schema.shape { Constraint, Literal, Shape, ShapeOf, Shapes, VariantShape }
 import silk.text.format { Format }
 import silk.text.string { String }
@@ -247,6 +249,38 @@ effect fn writeConfig() -> ()
 ```
 
 Writing does not run rules or checks; they guard what comes in. Encoding fails with a `SchemaError` only when JSON cannot hold a value, such as a NaN in an `f64` field.
+
+## Read and write YAML
+
+The same types read and write YAML through `SchemaYaml` in `silk/schema/yaml`, with no change to `Gateway`:
+
+```silk
+const YAML_CONFIG: &[u8] = b"name: edge-2\nlisten: 8081\nlevel: Debug\nupstreams:\n  - host: 10.0.0.7\n    port: 9000\nauth:\n  type: Basic\n  user: ops\n"
+
+effect fn yamlConfig() -> ()
+  ! SchemaError | OutOfMemoryError | WriterError
+  ? &mut Allocator | &mut Writer {
+  let gateway = run SchemaYaml.decode<Gateway>(YAML_CONFIG)
+  run SchemaYaml.encode<Gateway>(&gateway)
+}
+```
+
+`SchemaYaml.decode` parses the text into a `YamlDocument` from `silk/yaml/document` first, then reads the value from it, running the same rules, checks and defaults as `SchemaJson.decode`. `SchemaYaml.encode` writes block-style YAML in declaration order with the wire names. The default for `idle_seconds` was filled in on the way:
+
+```
+name: edge-2
+listen: 8081
+level: Debug
+idle_seconds: 30
+upstreams:
+  - host: 10.0.0.7
+    port: 9000
+auth:
+  type: Basic
+  user: ops
+```
+
+A field that holds text also accepts a plain scalar that YAML would read as another kind, such as `version: 1.10` or `zip: 01234`, and gets the text exactly as written. `SchemaYaml.decodeAll` reports every problem at once, like `SchemaJson.decodeAll` below, and each problem carries the span of the bytes it is about, so `SchemaReport` shows YAML problems the same way. For YAML whose shape is not known in advance, use `YamlDocument` directly.
 
 ## When reading fails
 
@@ -912,6 +946,7 @@ effect fn steps() -> ()
   ? &mut Allocator | &mut Writer {
   run readConfig()
   run writeConfig()
+  run yamlConfig()
   run firstProblem()
   run everyProblem()
   run wholeValue()
@@ -943,7 +978,7 @@ The output is the blocks shown in each section, in order.
 
 ## Limits to know
 
-- JSON is the only format so far. `SchemaReader` and `SchemaWriter` in `silk/schema/schema` are the interfaces a format implements; every `Schema` type then reads and writes it with no change.
+- JSON and YAML are the formats so far. `SchemaReader` and `SchemaWriter` in `silk/schema/schema` are the interfaces a format implements; every `Schema` type then reads and writes it with no change.
 - Types without a `Schema` implementation, such as `f32`, `HashMap`, tuples and fixed-size arrays, cannot be fields. Using one is a compile error such as ``error[SEM0121] `f32: silk.schema.schema.Schema` cannot be proved``. Wrap it in a type of your own with a codec, as `Delay` does.
 - A derived `Schema` reads and writes every field, so every field must be `pub`. A private field is a compile error at its declaration, such as ``error[SEM0177] a derived `Schema` reads and writes every field, so `port` must be `pub`, or the type must implement `read` and `write` ``. A type that keeps fields private implements `read` and `write` itself, usually through a codec.
 - `decodeAll` lists at most 64 problems, and one value records at most 16 failed `check`s.
@@ -955,6 +990,7 @@ The output is the blocks shown in each section, in order.
 
 - `silk/schema/schema`: `Schema`, `Spec`, `Checks`, `Schemas` (`shape`, `shapeOf`, `readVia`, `writeVia`, `shapeVia`), `SchemaReader`, `SchemaWriter`
 - `silk/schema/json`: `SchemaJson` (`decode`, `decodeAll`, `decodeVariant`, `encode`), `JsonSchemaReader`, `JsonSchemaWriter`
+- `silk/schema/yaml`: `SchemaYaml` (`decode`, `decodeAll`, `encode`), `YamlSchemaReader`, `YamlSchemaWriter`
 - `silk/schema/issue`: `SchemaError`, `SchemaErrors`, `Issue`, `IssueReason`, `ValueKind`, `Span`, `MAX_PROBLEMS`
 - `silk/schema/path`: `SchemaPath` (`text`, `pointer`, `names`, `matchesText`), `PathSegment`
 - `silk/schema/report`: `SchemaReport` (`write`, `writeOne`), `ReportOptions`, `ReportStyle`, `MAX_QUOTED`

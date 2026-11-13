@@ -209,7 +209,7 @@ effect fn serve(port: u16) -> () ! NativeSocketError | ByteIoError | OutOfMemory
 }
 ```
 
-`ListenOptions.defaults()` sets a backlog of 128, leaves address reuse off, and polls every millisecond. Use `ListenOptions.make(backlog, true, pollNanoseconds)` to turn reuse on, so a restarted server can bind the port again at once. `listenUnix` and `connectUnixOwned` do the same for Unix domain sockets, given a path.
+`ListenOptions.defaults()` sets a backlog of 128, leaves address reuse off, and polls every millisecond. Use `ListenOptions.make(backlog, true, pollNanoseconds)` to turn reuse on, so a restarted server can bind the port again at once. `listenUnix` and `connectUnixOwned` do the same for Unix domain sockets, given a path. The path may be absolute or relative, which the kernel resolves against the current directory. On Linux, a path that starts with a NUL byte, such as `b"\0my-server"`, is an abstract name: no file is made, and the name disappears with the last socket. Other systems refuse an abstract name with `AbstractPath`.
 
 ## The command line
 
