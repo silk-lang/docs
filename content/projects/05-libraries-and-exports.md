@@ -22,8 +22,8 @@ A library kind's root module defaults to `src/lib.silk`.
 
 ```
 Checking app (x86_64-unknown-linux-gnu)
-  load     145 modules, 1 in package         0.06s
-  check    failed: 3 modules, 1 error        0.13s
+  load      145 modules, 1 in package         0.06s
+  check     failed: 3 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 src/main.silk:4:8: error[MOD0003] Module lib is not exported by package text-utils@0.1.0
 Failed app in 0.20s
@@ -136,11 +136,11 @@ silk build
 
 ```
 Compiling text-utils (x86_64-unknown-linux-gnu, debug)
-  load     117 modules, 2 in package         0.04s
-  check    2 modules                         0.00s
-  codegen  2 functions                       0.00s
-  borrow   2 bodies                          0.00s
-  link     clang                             0.13s
+  load      117 modules, 2 in package         0.04s
+  check     2 modules                         0.00s
+  codegen   2 functions                       0.00s
+  borrow    2 bodies                          0.00s
+  link      clang                             0.13s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a in 0.19s
 ```
 

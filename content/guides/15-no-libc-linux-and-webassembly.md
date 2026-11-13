@@ -10,7 +10,7 @@ This guide writes one program, `squares`, that selects different code for each k
 
 ## What changes without libc
 
-On a hosted target, the providers you create in `main` talk to the C library: `StdoutWriter`, `StdoutLogger`, `OsFileSystem`, `OsMonotonicClock`, `OsRandom`, the native sockets and HTTP providers. Without libc most of them are gone or refuse to compile. WASI is the exception: there the same providers call the WASI host instead. Everything that only describes work stays everywhere: services, effects, collections, text, JSON, crypto, compression, URI parsing.
+On a hosted target, the providers you create in `main` talk to the C library: `StdoutWriter`, `StdoutLogger`, `OsFileSystem`, `OsMonotonicClock`, `OsRandom`, the native sockets and HTTP providers. Without libc most of them are gone or refuse to compile. WASI is the exception: there the same providers call the WASI host instead. On `wasm32-unknown-unknown`, `OsRandom` and the two clocks ask the JavaScript host that runs the module. Everything that only describes work stays everywhere: services, effects, collections, text, JSON, crypto, compression, URI parsing.
 
 | Kind of module | Hosted | Linux, no libc | `wasm32-unknown-unknown` | WASI |
 | --- | --- | --- | --- | --- |
@@ -18,18 +18,18 @@ On a hosted target, the providers you create in `main` talk to the C library: `S
 | Services (`silk/io/writer`, `silk/io/logger`, `silk/system/filesystem`, `silk/system/random`, ...) | yes | yes | yes | yes |
 | `Allocator.systemAllocatorProvider()` | yes | yes | yes | yes |
 | Output, logging and files (`silk/io/writer_native`, `silk/io/logger_native`, `silk/system/filesystem_native`) | yes | empty module | empty module | yes |
-| `OsRandom`, `OsMonotonicClock` | yes | build error | build error | yes |
+| `OsRandom`, `OsSystemClock`, `OsMonotonicClock` | yes | build error | yes, through two host imports | yes |
 | Child processes (`silk/system/child_process_native`) | yes | empty module | empty module | empty module |
 | Native sockets and HTTP (`silk/net/socket_native`, `silk/http/client_native`, ...) | yes | no | no | no; `wasm32-wasip2` has its own modules |
 | Raw kernel calls (`silk/platform/linux/syscall`, `silk/platform/linux/mapping`, `silk/platform/linux/process_inputs`) | empty module | yes | empty module | empty module |
 
-On WASI, `OsFileSystem` reaches only the directories the host preopens, and `OsRandom` uses the host's `random_get`. On the other two kinds of target your code keeps asking for services, and you supply providers you write yourself. That is the same move you make in tests, which the Testing with providers guide covers.
+On WASI, `OsFileSystem` reaches only the directories the host preopens, and `OsRandom` uses the host's `random_get`. On `wasm32-unknown-unknown`, `OsRandom` and the clocks import functions from the host, as **Random bytes and clocks from the host** below shows. For everything else on the other two kinds of target, your code keeps asking for services, and you supply providers you write yourself. That is the same move you make in tests, which the Testing with providers guide covers.
 
 ## Reading the per-target API pages
 
 The std lib API reference has one page per module. Each declaration on it ends with a `Profiles:` line that names the profiles where it is declared. On the `silk.io.writer_native` page, for example, the `Writer` operations of `StdoutWriter` list the three hosted profiles plus `wasm32-wasip1` and `wasm32-wasip2`. A declaration missing from a profile is the SEM0014 error shown below. The overview page ends with the list of profile identities and the target each one uses.
 
-A declaration that lists every profile can still refuse a target when you use it. `OsRandom.make()` is declared on all eight profiles, but on `wasm32-unknown-unknown` it stops the build with a `compileError`. The provider's doc comment and its "Gotchas" section say which profiles it supports.
+A declaration that lists every profile can still refuse a target when you use it. `OsRandom.make()` is declared on all eight profiles, but on the no-libc Linux profiles it stops the build with a `compileError`. The provider's doc comment and its "Gotchas" section say which profiles it supports.
 
 ## The manifest
 
@@ -183,9 +183,9 @@ silk check --profile bare
 
 ```
 Checking squares (x86_64-unknown-linux-gnu)
-  load     131 modules, 1 in package         0.02s
-  check    2 modules                         0.10s
-  borrow   29 bodies                         0.00s
+  load      131 modules, 1 in package         0.02s
+  check     2 modules                         0.10s
+  borrow    29 bodies                         0.00s
 Finished squares in 0.13s
 ```
 
@@ -195,9 +195,9 @@ silk check --profile web
 
 ```
 Checking squares (wasm32-unknown-unknown)
-  load     139 modules, 1 in package         0.02s
-  check    2 modules                         0.02s
-  borrow   22 bodies                         0.00s
+  load      139 modules, 1 in package         0.02s
+  check     2 modules                         0.02s
+  borrow    22 bodies                         0.00s
 Finished squares in 0.06s
 ```
 
@@ -207,9 +207,9 @@ silk check --profile wasi
 
 ```
 Checking squares (wasm32-wasip1)
-  load     139 modules, 1 in package         0.01s
-  check    2 modules                         0.11s
-  borrow   82 bodies                         0.00s
+  load      139 modules, 1 in package         0.01s
+  check     2 modules                         0.11s
+  borrow    82 bodies                         0.00s
 Finished squares in 0.14s
 ```
 
@@ -225,30 +225,30 @@ silk check --profile web
 
 ```
 Checking squares (wasm32-unknown-unknown)
-  load     139 modules, 1 in package         0.06s
-  check    failed: 2 modules, 1 error        0.04s
+  load      139 modules, 1 in package         0.06s
+  check     failed: 2 modules, 1 error        0.04s
 [wasm32-unknown-unknown]
 src/main.silk:25:34: error[SEM0014] Module silk.io.writer_native has no member StdoutWriter
 Failed squares in 0.11s
 ```
 
-`silk/io/writer_native` exists on `wasm32-unknown-unknown`, but declares nothing there. Now try a provider that is declared everywhere but refuses that target. Put `let random = OsRandom.make()` in the `Freestanding` `main`, with `import silk.system.random_native { OsRandom }`. This one `silk check --profile web` does not catch; it passes. The build stops:
+`silk/io/writer_native` exists on `wasm32-unknown-unknown`, but declares nothing there. Now try a provider that is declared everywhere but refuses a target. Put `let _random = OsRandom.make()` at the top of the raw Linux `main`, with `import silk.system.random_native { OsRandom }` among that arm's imports. `silk check --profile bare` and the build both stop:
 
 ```sh
-silk build --profile web
+silk build --profile bare
 ```
 
 ```
-Compiling squares (wasm32-unknown-unknown, web)
-  load     143 modules, 1 in package         0.02s
-  check    1 module                          0.00s
-  codegen  failed: 32 functions, 1 error     0.02s
-[wasm32-unknown-unknown]
-src/main.silk:28:18: error[SEM0177] OsRandom requires a supported WASI, Darwin or GNU libc profile
-Failed squares in 0.05s
+Compiling squares (x86_64-unknown-linux-gnu, bare)
+  load      162 modules, 1 in package         0.00s
+  check     1 module                          0.00s
+  codegen   failed: 97 functions, 1 error     0.07s
+[x86_64-unknown-linux-gnu]
+src/main.silk:59:19: error[SEM0177] OsRandom requires a JavaScript host, WASI, Windows, Darwin or a GNU libc profile
+Failed squares in 0.08s
 ```
 
-SEM0177 means library code asked the compiler to stop. The test runs inside `OsRandom.make`, and the error is reported at your call to it. So build each profile in CI as well as checking it. On such a target, write a `Random` provider over whatever entropy the host gives you.
+SEM0177 means library code asked the compiler to stop. The test runs inside `OsRandom.make`, and the error is reported at your call to it. Without libc, write a `Random` provider over whatever entropy the kernel gives you, such as the `getrandom` system call.
 
 ## Build and run the bare WebAssembly module
 
@@ -258,15 +258,15 @@ silk build --profile web
 
 ```
 Compiling squares (wasm32-unknown-unknown, web)
-  load     139 modules, 1 in package         0.02s
-  check    1 module                          0.00s
-  codegen  31 functions                      0.03s
-  borrow   24 bodies                         0.00s
-  link     clang                             0.15s
+  load      139 modules, 1 in package         0.02s
+  check     1 module                          0.00s
+  codegen   31 functions                      0.03s
+  borrow    24 bodies                         0.00s
+  link      clang                             0.15s
 Finished build/llvm/wasm32-unknown-unknown/web/squares in 0.22s
 ```
 
-The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing and exports its `memory`, `main`, and the report buffer described below, `silk_report` and `silk_report_length`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
+The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing, since this program reads no random bytes and no clock, and exports its `memory`, `main`, and the report buffer described below, `silk_report` and `silk_report_length`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
 
 Any WebAssembly host can instantiate the module and call `main()`. In Node, save this as `run.mjs`:
 
@@ -297,6 +297,33 @@ echo $?
 129
 ```
 
+### Random bytes and clocks from the host
+
+`OsRandom`, `OsSystemClock` and `OsMonotonicClock` work on `wasm32-unknown-unknown` too. A module that uses one of them imports a function from the import module `silk`:
+
+| Import | Does |
+| --- | --- |
+| `random(address, length)` | Fills `length` bytes at `address` with secure random bytes, as `crypto.getRandomValues` does |
+| `clock(monotonic)` | Returns milliseconds as an `f64`: since 1970 when `monotonic` is 0, since a fixed start, as `performance.now()` gives, when it is 1 |
+
+Only the functions the program reaches are imported. Flip a coin in the `Freestanding` arm, so `main` answers 385 or -385:
+
+```silk
+  import silk.system.random { Random }
+  import silk.system.random_native { OsRandom }
+
+  pub fn main() -> i32 {
+    let mut random = OsRandom.make()
+    let heads = run Random.nextBool() |> Effect.provideMut<Random>(&mut random)
+    if heads { return sumOfSquares(10) }
+    return 0 - sumOfSquares(10)
+  }
+```
+
+The module now imports `silk.random`, and the `run.mjs` above, which passes no imports, fails with `TypeError: WebAssembly.instantiate(): Import #0 module="silk": module is not an object or function`. `wasm-runner.mjs` supplies both functions, so it runs the module as it is and exits with 129 or 127, the low 8 bits of 385 and -385. A host that instantiates the module itself passes `{ silk: { random, clock } }`, or just the ones `WebAssembly.Module.imports` lists.
+
+A JavaScript host cannot block, so a wait on the monotonic clock, such as `Effect.sleep`, reads the clock until the deadline. It holds the thread, and in a browser it holds the page. Browsers also round `performance.now()`, often to 5 or 100 microseconds.
+
 ### When the module fails
 
 A module has no standard error, so when `main` fails with an unhandled error, or the program traps, the module writes the same report a native program prints into a buffer in its own memory: `silk_report()` returns its address and `silk_report_length()` its length. The runner prints it. For a trap it also prints the engine's stack, whose frames carry Silk names such as `main.pick`, and exits with 134. From a script, `runWasm` from the same file resolves to `main`'s status and rejects a trap with a `SilkError` whose `report` property holds the report. The error type of the Effect that `main` returns must implement `Debug`, as on every other target.
@@ -315,11 +342,11 @@ silk build --profile wasi
 
 ```
 Compiling squares (wasm32-wasip1, wasi)
-  load     139 modules, 1 in package         0.01s
-  check    1 module                          0.00s
-  codegen  218 functions                     0.18s
-  borrow   148 bodies                        0.00s
-  link     clang                             0.25s
+  load      139 modules, 1 in package         0.01s
+  check     1 module                          0.00s
+  codegen   218 functions                     0.18s
+  borrow    148 bodies                        0.00s
+  link      clang                             0.25s
 Finished build/llvm/wasm32-wasip1/wasi/squares in 0.49s
 ```
 
@@ -387,9 +414,9 @@ silk build --profile bare
 
 ```
 Compiling squares (x86_64-unknown-linux-gnu, bare)
-  load     131 modules, 1 in package         0.03s
-  check    1 module                          0.00s
-  codegen  failed: 95 functions, 1 error     0.12s
+  load      131 modules, 1 in package         0.03s
+  check     1 module                          0.00s
+  codegen   failed: 95 functions, 1 error     0.12s
 [x86_64-unknown-linux-gnu]
 <silk>/lib/silk/stdlib/silk/platform/linux/start.silk:31:5: unsupported[foreign-contract] not supported by the native compiler yet
 Failed squares in 0.17s

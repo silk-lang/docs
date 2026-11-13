@@ -189,8 +189,8 @@ The two services are separate on purpose. Try to provide the seeded generator wh
 
 ```
 Checking timing (x86_64-unknown-linux-gnu)
-  load     161 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.10s
+  load      161 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:144:7: error[SEM0123] silk.system.insecure_random.Xoshiro256StarStar does not implement silk.system.random.Random, so it cannot provide it
 Failed timing in 0.14s

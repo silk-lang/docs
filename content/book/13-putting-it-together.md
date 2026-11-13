@@ -298,9 +298,9 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     145 modules, 1 in package         0.07s
-  check    2 modules                         0.10s
-  borrow   92 bodies                         0.00s
+  load      145 modules, 1 in package         0.07s
+  check     2 modules                         0.10s
+  borrow    92 bodies                         0.00s
 Finished tasks in 0.18s
 ```
 
@@ -347,9 +347,9 @@ The natural first try is a closure, passed as the last argument of `respond`, th
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     235 modules, 8 in package         0.14s
-  check    13 modules                        1.90s
-  borrow   891 bodies                        0.07s
+  load      235 modules, 8 in package         0.14s
+  check     13 modules                        1.90s
+  borrow    891 bodies                        0.07s
 Finished tasks in 2.06s
 ```
 
@@ -503,11 +503,11 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     235 modules, 8 in package         0.12s
-  check    12 modules                        1.48s
-  codegen  7,945 functions                   2.83s
-  borrow   1,452 bodies                      0.11s
-  link     clang                             1.07s
+  load      235 modules, 8 in package         0.12s
+  check     12 modules                        1.48s
+  codegen   7,945 functions                   2.83s
+  borrow    1,452 bodies                      0.11s
+  link      clang                             1.07s
 Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 5.54s
 ```
 

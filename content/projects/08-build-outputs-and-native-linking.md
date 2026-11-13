@@ -7,11 +7,13 @@
 ```
 build/
   llvm/<target>/<profile>/<file>             silk build, silk run
-  llvm/<target>/<profile>/<file>.symbols     symbol map (builds with debug information)
+  llvm/<target>/<profile>/<file>.symbols     symbol map (every build)
+  llvm/<target>/<profile>/<file>.dSYM/       debug information of a macOS executable built with it
   llvm/<target>/<profile>/<file>.debug.wasm  the module with its DWARF (wasm32-unknown-unknown executables with debug information)
   llvm/<target>/<profile>/<file>.map         source map of that module (the same builds)
   llvm/<target>/<profile>/<file>.inputs      the files the build read, to skip an unchanged rebuild
   llvm/<target>/<profile>/<file>.units/      cached compiled code, reused by the next build
+  llvm/<target>/<profile>/<file>.lock        held while a build compiles and links this output
   llvm/<target>/<profile>/<file>.native/     objects compiled from [native].sources
   test/llvm/<target>/<profile>/<name>        silk test runner
   cache/<package>/                           the checker's cache, per package
@@ -24,6 +26,8 @@ build/
 - `<target>` is the full target name, such as `x86_64-unknown-linux-gnu`.
 - `<profile>` is `debug`, `release`, `release-with-debug`, `release-size` or `release-size-with-debug`, or the name of the selected `[profiles.<name>]`. See **Targets and profiles**.
 - The `.inputs`, `.units`, `.native` and `cache` entries only make the next build faster. Deleting them is safe.
+- Two builds of the same output take turns on its `.lock` file, so one never removes objects the other is linking.
+- On macOS, a build with debug information keeps Clang's `<file>.dSYM` bundle beside the executable, so LLDB finds function names and source lines.
 - A `wasm32-unknown-unknown` executable built with debug information ships without its DWARF. The module names `<file>.debug.wasm` in an `external_debug_info` section and `<file>.map` in a `sourceMappingURL` section, so serve them beside it for a browser's debugger. See **Debugging**.
 - `silk clean` deletes the whole output directory.
 
@@ -49,11 +53,11 @@ build/
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.06s
-  check    1 module                          0.14s
-  codegen  689 functions                     0.18s
-  borrow   229 bodies                        0.01s
-  link     clang                             0.29s
+  load      143 modules, 1 in package         0.06s
+  check     1 module                          0.14s
+  codegen   689 functions                     0.18s
+  borrow    229 bodies                        0.01s
+  link      clang                             0.29s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello.s in 0.71s
 ```
 
@@ -61,7 +65,7 @@ The `link` row is the Clang step whatever the stage; for `assembly` it runs `cla
 
 ## The symbol map
 
-Each output of a build with debug information, such as the default `debug` profile, has a `.symbols` file beside it. Each line is a native symbol, its kind and the Silk declaration it comes from, separated by tabs:
+Each output of a build has a `.symbols` file beside it, optimized builds included, so a hashed `silk_...` name in a crash report or a profiler can be traced to its declaration. Each line is a native symbol, its kind and the Silk declaration it comes from, separated by tabs:
 
 ```
 main	export	hello@0.1.0:silk/platform/native/start.silk::_._.enter
@@ -76,22 +80,23 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 | --- | --- |
 | `--clang <path or name>` | `silk build`, `silk run` and `silk test` on a package, and single-file `silk build <source> -o <output>`. A bare name is looked up on `PATH`. |
 | `SILK_CLANG` | Every build without `--clang`, when set. |
+| The bundled Clang | Otherwise, when the compiler has a release's LLVM beside it, at `<prefix>/lib/silk/llvm/bin/clang` for `<prefix>/bin/silkc`. The first build makes the tool links there. |
 | `clang` on `PATH` | Otherwise. |
 
-- Use Clang 22 or newer. Silk hands Clang LLVM 22 bitcode, and a build refuses an older Clang before compiling.
+- A release bundles LLVM 23 (Clang, LLD and `llvm-ar`, for x86-64, ARM64 and WebAssembly). Another Clang must be 22 or newer; a build refuses an older one before compiling.
 - Static archives use `SILK_LLVM_AR` when set, else the `llvm-ar` in Clang's directory.
 - Clang runs with only `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL` and `LC_CTYPE` from your environment. `CFLAGS`, `LDFLAGS` and similar are not passed.
 - An executable link adds `-lc -lm` after everything else.
-- On Linux, an executable links with the `ld.lld` in Clang's installation directory (the `InstalledDir` line of `clang --version`) when there is one, through `--ld-path`. Otherwise Clang uses the system linker. A `platform-supply` that names a linker, and a no-libc build, keep their own linker. The progress row reads `link     clang` either way.
+- On Linux, an executable links with the `ld.lld` in Clang's installation directory (the `InstalledDir` line of `clang --version`) when there is one, through `--ld-path`. Otherwise Clang uses the system linker. A `platform-supply` that names a linker, and a no-libc build, keep their own linker. The bundled Clang has its `ld.lld` beside it. The progress row reads `link      clang` either way.
 - On Linux, an executable is not position independent unless its profile sets `relocation = "pic"`: the default links with `-fno-pic` and `-no-pie`. See Targets and profiles.
 
 | Problem | Message |
 | --- | --- |
-| No `clang` on `PATH` | `silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable` |
+| No bundled Clang and no `clang` on `PATH` | `silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable` |
 | `--clang` name not found | `silk: cannot find nosuchclang on PATH; pass --clang the path of the Clang executable` |
 | The chosen Clang does not start | `silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable`. The parenthesis is `from SILK_CLANG`, `from --clang` or `found on PATH`. |
 
-Each of these fails the target and exits 2. `silk build` and `silk run` print the message, then a `link     failed` row and a `Failed` line.
+Each of these fails the target and exits 2. `silk build` and `silk run` print the message, then a `link      failed` row and a `Failed` line.
 
 ## macOS SDK and Linux sysroots
 
@@ -199,13 +204,13 @@ An entry the target cannot link, such as `{ framework = "Security" }` on Linux, 
 
 ```
 Compiling cmix (x86_64-unknown-linux-gnu, debug)
-  load     135 modules, 1 in package         0.06s
-  check    1 module                          0.09s
-  codegen  484 functions                     0.13s
-  borrow   147 bodies                        0.00s
+  load      135 modules, 1 in package         0.06s
+  check     1 module                          0.09s
+  codegen   484 functions                     0.13s
+  borrow    147 bodies                        0.00s
 [x86_64-unknown-linux-gnu]
 silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: framework Security links only on macOS targets
-  link     failed                            0.02s
+  link      failed                            0.02s
 Failed cmix in 0.33s
 ```
 
@@ -389,9 +394,9 @@ A `main` the runtime cannot start is SEM0225. Here `main` is a plain `pub fn mai
 
 ```
 Compiling sync (x86_64-unknown-linux-gnu, debug)
-  load     123 modules, 1 in package         0.07s
-  check    1 module                          0.05s
-  codegen  failed: 117 functions, 1 error    0.01s
+  load      123 modules, 1 in package         0.07s
+  check     1 module                          0.05s
+  codegen   failed: 117 functions, 1 error    0.01s
 [x86_64-unknown-linux-gnu]
 src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/platform/native/start_sync` cannot start
 Failed sync in 0.15s
@@ -430,10 +435,10 @@ An executable that exports no C `main` is refused before Clang runs, with exit s
 
 ```
 Compiling tiny (x86_64-unknown-linux-gnu, bare)
-  load     116 modules, 1 in package         0.00s
-  check    1 module                          0.00s
-  codegen  0 functions                       0.00s
-  borrow   1 body                            0.00s
+  load      116 modules, 1 in package         0.00s
+  check     1 module                          0.00s
+  codegen   0 functions                       0.00s
+  borrow    1 body                            0.00s
 [x86_64-unknown-linux-gnu]
 silk: an executable built with runtime = { kind = "none" } has no `main`; export one, as `export "C" fn start() -> i32 as "main"` does, or select a runtime
 Failed tiny in 0.01s

@@ -24,26 +24,36 @@ Each module sits in one category directory under `silk/`:
 
 | Category | What it holds |
 | --- | --- |
+| `build` | Build plans that `build.silk` computes: generated modules, native sources and libraries |
+| `cli` | Command lines described as types: options, subcommands, help, completions, and project tasks (`silk.cli.task`) |
 | `collections` | `List`, `Bytes`, `HashMap`, `HashSet`, hashing, slice helpers |
-| `compress` | DEFLATE encoding and decoding, gzip, Zstandard, XZ, LZMA and LZMA2 decoding, checksums, decode limits |
+| `color` | CSS Color 4 color spaces, conversion, gamut mapping and mixing |
+| `compress` | DEFLATE encoding and decoding, gzip, Brotli and Zstandard encoding and decoding, XZ, LZMA and LZMA2 decoding, tar and ZIP archives, checksums, decode limits |
 | `concurrency` | Fibers, schedulers, threads, thread pools, atomics, locks |
 | `core` | `Option`, `Result`, `Effect`, operators, equality, ordering, reflection, target and build facts |
 | `crypto` | Hashes (SHA-1, SHA-2, SHA-3, BLAKE2b, MD5), HMAC, HKDF, AES-GCM, ChaCha20-Poly1305, X25519, Ed25519, P-256, P-384, RSA |
-| `encoding` | Base64, UUIDs |
+| `encoding` | Base64, PEM, byte order, UUIDs |
+| `geometry` | Points, sizes, vectors, rectangles, insets and affine transforms over any number type |
+| `git` | The references of a local Git repository, and of a remote one over HTTP or HTTPS |
 | `http` | The HTTP client and server, messages, headers, HTTP/2 framing and HPACK, WebSockets |
 | `io` | Writers, loggers, standard input, buffered streams |
-| `json`, `toml` | Parsing, building and writing JSON and TOML |
+| `json`, `toml`, `yaml`, `xml` | Parsing, building and writing JSON, TOML and YAML; parsing XML |
+| `markdown` | A Markdown parser with source spans, and HTML output |
 | `mem` | Allocators, arenas, boxes, shared ownership, pointers, stacks |
 | `net` | Socket addresses, sockets, name resolution |
+| `npm` | npm's `.npmrc` files and layered configuration |
 | `num` | One module per number type, such as `silk.num.i32`, plus shared numeric operations |
 | `platform` | The runtimes and system interfaces of each platform: `native`, `linux` (no libc), `wasm`, `wasi` |
+| `schema` | Schemas that read and write your own types as JSON or YAML, with reports and JSON Schema output |
+| `semver` | Semantic versions, and version ranges in the npm and Cargo syntaxes |
 | `simd` | Vectors, masks and CPU feature detection |
 | `support` | The memory routines the compiler calls, such as `memcpy` |
 | `system` | Files, child processes, clocks, randomness, program arguments and environment |
 | `testing` | Test assertions and the test runner |
-| `text` | `string`, `String`, characters, Unicode, formatting |
+| `text` | `string`, `String`, characters, Unicode, formatting, regular expressions, globs, line diffs and patches, international domain names |
 | `tls` | The TLS client, certificates and trust stores |
 | `uri` | URIs, their parts and percent-encoding |
+| `url` | URLs as the WHATWG URL Standard specifies, as browsers parse them, and form encoding |
 
 A module whose name ends in `_native` or `_wasi` is the provider for one kind of platform, as `silk.io.logger_native` provides `silk.io.logger` on hosted targets.
 
@@ -74,7 +84,7 @@ Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `silk` of ap
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.00s
+  load      failed: 1 error                   0.00s
 silk: invalid module /home/you/hello/src/silk of hello@0.1.0: `silk` and `Intrinsic` are reserved module names (`silk.` imports name the standard library and `Intrinsic` the compiler's intrinsics); rename it
 Failed hello in 0.01s
 ```
@@ -103,8 +113,8 @@ silk check --target wasm32-unknown-unknown
 
 ```
 Checking hello (wasm32-unknown-unknown)
-  load     136 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.02s
+  load      136 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.02s
 [wasm32-unknown-unknown]
 src/main.silk:3:32: error[SEM0014] Module silk.io.logger_native has no member StdoutLogger
 Failed hello in 0.07s

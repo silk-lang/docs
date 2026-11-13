@@ -597,6 +597,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Command-line programs',
         'https://github.com/silk-lang/docs/blob/main/content/guides/20-command-line-programs.md',
       ),
+      page(
+        'guides',
+        'regular-expressions',
+        'Regular expressions',
+        'https://github.com/silk-lang/docs/blob/main/content/guides/21-regular-expressions.md',
+      ),
     ],
   },
   {

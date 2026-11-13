@@ -141,8 +141,8 @@ silk check -p tasks
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     203 modules, 7 in package         0.02s
-  check    failed: 12 modules, 1 error       0.00s
+  load      203 modules, 7 in package         0.02s
+  check     failed: 12 modules, 1 error       0.00s
 [x86_64-unknown-linux-gnu]
 tasks/src/main.silk:21:8: error[MOD0001] Unknown module cli.command
   note: did you mean `cli.Command`? Module paths match file names exactly, including letter case
@@ -219,8 +219,8 @@ silk check -p taskcore
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
-  load     130 modules, 5 in package         0.03s
-  check    failed: 5 modules, 2 errors       0.05s
+  load      130 modules, 5 in package         0.03s
+  check     failed: 5 modules, 2 errors       0.05s
 [x86_64-unknown-linux-gnu]
 taskcore/src/Board.silk:52:23: error[SEM0021] Cannot construct Task.Status.Done here because it has fields private to its module; call a function that module provides to build one
 taskcore/src/Store.silk:116:21: error[SEM0028] Pattern names private field `at` of variant `Done`; skip it with `..`, or mark it `pub at` to use it outside its module
@@ -273,8 +273,8 @@ silk check -p taskcore
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
-  load     130 modules, 5 in package         0.03s
-  check    failed: 5 modules, 1 error        0.06s
+  load      130 modules, 5 in package         0.03s
+  check     failed: 5 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 taskcore/src/Store.silk:184:10: error[SEM0129] Return expected i32 but received bool
 Failed taskcore in 0.12s
@@ -287,7 +287,7 @@ The list itself has to be right. An entry that names no module is refused before
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.00s
+  load      failed: 1 error                   0.00s
 Invalid Silk project manifest /home/you/tasks-workspace/taskcore/silk.toml:6: exports of taskcore@0.1.0: Stores is not a module of the package
 Failed taskcore in 0.01s
 Failed 1 of 1 package in 0.01s
@@ -302,9 +302,9 @@ silk build
 
 ```
 Checking taskcore (x86_64-unknown-linux-gnu)
-  load     130 modules, 5 in package         0.06s
-  check    5 modules                         0.18s
-  borrow   115 bodies                        0.00s
+  load      130 modules, 5 in package         0.06s
+  check     5 modules                         0.18s
+  borrow    115 bodies                        0.00s
 Finished taskcore in 0.26s
 ```
 
@@ -365,8 +365,8 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     201 modules, 7 in package         0.08s
-  check    failed: 12 modules, 1 error       0.84s
+  load      201 modules, 7 in package         0.08s
+  check     failed: 12 modules, 1 error       0.84s
 [x86_64-unknown-linux-gnu]
 tasks/src/main.silk:19:38: error[SEM0015] `fileText` is private to taskcore.Store; mark it `pub` there to use it here
 Failed tasks in 0.94s
@@ -382,8 +382,8 @@ import taskcore.Secret { salt }
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     203 modules, 7 in package         0.03s
-  check    failed: 13 modules, 1 error       1.41s
+  load      203 modules, 7 in package         0.03s
+  check     failed: 13 modules, 1 error       1.41s
 [x86_64-unknown-linux-gnu]
 tasks/src/main.silk:27:8: error[MOD0003] Module Secret is not exported by package taskcore@0.1.0
 Failed tasks in 1.47s
@@ -402,8 +402,8 @@ import taskcore.Board { Board, DuplicateTask, NoSuchTask }
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     201 modules, 7 in package         0.04s
-  check    failed: 12 modules, 1 error       0.10s
+  load      201 modules, 7 in package         0.04s
+  check     failed: 12 modules, 1 error       0.10s
 [x86_64-unknown-linux-gnu]
 tasks/src/main.silk:19:25: error[SEM0016] Multiple bindings claim Board; rename one with `as`, as in `import a.b as other` or `import a.b { Board as other }`
   note: tasks/src/main.silk:18:17: related location
@@ -423,9 +423,9 @@ fn openCount(board: &Board<'_>) -> i32 {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     201 modules, 7 in package         0.03s
-  check    12 modules                        1.15s
-  borrow   589 bodies                        0.04s
+  load      201 modules, 7 in package         0.03s
+  check     12 modules                        1.15s
+  borrow    589 bodies                        0.04s
 Finished tasks in 1.23s
 ```
 
@@ -450,8 +450,8 @@ and draw the bar with `run bar(barWidth, done, total)`:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     201 modules, 7 in package         0.02s
-  check    failed: 12 modules, 1 error       0.11s
+  load      201 modules, 7 in package         0.02s
+  check     failed: 12 modules, 1 error       0.11s
 [x86_64-unknown-linux-gnu]
 tasks/src/cli/Show.silk:11:1: error[SEM0214] Invalid compilation configuration: package parameter `barWidth` is not declared in the root package's root module, the only module that may declare `param`
 Failed tasks in 0.18s
@@ -496,11 +496,11 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     201 modules, 7 in package         0.10s
-  check    11 modules                        1.19s
-  codegen  4,645 functions                   1.43s
-  borrow   924 bodies                        0.06s
-  link     clang                             0.75s
+  load      201 modules, 7 in package         0.10s
+  check     11 modules                        1.19s
+  codegen   4,645 functions                   1.43s
+  borrow    924 bodies                        0.06s
+  link      clang                             0.75s
 Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.50s
 ```
 

@@ -1,6 +1,6 @@
 # Install
 
-Silk installs with one script: a shell script on macOS and Linux, and a PowerShell script on Windows (see **Install on Windows**). It downloads a release of Silk, the `silkc` compiler and its standard library, into `~/.silk`, as one version among any others you install later, and installs `silk`, the command you type. `silk` runs each project with the Silk version it pins. You also need Clang 22 or newer, because Silk builds programs through Clang.
+Silk installs with one script: a shell script on macOS and Linux, and a PowerShell script on Windows (see **Install on Windows**). It downloads a release of Silk, the `silkc` compiler and its standard library, into `~/.silk`, as one version among any others you install later, and installs `silk`, the command you type. `silk` runs each project with the Silk version it pins. Each release carries its own LLVM (Clang, LLD and `llvm-ar`), so building programs needs nothing else installed.
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/silk-lang/silk/main/install.sh | sh
@@ -49,7 +49,7 @@ Step by step, the script:
 4. Checks that the compiler `bin/silkc` has the SHA-256 the release publishes in `native-seed.json`, that it reports the requested version, and that its bundled change snapshot matches the release's `changes-snapshot.toml`.
 5. Moves the release into `~/.silk/toolchains/<version>`, replacing an earlier install of the same version, and makes it the default in `~/.silk/settings.toml`, keeping an `auto-install` line already there. Other versions stay installed.
 6. Moves the release's `bin/silk`, the tool, to `~/.silk/bin/silk`, after checking that it runs the installed compiler. The toolchain keeps only the compiler.
-7. Checks your Clang and your `PATH`, and prints what to fix.
+7. Checks your `PATH`, and prints what to fix.
 
 Any failed check stops the script with a `silk-install:` message on standard error, and nothing is installed.
 
@@ -63,6 +63,7 @@ What lands in `~/.silk`:
     bin/silkc                               the compiler
     lib/silk/stdlib/                        the standard library, in source
     lib/silk/changes-snapshot.toml          the change history this compiler was built from
+    lib/silk/llvm/                          the LLVM that builds programs: Clang, LLD and llvm-ar
 ```
 
 Builds add `~/.silk/git/` later, with one folder per commit of the git dependencies they fetch. See **Dependencies**.
@@ -94,69 +95,36 @@ silk-install: silk-lang/silk has no stable compiler release yet; use SILK_CHANNE
 
 Any other channel name stops with `silk-install: SILK_CHANNEL must be auto, stable, or dev`.
 
-## Install Clang
+## LLVM and Clang
 
-Silk compiles your code to LLVM 22 bitcode and hands it to Clang to make the executable, so it needs Clang 22 or newer. An older Clang misreads that bitcode, and `silk build` refuses it before handing it anything. Install LLVM from your package manager or from llvm.org. The Clang that ships with Xcode ("Apple clang") does not qualify, and the installer warns about it; install LLVM's own Clang on macOS too.
+Silk compiles your code to LLVM bitcode and hands it to Clang to make the executable. A release keeps its own LLVM 23 at `lib/silk/llvm`, beside the compiler: one `llvm` executable that is Clang, LLD and `llvm-ar`, for x86-64, ARM64 and WebAssembly. The first build makes the links Clang runs it by (`clang`, `ld.lld`, `ld64.lld`, `wasm-ld`, `lld-link`, `llvm-ar` and `llvm-dlltool`) in `lib/silk/llvm/bin`. A release installed by the script, by Homebrew, by mise or by unpacking the archive by hand works the same way. You do not install Clang yourself.
 
-The compiler uses the Clang named by `--clang <path>` on `silk build`, `silk run` or `silk test`, else the one named by the `SILK_CLANG` environment variable, else the first `clang` on your `PATH`.
+The compiler uses the Clang named by `--clang <path>` on `silk build`, `silk run` or `silk test`, else the one named by the `SILK_CLANG` environment variable, else the bundled Clang, else the first `clang` on your `PATH`. Another Clang must be 22 or newer. The archiver comes from `SILK_LLVM_AR`, or else the `llvm-ar` in the same folder as the Clang in use.
 
-The archiver comes from `SILK_LLVM_AR`, or else the `llvm-ar` in the same folder as that Clang.
+On Linux, an executable links with the `ld.lld` in Clang's installation directory when there is one, which is faster than the system linker. The bundled Clang has one beside it. The progress row reads `link      clang` either way.
 
-On Linux, an executable links with the `ld.lld` in Clang's installation directory when there is one, which is faster than the system linker. LLD is optional: without it, Clang uses the system linker. Clang's installation directory is the `InstalledDir` line of `clang --version`, such as `/usr/lib/llvm-22/bin`, so on Debian or Ubuntu install the `lld-22` package next to `clang-22`. The progress row still reads `link     clang` either way.
+On macOS, a plain program links with no SDK. A package with C sources or native libraries needs the macOS SDK, found through `xcrun`, else at `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`, else at Xcode's default SDK. With none, the build stops and says to install the Command Line Tools with `xcode-select --install` or to set `SDKROOT` to an SDK directory.
 
-If your default `clang` is older than 22, point `SILK_CLANG` at a newer one:
-
-```sh
-export SILK_CLANG=/usr/lib/llvm-22/bin/clang
-```
-
-The installer checks the Clang it would use. An older Clang, or Apple clang, gets a warning:
-
-```
-Silk needs Clang 22 or newer, but clang is: Ubuntu clang version 18.1.3 (1ubuntu1)
-Put LLVM 22 or newer on PATH, or set SILK_CLANG to its clang.
-```
-
-A build with an older Clang stops at the link step and names the Clang it found:
+A build with a Clang older than 22 stops at the link step and names the Clang it found:
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.05s
-  check    1 module                          0.14s
-  codegen  689 functions                     0.13s
-  borrow   229 bodies                        0.01s
-silk: Silk builds need Clang 22 or newer, but /usr/bin/clang-18 (from SILK_CLANG) is Clang 18; set SILK_CLANG or pass --clang the path of a newer Clang
-  link     failed                            0.02s
-Failed hello in 0.37s
-```
-
-With no Clang at all, the installer prints `Silk needs Clang 22 or newer to build programs. Put it on PATH, or set SILK_CLANG to it.`, and `silk build` and `silk run` stop at the link step:
-
-```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.06s
-  check    1 module                          0.14s
-  codegen  689 functions                     0.13s
-  borrow   229 bodies                        0.01s
-silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable
-  link     failed                            0.00s
-Failed hello in 0.35s
+  load      166 modules, 1 in package         0.03s
+  check     1 module                          0.00s
+  codegen   387 functions                     0.14s
+  borrow    253 bodies                        0.00s
+silk: Silk builds need Clang 22 or newer, but /usr/bin/clang (from SILK_CLANG) is Clang 18; set SILK_CLANG or pass --clang the path of a newer Clang
+  link      failed                            0.86s
+Failed hello in 1.07s
 ```
 
 If the chosen Clang cannot start, for example because `SILK_CLANG` names a file that does not exist, the message names the path and where it came from: `from SILK_CLANG`, `from --clang` or `found on PATH`.
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.06s
-  check    1 module                          0.14s
-  codegen  689 functions                     0.14s
-  borrow   229 bodies                        0.01s
 silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable
-  link     failed                            0.00s
-Failed hello in 0.36s
 ```
 
-All three failures exit with status 2.
+A compiler with no bundled LLVM beside it, such as one you built yourself, and no `clang` on your `PATH`, stops with `silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable`. All three failures exit with status 2.
 
 ## Add silk to your PATH
 
@@ -258,13 +226,7 @@ silk --version
 
 ### LLVM on Windows
 
-Building programs needs LLVM 22 or newer: Clang, plus the `lld-link` and `llvm-dlltool` that LLVM installs beside it. Install it with the LLVM Windows installer from [LLVM's releases](https://github.com/llvm/llvm-project/releases), or with winget:
-
-```powershell
-winget install LLVM.LLVM
-```
-
-Put LLVM's `bin` folder, usually `C:\Program Files\LLVM\bin`, on your `PATH`, or point `SILK_CLANG` at `clang.exe`:
+The release carries its own LLVM at `lib\silk\llvm`, with `lld-link` and `llvm-dlltool`, so building programs needs nothing else installed. The compiler makes hard links to the `llvm.exe` there on first use, since a ZIP cannot hold links. To use another LLVM 22 or newer, point `SILK_CLANG` at its `clang.exe`:
 
 ```powershell
 $env:SILK_CLANG = 'C:\Program Files\LLVM\bin\clang.exe'
@@ -314,21 +276,19 @@ Running the script again does both. Add `SILK_RELEASE` to the script to install 
 
 Each package records the Silk version it runs with in `silk.toml` as `silk-version`. `silk init` writes your default version. Inside the package, `silk` hands every command to that version, so two projects on one machine can use different releases. A pin of `0.0.0` pins nothing.
 
-Pin a version from inside a project with `silk set`, then install it with `silk use`:
+Pin a version from inside a project with `silk set`. It also installs that version:
 
 ```sh
-silk set 0.1.0-dev.11
-silk use
+silk set 0.1.0-dev.72
 ```
 
 ```
-Pinned Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/app/silk.toml ([package].silk-version, was 0.1.0)
-Silk 0.1.0-dev.11+6de14da2a8a6 is not installed yet. Install it with: silk use
-note: Silk 0.1.0-dev.11+6de14da2a8a6 is older than this tool (0.1.0); if it cannot read this silk.toml, pin a newer version or edit the manifest for it
-Installed Silk 0.1.0-dev.11+6de14da2a8a6 in /home/you/.silk/toolchains/0.1.0-dev.11+6de14da2a8a6
+Pinned Silk 0.1.0-dev.72+9c780a04d6ef in /home/you/app/silk.toml ([package].silk-version, was 0.1.0-dev.73+a4ea55e44e78)
+Installed Silk 0.1.0-dev.72+9c780a04d6ef in /home/you/.silk/toolchains/0.1.0-dev.72+9c780a04d6ef
+note: Silk 0.1.0-dev.72+9c780a04d6ef is older than this tool (0.1.0-dev.73+a4ea55e44e78); if it cannot read this silk.toml, pin a newer version or edit the manifest for it
 ```
 
-`silk set` names the version it replaced, and warns when the new pin is older than the tool, since an older compiler may not read every key of a newer manifest. The last line comes from `silk use`.
+`silk set` names the version it replaced, and warns when the new pin is older than the tool, since an older compiler may not read every key of a newer manifest. `silk set <version> --no-install` only edits the manifest.
 
 After cloning someone's project, `silk use` alone installs the version it pins. When a project pins a version you do not have, its commands stop with exit status 3 and name the fix:
 

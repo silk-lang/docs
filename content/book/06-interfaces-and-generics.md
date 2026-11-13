@@ -43,8 +43,8 @@ silk check
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.05s
-  check    failed: 2 modules, 1 error        0.12s
+  load      143 modules, 1 in package         0.05s
+  check     failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:13:7: error[SEM0121] `main.Status: silk.text.format.Display` cannot be proved: no implementation of `silk.text.format.Display` exists for `main.Status`
 Failed scratch in 0.19s
@@ -142,8 +142,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.06s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:9:15: error[SEM0157] Enum Priority has no order, so >= does not apply; compare backing values with `Priority.value(...)` instead
 Failed scratch in 0.09s
@@ -182,8 +182,8 @@ Notice the comment: the operators work on references. `Order.compare` takes `&Se
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     144 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.26s
+  load      144 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.26s
 [x86_64-unknown-linux-gnu]
 src/main.silk:120:18: error[SEM0135] Operator == does not accept (main.TaskId, main.TaskId)
 Failed tasks in 0.30s
@@ -283,8 +283,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.01s
-  check    failed: 2 modules, 1 error        0.05s
+  load      135 modules, 1 in package         0.01s
+  check     failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:1: error[SEM0083] Invalid conformance: `Filter` requires `keep`, which this implementation does not define
 Failed scratch in 0.08s
@@ -424,8 +424,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.01s
-  check    failed: 2 modules, 1 error        0.05s
+  load      135 modules, 1 in package         0.01s
+  check     failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:10: error[SEM0077] `next` changes what it captures, so calling it needs a mutable binding; declare it `let mut next`
 Failed scratch in 0.08s

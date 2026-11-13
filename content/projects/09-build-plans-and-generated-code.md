@@ -131,7 +131,7 @@ A plan that goes wrong refuses the build with exit status 1, naming `build.silk`
 
 ```
 Checking tables (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.06s
+  load      failed: 1 error                   0.06s
 silk: /home/you/tables/build.silk: build.silk computes no plan: its `PLAN` cannot be evaluated
 [x86_64-unknown-linux-gnu]
 build.silk:1:1: error[SEM0006] A present value name with no matching local declaration
@@ -178,7 +178,7 @@ A step that fails refuses the build and shows what it printed:
 
 ```
 Compiling tables (x86_64-unknown-linux-gnu, debug)
-  load     failed: 1 error                   0.10s
+  load      failed: 1 error                   0.10s
 silk: /home/you/tables/build.silk: build.silk computes no plan: its tool step `colors` failed with status 4:
 no network
 

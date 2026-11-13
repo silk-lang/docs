@@ -177,8 +177,8 @@ import geometry.Point { secret }
 
 ```
 Checking shapes (x86_64-unknown-linux-gnu)
-  load     139 modules, 3 in package         0.03s
-  check    failed: 4 modules, 1 error        0.06s
+  load      139 modules, 3 in package         0.03s
+  check     failed: 4 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:1:25: error[SEM0015] `secret` is private to geometry.Point; mark it `pub` there to use it here
 Failed shapes in 0.11s

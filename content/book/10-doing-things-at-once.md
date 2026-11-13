@@ -75,11 +75,11 @@ TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     165 modules, 1 in package         0.07s
-  check    1 module                          0.39s
-  codegen  2,555 functions                   0.46s
-  borrow   484 bodies                        0.02s
-  link     clang                             0.58s
+  load      165 modules, 1 in package         0.07s
+  check     1 module                          0.39s
+  codegen   2,555 functions                   0.46s
+  borrow    484 bodies                        0.02s
+  link      clang                             0.58s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.53s
 115 minutes in total
 time 0.603s
@@ -102,11 +102,11 @@ effect fn total() -> i32
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     165 modules, 1 in package         0.03s
-  check    1 module                          0.14s
-  codegen  2,792 functions                   0.84s
-  borrow   518 bodies                        0.02s
-  link     clang                             0.20s
+  load      165 modules, 1 in package         0.03s
+  check     1 module                          0.14s
+  codegen   2,792 functions                   0.84s
+  borrow    518 bodies                        0.02s
+  link      clang                             0.20s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.25s
 115 minutes in total
 time 0.303s
@@ -223,8 +223,8 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.16s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.16s
 [x86_64-unknown-linux-gnu]
 src/main.silk:14:49: error[SEM0076] The Effect passed here also requires &mut Logger, but the expected Effect may only require &mut Scheduler | &mut MonotonicClock; provide &mut Logger inside it, or run that work before passing it
 Failed tasks in 0.20s
@@ -248,8 +248,8 @@ effect fn root<'text>(title: string<'text>) -> () ! OutOfMemoryError | TaskIdExh
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.01s
-  check    failed: 2 modules, 1 error        0.08s
+  load      143 modules, 1 in package         0.01s
+  check     failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
 src/main.silk:14:15: error[SEM0212] This value must live for `'static`, but it borrows something that lives only as long as a lifetime of the enclosing function; pass owned data instead of a borrow
 Failed tasks in 0.11s
@@ -337,8 +337,8 @@ The closure receives `state: &mut Fired` and hands it to `record`. Check it:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     178 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.94s
+  load      178 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.94s
 [x86_64-unknown-linux-gnu]
 src/main.silk:590:63: error[OWN0003] `state` is a `&mut` reference: lend it again with `&mut state` (a reborrow), or write `move state` to give it away
 Failed tasks in 1.00s
@@ -437,8 +437,8 @@ pub effect fn main() -> i32 ! OutOfMemoryError | TaskIdExhaustedError | Cancelle
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.09s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:16:10: error[SEM0071] This `run` needs `&mut Scheduler | &mut MonotonicClock`, which the enclosing function does not provide; add `? &mut Scheduler | &mut MonotonicClock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 Failed tasks in 0.13s
@@ -507,8 +507,8 @@ effect fn parseMilliseconds(word: string) -> u64 ! UsageError {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     178 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.72s
+  load      178 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.72s
 [x86_64-unknown-linux-gnu]
 src/main.silk:477:33: error[SEM0009] Unknown name u32; is `import silk.num.u32` missing?
 Failed tasks in 0.78s

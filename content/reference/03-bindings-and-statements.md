@@ -79,8 +79,9 @@ ConstDeclaration = 'pub'? 'const' Identifier ':' Type '=' Expression
 
 - `let static name = e` evaluates `e` at compile time and binds the result. `e` may call only `static fn` functions (SEM0176 otherwise). `let static mut` is not allowed. See Static evaluation.
 - `const NAME: T = e` declares a module-level constant. The type annotation is required: `const A = 5` is SEM0086.
-- A constant's type is `bool`, `char`, an integer or float type, `string`, a fixed array of these, or a struct or enum: `const ORIGIN: Point = Point { x: 1, y: 1 }` and `const STEPS: [i32; 3] = [1, 2, 3]` are constants. Any other type, such as `&[u8]`, is SEM0086: "Invalid constant: a constant cannot have type `&'static [u8]`; its type must be `bool`, `char`, an integer or float primitive, `string`, a fixed array of these, or a struct or enum".
+- A constant's type is `bool`, `char`, an integer or float type, `string`, `&'static [u8]`, a fixed array of these, or a struct or enum: `const ORIGIN: Point = Point { x: 1, y: 1 }`, `const STEPS: [i32; 3] = [1, 2, 3]` and `const MAGIC: &[u8] = b"\x7fELF"` are constants. Any other type, such as `&[string]`, is SEM0086: "Invalid constant: a constant cannot have type `&'static [string<'static>]`; its type must be `bool`, `char`, an integer or float primitive, `string`, `&'static [u8]`, a fixed array of these, or a struct or enum".
 - A struct with a `Drop` impl can't be a constant. Its initializer is SEM0176.
+- A method call on a constant calls the method on the constant's value: with `const LIMITS: Span = ...`, `LIMITS.length()` is `Span.length(&LIMITS)`. A method the type does not have is SEM0010 at the member: "main.Span has no method `size`".
 - `&NAME` borrows a constant for `'static`, so it can be passed where a `&'static` reference is expected. See Borrowing.
 - A constant initializer may use operators and `static fn` calls: `const C: i32 = 1 + 2`.
 - `pub const` exports the constant.

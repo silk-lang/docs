@@ -83,14 +83,31 @@ ExactType           = 'typeof' '(' Path ')'
 | `Reflect.variantFields(variant)` | A static sequence of the variant's field descriptors; empty for a unit variant |
 | `Reflect.makeVariant(variant, fields)` | A `U` built from a tuple of the variant's fields in order, or `()` for a unit variant |
 | `Reflect.isVariant(owner, variant)` | Whether `owner: &U` holds that variant |
+| `Reflect.borrowVariantField(owner, variant, field)` | `&V`, a borrow of that field of the variant `owner: &U` holds; traps when it holds another variant |
+| `Reflect.borrowVariantFieldMut(owner, variant, field)` | `&mut V`, a mutable borrow of that field, from `owner: &mut U`; traps the same way |
 
 - Kind constants in `silk/core/reflect`: `namedKind` (0, a `struct`), `positionalKind` (1, a `tuple` declaration), `anonymousNamedKind` (2, a `.{ ... }` record), `anonymousPositionalKind` (3, a `( ... )` tuple), `arrayKind` (4, a fixed array), `otherKind` (5, any other type, such as `i32`, `string`, a slice, an enum or a structural union `A | B`) and `unionKind` (6, a nominal `union`).
 - Field kind constants: `labeledFieldKind` (0), `positionalFieldKind` (1) and `variantFieldKind` (2, a field of a union variant, which has both a label and an ordinal).
-- Every operation except `borrowField`, `borrowFieldMut`, `makeVariant` and `isVariant` is a `static fn`. Calling one where a runtime value is needed, as in `let fields = Reflect.fields<P>()` in an ordinary function, is SEM0176.
-- `borrowField`, `borrowFieldMut`, `makeVariant` and `isVariant` run at runtime. Their descriptor parameter is `static`, so the descriptor must come from static code, usually a `static for` binding. Type arguments may be written (`borrowField<P, i32>`) or inferred.
+- Every operation except `borrowField`, `borrowFieldMut`, `borrowVariantField`, `borrowVariantFieldMut`, `makeVariant` and `isVariant` is a `static fn`. Calling one where a runtime value is needed, as in `let fields = Reflect.fields<P>()` in an ordinary function, is SEM0176.
+- `borrowField`, `borrowFieldMut`, `borrowVariantField`, `borrowVariantFieldMut`, `makeVariant` and `isVariant` run at runtime. Their descriptor parameter is `static`, so the descriptor must come from static code, usually a `static for` binding. Type arguments may be written (`borrowField<P, i32>`) or inferred.
 - `borrowFieldMut` lets generic code write each field in place: `let place = Reflect.borrowFieldMut(&mut owner.*, field)` then `place.* = place.* + amount`.
 - At runtime `makeVariant(line, (a, b))` is a plain variant construction and `isVariant` a plain test of the active variant, like a one-arm `match`.
-- A variant's field descriptors cannot be given to `borrowField`.
+- A variant's field descriptors cannot be given to `borrowField`; give them, with their variant, to `borrowVariantField` or `borrowVariantFieldMut`. At runtime each is a test of the active variant followed by a plain field borrow, like a `match` arm that binds that field, so test with `isVariant` first:
+
+```silk
+// Doubles the fields of whichever variant `shape` holds.
+fn double(shape: &mut Shape) -> () {
+  static for variant in Reflect.variants<Shape>() {
+    if Reflect.isVariant(&shape.*, variant) {
+      static for field in Reflect.variantFields(variant) {
+        let place = Reflect.borrowVariantFieldMut<Shape, u32>(&mut shape.*, variant, field)
+        place.* = place.* * 2
+      }
+    }
+  }
+}
+```
+
 - Comparing labels is static: `static if Reflect.fieldLabel(field) == "count"` selects one field.
 - `Reflect.fields<T>()` and `Reflect.variantFields` list only `pub` fields, even when called in the module that declares `T`. Visibility is that of `silk/core/reflect`. For the same reason `makeVariant` needs every field of the variant to be `pub`; a private field is SEM0021 at the call ("Cannot construct main.Shape.Line here because it has fields private to its module").
 - `Intrinsic.reflectFields<T>()` uses the calling module's visibility instead, so it also lists private fields of a local type. See Intrinsics.

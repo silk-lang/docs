@@ -314,8 +314,8 @@ Each successful attempt now reports its own time. The slow station's reads all t
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.09s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:126:26: error[SEM0076] Callable value with mode `once` cannot satisfy a parameter with mode `mut`, which may call it more than once
 Failed weather in 0.14s
@@ -348,8 +348,8 @@ An effect that borrows a local keeps the borrow from the moment it is built unti
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.10s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:120:16: error[OWN0011] Reading `station.reads` while a borrow of it is still in use; use that borrow for the last time before this
   note: src/main.silk:119:38: the borrow starts here
@@ -362,8 +362,8 @@ If `retrying` declared its predicate as a plain `fn(&E) -> bool`, the closure th
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.10s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:119:55: error[SEM0076] Callable value with mode `mut` cannot satisfy a parameter with mode shared (no `mut` or `once`), which may call it through a shared borrow
 Failed weather in 0.15s
@@ -418,9 +418,9 @@ A combinator can log like any other effect function, type parameters and all. Ad
 
 ```
 Checking weather (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    2 modules                         0.33s
-  borrow   171 bodies                        0.01s
+  load      143 modules, 1 in package         0.02s
+  check     2 modules                         0.33s
+  borrow    171 bodies                        0.01s
 Finished weather in 0.37s
 ```
 

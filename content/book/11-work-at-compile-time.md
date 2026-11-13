@@ -61,7 +61,7 @@ silk check
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.15s
+  load      failed: 1 error                   0.15s
 [x86_64-unknown-linux-gnu]
 src/main.silk:1:41: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
 Failed scratch in 0.15s
@@ -140,8 +140,8 @@ The statement form is a little stricter than the module form. You might want thr
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     180 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        1.04s
+  load      180 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        1.04s
 [x86_64-unknown-linux-gnu]
 src/main.silk:610:10: error[PAR0001] Expected `{`
 Failed tasks in 1.11s
@@ -162,8 +162,8 @@ pub fn main() -> i32 {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.08s
-  check    failed: 2 modules, 1 error        0.11s
+  load      135 modules, 1 in package         0.08s
+  check     failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 src/main.silk:4:14: error[PAR0001] Expected identifier
 Failed tasks in 0.20s
@@ -188,11 +188,11 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     180 modules, 1 in package         0.08s
-  check    1 module                          1.50s
-  codegen  4,645 functions                   0.93s
-  borrow   918 bodies                        0.06s
-  link     clang                             0.81s
+  load      180 modules, 1 in package         0.08s
+  check     1 module                          1.50s
+  codegen   4,645 functions                   0.93s
+  borrow    918 bodies                        0.06s
+  link      clang                             0.81s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.36s
 tasks 0.11 (linux, debug build)
 tasks file /tasks.txt, reminders wait 250ms
@@ -209,17 +209,13 @@ silk build --release
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, release)
-  load     180 modules, 1 in package         0.03s
-  check    1 module                          1.46s
-  codegen  4,645 functions                   1.15s
-  borrow   918 bodies                        0.06s
-  link     clang                             6.38s
+  ...
 Finished build/llvm/x86_64-unknown-linux-gnu/release/tasks in 9.04s
 tasks 0.11 (linux, release build)
 tasks file /tasks.txt, reminders wait 250ms
 ```
 
-Release builds go to their own `release` directory. See **Static control flow and reflection** in the reference for every target and build query.
+Release builds go to their own `release` directory, and their progress has one more row, `optimize`, where Clang optimizes the whole program before the `link` row. See **Static control flow and reflection** in the reference for every target and build query.
 
 ## Setting parameters in silk.toml
 
@@ -244,11 +240,11 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     180 modules, 1 in package         0.03s
-  check    1 module                          1.48s
-  codegen  4,645 functions                   1.03s
-  borrow   918 bodies                        0.06s
-  link     clang                             0.15s
+  load      180 modules, 1 in package         0.03s
+  check     1 module                          1.48s
+  codegen   4,645 functions                   1.03s
+  borrow    918 bodies                        0.06s
+  link      clang                             0.15s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.73s
 tasks 0.11 (linux, debug build)
 tasks file /tasks.txt, reminders wait 300ms
@@ -271,7 +267,7 @@ The `where` clause guards values from `silk.toml` too. Change the value to `9000
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.03s
+  load      failed: 1 error                   0.03s
 [x86_64-unknown-linux-gnu]
 src/main.silk:245:43: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
 Failed tasks in 0.05s
@@ -283,7 +279,7 @@ A typo in the parameter name is a different mistake, so it points somewhere else
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.03s
+  load      failed: 1 error                   0.03s
 /home/you/tasks/silk.toml:7: error[SEM0214] invalid package parameter binding: module `main.silk` declares no package parameter `remindBudget`
 Failed tasks in 0.04s
 ```
@@ -310,11 +306,11 @@ ls *.txt
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, demo)
-  load     180 modules, 1 in package         0.04s
-  check    1 module                          1.44s
-  codegen  4,645 functions                   1.07s
-  borrow   918 bodies                        0.06s
-  link     clang                             0.71s
+  load      180 modules, 1 in package         0.04s
+  check     1 module                          1.44s
+  codegen   4,645 functions                   1.07s
+  borrow    918 bodies                        0.06s
+  link      clang                             0.71s
 Finished build/llvm/x86_64-unknown-linux-gnu/demo/tasks in 3.29s
 tasks 0.11 (linux, debug build)
 tasks file /demo-tasks.txt, reminders wait 300ms
@@ -353,11 +349,11 @@ silk build --profile small
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, small)
-  load     180 modules, 1 in package         0.08s
-  check    1 module                          1.31s
-  codegen  4,645 functions                   1.16s
-  borrow   918 bodies                        0.05s
-  link     clang                             5.30s
+  load      180 modules, 1 in package         0.08s
+  check     1 module                          1.31s
+  codegen   4,645 functions                   1.16s
+  borrow    918 bodies                        0.05s
+  link      clang                             5.30s
 Finished build/llvm/x86_64-unknown-linux-gnu/small/tasks in 7.89s
 tasks 0.11 (linux, debug build)
 tasks file /tasks.txt, reminders wait 300ms
@@ -434,11 +430,11 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     180 modules, 1 in package         0.04s
-  check    1 module                          0.07s
-  codegen  4,645 functions                   2.00s
-  borrow   829 bodies                        0.04s
-  link     clang                             0.07s
+  load      180 modules, 1 in package         0.04s
+  check     1 module                          0.07s
+  codegen   4,645 functions                   2.00s
+  borrow    829 bodies                        0.04s
+  link      clang                             0.07s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.26s
 [ ] #2 Write the Silk book (high)
 [ ] #1 Buy milk (normal)
@@ -451,8 +447,8 @@ One of four done, five of twenty cells. Now make the mistake on purpose: change 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     180 modules, 1 in package         0.05s
-  check    failed: 2 modules, 1 error        1.47s
+  load      180 modules, 1 in package         0.05s
+  check     failed: 2 modules, 1 error        1.47s
 [x86_64-unknown-linux-gnu]
 src/main.silk:577:5: error[SEM0177] a progress bar is 1 to 40 cells wide
   note: src/main.silk:568:7: related location
@@ -480,8 +476,8 @@ pub fn main() -> i32 {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.05s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:3:13: error[SEM0176] reading the runtime value `verbose` is not available during static evaluation for x86_64-unknown-linux-gnu
 Failed tasks in 0.09s
@@ -625,11 +621,11 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     180 modules, 1 in package         0.08s
-  check    1 module                          1.50s
-  codegen  4,645 functions                   0.93s
-  borrow   918 bodies                        0.06s
-  link     clang                             0.81s
+  load      180 modules, 1 in package         0.08s
+  check     1 module                          1.50s
+  codegen   4,645 functions                   0.93s
+  borrow    918 bodies                        0.06s
+  link      clang                             0.81s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.36s
 id,title,priority,done
 1,Buy milk,normal,no
@@ -644,11 +640,11 @@ Two changes are worth trying here. First, `done` is a yes-or-no value, so `bool`
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     180 modules, 1 in package         0.04s
-  check    1 module                          0.16s
-  codegen  4,675 functions                   2.05s
-  borrow   840 bodies                        0.05s
-  link     clang                             0.44s
+  load      180 modules, 1 in package         0.04s
+  check     1 module                          0.16s
+  codegen   4,675 functions                   2.05s
+  borrow    840 bodies                        0.05s
+  link      clang                             0.44s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.77s
 id,title,priority,done
 1,Buy milk,normal,false

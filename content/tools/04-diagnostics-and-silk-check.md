@@ -12,9 +12,9 @@ With no errors, you get a heading, one row per compiler phase, and a final line:
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.06s
-  check    2 modules                         0.14s
-  borrow   123 bodies                        0.00s
+  load      143 modules, 1 in package         0.06s
+  check     2 modules                         0.14s
+  borrow    123 bodies                        0.00s
 Finished hello in 0.22s
 ```
 
@@ -39,8 +39,8 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.01s
-  check    failed: 2 modules, 1 error        0.07s
+  load      135 modules, 1 in package         0.01s
+  check     failed: 2 modules, 1 error        0.07s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
 Failed hello in 0.10s
@@ -67,8 +67,8 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     162 modules, 1 in package         0.05s
-  check    failed: 2 modules                 0.06s
+  load      162 modules, 1 in package         0.05s
+  check     failed: 2 modules                 0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:2:7: warning[SEM0255] `unused` is never used; remove it, or start its name with `_` to keep it
 silk: warnings fail this command; fix them, or pass --ignore-warnings to allow them
@@ -97,8 +97,8 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 2 errors       0.06s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 2 errors       0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:5:4: error[SEM0003] Duplicate declaration name half
   note: src/main.silk:1:4: related location
@@ -124,8 +124,8 @@ pub fn main() -> i32 {
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 2 errors       0.11s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 2 errors       0.11s
 [x86_64-unknown-linux-gnu]
 src/main.silk:1:20: error[PAR0001] Expected `)`
 src/main.silk:6:20: error[SEM0037] Assignment expected i32 but received string<'static>
@@ -142,14 +142,14 @@ silk check --target host --target wasm32-unknown-unknown
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.06s
-  check    failed: 2 modules, 1 error        0.09s
+  load      135 modules, 1 in package         0.06s
+  check     failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
 Failed hello in 0.17s
 Checking hello (wasm32-unknown-unknown)
-  load     126 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.03s
+  load      126 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.03s
 [wasm32-unknown-unknown]
 src/main.silk:7:15: error[SEM0012] Expected i32 but received i64
 Failed hello in 0.07s
@@ -215,28 +215,31 @@ The heading, the phase rows and the final line are progress output. `silk check`
 | `check` | Modules analyzed |
 | `borrow` | Function bodies checked for ownership and borrowing |
 | `codegen` | Functions turned into machine code (`silk build` and `silk run`) |
+| `optimize` | Clang optimizing the whole program into one object, in an optimized native build. A rebuild whose program did not change reuses that object and shows no `optimize` row |
 | `link` | The native linker run (`silk build` and `silk run`) |
 
 `silk build` and `silk run` end with `Finished` and the path of the program they built, relative to the current directory. When the program is outside it, as when you build inside a workspace member, the path is absolute; it never starts with `../`. A command that stops on an error ends with `Failed <package> in <time>`.
 
-A phase that fails says so in its row: `check    failed: 2 modules, 1 error`. A row with nothing more to say reads just `failed`, as the `link` row does when Clang is missing:
+A phase that fails says so in its row: `check     failed: 2 modules, 1 error`. A row with nothing more to say reads just `failed`, as the `link` row does when the Clang named by `SILK_CLANG` cannot start:
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.06s
-  check    1 module                          0.14s
-  codegen  689 functions                     0.13s
-  borrow   229 bodies                        0.01s
-silk: cannot find clang on PATH; set SILK_CLANG or pass --clang the path of the Clang executable
-  link     failed                            0.00s
-Failed hello in 0.35s
+  load      166 modules, 1 in package         0.03s
+  check     1 module                          0.00s
+  codegen   387 functions                     0.14s
+  borrow    253 bodies                        0.00s
+silk: cannot run the C compiler /nope/clang (from SILK_CLANG); set SILK_CLANG or pass --clang the path of the Clang executable
+  link      failed                            0.00s
+Failed hello in 0.18s
 ```
+
+A `silk check` that a check server answers prints only the heading and the final line; see **The check server** in the Command-line reference.
 
 A build that is refused before any module is checked, such as an `exports` entry that names no module, still gets a `load` row, then the message:
 
 ```
 Checking text-utils (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.00s
+  load      failed: 1 error                   0.00s
 Invalid Silk project manifest /home/you/text-utils/silk.toml:6: exports of text-utils@0.1.0: Stores is not a module of the package
 Failed text-utils in 0.01s
 ```
@@ -279,9 +282,9 @@ silk check --timings
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    2 modules                         0.09s
-  borrow   104 bodies                        0.00s
+  load      143 modules, 1 in package         0.02s
+  check     2 modules                         0.09s
+  borrow    104 bodies                        0.00s
   Slowest modules to check
        46.3ms  silk/platform/native/start.silk
        17.1ms  silk/text/format.silk

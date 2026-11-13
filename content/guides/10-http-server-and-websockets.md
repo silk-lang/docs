@@ -474,11 +474,11 @@ silk build
 
 ```
 Compiling greeter (x86_64-unknown-linux-gnu, debug)
-  load     191 modules, 1 in package         0.13s
-  check    1 module                          1.06s
-  codegen  2,980 functions                   1.00s
-  borrow   915 bodies                        0.07s
-  link     clang                             0.98s
+  load      191 modules, 1 in package         0.13s
+  check     1 module                          1.06s
+  codegen   2,980 functions                   1.00s
+  borrow    915 bodies                        0.07s
+  link      clang                             0.98s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/greeter in 3.21s
 ```
 

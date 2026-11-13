@@ -269,8 +269,8 @@ pub effect fn main() -> i32 ! LogError | HostInputError | OutOfMemoryError ? &mu
 
 ```
 Checking notes (x86_64-unknown-linux-gnu)
-  load     153 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.11s
+  load      153 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.11s
 [x86_64-unknown-linux-gnu]
 src/main.silk:189:58: error[SEM0067] Invalid Effect.catch handler: its parameter type `main.UsageError | main.BadText | silk.system.filesystem.AtomicWriteError | silk.system.filesystem.FileError | silk.mem.allocator.OutOfMemoryError` does not accept `silk.io.logger.LogError`, a failure of the handled Effect; add it to the parameter's union
 Failed notes in 0.15s

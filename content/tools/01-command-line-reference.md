@@ -141,21 +141,21 @@ See **Dependencies** in Projects and packages.
 ## check
 
 ```
-silk check [project options] [--progress <mode>] [--quiet] [--timings] [--json] [--replay <script> [--differential]]
+silk check [project options] [--progress <mode>] [--quiet] [--timings] [--json] [--no-server] [--replay <script> [--differential]]
 ```
 
 Analyzes every planned target without generating code. Each target prints a heading, a row per phase and a final line, on standard error. See **Diagnostics and silk check**.
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.06s
-  check    2 modules                         0.14s
-  borrow   123 bodies                        0.00s
+  load      143 modules, 1 in package         0.06s
+  check     2 modules                         0.14s
+  borrow    123 bodies                        0.00s
 Finished hello in 0.22s
 Checking hello (wasm32-wasip1)
-  load     136 modules, 1 in package         0.02s
-  check    2 modules                         0.08s
-  borrow   79 bodies                         0.00s
+  load      136 modules, 1 in package         0.02s
+  check     2 modules                         0.08s
+  borrow    79 bodies                         0.00s
 Finished hello in 0.11s
 ```
 
@@ -169,6 +169,25 @@ That is `silk check --target host --target wasm32-wasip1` on the program `silk i
 | `--json` | Write each diagnostic as one JSON object per line, with no progress output |
 | `--replay <script>` | Apply the edits in a TOML script in memory and print the incremental checker's counters for each step, on standard output |
 | `--differential` | With `--replay`, also check each step from scratch and exit 1 if the results differ |
+| `--no-server` | Check in this process only, without asking a check server or leaving one behind |
+
+### The check server
+
+On Linux (GNU) and macOS, the last check of a `silk check` run that checks one package leaves a copy of itself behind, a check server. It keeps everything that check loaded and listens on a Unix socket in `$XDG_RUNTIME_DIR`, or in `/tmp/silk-<uid>` when that is not set. The socket is named after what the check depends on besides the sources: the compiler, the manifest, the profile, the standard library and the output options. The next `silk check` of the same project asks the server first. The server rereads the files that changed, rechecks only what the edit reaches and answers with the diagnostics and the exit status, usually in a few hundredths of a second. A served check prints no phase rows:
+
+```
+$ silk check
+Checking hello (x86_64-unknown-linux-gnu)
+  load      166 modules, 1 in package         0.03s
+  check     2 modules                         0.10s
+  borrow    237 bodies                        0.00s
+Finished hello in 0.13s
+$ silk check
+Checking hello (x86_64-unknown-linux-gnu)
+Finished hello in 0.00s
+```
+
+A changed manifest, or a file added to or removed from the package, makes the server decline and exit; that check runs by itself and leaves a new server. A server exits after 15 minutes with no check, and sooner when its project is removed or reshaped. A workspace check (`--workspace`, or several members) leaves no server. Other hosts never start one. `--no-server` checks in the process alone, which is what to use when comparing timings or when memory is short.
 
 ## build
 
@@ -180,11 +199,11 @@ Builds every planned target. The rows add `codegen` and `link`, and the final li
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.03s
-  check    1 module                          0.00s
-  codegen  689 functions                     0.28s
-  borrow   229 bodies                        0.01s
-  link     clang                             0.36s
+  load      143 modules, 1 in package         0.03s
+  check     1 module                          0.00s
+  codegen   689 functions                     0.28s
+  borrow    229 bodies                        0.01s
+  link      clang                             0.36s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.71s
 ```
 
@@ -350,7 +369,7 @@ silk use <version> [--dev] [--json]
 silk use list [--json]
 silk use which [--json]
 silk use uninstall <version>
-silk set <version> [--dev] [--json]
+silk set <version> [--dev] [--no-install] [--json]
 silk update self [--dev]
 silk +<version> <command> [args]
 ```
@@ -440,15 +459,26 @@ silk: silk-0.1.0-dev.14+0066f03c8c33-x86_64-unknown-linux-gnu.tar.gz is not sign
 
 ### set
 
-`set` writes `silk-version` into the `[workspace]` table of the workspace that lists the package, or into the package's own `[package]` table, and moves the members' own pins along with a workspace pin. It downloads nothing, so it also works offline for a full version:
+`set` writes `silk-version` into the `[workspace]` table of the workspace that lists the package, or into the package's own `[package]` table, and moves the members' own pins along with a workspace pin. Then it installs the version it pinned, with the same download and signature checks as `use`:
 
 ```
-$ silk set 0.1.0-dev.13
-Pinned Silk 0.1.0-dev.13+e62f1b34f810 in /home/you/app/silk.toml ([package].silk-version, was 0.1.0-dev.14+0066f03c8c33)
-Silk 0.1.0-dev.13+e62f1b34f810 is not installed yet. Install it with: silk use
+$ silk set 0.1.0-dev.72
+Pinned Silk 0.1.0-dev.72+9c780a04d6ef in /home/you/app/silk.toml ([package].silk-version, was 0.1.0-dev.73+a4ea55e44e78)
+Installed Silk 0.1.0-dev.72+9c780a04d6ef in /home/you/.silk/toolchains/0.1.0-dev.72+9c780a04d6ef
+note: Silk 0.1.0-dev.72+9c780a04d6ef is older than this tool (0.1.0-dev.73+a4ea55e44e78); if it cannot read this silk.toml, pin a newer version or edit the manifest for it
 ```
 
-The last line goes to standard error. Outside a project, `set` exits 2 with `` silk set: no silk.toml here or above; start a project with `silk init` ``. `set` refuses `0.0.0`.
+The note goes to standard error. A version that is already installed downloads nothing and prints no `Installed` line. The install runs before any file is written, so a failed download (exit status 4) or a failed signature check (exit status 5) leaves the project unchanged.
+
+`--no-install` only pins, downloads nothing, and so also works offline for a full version:
+
+```
+$ silk set 0.1.0-dev.73 --no-install
+Pinned Silk 0.1.0-dev.73+a4ea55e44e78 in /home/you/app/silk.toml ([package].silk-version, was 0.1.0-dev.72+9c780a04d6ef)
+Silk 0.1.0-dev.73+a4ea55e44e78 is not installed yet. Install it with: silk use
+```
+
+`--json` prints one object instead, with `version`, `manifest`, `table`, `previous`, `members`, `changed`, `installed` (true once the version is there) and `downloaded` (true when this run fetched it). Outside a project, `set` exits 2 with `` silk set: no silk.toml here or above; start a project with `silk init` ``. A version with no published release exits 1 with `silk: no published Silk release is version 0.1.0-dev.999`. `set` refuses `0.0.0`.
 
 ### uninstall
 
@@ -471,7 +501,7 @@ $ silk use uninstall 0.5.0
 $ silk update silk
 silk update silk: Silk versions are not updated in place.
 To install the newest Silk as your default: silk use latest
-To move this project to it: silk set latest, then silk use
+To move this project to it and install it: silk set latest
 ```
 
 ### Exit status of the tool

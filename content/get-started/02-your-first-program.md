@@ -1,6 +1,6 @@
 # Your first program
 
-This page takes you from an empty folder to a program that reads an argument, prints a greeting and sets its exit status. You need `silk` on your `PATH` and Clang 22 or newer; see Install.
+This page takes you from an empty folder to a program that reads an argument, prints a greeting and sets its exit status. You need `silk` on your `PATH`; see Install.
 
 ## Create a package
 
@@ -75,11 +75,11 @@ silk run
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.07s
-  check    1 module                          0.13s
-  codegen  689 functions                     0.14s
-  borrow   229 bodies                        0.01s
-  link     clang                             0.38s
+  load      143 modules, 1 in package         0.07s
+  check     1 module                          0.13s
+  codegen   689 functions                     0.14s
+  borrow    229 bodies                        0.01s
+  link      clang                             0.38s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.77s
 Hello, world!
 ```
@@ -171,9 +171,9 @@ silk check
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.01s
-  check    2 modules                         0.22s
-  borrow   253 bodies                        0.01s
+  load      143 modules, 1 in package         0.01s
+  check     2 modules                         0.22s
+  borrow    253 bodies                        0.01s
 Finished hello in 0.25s
 ```
 
@@ -187,11 +187,11 @@ silk build
 
 ```
 Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.05s
-  check    1 module                          0.18s
-  codegen  803 functions                     0.17s
-  borrow   267 bodies                        0.01s
-  link     clang                             0.41s
+  load      143 modules, 1 in package         0.05s
+  check     1 module                          0.18s
+  codegen   803 functions                     0.17s
+  borrow    267 bodies                        0.01s
+  link      clang                             0.41s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.84s
 ```
 

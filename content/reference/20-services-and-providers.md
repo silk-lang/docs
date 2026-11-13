@@ -149,17 +149,20 @@ These operations live in `Effect` from `silk/core/effect`. Each takes an Effect 
 - `&Option<&S>` is its own requirement entry, separate from `&S`. A row may hold both.
 - Branch on it with `withSome<&S>(absent, present)` from `silk/core/option`. Both arguments are Effects. `present` may also require `S`; `absent` may not. The provider decides at run time which branch runs, and the other is dropped. The type argument may be omitted when the arguments determine it.
 - Both branches share every other requirement of the row. The rest of the row must not contain `S` (`where R in Without<R, S>`). An `absent` branch that requires `S` is SEM0234.
-- Three providers satisfy `&Option<&S>`:
+- Three providers satisfy `&Option<&S>`, and so does providing nothing:
 
 | Provider | Branch that runs |
 | --- | --- |
+| None: no provision around the `run`, and no `&Option<&S>` in the enclosing signature | `absent` |
 | `Effect.provide(e, &Option<P>.some(p))`, where `&P` provides `S` | `present`, with `p` |
 | `Effect.provide(e, &Option<P>.none())` or `&Option<never>.none()` | `absent` |
 | `provideSome<&S>(e, &p)` from `silk/core/option` | `present`, with the borrowed `p` |
 
 - `Option<never>.none()` is the absent provider when no provider type is at hand: `never` serves every service and has no values.
 - A provider of `S` alone does not satisfy `&Option<&S>`. Providing one is SEM0123. Lift it with `provideSome`.
-- A function that declares `? &S` cannot run an Effect that needs `&Option<&S>` without providing it (SEM0071).
+- A `run` owes its enclosing signature every requirement of the Effect except the optional ones. An `&Option<&S>` entry that no provision around the `run` and no entry of the enclosing signature provides is absent for that run, so the Effect runs its `absent` branch. SEM0071 never names an optional service.
+- An enclosing signature that declares `? &Option<&S>` forwards it: the `run` uses whatever provider the function itself receives, or none. A signature that declares only `? &S` does not forward it, so the run is absent.
+- Only a `run` supplies absence. An Effect value that still requires `&Option<&S>` does not fit an `Effect` type or a contract whose row lacks that entry.
 - The optional service must be shared. An `Option` provider lends its service through a shared borrow, so nothing could provide `&Option<&mut S>`, and the requirement itself is SEM0240, reported where the row is written: "An optional service takes shared access only: an `Option` provider lends its service through a shared borrow, so nothing can provide `&Option<&mut S>`; require `&mut S`, or `&Option<&S>`".
 - Diagnostics may name the service the key stands for as `OptionService`, declared in `silk/core/option`. Code does not name it.
 
@@ -428,6 +431,17 @@ effect fn measure() -> i32
   return run withSome<&Tracer>(plain(), traced())
 }
 
+// Does not name the optional service: measure runs without a tracer.
+effect fn untraced() -> i32 {
+  return run measure()
+}
+
+// Names it: measure uses whatever this function is given.
+effect fn forward() -> i32
+  ? &Option<&Tracer> {
+  return run measure()
+}
+
 pub fn main() -> i32 {
   let offset = Offset { amount: 10 }
   let owned = Option<Offset>.some(Offset { amount: 20 })
@@ -437,7 +451,10 @@ pub fn main() -> i32 {
   let present = run Effect.provide(measure(), &owned)
   let absent = run Effect.provide(measure(), &missing)
   let never = run Effect.provide(measure(), &none)
-  if lifted != 11 || present != 21 || absent != 1 || never != 1 {
+  let unprovided = run measure()
+  let dropped = run untraced()
+  let forwarded = run Effect.provide(forward(), &owned)
+  if lifted != 11 || present != 21 || absent != 1 || never != 1 || unprovided != 1 || forwarded != 21 || dropped != 1 {
     return 1
   }
   return 0
@@ -447,7 +464,7 @@ pub fn main() -> i32 {
 A `main` that provides the plain provider instead, `let offset = Offset { amount: 10 }` followed by `return run Effect.provide(measure(), &offset)`, is rejected:
 
 ```
-src/main.silk:33:14: error[SEM0123] A provider that matches no member of its concrete source requirement row
+src/main.silk:46:14: error[SEM0123] A provider that matches no member of its concrete source requirement row
 ```
 
 ## Diagnostics

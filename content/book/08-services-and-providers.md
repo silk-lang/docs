@@ -350,8 +350,8 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     162 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.15s
+  load      162 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.15s
 [x86_64-unknown-linux-gnu]
 src/main.silk:601:10: error[SEM0071] This `run` needs `&mut FileSystem`, which the enclosing function does not provide; add `? &mut FileSystem` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 Failed tasks in 0.21s
@@ -378,8 +378,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.05s
-  check    failed: 2 modules, 1 error        0.08s
+  load      135 modules, 1 in package         0.05s
+  check     failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
 src/main.silk:10:17: error[SEM0071] This `run` needs `&mut SystemClock`, which the enclosing function does not provide; add `? &mut SystemClock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 Failed scratch in 0.14s
@@ -406,8 +406,8 @@ silk check
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.07s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.07s
 [x86_64-unknown-linux-gnu]
 src/main.silk:3:15: error[SEM0225] Entry point `main` has a result the selected runtime cannot start; the default runtime accepts i32, (), or an Effect producing () or i32 that requires at most `&mut HostInput` and whose errors all implement `Debug`
 Failed scratch in 0.11s
@@ -436,8 +436,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     145 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.08s
+  load      145 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
 src/main.silk:12:21: error[SEM0131] A provider whose key matches but whose access cannot satisfy the requirement
 Failed scratch in 0.12s
