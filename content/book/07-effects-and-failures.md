@@ -39,8 +39,8 @@ pub effect fn main() -> () ! LogError {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.05s
-  check    failed: 2 modules, 1 error        0.10s
+  load      143 modules, 1 in package         0.05s
+  check     failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:11:3: error[SEM0087] Expression statement produces an Effect of `()` that is never run (write `run` before it to run it, or `drop` it to discard it), but only () or never may be ignored
 Failed scratch in 0.17s
@@ -135,8 +135,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.06s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:5:5: error[SEM0063] Only an `effect fn` can `fail`; declare `complete` as an `effect fn` that names the failure type after `!`
 Failed scratch in 0.10s
@@ -168,8 +168,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.05s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.05s
 [x86_64-unknown-linux-gnu]
 src/main.silk:10:3: error[SEM0066] This `run` can fail with `NoSuchTask`, which the enclosing function does not declare; add `! NoSuchTask` to its signature, or handle the failure with `Effect.result`
 Failed scratch in 0.09s
@@ -462,8 +462,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.06s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:18:37: error[SEM0099] One named type parameter left undetermined by an explicit prefix and the arguments
 Failed scratch in 0.10s
@@ -493,8 +493,8 @@ The obvious finalizer is a log line:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     144 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.13s
+  load      144 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 src/main.silk:460:50: error[SEM0052] This call needs an Effect that cannot fail, but the one passed here can fail with silk.io.logger.LogError; wrap it in `Effect.result(...)` and handle the Result it returns
 Failed tasks in 0.19s

@@ -35,8 +35,8 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 2 errors       0.09s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 2 errors       0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:29:17: error[SEM0210] The result is a borrow, but the function has no borrowed input it could come from; for a literal or other data that lives for the whole program, write `'static`, as in `string<'static>` or `&'static T`
 src/main.silk:55:16: error[SEM0210] The result is a borrow, but the function has no borrowed input it could come from; for a literal or other data that lives for the whole program, write `'static`, as in `string<'static>` or `&'static T`
@@ -229,8 +229,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.05s
-  check    failed: 2 modules, 1 error        0.07s
+  load      135 modules, 1 in package         0.05s
+  check     failed: 2 modules, 1 error        0.07s
 [x86_64-unknown-linux-gnu]
 src/main.silk:3:43: error[SEM0210] The omitted output lifetime has no unique input; name its lifetime explicitly
 Failed scratch in 0.14s
@@ -256,8 +256,8 @@ Inside a function body you usually don't write lifetimes; the compiler works the
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.19s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
 src/main.silk:139:18: error[SEM0012] Expected main.Draft<'static> but received main.Draft<'_>
 Failed tasks in 0.24s
@@ -327,8 +327,8 @@ If you leave the lifetime off, elision applies its second rule and ties the resu
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.00s
-  check    failed: 2 modules, 2 errors       0.12s
+  load      143 modules, 1 in package         0.00s
+  check     failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:199:3: error[OWN0011] Dropping `board` while a borrow of it is still in use; use that borrow for the last time before this
   note: src/main.silk:198:17: the borrow starts here
@@ -389,8 +389,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.06s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.06s
 [x86_64-unknown-linux-gnu]
 src/main.silk:21:6: error[OWN0019] `board` is used after `buffer`, which it borrows, ended or was replaced
   note: src/main.silk:19:35: the borrow starts here

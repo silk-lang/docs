@@ -208,8 +208,8 @@ Leave out the `impl Order` and `rows.sort()` stops the build:
 
 ```
 Checking wordfreq (x86_64-unknown-linux-gnu)
-  load     147 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.10s
+  load      147 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:129:7: error[SEM0121] `main.Count<'_>: silk.core.order.Order` cannot be proved: no implementation of `silk.core.order.Order` exists for `main.Count<'_>`
 Failed wordfreq in 0.17s

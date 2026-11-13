@@ -351,8 +351,8 @@ silk check
 
 ```
 Checking sealnote (x86_64-unknown-linux-gnu)
-  load     171 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.14s
+  load      171 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
 src/main.silk:200:3: error[SEM0071] This `run` needs `&mut Random`, which the enclosing function does not provide; add `? &mut Random` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 Failed sealnote in 0.19s

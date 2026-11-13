@@ -110,11 +110,11 @@ The fetch prints nothing of its own. Its time is part of the `load` row. The fir
 
 ```
 Compiling app (x86_64-unknown-linux-gnu, debug)
-  load     147 modules, 1 in package         0.09s
-  check    3 modules                         0.15s
-  codegen  720 functions                     0.15s
-  borrow   233 bodies                        0.01s
-  link     clang                             0.38s
+  load      147 modules, 1 in package         0.09s
+  check     3 modules                         0.15s
+  codegen   720 functions                     0.15s
+  borrow    233 bodies                        0.01s
+  link      clang                             0.38s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/app in 0.82s
 length 42
 ```

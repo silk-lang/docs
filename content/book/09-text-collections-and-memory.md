@@ -29,8 +29,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.05s
-  check    failed: 2 modules, 1 error        0.08s
+  load      135 modules, 1 in package         0.05s
+  check     failed: 2 modules, 1 error        0.08s
 [x86_64-unknown-linux-gnu]
 src/main.silk:2:27: error[SEM0135] Operator + does not join strings; build an owned `String` with `String.copy` and `String.append`, or write the text with a `Format.format` template
 Failed scratch in 0.14s
@@ -99,8 +99,8 @@ In `Board.make`, you might write `List.make()` and expect the field type to fill
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     166 modules, 1 in package         0.04s
-  check    failed: 2 modules, 1 error        0.48s
+  load      166 modules, 1 in package         0.04s
+  check     failed: 2 modules, 1 error        0.48s
 [x86_64-unknown-linux-gnu]
 src/main.silk:167:14: error[SEM0052] Cannot infer all type arguments for List.make from supplied values
 Failed tasks in 0.55s
@@ -168,8 +168,8 @@ pub effect fn main() -> () ! OutOfMemoryError {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.09s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:12:15: error[SEM0121] `main.Task: Copy` cannot be proved: the callee requires a `Copy` type argument here, and this type does not implement `Copy`
 Failed scratch in 0.12s
@@ -271,8 +271,8 @@ pub effect fn main() -> () ! OutOfMemoryError {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     139 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.10s
+  load      139 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:10:12: error[SEM0121] `main.Title: silk.collections.hash.HashKey` cannot be proved: no implementation of `silk.collections.hash.HashKey` exists for `main.Title`
 Failed scratch in 0.14s
@@ -403,8 +403,8 @@ Run `silk check`:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     166 modules, 1 in package         0.05s
-  check    failed: 2 modules, 1 error        0.63s
+  load      166 modules, 1 in package         0.05s
+  check     failed: 2 modules, 1 error        0.63s
 [x86_64-unknown-linux-gnu]
 src/main.silk:525:45: error[SEM0012] Expected &main.Board<'_> but received &mut main.Board<'_>
 Failed tasks in 0.73s

@@ -86,11 +86,11 @@ silk run
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.06s
-  check    1 module                          0.15s
-  codegen  689 functions                     0.17s
-  borrow   229 bodies                        0.01s
-  link     clang                             0.36s
+  load      143 modules, 1 in package         0.06s
+  check     1 module                          0.15s
+  codegen   689 functions                     0.17s
+  borrow    229 bodies                        0.01s
+  link      clang                             0.36s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.80s
 Hello, world!
 ```
@@ -205,8 +205,8 @@ silk run
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 1 module, 1 error         0.19s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 1 module, 1 error         0.19s
 [x86_64-unknown-linux-gnu]
 src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
 Failed tasks in 0.25s
@@ -220,8 +220,8 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.13s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 src/main.silk:9:7: error[SEM0177] template field {versoin} not found; available visible fields: version
 Failed tasks in 0.17s
@@ -239,9 +239,9 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.05s
-  check    2 modules                         0.14s
-  borrow   127 bodies                        0.00s
+  load      143 modules, 1 in package         0.05s
+  check     2 modules                         0.14s
+  borrow    127 bodies                        0.00s
 Finished tasks in 0.21s
 ```
 
@@ -259,11 +259,11 @@ silk build
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load     143 modules, 1 in package         0.06s
-  check    1 module                          0.17s
-  codegen  709 functions                     0.15s
-  borrow   234 bodies                        0.01s
-  link     clang                             0.34s
+  load      143 modules, 1 in package         0.06s
+  check     1 module                          0.17s
+  codegen   709 functions                     0.15s
+  borrow    234 bodies                        0.01s
+  link      clang                             0.34s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.74s
 ```
 

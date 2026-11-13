@@ -74,7 +74,7 @@ Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `silk` of ap
 
 ```
 Checking hello (x86_64-unknown-linux-gnu)
-  load     failed: 1 error                   0.00s
+  load      failed: 1 error                   0.00s
 silk: invalid module /home/you/hello/src/silk of hello@0.1.0: `silk` and `Intrinsic` are reserved module names (`silk.` imports name the standard library and `Intrinsic` the compiler's intrinsics); rename it
 Failed hello in 0.01s
 ```
@@ -103,8 +103,8 @@ silk check --target wasm32-unknown-unknown
 
 ```
 Checking hello (wasm32-unknown-unknown)
-  load     136 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.02s
+  load      136 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.02s
 [wasm32-unknown-unknown]
 src/main.silk:3:32: error[SEM0014] Module silk.io.logger_native has no member StdoutLogger
 Failed hello in 0.07s

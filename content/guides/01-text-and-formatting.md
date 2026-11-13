@@ -83,8 +83,8 @@ silk check
 
 ```
 Checking textinfo (x86_64-unknown-linux-gnu)
-  load     141 modules, 1 in package         0.06s
-  check    failed: 2 modules, 1 error        0.12s
+  load      141 modules, 1 in package         0.06s
+  check     failed: 2 modules, 1 error        0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:8:7: error[SEM0177] template field {count} not found; available visible fields: name, cuont
 Failed textinfo in 0.20s

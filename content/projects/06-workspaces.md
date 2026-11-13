@@ -74,16 +74,16 @@ silk build
 
 ```
 Checking pricing (x86_64-unknown-linux-gnu)
-  load     118 modules, 1 in package         0.15s
-  check    1 module                          0.03s
-  borrow   2 bodies                          0.00s
+  load      118 modules, 1 in package         0.15s
+  check     1 module                          0.03s
+  borrow    2 bodies                          0.00s
 Finished pricing in 0.19s
 Compiling store (x86_64-unknown-linux-gnu, debug)
-  load     139 modules, 1 in package         0.05s
-  check    2 modules                         0.07s
-  codegen  486 functions                     0.09s
-  borrow   149 bodies                        0.00s
-  link     clang                             0.32s
+  load      139 modules, 1 in package         0.05s
+  check     2 modules                         0.07s
+  codegen   486 functions                     0.09s
+  borrow    149 bodies                        0.00s
+  link      clang                             0.32s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.55s
 Finished 2 packages in 0.63s
 ```
@@ -110,9 +110,9 @@ silk check -p store
 
 ```
 Checking store (x86_64-unknown-linux-gnu)
-  load     139 modules, 1 in package         0.02s
-  check    3 modules                         0.07s
-  borrow   89 bodies                         0.00s
+  load      139 modules, 1 in package         0.02s
+  check     3 modules                         0.07s
+  borrow    89 bodies                         0.00s
 Finished store in 0.12s
 Finished 1 package in 0.14s
 ```

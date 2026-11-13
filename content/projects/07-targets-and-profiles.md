@@ -34,7 +34,7 @@ Objects, static archives, LLVM IR and assembly build for every target. `silk run
 
 ## Cross-compiling
 
-`silk build --target <name>` links an executable for any macOS, Linux or Windows target on any host, with the same Clang 22 and its LLD. No SDK, sysroot or second toolchain is needed:
+`silk build --target <name>` links an executable for any macOS, Linux or Windows target on any host, with the same Clang and its LLD, the ones a release bundles. No SDK, sysroot or second toolchain is needed:
 
 ```sh
 silk build --target aarch64-apple-darwin
@@ -43,11 +43,11 @@ file build/llvm/aarch64-apple-darwin/debug/tiny
 
 ```
 Compiling tiny (aarch64-apple-darwin, debug)
-  load     161 modules, 1 in package         0.07s
-  check    1 module                          0.07s
-  codegen  267 functions                     0.07s
-  borrow   151 bodies                        0.00s
-  link     clang                             0.17s
+  load      161 modules, 1 in package         0.07s
+  check     1 module                          0.07s
+  codegen   267 functions                     0.07s
+  borrow    151 bodies                        0.00s
+  link      clang                             0.17s
 Finished build/llvm/aarch64-apple-darwin/debug/tiny in 0.43s
 build/llvm/aarch64-apple-darwin/debug/tiny: Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|PIE|HAS_TLV_DESCRIPTORS>
 ```
@@ -70,24 +70,24 @@ silk check --target aarch64-apple-darwin --target aarch64-unknown-linux-gnu --ta
 
 ```
 Checking tiny (aarch64-apple-darwin)
-  load     135 modules, 1 in package         0.02s
-  check    2 modules                         0.09s
-  borrow   90 bodies                         0.00s
+  load      135 modules, 1 in package         0.02s
+  check     2 modules                         0.09s
+  borrow    90 bodies                         0.00s
 Finished tiny in 0.13s
 Checking tiny (aarch64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.01s
-  check    2 modules                         0.08s
-  borrow   134 bodies                        0.00s
+  load      135 modules, 1 in package         0.01s
+  check     2 modules                         0.08s
+  borrow    134 bodies                        0.00s
 Finished tiny in 0.11s
 Checking tiny (wasm32-unknown-unknown)
-  load     126 modules, 1 in package         0.01s
-  check    2 modules                         0.02s
-  borrow   20 bodies                         0.00s
+  load      126 modules, 1 in package         0.01s
+  check     2 modules                         0.02s
+  borrow    20 bodies                         0.00s
 Finished tiny in 0.05s
 Checking tiny (wasm32-wasip1)
-  load     128 modules, 1 in package         0.01s
-  check    2 modules                         0.06s
-  borrow   65 bodies                         0.00s
+  load      128 modules, 1 in package         0.01s
+  check     2 modules                         0.06s
+  borrow    65 bodies                         0.00s
 Finished tiny in 0.09s
 ```
 
@@ -114,7 +114,7 @@ optimization = "size"
 debug = false
 ```
 
-For the program `silk init` writes, `silk build --profile small` makes a 48,680-byte executable where `--release` makes 54,392 bytes.
+For the program `silk init` writes, `silk build --profile small` makes a 45,160-byte executable where `--release` makes 50,384 bytes.
 
 ```sh
 silk build --release
@@ -122,13 +122,16 @@ silk build --release
 
 ```
 Compiling tiny (x86_64-unknown-linux-gnu, release)
-  load     135 modules, 1 in package         0.06s
-  check    1 module                          0.08s
-  codegen  484 functions                     0.11s
-  borrow   147 bodies                        0.00s
-  link     clang                             0.61s
-Finished build/llvm/x86_64-unknown-linux-gnu/release/tiny in 0.89s
+  load      166 modules, 1 in package         0.03s
+  check     1 module                          0.00s
+  codegen   387 functions                     0.15s
+  borrow    253 bodies                        0.00s
+  optimize  clang                             0.63s
+  link      clang                             0.08s
+Finished build/llvm/x86_64-unknown-linux-gnu/release/tiny in 0.91s
 ```
+
+An optimized native executable is optimized in its own step: Clang compiles the whole program to one object, kept in `<output>.units/`, and the `link` row links it. A rebuild whose program did not change reuses that object, so it shows no `optimize` row, even when the link runs again for a native library. Debug builds, WebAssembly and Windows still compile and link in one step.
 
 The heading names the profile in parentheses after the target.
 
@@ -151,11 +154,11 @@ silk build --profile fast
 
 ```
 Compiling tiny (x86_64-unknown-linux-gnu, fast)
-  load     135 modules, 1 in package         0.06s
-  check    1 module                          0.08s
-  codegen  484 functions                     0.10s
-  borrow   147 bodies                        0.00s
-  link     clang                             0.57s
+  load      135 modules, 1 in package         0.06s
+  check     1 module                          0.08s
+  codegen   484 functions                     0.10s
+  borrow    147 bodies                        0.00s
+  link      clang                             0.57s
 Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.83s
 ```
 
@@ -260,11 +263,11 @@ file build/llvm/x86_64-unknown-linux-gnu/fast/tiny
 
 ```
 Compiling tiny (x86_64-unknown-linux-gnu, fast)
-  load     135 modules, 1 in package         0.00s
-  check    1 module                          0.10s
-  codegen  484 functions                     0.10s
-  borrow   147 bodies                        0.00s
-  link     clang                             0.48s
+  load      135 modules, 1 in package         0.00s
+  check     1 module                          0.10s
+  codegen   484 functions                     0.10s
+  borrow    147 bodies                        0.00s
+  link      clang                             0.48s
 Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.71s
 build/llvm/x86_64-unknown-linux-gnu/fast/tiny: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, for GNU/Linux 3.2.0, BuildID[sha1]=c0c840c6741b03e8b282f7b51951b1bc3b3da33f, not stripped
 ```
@@ -406,9 +409,9 @@ relocation = "static"
 
 ```
 Compiling bare (x86_64-unknown-linux-gnu, bare)
-  load     121 modules, 1 in package         0.02s
-  check    1 module                          0.00s
-  codegen  failed: 15 functions, 1 error     0.00s
+  load      121 modules, 1 in package         0.02s
+  check     1 module                          0.00s
+  codegen   failed: 15 functions, 1 error     0.00s
 [x86_64-unknown-linux-gnu]
 <silk>/lib/silk/stdlib/silk/platform/linux/start.silk:31:5: unsupported[foreign-contract] not supported by the native compiler yet
 Failed bare in 0.04s
@@ -420,7 +423,7 @@ Without the composition, `libc = "none"` finds no runtime in the std lib catalog
 
 ## WebAssembly
 
-`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. The module imports nothing. It exports its `memory`, `main`, and every `export "C"` function under its own name. The program `silk init` writes does not build for wasm32 as it is, because it imports `silk.io.logger_native`, which needs an operating system to write to; a wasm32 program starts from a `main` like this one:
+`silk build --target wasm32-unknown-unknown`, or a profile with that target, links a WebAssembly module on any host. Clang links it freestanding with a small runtime the compiler carries: an allocator over linear memory, which reuses freed memory and grows the memory only when it must, and the byte routines LLVM calls. Every wasm32 module is compiled with bulk memory, which that runtime uses for copies and fills, so a profile need not list `bulk-memory` in `cpu.features`. The module imports nothing unless the program uses the host: `ConsoleLogger` imports `silk.console`, and `OsRandom`, `OsSystemClock` and `OsMonotonicClock` import `silk.random` and `silk.clock`, which `<silk>/lib/silk/stdlib/host/wasm-runner.mjs` supplies (see **No-libc Linux and WebAssembly** in the Guides). It exports its `memory`, `main`, and every `export "C"` function under its own name. The program `silk init` writes does not build for wasm32 as it is, because it imports `silk.io.logger_native`, which needs an operating system to write to; a wasm32 program starts from a `main` like this one:
 
 ```silk
 export "C" fn add(left: i32, right: i32) -> i32 {
@@ -438,11 +441,11 @@ silk build --target wasm32-unknown-unknown
 
 ```
 Compiling web (wasm32-unknown-unknown, debug)
-  load     126 modules, 1 in package         0.05s
-  check    1 module                          0.01s
-  codegen  32 functions                      0.01s
-  borrow   24 bodies                         0.00s
-  link     clang                             0.13s
+  load      126 modules, 1 in package         0.05s
+  check     1 module                          0.01s
+  codegen   32 functions                      0.01s
+  borrow    24 bodies                         0.00s
+  link      clang                             0.13s
 Finished build/llvm/wasm32-unknown-unknown/debug/web in 0.23s
 ```
 
@@ -471,10 +474,10 @@ silk build --target wasm32-wasip1 --backend direct
 
 ```
 Compiling hello (wasm32-wasip1, debug)
-  load     164 modules, 1 in package         0.08s
-  check    1 module                          0.13s
-  codegen  459 functions                     0.15s
-  borrow   333 bodies                        0.01s
+  load      164 modules, 1 in package         0.08s
+  check     1 module                          0.13s
+  codegen   459 functions                     0.15s
+  borrow    333 bodies                        0.01s
 Finished build/llvm/wasm32-wasip1/debug/hello in 0.44s
 ```
 
@@ -494,11 +497,11 @@ silk build --target wasm32-wasip1
 
 ```
 Compiling hello (wasm32-wasip1, debug)
-  load     136 modules, 1 in package         0.05s
-  check    1 module                          0.07s
-  codegen  175 functions                     0.02s
-  borrow   112 bodies                        0.00s
-  link     clang                             0.18s
+  load      136 modules, 1 in package         0.05s
+  check     1 module                          0.07s
+  codegen   175 functions                     0.02s
+  borrow    112 bodies                        0.00s
+  link      clang                             0.18s
 Finished build/llvm/wasm32-wasip1/debug/hello in 0.35s
 ```
 

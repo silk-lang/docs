@@ -194,8 +194,8 @@ silk check
 
 ```
 Checking tour (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.17s
+  load      143 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.17s
 [x86_64-unknown-linux-gnu]
 src/main.silk:84:38: error[OWN0003] Moving tea requires an explicit move
 Failed tour in 0.23s

@@ -921,18 +921,18 @@ before-build = ["codegen"]
 ```
 $ silk build
 Compiling site (x86_64-unknown-linux-gnu, tasks)
-  load     212 modules, 1 in package         0.00s
-  check    1 module                          0.00s
-  codegen  0 functions                       0.00s
-  link     clang                             0.00s
+  load      212 modules, 1 in package         0.00s
+  check     1 module                          0.00s
+  codegen   0 functions                       0.00s
+  link      clang                             0.00s
 Finished build/llvm/x86_64-unknown-linux-gnu/tasks/site in 0.02s
 wrote src/Pages.silk
 Compiling site (x86_64-unknown-linux-gnu, debug)
-  load     166 modules, 2 in package         0.00s
-  check    2 modules                         0.09s
-  codegen  531 functions                     0.11s
-  borrow   215 bodies                        0.00s
-  link     clang                             0.25s
+  load      166 modules, 2 in package         0.00s
+  check     2 modules                         0.09s
+  codegen   531 functions                     0.11s
+  borrow    215 bodies                        0.00s
+  link      clang                             0.25s
 Finished build/llvm/x86_64-unknown-linux-gnu/debug/site in 0.48s
 ```
 

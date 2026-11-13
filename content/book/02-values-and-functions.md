@@ -95,8 +95,8 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.04s
-  check    failed: 2 modules, 1 error        0.13s
+  load      143 modules, 1 in package         0.04s
+  check     failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 src/main.silk:15:15: error[SEM0135] Operator < does not accept (i32, usize)
 Failed tasks in 0.19s
@@ -124,8 +124,8 @@ fn count() -> i32 {
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.04s
-  check    failed: 2 modules, 1 error        0.14s
+  load      143 modules, 1 in package         0.04s
+  check     failed: 2 modules, 1 error        0.14s
 [x86_64-unknown-linux-gnu]
 src/main.silk:17:7: error[SEM0035] Cannot assign through immutable binding open
 Failed tasks in 0.21s
@@ -141,8 +141,8 @@ You may be used to writing `open += 1`. Silk has no compound assignment:
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.04s
-  check    failed: 2 modules, 1 error        0.10s
+  load      143 modules, 1 in package         0.04s
+  check     failed: 2 modules, 1 error        0.10s
 [x86_64-unknown-linux-gnu]
 src/main.silk:17:12: error[PAR0010] Silk has no compound assignment; write `x = x + 1` instead of `x += 1`
 Failed tasks in 0.16s
@@ -367,8 +367,8 @@ pub fn main() -> i32 {
 
 ```
 Checking scratch (x86_64-unknown-linux-gnu)
-  load     135 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.09s
+  load      135 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:2:18: error[SEM0135] Operator + does not accept (i32, i64)
 Failed scratch in 0.13s

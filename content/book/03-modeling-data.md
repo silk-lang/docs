@@ -50,8 +50,8 @@ The compiler checks that the arms cover every member. Delete the `Priority.High`
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.01s
-  check    failed: 2 modules, 1 error        0.19s
+  load      143 modules, 1 in package         0.01s
+  check     failed: 2 modules, 1 error        0.19s
 [x86_64-unknown-linux-gnu]
 src/main.silk:32:10: error[SEM0158] Match over Priority does not cover High
 Failed tasks in 0.23s
@@ -125,8 +125,8 @@ Every field must be given, except an optional one: a field of type `Option`, whi
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.01s
-  check    failed: 2 modules, 1 error        0.13s
+  load      143 modules, 1 in package         0.01s
+  check     failed: 2 modules, 1 error        0.13s
 [x86_64-unknown-linux-gnu]
 src/main.silk:73:9: error[SEM0025] Field id expects main.TaskId but received i32
 Failed tasks in 0.16s
@@ -167,8 +167,8 @@ Why all this, when `priorityLabel` could just write `match priority`? Because a 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.21s
+  load      143 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.21s
 [x86_64-unknown-linux-gnu]
 src/main.silk:40:16: error[OWN0003] `match status.*` would move `status.*` out of a borrow, which cannot give it away; write `match &status.*` to look at it
 Failed tasks in 0.26s
@@ -264,9 +264,9 @@ The `'static` on the title says where its text lives. Leave it off, writing `Add
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    2 modules                         0.20s
-  borrow   225 bodies                        0.01s
+  load      143 modules, 1 in package         0.02s
+  check     2 modules                         0.20s
+  borrow    225 bodies                        0.01s
 Finished tasks in 0.25s
 ```
 
@@ -276,8 +276,8 @@ Guards are useful, but the compiler cannot see inside them. A guarded arm does n
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.03s
-  check    failed: 2 modules, 1 error        0.20s
+  load      143 modules, 1 in package         0.03s
+  check     failed: 2 modules, 1 error        0.20s
 [x86_64-unknown-linux-gnu]
 src/main.silk:47:10: error[SEM0044] Match over Command does not cover Done
 Failed tasks in 0.25s

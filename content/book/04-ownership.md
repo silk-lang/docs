@@ -221,8 +221,8 @@ silk check
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.09s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:144:24: error[OWN0003] Moving draft requires an explicit move
 Failed tasks in 0.13s
@@ -247,8 +247,8 @@ Put the `move` back. Now try using the draft after it has moved. Add a log line 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 1 error        0.09s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 1 error        0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:145:48: error[OWN0001] draft.title was moved and cannot be used again
   note: src/main.silk:144:24: related location
@@ -277,8 +277,8 @@ Structs, unions and tuples are not `Copy` unless you say so. Delete the `impl Co
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 2 errors       0.09s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 2 errors       0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:65:41: error[OWN0003] Moving id requires an explicit move
 src/main.silk:146:21: error[OWN0003] Moving milk requires an explicit move
@@ -326,8 +326,8 @@ An exclusive borrow needs something that is allowed to change. Change the first 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 4 errors       0.09s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 4 errors       0.09s
 [x86_64-unknown-linux-gnu]
 src/main.silk:144:20: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
 src/main.silk:145:14: error[SEM0057] `board` is not mutable; declare it with `mut`, as in `let mut board`, to borrow it with `&mut`
@@ -342,8 +342,8 @@ The same rule applies inside methods. Change `complete` to take `self: &Self`, a
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.01s
-  check    failed: 2 modules, 1 error        0.20s
+  load      143 modules, 1 in package         0.01s
+  check     failed: 2 modules, 1 error        0.20s
 [x86_64-unknown-linux-gnu]
 src/main.silk:76:18: error[SEM0058] `self` is a shared reference, so it cannot lend `&mut` access; take a `&mut` reference where it comes from to change what it points at
 Failed tasks in 0.24s
@@ -369,8 +369,8 @@ To see it, keep a reference to the first task while adding more. Change the top 
 
 ```
 Checking tasks (x86_64-unknown-linux-gnu)
-  load     143 modules, 1 in package         0.02s
-  check    failed: 2 modules, 2 errors       0.12s
+  load      143 modules, 1 in package         0.02s
+  check     failed: 2 modules, 2 errors       0.12s
 [x86_64-unknown-linux-gnu]
 src/main.silk:146:8: error[OWN0010] A mutable borrow of `board` conflicts with an earlier shared borrow of it that is still in use; use that borrow for the last time before this one
   note: src/main.silk:145:15: the earlier borrow starts here

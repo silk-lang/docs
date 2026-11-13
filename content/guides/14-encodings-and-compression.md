@@ -45,8 +45,8 @@ If you import both as `Format`, `silk check` stops at the second import and poin
 
 ```
 Checking unpack (x86_64-unknown-linux-gnu)
-  load     188 modules, 1 in package         0.08s
-  check    failed: 2 modules, 1 error        0.23s
+  load      188 modules, 1 in package         0.08s
+  check     failed: 2 modules, 1 error        0.23s
 [x86_64-unknown-linux-gnu]
 src/main.silk:6:54: error[SEM0016] Multiple bindings claim Format; rename one with `as`, as in `import a.b as other` or `import a.b { Format as other }`
   note: src/main.silk:5:27: related location
