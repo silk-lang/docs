@@ -586,6 +586,7 @@ pub fn main() -> i32 { return 0 }
 
 ```text
 src/main.silk:1:8: error[MOD0001] Unknown module silk.lists
+src/main.silk:1:20: warning[MOD0007] Import `List` is never used; remove it
 ```
 
 Fix: Correct the module path. Std lib modules are listed in the API reference. See Modules and imports.
@@ -603,6 +604,7 @@ pub fn main() -> i32 { return 0 }
 
 ```text
 src/main.silk:1:8: error[MOD0002] An import redundantly naming its own containing module
+src/main.silk:1:16: warning[MOD0007] Import `me` is never used; remove it
 ```
 
 Message template, not filled by this compiler: `Module {module} imports itself`.
@@ -678,6 +680,7 @@ pub fn main() -> i32 { return 0 }
 
 ```text
 src/main.silk:1:8: error[MOD0004] Module Intrinsic cannot be imported: `Intrinsic` is reserved for compiler intrinsics, which are written `Intrinsic.<name>` without an import
+src/main.silk:1:20: warning[MOD0007] Import `replace` is never used; remove it
 ```
 
 Any import whose path starts with `Intrinsic`, such as `import Intrinsic.helpers { hi }`, is MOD0004, except `import Intrinsic.application`. The message names the imported path: `Module Intrinsic.helpers cannot be imported: ...`. An unknown `silk.` path, such as `import silk.nope`, is MOD0001 instead. A local module named `silk` or `Intrinsic` at the top of the source root is refused before checking starts, with `silk: invalid module ...` and exit status 1.
@@ -956,7 +959,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:6:29: error[OWN0008] Match guard cannot consume pattern binding value
+src/main.silk:6:29: error[OWN0008] A match guard cannot move, drop or assign value; a guard only tests, so do the change in the arm
 ```
 
 Fix: Borrow in the guard instead of moving: pass `&value` to a function that takes `&Payload`. See Ownership and moves, Borrowing.
@@ -1212,7 +1215,7 @@ A literal outside its selected integer range.
 
 ```silk
 pub fn main() -> i32 {
-  let small: u8 = 300
+  let _small: u8 = 300
   return 0
 }
 ```
@@ -1220,7 +1223,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:19: error[SEM0002] Integer literal 300 is outside the u8 range, 0 through 255
+src/main.silk:2:20: error[SEM0002] Integer literal 300 is outside the u8 range, 0 through 255
 ```
 
 Fix: Use a literal that fits the type, or a wider type: `let small: u16 = 300`. See Values and primitive types.
@@ -1332,6 +1335,7 @@ pub fn main() -> i32 {
 
 ```text
 src/main.silk:3:7: error[SEM0008] Cannot rebind n
+src/main.silk:2:7: warning[SEM0255] `n` is never used; remove it, or start its name with `_` to keep it
 ```
 
 A body may rebind a parameter: in `fn next(n: i32) -> i32`, the line `let n = n + 1` is accepted.
@@ -1366,7 +1370,7 @@ impl Point {
   fn make() -> Point { return Point { x: 0 } }
 }
 pub fn main() -> i32 {
-  let p = Point.build()
+  let _p = Point.build()
   return 0
 }
 ```
@@ -1374,7 +1378,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:17: error[SEM0010] main.Point has no associated function `build`
+src/main.silk:6:18: error[SEM0010] main.Point has no associated function `build`
 ```
 
 A call on a value names the method instead, such as ``silk.collections.list.List<i32> has no method `push` ``.
@@ -1614,7 +1618,7 @@ A struct literal naming a field its type does not declare.
 ```silk
 struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
-  let p = Point { x: 1, y: 2, z: 3 }
+  let _p = Point { x: 1, y: 2, z: 3 }
   return 0
 }
 ```
@@ -1622,7 +1626,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:31: error[SEM0022] main.Point has no field z
+src/main.silk:3:32: error[SEM0022] main.Point has no field z
 ```
 
 Fix: Initialize only declared fields. See Structs, tuples and arrays, Enums and unions.
@@ -1634,7 +1638,7 @@ A struct literal that initializes one field twice.
 ```silk
 struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
-  let p = Point { x: 1, x: 2, y: 3 }
+  let _p = Point { x: 1, x: 2, y: 3 }
   return 0
 }
 ```
@@ -1642,7 +1646,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:25: error[SEM0023] A struct literal that initializes one field twice
+src/main.silk:3:26: error[SEM0023] A struct literal that initializes one field twice
 ```
 
 Message template, not filled by this compiler: `Field {field} is initialized more than once`.
@@ -1656,7 +1660,7 @@ A struct literal that omits a declared field whose type does not implement `Omit
 ```silk
 struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
-  let p = Point { x: 1 }
+  let _p = Point { x: 1 }
   return 0
 }
 ```
@@ -1664,7 +1668,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0024] `Point { ... }` omits field `y`
+src/main.silk:3:12: error[SEM0024] `Point { ... }` omits field `y`
 ```
 
 Fix: Initialize every field that is not optional. See Structs, tuples and arrays, Enums and unions.
@@ -1676,7 +1680,7 @@ A struct literal field whose value mismatches the field type.
 ```silk
 struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
-  let p = Point { x: 1, y: true }
+  let _p = Point { x: 1, y: true }
   return 0
 }
 ```
@@ -1684,7 +1688,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:28: error[SEM0025] Field y expects i32 but received bool
+src/main.silk:3:29: error[SEM0025] Field y expects i32 but received bool
 ```
 
 Fix: Give each field a value of its declared type. See Structs, tuples and arrays.
@@ -1769,7 +1773,7 @@ An empty array literal with no expected `Array` type to fix its element.
 
 ```silk
 pub fn main() -> i32 {
-  let empty = []
+  let _empty = []
   return 0
 }
 ```
@@ -1777,7 +1781,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:15: error[SEM0029] An empty array literal needs an expected Array type
+src/main.silk:2:16: error[SEM0029] An empty array literal needs an expected Array type
 ```
 
 Fix: Annotate the binding: `let empty: [i32; 0] = []`. See Structs, tuples and arrays.
@@ -1788,7 +1792,7 @@ An array literal element whose type mismatches the element type.
 
 ```silk
 pub fn main() -> i32 {
-  let xs: [i32; 2] = [1, true]
+  let _xs: [i32; 2] = [1, true]
   return 0
 }
 ```
@@ -1796,7 +1800,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:26: error[SEM0030] This element is bool, but the array holds i32
+src/main.silk:2:27: error[SEM0030] This element is bool, but the array holds i32
 ```
 
 Fix: Make every element the declared element type. See Structs, tuples and arrays.
@@ -1807,7 +1811,7 @@ An array literal whose element count differs from its expected length.
 
 ```silk
 pub fn main() -> i32 {
-  let xs: [i32; 3] = [1, 2]
+  let _xs: [i32; 3] = [1, 2]
   return 0
 }
 ```
@@ -1815,7 +1819,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:22: error[SEM0031] An array literal whose element count differs from its expected length
+src/main.silk:2:23: error[SEM0031] An array literal whose element count differs from its expected length
 ```
 
 Message template, not filled by this compiler: `Array literal expects {expected} elements but received {actual}`.
@@ -1970,7 +1974,7 @@ A structural union member that is not a detached ordinary value with finite stor
 
 ```silk
 pub fn main() -> i32 {
-  let x: i32 | &i32 = 1
+  let _x: i32 | &i32 = 1
   return 0
 }
 ```
@@ -1978,7 +1982,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:16: error[SEM0039] A structural union member that is not a detached ordinary value with finite storage
+src/main.silk:2:17: error[SEM0039] A structural union member that is not a detached ordinary value with finite storage
 ```
 
 Message template, not filled by this compiler: `Structural union members must be detached ordinary values with finite storage, found {type}`.
@@ -2125,7 +2129,7 @@ A struct pattern that names one field twice.
 struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
   let p = Point { x: 1, y: 2 }
-  let Point { x, x: other, y } = move p
+  let Point { x, x: _other, y: _y } = move p
   return x
 }
 ```
@@ -2158,6 +2162,7 @@ pub fn main() -> i32 {
 
 ```text
 src/main.silk:5:15: error[SEM0048] `x` is already declared in this scope; bind field `x` to another name, as in `{ x: found }`
+src/main.silk:3:7: warning[SEM0255] `x` is never used; remove it, or start its name with `_` to keep it
 ```
 
 A binding that is not a record field, such as `Color c` in a match arm, asks for another name instead.
@@ -2173,7 +2178,7 @@ struct Point { x: i32 }
 pub fn main() -> i32 {
   let n = 3
   let p = Point { x: 1 }
-  let r = match n {
+  let _r = match n {
     0 => &p
     _ => 2
   }
@@ -2215,7 +2220,7 @@ An application with the wrong number of type arguments.
 ```silk
 import silk.core.option {Option}
 pub fn main() -> i32 {
-  let o: Option<i32, i32> = Option<i32>.none()
+  let _o: Option<i32, i32> = Option<i32>.none()
   return 0
 }
 ```
@@ -2223,7 +2228,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:10: error[SEM0051] `Option` takes 1 type argument, but 2 were written
+src/main.silk:3:11: error[SEM0051] An application with the wrong number of type arguments
 ```
 
 Fix: Pass the declared number of type arguments: `Option<i32>`. See Generics.
@@ -2235,7 +2240,7 @@ A generic call whose type arguments its values do not determine.
 ```silk
 import silk.core.option {Option}
 pub fn main() -> i32 {
-  let o = Option.none()
+  let _o = Option.none()
   return 0
 }
 ```
@@ -2243,7 +2248,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0052] Cannot infer all type arguments for Option.none from supplied values
+src/main.silk:3:12: error[SEM0052] Cannot infer all type arguments for Option.none from supplied values
 ```
 
 Fix: Write the type arguments: `Option<i32>.none()`. See Generics.
@@ -2263,10 +2268,8 @@ pub fn main() -> i32 { return grow<i32>(1, 3) }
 `silk check` prints:
 
 ```text
-src/main.silk:1:1: error[SEM0053] Recursion that re-specializes its callee with different type arguments
+src/main.silk:1:1: error[SEM0053] Recursive specialization changes type arguments from `grow<i32>` to `grow<[i32; 1]>`
 ```
-
-Message template, not filled by this compiler: `Recursive specialization changes type arguments from {caller} to {target}`.
 
 Fix: Recurse with the same type arguments, or use a runtime value instead of a growing type. See Generics.
 
@@ -2281,7 +2284,7 @@ impl Counter {
   fn get(self: &Counter) -> i32 { return self.n }
 }
 pub fn main() -> i32 {
-  let read = Counter.make().get
+  let _read = Counter.make().get
   return 0
 }
 ```
@@ -2289,7 +2292,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:7:14: error[SEM0056] A borrowed view requires a direct stable owner or borrowed view
+src/main.silk:7:15: error[SEM0056] A borrowed view requires a direct stable owner or borrowed view
 ```
 
 Fix: Bind the value first: `let c = Counter.make()` then `c.get()`. See Borrowing.
@@ -2341,7 +2344,7 @@ A negative decimal literal contextualized as unsigned `usize`.
 
 ```silk
 pub fn main() -> i32 {
-  let n: usize = -1
+  let _n: usize = -1
   return 0
 }
 ```
@@ -2349,7 +2352,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:18: error[SEM0060] usize literals cannot be negative
+src/main.silk:2:19: error[SEM0060] usize literals cannot be negative
 ```
 
 Fix: Use a signed type, or a non-negative value. See Values and primitive types.
@@ -2571,7 +2574,7 @@ pub fn main() -> i32 {
 src/main.silk:6:10: error[SEM0071] This `run` needs `&Clock`, which the enclosing function does not provide; add `? &Clock` to its signature, or provide it with `|> Effect.provideMut(&mut value)`
 ```
 
-Fix: Provide the service with `Effect.provide`, or declare it in the caller's row. See Services and providers.
+Fix: Provide the service with `Effect.provide`, or declare it in the caller's row. An optional service, `&Option<&S>`, is never reported here: left unprovided, it is absent for the run. See Services and providers.
 
 ### SEM0075
 
@@ -2697,7 +2700,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:10: error[SEM0081] Cannot return an owned callable whose concrete environment identity is unknown
+src/main.silk:2:10: error[SEM0081] Returning an owned callable whose concrete environment is unknown
 ```
 
 Fix: Return a callable whose identity is known, or use an opaque result `some<F: ...> F`. See Closures and callable types.
@@ -2780,7 +2783,7 @@ Malformed escapes, invalid UTF-8, or non-byte literal values.
 
 ```silk
 pub fn main() -> i32 {
-  let text = "tab\qhere"
+  let _text = "tab\qhere"
   return 0
 }
 ```
@@ -2788,7 +2791,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:14: error[SEM0085] Invalid static literal: `\q` is not an escape; the escapes are `\n`, `\r`, `\t`, `\0`, `\\`, `\"`, `\'`, `\xNN`, and `\u{...}`
+src/main.silk:2:15: error[SEM0085] Invalid static literal: `\q` is not an escape; the escapes are `\n`, `\r`, `\t`, `\0`, `\\`, `\"`, `\'`, `\xNN`, and `\u{...}`
 ```
 
 Fix: Use a supported escape: `\n` `\r` `\t` `\0` `\\` `\"`, `\'` in a character literal, `\xHH` or `\u{H...}`.
@@ -2909,8 +2912,8 @@ A float literal that rounds to infinity at its type's width.
 
 ```silk
 pub fn main() -> i32 {
-  let big: f32 = 1e39
-  let huge = 1.0e400
+  let _big: f32 = 1e39
+  let _huge = 1.0e400
   return 0
 }
 ```
@@ -2918,8 +2921,8 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:18: error[SEM0095] Float literal 1e39 rounds to infinity as f32, whose largest finite value is 3.4028235e38
-src/main.silk:3:14: error[SEM0095] Float literal 1.0e400 rounds to infinity as f64, whose largest finite value is 1.7976931348623157e308
+src/main.silk:2:19: error[SEM0095] Float literal 1e39 rounds to infinity as f32, whose largest finite value is 3.4028235e38
+src/main.silk:3:15: error[SEM0095] Float literal 1.0e400 rounds to infinity as f64, whose largest finite value is 1.7976931348623157e308
 ```
 
 The column is the literal, or its leading minus sign. The check uses the literal's selected type, so `1e39` is accepted as an `f64` and rejected as an `f32`. A leading minus sign does not help: `-1.0e400` is reported the same way, at the minus sign.
@@ -2934,7 +2937,7 @@ One named type parameter left undetermined by an explicit prefix and the argumen
 import silk.core.option {Option}
 fn convert<A, B>(a: A) -> Option<B> { return Option<B>.none() }
 pub fn main() -> i32 {
-  let o = convert<i32>(1)
+  let _o = convert<i32>(1)
   return 0
 }
 ```
@@ -2942,7 +2945,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:11: error[SEM0099] One named type parameter left undetermined by an explicit prefix and the arguments
+src/main.silk:4:12: error[SEM0099] One named type parameter left undetermined by an explicit prefix and the arguments
 ```
 
 Message template, not filled by this compiler: `Cannot infer type argument {parameter} of {target} from supplied values`.
@@ -3267,7 +3270,7 @@ import silk.core.ownership {Copy}
 fn twin<T: Copy>(v: T) -> T { return v }
 struct Token { n: i32 }
 pub fn main() -> i32 {
-  let t = twin(Token { n: 1 })
+  let _t = twin(Token { n: 1 })
   return 0
 }
 ```
@@ -3275,7 +3278,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:5:11: error[SEM0121] `main.Token: Copy` cannot be proved: the callee requires a `Copy` type argument here, and this type does not implement `Copy`
+src/main.silk:5:12: error[SEM0121] `main.Token: Copy` cannot be proved: the callee requires a `Copy` type argument here, and this type does not implement `Copy`
 ```
 
 Inside a generic body, a type parameter conforms only through the bounds it declares. A call that needs a bound the caller does not declare is SEM0121 at the call, and the message names the bound to add:
@@ -3342,7 +3345,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:10:14: error[SEM0125] The provider matches more than one requirement; select one explicitly
+src/main.silk:10:14: error[SEM0125] Provider selection that retains more than one common requirement member
 ```
 
 Fix: Select the requirement explicitly with `Effect.provide<Journal at Audit>(...)`, or give the rows distinct services. See Services and providers.
@@ -3475,7 +3478,7 @@ Operator syntax whose operator interface has no conformance accepting its operan
 pub fn main() -> i32 {
   let a: i64 = 1
   let b: i32 = 2
-  let c = a + b
+  let _c = a + b
   return 0
 }
 ```
@@ -3483,7 +3486,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:13: error[SEM0135] Operator + does not accept (i64, i32)
+src/main.silk:4:14: error[SEM0135] Operator + does not accept (i64, i32)
 ```
 
 Fix: Convert one operand so both have the same type. See Expressions and operators.
@@ -3500,7 +3503,7 @@ fn addI(a: M, b: M) -> i32 { return a.v + b.v }
 impl Add<M, M> for M { add: M.addM }
 impl Add<M, i32> for M { add: M.addI }
 pub fn main() -> i32 {
-  let s = M { v: 1 } + M { v: 2 }
+  let _s = M { v: 1 } + M { v: 2 }
   return 0
 }
 ```
@@ -3508,7 +3511,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:8:22: error[SEM0136] Operator syntax matched by more than one conformance of its operator interface
+src/main.silk:8:23: error[SEM0136] Operator syntax matched by more than one conformance of its operator interface
 ```
 
 Message template, not filled by this compiler: `Operator {operator} is ambiguous between {candidates}`.
@@ -3707,7 +3710,7 @@ A member missing from a resolved scalar enum.
 ```silk
 enum Color { Red, Green }
 pub fn main() -> i32 {
-  let c = Color.Blue
+  let _c = Color.Blue
   return 0
 }
 ```
@@ -3715,7 +3718,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0153] Enum Color has no member Blue
+src/main.silk:3:12: error[SEM0153] Enum Color has no member Blue
 ```
 
 Fix: Name a declared member. See Enums and unions.
@@ -3728,7 +3731,7 @@ A canonical member used through or required by another enum.
 enum Color { Red, Green }
 enum Light { Red, Off }
 pub fn main() -> i32 {
-  let c: Color = Light.Red
+  let _c: Color = Light.Red
   return 0
 }
 ```
@@ -3736,7 +3739,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:4:18: error[SEM0154] Expected main.Color but received a member of main.Light; enums do not convert into each other
+src/main.silk:4:19: error[SEM0154] Expected main.Color but received a member of main.Light; enums do not convert into each other
 ```
 
 Fix: Use the member of the expected enum: `Color.Red`. See Enums and unions.
@@ -3748,7 +3751,7 @@ Implicit mixing between a scalar enum and an integer.
 ```silk
 enum Color { Red, Green }
 pub fn main() -> i32 {
-  let c: Color = 1
+  let _c: Color = 1
   return 0
 }
 ```
@@ -3756,7 +3759,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:18: error[SEM0155] Expected Color but received i32; an integer does not convert into an enum, so write one of the members of Color instead
+src/main.silk:3:19: error[SEM0155] Expected Color but received i32; an integer does not convert into an enum, so write one of the members of Color instead
 ```
 
 Fix: Use a member (`Color.Green`), or convert explicitly. See Enums and unions.
@@ -3982,7 +3985,7 @@ A variant selector absent from its resolved nominal union.
 ```silk
 union Shape { Circle { radius: i32 }, Empty }
 pub fn main() -> i32 {
-  let s = Shape.Square
+  let _s = Shape.Square
   return 0
 }
 ```
@@ -3990,7 +3993,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0167] Union `Shape` has no variant `Square`
+src/main.silk:3:12: error[SEM0167] Union `Shape` has no variant `Square`
   note: `Shape` has the variants `Circle` and `Empty`
 ```
 
@@ -4002,7 +4005,7 @@ A duration literal whose exact nanosecond total exceeds `u64`.
 
 ```silk
 pub fn main() -> i32 {
-  let forever = 1000000000000h
+  let _forever = 1000000000000h
   return 0
 }
 ```
@@ -4010,7 +4013,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:2:17: error[SEM0170] Duration literal exceeds the u64 nanosecond range
+src/main.silk:2:18: error[SEM0170] Duration literal exceeds the u64 nanosecond range
 ```
 
 Fix: Use a duration that fits in u64 nanoseconds (about 584 years). See Values and primitive types.
@@ -4043,7 +4046,7 @@ Positional construction with the wrong number of tuple elements.
 ```silk
 tuple Pair(i32, i32)
 pub fn main() -> i32 {
-  let p = Pair(1, 2, 3)
+  let _p = Pair(1, 2, 3)
   return 0
 }
 ```
@@ -4051,7 +4054,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0172] main.Pair expects 2 tuple elements but received 3
+src/main.silk:3:12: error[SEM0172] main.Pair expects 2 tuple elements but received 3
 ```
 
 Fix: Pass one value per tuple element. See Structs, tuples and arrays.
@@ -4063,7 +4066,7 @@ Using tuple syntax with a named struct or record syntax with a tuple.
 ```silk
 struct Point { x: i32, y: i32 }
 pub fn main() -> i32 {
-  let p: Point = (1, 2)
+  let _p: Point = (1, 2)
   return 0
 }
 ```
@@ -4071,7 +4074,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:18: error[SEM0173] Using tuple syntax with a named struct or record syntax with a tuple
+src/main.silk:3:19: error[SEM0173] Using tuple syntax with a named struct or record syntax with a tuple
 ```
 
 Message template, not filled by this compiler: `A contextual {expected} literal cannot construct {actual}`.
@@ -4245,7 +4248,7 @@ Exhausting the static evaluator's retained-value budget.
 ```silk
 static fn big() -> [i64; 100000000] { return [0; 100000000] }
 pub fn main() -> i32 {
-  let static table = big()
+  let static _table = big()
   return 0
 }
 ```
@@ -4254,7 +4257,7 @@ pub fn main() -> i32 {
 
 ```text
 src/main.silk:1:46: error[SEM0181] Static evaluation exceeded its limit of 1048576 bytes of retained values; keep fewer or smaller values alive at once, or do this work at runtime
-  note: src/main.silk:3:22: related location
+  note: src/main.silk:3:23: related location
 ```
 
 Fix: Build smaller static values. See Static evaluation.
@@ -4332,7 +4335,7 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:1:1: error[SEM0186] Foreign function abs must be declared unsafe
+src/main.silk:1:1: error[SEM0186] Foreign declaration abs must be declared unsafe
 ```
 
 Fix: Declare it `unsafe extern "C" fn` and call it inside `unsafe { }`. See Unsafe code and C interop.
@@ -4417,7 +4420,7 @@ Using a foreign function as a first-class value rather than calling it.
 ```silk
 unsafe extern "C" fn abs(value: i32) -> i32
 pub fn main() -> i32 {
-  let f = abs
+  let _f = abs
   return 0
 }
 ```
@@ -4425,7 +4428,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:11: error[SEM0189] Using a foreign function as a first-class value rather than calling it
+src/main.silk:3:12: error[SEM0189] Using a foreign function as a first-class value rather than calling it
 ```
 
 Message template, not filled by this compiler: `Foreign function {name} can only be called; it cannot be used as a first-class value`.
@@ -4477,17 +4480,15 @@ Two reachable declarations of one symbol with different C signatures.
 ```silk
 export "C" fn twice(value: i32) -> i32 { return value * 2 }
 unsafe extern "C" fn again(value: i64) -> i64 as "twice"
-pub fn main() -> i32 { unsafe { let doubled = again(2) } return 0 }
+pub fn main() -> i32 { unsafe { let _doubled = again(2) } return 0 }
 ```
 
 `silk check` prints:
 
 ```text
-src/main.silk:2:50: error[SEM0192] Two reachable declarations of one symbol with different C signatures
-  note: src/main.silk:1:15: related location
+src/main.silk:2:50: error[SEM0192] Foreign symbol twice is declared with a conflicting C signature or behavioral contract
+  note: src/main.silk:1:15: the other declaration of the symbol
 ```
-
-Message template, not filled by this compiler: `Foreign symbol {symbol} is declared with a conflicting C signature or behavioral contract`.
 
 Fix: Declare one C signature per symbol. See Unsafe code and C interop.
 
@@ -4733,7 +4734,7 @@ A C-layout record field outside the closed C object subset.
 ```silk
 extern "C" struct Flags {
   on: bool,
-  name: string,
+  name: string<'static>,
 }
 pub fn main() -> i32 { return 0 }
 ```
@@ -4741,8 +4742,8 @@ pub fn main() -> i32 { return 0 }
 `silk check` prints:
 
 ```text
-src/main.silk:2:7: error[SEM0206] Field on of C-layout record main.Flags<'_> has unsupported type bool
-src/main.silk:3:9: error[SEM0206] Field name of C-layout record main.Flags<'_> has unsupported type string
+src/main.silk:2:7: error[SEM0206] Field on of C-layout record main.Flags has unsupported type bool
+src/main.silk:3:9: error[SEM0206] Field name of C-layout record main.Flags has unsupported type string<'static>
 ```
 
 Fix: Use C object types in C-layout fields: integers, floats, raw pointers, nested C-layout structs. See Unsafe code and C interop.
@@ -4936,7 +4937,7 @@ impl<T> Maybe<T> {
   fn some(value: T) -> Maybe<T> { return Maybe<T>.Some { value: move value } }
 }
 pub fn main() -> i32 {
-  let value = Maybe.some<i32>(1)
+  let _value = Maybe.some<i32>(1)
   return 0
 }
 ```
@@ -4944,7 +4945,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:6:25: error[SEM0221] A member list follows an unwritten owner whose parameters the member uses (GEN-008)
+src/main.silk:6:26: error[SEM0221] A member list follows an unwritten owner whose parameters the member uses (GEN-008)
 ```
 
 Message template, not filled by this compiler: `{owner}.{member} uses {owner}'s parameters, so its type arguments follow a written owner: {owner}<...>.{member}<...>`.
@@ -5160,7 +5161,7 @@ A type named through a module import in a value position.
 ```silk
 import silk.compress.inflate
 pub fn main() -> i32 {
-  let format = inflate.Format.Gzip
+  let _format = inflate.Format.Gzip
   return 0
 }
 ```
@@ -5168,7 +5169,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:16: error[SEM0238] Format is a type of module silk.compress.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.compress.inflate { Format }`
+src/main.silk:3:17: error[SEM0238] Format is a type of module silk.compress.inflate, which a value cannot reach through the module name; import it by name, as in `import silk.compress.inflate { Format }`
 ```
 
 A module import lets you name the module's types in type positions, such as `inflate.Format` in a signature, but not reach their members as values.
@@ -5246,7 +5247,7 @@ An architecture intrinsic whose target or CPU feature is not enabled for the fun
 ```silk
 pub fn main() -> i32 {
   let bytes = Intrinsic.simdSplat<simd<u8, 16>>(1)
-  let picked = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(bytes, bytes)
+  let _picked = Intrinsic.x86ShuffleBytes<simd<u8, 16>>(bytes, bytes)
   return 0
 }
 ```
@@ -5254,7 +5255,7 @@ pub fn main() -> i32 {
 `silk check` prints:
 
 ```text
-src/main.silk:3:16: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `@features(...)` directive
+src/main.silk:3:17: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `@features(...)` directive
 ```
 
 The default x86-64 profile has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
