@@ -34,7 +34,7 @@ The archive holds exactly what a build of the package reads, under one top direc
 
 - `silk.toml`.
 - Every file below the source root (`[package].source`, by default `src`).
-- The files and directories `[package].include` names, as paths relative to the package directory. Use it for files the source embeds or reads at build time, such as `include = ["assets", "data/table.txt"]`.
+- The files and directories `[package].include` names, as paths relative to the package directory. Use it for files the source embeds or reads at build time, such as `include = ["assets", "data/table.txt"]`. A file a module embeds with `Source.read`, `Source.text` or their compressed forms must be in the archive: a package that depends on the archive reads the file from it, so `silk pack` refuses when one is missing. Only modules the package's own check reads count, so a test module may embed fixtures the archive leaves out.
 - `README`, `LICENSE`, `LICENCE`, `COPYING` and `CHANGELOG` at the package root, in any case, with or without an extension (`README.md`, `license-mit.txt`).
 
 It never holds the build directory, or a file or directory whose name starts with `.`. A symbolic link, below the source root or on the way to an `include` entry, refuses the package: an archive holds only files and directories, and following a link could pack files from outside the package.
@@ -86,6 +86,7 @@ Packing the same files gives the same bytes, and so the same SHA-256, on every m
 | `silk pack: greet: [package].include entry ../x is not a path below the package directory` | An absolute `include` path, or one with a `..` segment |
 | `silk pack: greet: [package].include entry assets names no file or directory` | An `include` entry that does not exist |
 | `silk pack: greet: [package].include entry assets passes through a symbolic link; an archive holds only files and directories` | An `include` entry that is, or is inside, a symbolic link |
+| `silk pack: greet: module banner.silk embeds assets/logo.txt, which the archive would not hold; add it to [package].include` | A module embeds a file outside the source root that `include` does not name |
 | `silk pack: greet: src/data is a symbolic link; an archive holds only files and directories` | A symbolic link below the source root |
 | `silk pack: greet: the source root /home/you/shared is outside the package directory` | A `[package].source` outside the package |
 
