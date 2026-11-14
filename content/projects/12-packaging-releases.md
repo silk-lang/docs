@@ -52,6 +52,24 @@ silk.toml
 src/lib.silk
 ```
 
+### Workspace dependencies are written out
+
+The archive's `silk.toml` is the package's own, with one change: a dependency written `name = { workspace = true }` is replaced by the entry the workspace's `[workspace.dependencies]` has for it. Whoever downloads the archive has the package, not the workspace around it, so the pin has to be in the package's manifest. The manifest on disk is not touched.
+
+```toml
+# pricing/silk.toml in the workspace
+[dependencies]
+vector = { workspace = true }
+```
+
+```toml
+# pricing-0.1.0/silk.toml in the archive
+[dependencies]
+vector = { git = "https://example.com/geometry.git", rev = "fb09a5d023a80e50a973adb896a198ab4daab4db", path = "vector" }
+```
+
+Write the entry on one line, as above, in `[dependencies]` or `[profiles.<name>.dependencies]`. A shared path dependency is refused like any other path dependency.
+
 ### Reproducible archives
 
 Packing the same files gives the same bytes, and so the same SHA-256, on every machine. Members are sorted by path, every modification time is zero, owner and group are zero with no names, modes are 644 for files and 755 for executables and directories, and the gzip header has no timestamp. A release workflow can pack again and compare the checksum with the one it published.
@@ -64,6 +82,7 @@ Packing the same files gives the same bytes, and so the same SHA-256, on every m
 | --- | --- |
 | `silk pack: greet: [package] has no version; write one, as version = "0.1.0", to name the archive` | No `version` in `[package]` |
 | ``silk pack: core: path dependency `demo`: an archive cannot carry ../demo; depend on it by git or url instead`` | A path dependency. Nobody who downloads the archive has `../demo`. Git and URL dependencies are fine, with or without their own `path` |
+| ``silk pack: core: dependency `vector` cannot be written out for the archive; write it on one line in [dependencies], as vector = { workspace = true }`` | A `workspace = true` dependency written as a `[dependencies.vector]` table or a dotted key |
 | `silk pack: greet: [package].include entry ../x is not a path below the package directory` | An absolute `include` path, or one with a `..` segment |
 | `silk pack: greet: [package].include entry assets names no file or directory` | An `include` entry that does not exist |
 | `silk pack: greet: [package].include entry assets passes through a symbolic link; an archive holds only files and directories` | An `include` entry that is, or is inside, a symbolic link |

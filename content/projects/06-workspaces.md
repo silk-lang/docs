@@ -34,6 +34,7 @@ To bring in a package that already exists, move it into the folder and add it to
 | `members` | Required. Member directories, relative to the workspace manifest. `"apps/*"` adds every child directory of `apps`. |
 | `output-dir` | Shared output directory. Default `"build"`. |
 | `silk-version` | The Silk toolchain for the workspace and every member it lists. Overrides the members' own `silk-version`. Must be a semantic version. |
+| `dependencies` | The `[workspace.dependencies]` table: dependencies written once for members to take by name. See **Shared dependencies**. |
 
 - Every member directory must hold a `silk.toml` with a `[package]` name, and no two members may share a name.
 - Entries must stay inside the workspace.
@@ -63,6 +64,53 @@ Added dependency pricing = { path = "../pricing" } to /home/you/shop/store/silk.
 ```
 
 See **Dependencies**.
+
+## Shared dependencies
+
+When several members use the same dependency, each manifest repeats the same entry, and a new pin means editing all of them. `[workspace.dependencies]` in the workspace manifest writes the entry once:
+
+```toml
+[workspace]
+members = ["store", "pricing"]
+
+[workspace.dependencies]
+vector = { git = "https://example.com/geometry.git", rev = "fb09a5d023a80e50a973adb896a198ab4daab4db", path = "vector" }
+pricing = { path = "pricing" }
+```
+
+A member takes an entry by name with `workspace = true`:
+
+```toml
+[package]
+name = "store"
+version = "0.1.0"
+
+[dependencies]
+vector = { workspace = true }
+pricing = { workspace = true }
+```
+
+- The entries are written exactly as in `[dependencies]`: path, git or URL dependencies, with the same keys. See **Dependencies**.
+- The name is the key in both tables. `vector = { workspace = true }` takes the workspace's `vector`, and the member imports it as `vector`.
+- A `path` in `[workspace.dependencies]` is relative to the workspace manifest, not to the member. `pricing = { path = "pricing" }` above names `shop/pricing` for every member, whatever folder the member is in.
+- `workspace = true` stands alone. A member cannot add or change a key of the shared entry; a member that needs something else writes its own full entry instead.
+- It works in `[dependencies]` and in a profile's `[profiles.<name>.dependencies]`.
+- A member only gets the dependencies it lists. An entry no member takes is never read or fetched.
+- To change a pin for every member, edit the one line in the workspace manifest.
+
+A package from a git or URL dependency can use `workspace = true` too: its workspace is looked for inside that repository or archive only.
+
+| Mistake | Message after `Invalid Silk project manifest FILE:LINE:` |
+| --- | --- |
+| The workspace has no such entry | ``dependency `missing` of store@0.1.0: workspace = true takes the entry from [workspace.dependencies] of /home/you/shop/silk.toml, which has no `missing` `` |
+| Another key beside `workspace = true` | `dependencies.vector must be a dependency: { path = ... }, { git = ..., rev = ... } or { url = ..., sha256 = ... }, with an optional package, or { workspace = true }` |
+| `workspace = false` | `dependencies.vector.workspace must be true; it is false` |
+| The package is not a member of any workspace | ``dependency `vector` of tool@0.1.0: workspace = true takes the entry from [workspace.dependencies], but no workspace lists this package as a member`` |
+| `workspace = true` inside `[workspace.dependencies]` | `workspace.dependencies.vector must be a dependency written out, as members take it with { workspace = true }; it is { workspace = true }` |
+
+A mistake in the shared entry itself, such as a `rev` that is not a full commit hash, is reported at its line in the workspace manifest.
+
+`silk pack` writes each `workspace = true` entry out in the archive's `silk.toml`, so the archive builds without the workspace. See **Packaging releases**.
 
 ## Running commands from the root
 

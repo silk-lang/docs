@@ -192,6 +192,17 @@ Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `greet` of a
 
 Once fetched, builds read the store and need no network, even after the URL is gone. With `SILK_OFFLINE` set, a build that needs an archive it does not have fails instead of downloading it. The editor, `silk doc` and `silk doctest` never download; they read what is already in the store. A package read from an archive reaches other packages by path only inside the same archive, as a package from a git commit does.
 
+## Workspace dependencies
+
+In a workspace, a dependency that several members share can be written once in the workspace manifest's `[workspace.dependencies]` table. A member then takes it by name:
+
+```toml
+[dependencies]
+vector = { workspace = true }
+```
+
+The entry is read as if the member wrote the workspace's keys itself, except that a `path` there is relative to the workspace manifest. See "Shared dependencies" in **Workspaces**.
+
 ## Naming rules
 
 - The dependency name (the key) must be an identifier: an ASCII letter or `_`, then letters, digits or `_`. `text-utils` is not one, so `silk add` writes `text_utils`.

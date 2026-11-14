@@ -173,8 +173,9 @@ greet = { url = "https://example.com/greet-0.1.0.tar.gz", sha256 = "b9b86606bfdd
 | `url` | for a URL dependency | Where the package's archive is: an `https://` or `file:///` URL of a `.tar.gz`, `.tar` or ZIP file. |
 | `sha256` | with `url` | The archive's SHA-256, 64 lowercase hexadecimal digits. |
 | `package` | no | The dependency's `[package].name`. When given, it must match. |
+| `workspace` | alone | `true` takes the entry of the same name from the workspace's `[workspace.dependencies]`. No other key may stand beside it. See "Shared dependencies" in **Workspaces**. |
 
-The other settings (`version`, `tag`, `branch`, `hash`, `optional`, `workspace`) are refused as not supported yet. A git dependency is pinned with `rev`, never with `tag` or `branch`, and a URL dependency with `sha256`. See **Dependencies** for git and archive dependencies, fetching and the naming rules.
+The other settings (`version`, `tag`, `branch`, `hash`, `optional`) are refused as not supported yet. A git dependency is pinned with `rev`, never with `tag` or `branch`, and a URL dependency with `sha256`. See **Dependencies** for git and archive dependencies, fetching and the naming rules.
 
 ## &#91;profiles.\<name>\]
 
@@ -213,6 +214,7 @@ The `tasks` profile builds the package's tasks for `silk task` and exists withou
 | --- | --- | --- |
 | `members` | yes | Array of member directories inside the workspace. An entry ending in `/*` adds every child directory. |
 | `output-dir` | no | Shared output directory for all members. Default `"build"`. |
+| `dependencies` | no | A table of dependencies, written as in `[dependencies]`, that members take with `name = { workspace = true }`. A `path` in it is relative to this manifest. |
 
 A manifest may hold both `[package]` and `[workspace]`. See **Workspaces**.
 
@@ -275,7 +277,7 @@ Invalid Silk project manifest /home/you/hello/silk.toml:2: package.nmae is not a
 | Only `[workspace]`, for a command that needs a package | `this manifest only defines a workspace; run the command in one of its member directories` |
 | An earlier spelling, such as `[build].artifact` | `LINE: build.artifact is an earlier spelling; write package.kind` |
 | A reserved table, such as `[dev-dependencies]` | `LINE: dev-dependencies is not supported yet` |
-| A reserved key, such as a dependency's `tag` | ``LINE: dependency `<name>` of <package@version>: tag is not supported yet; a dependency takes only path, git, rev, url, sha256 and package; pin a git dependency to a full commit hash with rev`` |
+| A reserved key, such as a dependency's `tag` | ``LINE: dependency `<name>` of <package@version>: tag is not supported yet; a dependency takes only path, git, rev, url, sha256 and package, or workspace = true alone; pin a git dependency to a full commit hash with rev`` |
 | Unknown top-level key or table, such as `[packge]` | `LINE: packge is not a supported field; did you mean package?` |
 | Unknown `[package]` key | `LINE: package.<key> is not a supported field`, plus `; did you mean package.<close key>?` when there is one, as for every unknown key below |
 | Unknown key in a dependency entry | `LINE: dependencies.<name>.<key> is not a supported field` |
