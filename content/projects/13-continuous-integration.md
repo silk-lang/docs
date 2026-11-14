@@ -41,7 +41,7 @@ jobs:
   test:
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: silk-lang/action@v1
       - run: silk check --workspace
       - run: silk test
@@ -65,7 +65,7 @@ Any CI system that can keep a directory between runs works the same way. Keep th
 With `actions/cache`, end the key in the commit so every run saves a new cache, and restore by prefix so a run starts from the latest one:
 
 ```yaml
-- uses: actions/cache@v4
+- uses: actions/cache@v5
   with:
     path: |
       build
