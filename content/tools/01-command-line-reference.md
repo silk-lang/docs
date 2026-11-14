@@ -290,9 +290,10 @@ The program runs with your environment plus `SILK_PROJECT_ROOT`, the package's d
 ```
 silk pack [--list] [--output <dir>] [--json] [--bin] [--sign <file>] [shared project options]
 silk pack --new-key <path>
+silk pack --verify <dir> [--key <file>]
 ```
 
-`pack` checks the package as `check` does, then writes its release files in `build/package/`, or `--output`: the source archive `<name>-<version>.tar.gz`, the documentation `<name>-<version>.docs.json`, and `SHA256SUMS`. `--bin` also builds each target's executable, with the release profile unless a profile option chooses another, and writes `<name>-<version>-<target>.tar.gz`. `--sign <file>`, or the key text in `SILK_SIGNING_KEY`, writes a minisign `<file>.minisig` beside every file. `--new-key <path>` writes a new key pair and packs nothing. `--list` prints the files the source archive would hold and writes nothing.
+`pack` checks the package as `check` does, then writes its release files in `build/package/`, or `--output`: the source archive `<name>-<version>.tar.gz`, the documentation `<name>-<version>.docs.json`, and `SHA256SUMS`. `--bin`, or a `[pack.binary]` table in the manifest, also builds each target's executable, with the release profile unless a profile option chooses another, and writes `<name>-<version>-<target>.tar.gz`, or `.zip` when the table says so. `--sign <file>`, or the key text in `SILK_SIGNING_KEY`, writes a minisign `<file>.minisig` beside every file. `--new-key <path>` writes a new key pair and packs nothing. `--verify <dir>` checks a directory of release files against `SHA256SUMS` and their signatures, with the public key file `--key` names or `minisign.pub` in the working directory, and packs nothing: it exits 0 when every file verifies, 1 after naming each fault, and 2 without a usable key. `--list` prints the files the source archive would hold and writes nothing.
 
 ```
 wrote /home/you/greet/build/package/greet-0.1.0.tar.gz (4 files, 432 bytes)

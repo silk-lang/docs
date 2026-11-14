@@ -22,7 +22,7 @@ wrote /home/you/greet/build/package/greet-0.1.0.docs.json
 | --- | --- |
 | `<name>-<version>.tar.gz` | The source archive: what a dependent downloads and builds. |
 | `<name>-<version>.docs.json` | The package documentation, as `silk doc` writes it, with source paths relative to the package. It is not inside the archive, so a build of the archive never reads it. |
-| `<name>-<version>-<target>.tar.gz` | With `--bin`, one binary archive per target. |
+| `<name>-<version>-<target>.tar.gz` or `.zip` | With `--bin` or a `[pack.binary]` table, one binary archive per target. |
 | `SHA256SUMS` | The SHA-256 of every file this run wrote in the directory, one `<hex>  <file>` line each, as `sha256sum` writes them, so `sha256sum -c SHA256SUMS` checks a download. |
 | `<file>.minisig` | With `--sign` or `SILK_SIGNING_KEY`, a minisign signature beside each file above, `SHA256SUMS` included. |
 
@@ -135,9 +135,43 @@ The build progress goes to standard error and the `wrote` lines to standard outp
 
 - The targets are those `silk build` would build: each `--target`, else `[build].targets`, else the host. Cross targets need what `silk build --target` needs.
 - The build uses the release profile (optimized, no debug information) unless `--profile`, `--optimization` or `--profile-input` chooses another. With `--profile <name>`, the profile name follows the target in the file name, as `app-0.1.0-x86_64-unknown-linux-gnu-small.tar.gz`, so two profiles never overwrite each other.
-- A binary archive holds `<name>-<version>-<target>/bin/<executable>` with mode 755, and the `README`, `LICENSE`, `LICENCE`, `COPYING` and `CHANGELOG` files of the package root. It is a `.tar.gz` on every target, Windows included.
+- A binary archive holds `<name>-<version>-<target>/bin/<executable>` with mode 755, and the `README`, `LICENSE`, `LICENCE`, `COPYING` and `CHANGELOG` files of the package root. It is a `.tar.gz` on every target unless the manifest says otherwise, as below.
 - A library has no binaries: `--bin` packs its source archive only.
 - A target that fails to build is reported as `silk build` reports it and gets no archive. The other targets are still packed.
+
+### Binaries in the manifest
+
+A package that always ships binaries says so in `silk.toml`, with a `[pack.binary]` table. With the table, `silk pack` builds and archives the binaries without `--bin`, and the table says what the archives look like:
+
+```toml
+[pack.binary]
+include = ["completions", "man/tool.1"]
+
+[pack.binary.target.x86_64-pc-windows-msvc]
+format = "zip"
+layout = "flat"
+include = ["scripts/install.ps1"]
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `format` | `"tar.gz"` | `"tar.gz"` or `"zip"`. |
+| `layout` | `"bin"` | `"bin"` puts the executable in `bin/`. `"flat"` puts it at the top of the archive, which is what Windows users expect. |
+| `include` | none | Files and directories added to every binary archive at their paths in the package, beside the README, LICENSE and CHANGELOG. The rules are those of `[package].include`. |
+| `[pack.binary.target.<target>]` | none | `format`, `layout` or `include` for one target, by its name. Each key written there replaces the one in `[pack.binary]`; `include = []` adds nothing for that target. |
+
+An empty `[pack.binary]` table is enough to ship the default archives. The manifest above writes `tool-1.0.0-x86_64-unknown-linux-gnu.tar.gz` holding `bin/tool`, the completions and the man page, and `tool-1.0.0-x86_64-pc-windows-msvc.zip` holding `tool.exe` and `scripts/install.ps1` at its top.
+
+Binary archives are reproducible in both formats: the executable comes first, then every other file in byte order, with fixed times and modes. A ZIP file records modes 644 and 755 the way Unix archivers do, so `unzip` restores the execute bit.
+
+`silk pack` refuses, with exit status 1:
+
+| Message | Cause |
+| --- | --- |
+| `silk pack: tool: [pack.binary].include holds bin, which takes the place of the executable at bin/tool in the archive` | An included file or directory at the executable's path, above it or below it. A target's own list is named as `[pack.binary.target.<target>].include` |
+| `silk pack: mathlib: [pack.binary] archives an executable, and [package].kind is library; remove the table` | The table on a package that is not an executable |
+
+`--list` still prints the source archive's files only, and builds nothing.
 
 ## Signing
 
@@ -176,7 +210,39 @@ silk pack: cannot sign: the password does not decrypt the secret key
 silk pack: cannot sign: the secret key is not a minisign Ed25519 secret key
 ```
 
-To check a release:
+### Checking a release
+
+`silk pack --verify` checks a directory of release files, such as the assets of a release downloaded into one directory, against a public key:
+
+```sh
+silk pack --verify dist --key release.pub
+```
+
+```
+verified app-0.1.0.tar.gz
+verified app-0.1.0.docs.json
+verified app-0.1.0-x86_64-unknown-linux-gnu.tar.gz
+```
+
+Without `--key`, the key is `minisign.pub` in the working directory, which is where a repository that signs its releases keeps it. The directory verifies when:
+
+- `SHA256SUMS` is signed by the key.
+- Every file `SHA256SUMS` names is there, has that SHA-256 and has its own `.minisig` by the same key.
+- Nothing else is in the directory. Every entry is a regular file that is `SHA256SUMS`, a file it names, or the signature of one of those.
+
+The exit status is 0 when it verifies. Otherwise every fault is named on standard error, no file is reported as verified, and the status is 1:
+
+```
+silk pack: app-0.1.0.tar.gz: the SHA-256 does not match SHA256SUMS
+silk pack: notes.txt: SHA256SUMS does not name it
+silk pack: SHA256SUMS: the signature was made with a different key
+```
+
+A key file that cannot be read, or is not a minisign public key, exits 2. `--verify` packs nothing and runs no hook, so it takes no other option than `--key`.
+
+A signature shows who signed a file, not which release it belongs to: an older release signed by the same key verifies too. The version is in each file name.
+
+The same check by hand, without Silk:
 
 ```sh
 sha256sum -c SHA256SUMS
@@ -220,9 +286,11 @@ There is one entry for each package packed. `documentation` is `null` when no st
 | `--list` | Print the files each source archive would hold, and write nothing |
 | `--output <dir>` | Write everything in `<dir>` instead of `build/package/` |
 | `--json` | Print the JSON object above instead of lines |
-| `--bin` | Also build and archive each target's executable |
+| `--bin` | Also build and archive each target's executable. A `[pack.binary]` table does the same without the flag |
 | `--sign <file>` | Sign every file with this minisign secret key file |
 | `--new-key <path>` | Write a new key pair, and pack nothing |
+| `--verify <dir>` | Check the release files in `<dir>` against `SHA256SUMS` and their signatures, and pack nothing |
+| `--key <file>` | The minisign public key file for `--verify`; without it, `minisign.pub` in the working directory |
 | `-p <member>`, `--workspace` | Pick workspace members, as for other commands |
 | `--target`, `--profile`, `--release`, `--optimization`, `--profile-input`, `--backend`, `--clang` | As for `silk build`; they matter for `--bin` and for the check |
 | `--manifest-path`, `--stdlib`, `--progress`, `--quiet`, `--timings` | As for other commands |
