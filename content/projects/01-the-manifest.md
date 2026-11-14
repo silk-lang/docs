@@ -218,6 +218,19 @@ The `tasks` profile builds the package's tasks for `silk task` and exists withou
 
 A manifest may hold both `[package]` and `[workspace]`. See **Workspaces**.
 
+## &#91;pack.binary\]
+
+An executable package with this table ships binary archives: `silk pack` builds each target and archives its executable without `--bin`.
+
+| Key | Values | Default |
+| --- | --- | --- |
+| `format` | `"tar.gz"`, `"zip"` | `"tar.gz"` |
+| `layout` | `"bin"` (the executable in `bin/`), `"flat"` (at the top of the archive) | `"bin"` |
+| `include` | array of files and directories, relative to the package directory, added to each binary archive | none |
+| `target.<target>` | a table with `format`, `layout` or `include` that replaces them for one target | none |
+
+See "Binaries in the manifest" in **Packaging releases**.
+
 ## &#91;release\]
 
 Read only by `silk change`, the release notes command. Its keys (`repository`, `directory`, `version-file`) are described with that command in the Tools section. Builds ignore the table. It was called `[changes]` before; a manifest that still uses that name is refused.
