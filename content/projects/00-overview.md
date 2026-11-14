@@ -18,3 +18,4 @@ These pages cover how Silk code is organized and built, from a single file up to
 | **Project templates** | `silk init --template` and `--list`, naming a template, writing one, and its `[[post-init]]` commands. |
 | **Hooks and scripts** | Every command a package can have Silk run, when each runs, and how to write a hook script. |
 | **Packaging releases** | `silk pack`: the source archive, documentation, binaries, checksums and minisign signatures to attach to a release, and `publish = false`. |
+| **Continuous integration** | Keeping `build` between CI runs so a job only pays for what a commit changed, the `silk-lang/action` GitHub Action, and `silk hash` for skipping jobs. |

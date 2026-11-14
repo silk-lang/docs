@@ -403,6 +403,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Packaging releases',
         'https://github.com/silk-lang/docs/blob/main/content/projects/12-packaging-releases.md',
       ),
+      page(
+        'projects',
+        'continuous-integration',
+        'Continuous integration',
+        'https://github.com/silk-lang/docs/blob/main/content/projects/13-continuous-integration.md',
+      ),
     ],
   },
   {
