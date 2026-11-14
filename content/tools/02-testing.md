@@ -59,7 +59,7 @@ The runner is a separate executable, built under `build/test/llvm/<target>/<prof
 
 While it builds the runner, `silk test` prints no progress rows, unlike `silk build`. A compile error is printed as its diagnostic line, and the command exits 1 without running any test.
 
-The next `silk test` reuses the runner when nothing it was built from has changed: the sources it read, the std lib, the compiler and the toolchain. A rerun, with or without `--filter`, then starts at once. Editing a test or adding a file under `src` builds the runner again. `--no-cache` builds it again anyway. Test results are never reused: every run executes every selected test.
+The next `silk test` reuses the runner when nothing it was built from has changed: the sources it read, the std lib, the compiler and the toolchain. A rerun, with or without `--filter`, then starts at once. Editing a test or adding a file under `src` builds the runner again. `--no-cache` builds it again anyway. When nothing changed since every selected test passed, the tests are not run again either: `silk test` prints the last report and `Not run again: nothing changed since these tests passed`. `--no-cache` runs them.
 
 The summary line counts tests at each stage. Discovered tests were found by the compiler, selected ones passed the filters, and executed ones ran. Cached is always 0 in this release. The command exits 0 when every selected test passed. Without `--file` or `--filter`, that includes a package with no tests.
 
