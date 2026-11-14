@@ -84,10 +84,14 @@ pub effect fn main() -> ()
   let mut allocator = Allocator.systemAllocatorProvider()
   let packed = Source.compressedText("js/index.js")
   let script = run CompressedText.text(&packed) |> Effect.provideMut<Allocator>(&mut allocator)
-  run Effect.log("{held} bytes in the program, {full} bytes of script\n", &.{
-    held: CompressedText.compressedLength(&packed),
-    full: String.ownedUtf8Bytes(&script).length,
-  }) |> Effect.provideMut(&mut logger)
+  run Effect.log(
+    "{held} bytes in the program, {full} bytes of script\n",
+    &.{
+      held: CompressedText.compressedLength(&packed),
+      full: String.ownedUtf8Bytes(&script).length,
+    },
+  )
+    |> Effect.provideMut(&mut logger)
 }
 ```
 
