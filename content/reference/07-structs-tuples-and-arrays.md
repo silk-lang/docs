@@ -90,6 +90,7 @@ UnitType       = '(' ')'
 ## Fixed arrays
 
 - `[T; N]` is an array of exactly `N` elements. `N` may be a literal or a constant: `[i32; N]`.
+- The type written on a `let` or `const` may end with a column count for `silk format`: `const T: [u8; 64; 4] = [...]` has type `[u8; 64]`, and its literal is laid out four elements per line. The count has no other meaning. It is a decimal literal of at least 1, allowed only on the outermost array type of a `let` or `const`. See Formatting.
 - `[a, b, c]` is an array literal. All elements must have one type (SEM0030). Against an annotation, the count must match (SEM0031).
 - With no expected type, elements whose types differ only in a lifetime join at the shortest one: `[header("a", b"x"), header("b", &local)]` is valid and lives as long as `local`. Using it past that is OWN0019.
 - `[value; count]` repeats one value: `[0; 64]`, `[[7; 3]; 2]`. `count` is a static integer, such as a literal, a `const`, a `let static` binding or a `static` parameter. A runtime count is SEM0176.
