@@ -111,7 +111,16 @@ const REVERSE_BITS: [u8; 8; 4] = [
 ]
 ```
 
-The count is a formatter hint, not part of the type: `[u8; 8; 4]` is the type `[u8; 8]`, and the length may still be an expression, as in `[u8; 256 / 4; 4]`. A literal with more elements than the count always breaks, with that many elements on each line and the last row holding the rest. One with the count or fewer stays on one line when it fits.
+The count is a formatter hint, not part of the type: `[u8; 8; 4]` is the type `[u8; 8]`, and the length may still be an expression, as in `[u8; 256 / 4; 4]`. A literal with more elements than the count always breaks, with that many elements on each line and the last row holding the rest. One with the count or fewer stays on one line when it fits. Each column is right-aligned to its widest element, so numbers line up:
+
+```silk
+const STEPS: [i32; 6; 3] = [
+     1, 200,   3,
+  4000,   5, -60,
+]
+```
+
+A literal with a comment inside it, or an element that spans several lines, keeps one space between elements instead.
 
 The hint applies only to the array literal that is the declaration's own value, and only when the type is written there. Nothing carries it further, so a later assignment such as `table = [...]` is laid out as an ordinary list. The count is a decimal literal of at least 1, written only on the outermost array type of a `let` or `const`; anywhere else, such as a parameter type or an element type, it is a syntax error.
 
