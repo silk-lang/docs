@@ -32,7 +32,7 @@ DirectiveLit    = TextLiteral | '-'? DecimalInteger | 'true' | 'false' | '(' ( D
 | SIMD vectors | 46 | `simdSplat`, `simdFromArray`, `simdToArray`, `simdExtract`, `simdInsert`, `simdLoad`, `simdStore`, `simdPointerLoad`, `simdPointerStore`, `simdLanesEqual` and the other `simdLanes*` comparisons, `simdSelect`, `simdMinimum`, `simdMaximum`, `simdShuffle`, `simdWrapping*`, `simdSaturating*`, `simdShift*`, `simdRotate*`, `simdSqrt`, `simdMulAdd`, `simdReduce*`, `simdMask*`, `simdConvert`, `simdBitcast` |
 | Architecture operations | 31 | `x86ShuffleBytes`, `x86MultiplyAddBytes`, `x86MultiplyAddWords`, `x86PackUnsignedSaturate`, `x86PackSignedSaturate`, `x86SumAbsoluteDifferences`, `x86AesEncrypt`, `x86AesEncryptLast`, `x86AesDecrypt`, `x86AesDecryptLast`, `x86AesInverseMixColumns`, `x86CarrylessMultiply`, `x86Sha256Rounds2`, `x86Sha256Message1`, `x86Sha256Message2`, `aarch64TableLookup`, `aarch64DotProduct`, `aarch64PairwiseAdd`, `aarch64AesEncrypt`, `aarch64AesDecrypt`, `aarch64AesMixColumns`, `aarch64AesInverseMixColumns`, `aarch64Sha256Hash`, `aarch64Sha256Hash2`, `aarch64Sha256ScheduleUpdate0`, `aarch64Sha256ScheduleUpdate1`, `wasmSwizzle`, `wasmRelaxedSwizzle`, `wasmDot`, `wasmNarrowUnsigned`, `wasmNarrowSigned` |
 | Atomics | 13 | `atomicLoad`, `atomicStore`, `atomicSwap`, `atomicCompareExchange`, `atomicCompareExchangeWeak`, `atomicFetchAdd`, `atomicFetchSubtract`, `atomicFetchBitAnd`, `atomicFetchBitOr`, `atomicFetchBitXor`, `atomicFetchMinimum`, `atomicFetchMaximum`, `atomicFence` |
-| Allocation and raw storage | 17 | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBufferEmpty`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
+| Allocation and raw storage | 18 | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBufferEmpty`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `sliceCopy`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
 | Shared ownership | 4 | `sharedLayout`, `sharedFromAllocation`, `sharedClone`, `sharedWithMut` |
 | Execution | 11 | `executionLayout`, `executionFromAllocation`, `executionDrive`, `relinquish`, `executionCurrent`, `executionRefOf`, `executionLoad`, `executionStore`, `executionCompareExchange`, `executionNotify`, `executionLive` |
 | Effect composition | 8 | `bindRequirement`, `bindRequirementMut`, `bindRequirementOwned`, `catchFailure`, `suspendEffect`, `finalizeEffect`, `finalizeEffectNonParking`, `useReleaseNonParking` |
@@ -45,11 +45,11 @@ DirectiveLit    = TextLiteral | '-'? DecimalInteger | 'true' | 'false' | '(' ( D
 | Reflection | 11 | `reflectType`, `reflectTypeKind`, `reflectFields`, `reflectFieldKind`, `reflectFieldLabel`, `reflectFieldOrdinal`, `reflectVariants`, `reflectVariantLabel`, `reflectVariantFields`, `makeVariant`, `isVariant` |
 | Tests | 3 | `tests`, `testInfo`, `testFunction` |
 | Diagnostics | 3 | `observeUnhandled`, `observeHandled`, `observeDiagnostics` |
-| Traps | 1 | `trap` |
+| Traps and unreachable points | 2 | `trap`, `unreachable` |
 | Machine code and stack | 3 | `assembly`, `frameAddress`, `stackAllocate` |
 | Enums | 1 | `enumValue` |
 
-The inventory holds 829 members: 628 scalar operations and the 201 in the table.
+The inventory holds 832 members: 629 scalar operations and the 203 in the table.
 
 ## Scalar operations
 
@@ -68,7 +68,7 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 | Checked conversion | 100 | `CheckedTo<Type>` between integer types |
 | Float classification | 12 | `IsNaN`, `IsInfinite`, `IsFinite`, `IsNormal`, `IsSubnormal`, `IsSignNegative` |
 | Float math | 6 | `Sqrt`, `Sin`, `Cos` |
-| Logical | 1 | `boolNot` |
+| Logical | 2 | `boolNot`, `boolExpect` |
 
 - Integer scalars are `i8` to `i64`, `isize`, `u8` to `u64` and `usize`. Floats are `f32` and `f64`. `bool` and `char` have equality, comparison and conversion members.
 - Negating members exist only for signed integers and floats. Wrapping, saturating and checked members exist only for integers.
@@ -205,21 +205,47 @@ unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> {
 
 ## Unsafe members
 
-- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `pointerBorrowMany`, `pointerBorrowManyMut`, `simdPointerLoad`, `simdPointerStore`, `stackAllocate`, `assembly`.
+- These members are unsafe: `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `pointerBorrowMany`, `pointerBorrowManyMut`, `simdPointerLoad`, `simdPointerStore`, `stackAllocate`, `assembly`, `unreachable`.
 - Every atomic member except `atomicFence` is unsafe. Each takes its memory order as a static string, such as `"acquire"`; an order or element type the operation does not admit is SEM0237.
-- So are these storage members: `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `sharedFromAllocation`, `stringFromUtf8Unchecked`, `executionFromAllocation`.
+- So are these storage members: `allocationAdopt`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `sliceCopy`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `sharedFromAllocation`, `stringFromUtf8Unchecked`, `executionFromAllocation`.
 - Call them inside `unsafe { }` or as `unsafe Intrinsic.member(...)`. Otherwise SEM0082.
 - No other member is unsafe. Scalar operations, the other SIMD members, architecture members, target queries and reflection are safe. A function compiled for extra CPU features is unsafe to call; see Functions compiled for CPU features above.
+- `sliceCopy<T>(destination: &mut [T], offset: usize, source: &[T])` copies every element of `source` into `destination` from index `offset` with one `memmove`. The caller proves the source fits; nothing checks it.
 - `allocationAdopt(base: *mut u8, layout: Layout, reclaim: extern "C" fn(?*mut u8) -> (), context: ?*mut u8)` returns an `Allocation` over storage that the caller manages. Dropping it calls `reclaim(context)` instead of returning memory to the system. `Arena` in `silk/mem/arena` uses it for each allocation it hands out.
 
 ## Traps, the stack and slice views
 
 - `Intrinsic.trap(reason)` stops the program with a trap, as an overflow does. `reason` is a `string<'static>`, and the result type is `never`, so `return Intrinsic.trap("...")` ends a branch of any function. The runtime prints `fatal trap: <reason>` and the frame, then, in an unoptimized build, the calling functions, and the process exits with status 132. The std lib uses it for precondition failures, such as `f32.toU8` of NaN.
+- `unsafe Intrinsic.unreachable()` marks a point that execution never reaches. Its result type is `never`, like `trap`'s, but reaching it is undefined behavior, not a trap: the optimizer removes every path that leads to it and the tests that select those paths. A branch around it states a fact, as in `if shift >= 32 { unsafe { Intrinsic.unreachable() } }`.
+- `Intrinsic.boolExpect(condition, expected)` returns `condition` and weighs the branch that tests it as usually equal to `expected`. It changes block layout, never the result, and static evaluation runs it as its condition.
+- `silk/core/hint` wraps both as `hint.likely`, `hint.unlikely`, `hint.assume` and `hint.unreachable`.
 - `Intrinsic.frameAddress()` returns the address of the running function's stack frame as `[*]const u8`. The stack grows down on every target, so a caller's frame is at the same or a higher address. It is safe to call; reading through the address is not.
 - `unsafe Intrinsic.stackAllocate<T>(count)` returns `[*]mut T` storage for `count` values on the running function's stack. The storage is uninitialized, nothing in it is dropped, and it ends when the function returns or suspends. The caller proves it fits in the stack that is left; the compiler does not check. A byte size that overflows `usize` traps.
 - `silk/mem/stack` wraps both: `Stack.frameAddress()` and `unsafe Stack.withStorage<T, A>(count, use)`, which calls `use` once with the storage.
 - `Intrinsic.sliceView<T>(values, offset, length)` returns the subrange `offset..offset + length` with the same loan, and traps when it is out of range. Given a shared `&[T]` it returns `&[T]`. Given an exclusive `&mut [T]` that the caller moves in, as in `Intrinsic.sliceView<T>(move values, 1, 3)`, it returns an exclusive `&mut [T]`. Passing a `&mut [T]` binding without `move` is an error.
 - `Intrinsic.pointerNullFunction<F>()` returns the null value of a nullable C function pointer type `F`, such as `?extern "C" fn(i32) -> ()`. See Unsafe code and C interop.
+
+## Assembly
+
+`unsafe Intrinsic.assembly<R>(template, constraints, clobbers, memory, sideEffects, noReturn, inputs)` emits one inline assembly fragment on x86-64 and ARM64 targets. Every argument but `inputs` is a literal.
+
+- `constraints` lists the output first when `R` is not `()`, then one entry per input, separated by commas. The template names them `$0`, `$1` and so on, and writes a literal `$` as `$$`.
+- An output is `={register}`, `=&{register}` when inputs may not share its register, or `=r` and `=&r` for a register the allocator chooses.
+- An input is `{register}`, `r` for a register the allocator chooses, `0` to share the output's register, or `m` for the memory a pointer input addresses. An `m` operand prints as the target's memory operand, such as `(%rdi)` or `[x0]`, and needs a `memory` other than `"none"`.
+- Fixed registers are `rax`, `rdi`, `rsi`, `rdx`, `rcx` and `r8` to `r11` on x86-64, and `x0` to `x17` on ARM64. `clobbers` lists the registers the fragment changes, plus `flags`.
+- `memory` is `"none"`, `"read"`, `"write"` or `"readwrite"`. A fragment that writes memory needs `sideEffects`, and a `noReturn` fragment has result `()`.
+
+```silk
+fn sum(left: u64, right: u64) -> u64 {
+  return unsafe Intrinsic.assembly<u64>("leaq ($1,$2), $0", "=r,r,r", "", "none", false, false, (left, right))
+}
+
+fn load(address: *const u64) -> u64 {
+  return unsafe Intrinsic.assembly<u64>("movq $1, $0", "=&r,m", "", "read", false, false, .(address))
+}
+```
+
+A contract the target does not admit, such as an unknown constraint or an `m` operand under `"none"`, is SEM0214.
 
 ## Static-only members
 
@@ -246,6 +272,7 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 | Atomics | `silk/concurrency/atomic` |
 | SIMD vectors | `silk/simd/simd` and one module per shape, such as `silk/simd/u8x16` and `silk/simd/mask16` |
 | Architecture operations | `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm` |
+| Branch weights and stated facts | `silk/core/hint` (`hint.likely`, `hint.unlikely`, `hint.assume`, `hint.unreachable`) |
 | Stack frame and scratch storage | `silk/mem/stack` (`Stack.frameAddress()`, `Stack.withStorage`) |
 | Allocation, raw storage | `silk/mem/allocator`, `silk/mem/arena`, `silk/mem/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/box`, `silk/collections/list` |
 | Shared ownership | `silk/mem/shared` |
