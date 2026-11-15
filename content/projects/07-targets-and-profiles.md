@@ -133,6 +133,21 @@ Finished build/llvm/x86_64-unknown-linux-gnu/release/tiny in 0.91s
 
 An optimized native executable is optimized in its own step: Clang compiles the whole program to one object, kept in `<output>.units/`, and the `link` row links it. A rebuild whose program did not change reuses that object, so it shows no `optimize` row, even when the link runs again for a native library. Debug builds, WebAssembly and Windows still compile and link in one step.
 
+### Codegen units
+
+A debug executable, native or WebAssembly, compiles in codegen units: one per module, or a few for a large module. Each unit's object is kept in the `units/` directory beside the output, named by its content, so a rebuild after an edit compiles only the units the edit changed and links again. A page of 10,000 functions built for `wasm32-unknown-unknown` rebuilds in about 2 seconds after a one-line edit.
+
+An optimized executable is one module, so Clang can inline across the whole program. A profile's `codegen-units` splits it:
+
+```toml
+[profiles.quick]
+optimization = "speed"
+debug = false
+codegen-units = 8
+```
+
+The program then splits along its call graph into at most that many units when it holds more than 4 MB of bitcode. Clang optimizes the units on separate threads, and a ThinLTO link joins them and keeps each unit's result for the next build. The same page built for wasm32 in 1m24 in 8 units on 4 cores, where one module took 3m29. The split costs run time and size, because calls across units inline less: the compiler ran 3% slower in 16 units, and the page was 9% larger. A build with debug information, a Windows build, and a build with no lld beside Clang stay one module.
+
 The heading names the profile in parentheses after the target.
 
 Within one profile, directives on a function steer the optimizer: `@inline`, `@inlineAlways` and `@inlineNever` on the line before a `fn` ask for or against inlining, and `@cold` marks a function that rarely runs. `@optimizeSize` builds one function for size inside a speed build. See **Intrinsics** in the reference.
@@ -166,7 +181,7 @@ Finished build/llvm/x86_64-unknown-linux-gnu/fast/tiny in 0.83s
 - `target` defaults to the compiler's host. Every other field has a default too, so a profile turns on optimization only when it says `optimization = "speed"`.
 - `dev` and `release` exist without a table. `dev` builds for the host without optimization and with debug information; `release` builds with `optimization = "speed"` and without it. A `[profiles.dev]` or `[profiles.release]` table replaces the built-in one.
 - `[build].profile = "fast"` makes it the default for builds with no `--target`, `--profile` or `--profile-input`.
-- `--profile-input '<json>'` passes a whole profile as JSON, with the same fields, except that `code-model` and `max-memory` are spelled `codeModel` and `maxMemory`. Its directory comes from its optimization and debug settings, as in the table above.
+- `--profile-input '<json>'` passes a whole profile as JSON, with the same fields, except that `code-model`, `max-memory` and `codegen-units` are spelled `codeModel`, `maxMemory` and `codegenUnits`. Its directory comes from its optimization and debug settings, as in the table above.
 - A named or JSON profile cannot be combined with `--target`, `--release` or `--optimization`:
 
 ```
@@ -227,6 +242,7 @@ The manifest page lists every field and its values. The native build applies the
 | `link` | `static` links a static executable (`-static`) with code that is not position independent. |
 | `artifact` | The output form: `executable`, `static-archive`, `loadable-module` or `object`. It defaults to the form `[package].kind` builds and may differ from it. |
 | `backend` | `llvm`, the default, or `direct` for WebAssembly without Clang (see The direct WebAssembly backend). `--backend` on the command line sets it too. |
+| `codegen-units` | A whole number from 1 to 256: how many codegen units an optimized executable splits into (see Codegen units). One module when unset or `1`. |
 | `threading` | `multi` on `wasm32-unknown-unknown` builds with atomics and a shared memory (see below). Refused on other targets. |
 | `max-memory` | WebAssembly only (`wasm32` and `wasm64`): the most linear memory the module may grow to, such as `"256MiB"`. Bytes, `KiB`, `MiB` or `GiB`; a multiple of 64 KiB and at most 4 GiB. |
 

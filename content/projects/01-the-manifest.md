@@ -194,6 +194,7 @@ A named profile is a complete build configuration. Select it with `--profile <na
 | `code-model` | `"small"`, `"large"` | `"small"` |
 | `safety` | `"checked"`, `"unchecked"` | `"checked"` |
 | `threading` | `"single"`, `"multi"` | `"single"` |
+| `codegen-units` | a whole number from 1 to 256: the codegen units an optimized executable splits into | `1` |
 | `max-memory` | wasm32 only: a size such as `"256MiB"` (bytes, `KiB`, `MiB`, `GiB`) | none (threaded wasm32: 1 GiB) |
 | `sanitizers` | array of `"address"`, `"thread"`, `"undefined"` | `[]` |
 | `unwind` | `"none"`, `"native"` | `"none"` |
