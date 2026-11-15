@@ -94,6 +94,27 @@ fn f() -> i32 {
 }
 ```
 
+## Array columns
+
+A long array literal breaks one element per line. To lay a table out in rows instead, add a column count after a second semicolon in the array type of the `let` or `const` it initializes:
+
+```silk
+const REVERSE_BITS: [u8; 8; 4] = [0x00, 0x80, 0x40, 0xC0, 0x20, 0xA0, 0x60, 0xE0]
+```
+
+becomes
+
+```silk
+const REVERSE_BITS: [u8; 8; 4] = [
+  0x00, 0x80, 0x40, 0xC0,
+  0x20, 0xA0, 0x60, 0xE0,
+]
+```
+
+The count is a formatter hint, not part of the type: `[u8; 8; 4]` is the type `[u8; 8]`, and the length may still be an expression, as in `[u8; 256 / 4; 4]`. A literal with more elements than the count always breaks, with that many elements on each line and the last row holding the rest. One with the count or fewer stays on one line when it fits.
+
+The hint applies only to the array literal that is the declaration's own value, and only when the type is written there. Nothing carries it further, so a later assignment such as `table = [...]` is laid out as an ordinary list. The count is a decimal literal of at least 1, written only on the outermost array type of a `let` or `const`; anywhere else, such as a parameter type or an element type, it is a syntax error.
+
 ## Format some files
 
 Name files or directories to format only those. Paths are relative to the current directory. A directory must be inside the package's source root. A `.silk` file can be anywhere, even in a folder with no `silk.toml`, so an editor can format a scratch file:
@@ -154,5 +175,6 @@ At a workspace root, `silk format` and `silk format --check` cover the source ro
 
 - `silk format` rewrites every `.silk` file under the source root; name files or directories to narrow it.
 - `silk format --check` changes nothing and exits 1 when any file needs formatting.
+- `const T: [u8; 64; 4] = [...]` lays the literal out four elements per line; the hint is not part of the type.
 - Files with syntax errors are reported with their codes and left untouched.
 - Exit status 2 means the command or a file operation failed, not the layout.
