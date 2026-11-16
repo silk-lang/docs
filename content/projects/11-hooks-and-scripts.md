@@ -87,7 +87,7 @@ A dependency's tool steps require `tools = true` on its dependency entry. Tools 
 
 Requests contain absolute source and native paths, all package parameters, generated modules, compiler settings and platform inputs. Replaying a request uses these captured values even when an ambient manifest changes.
 
-The language server reads saved requests and `compile_commands.json`. With workspace trust and refresh enabled, it may run the root's `plan` under confinement. A project without a `Plan` variant uses the built-in compilation without running its task entry. An unavailable or refused refresh retains the last usable requests and reports that the developer should run `silk build` or `silk plan`. `check`, `format`, `doc`, `hash` and `pack` do not run project tasks.
+The language server reads saved requests and `compile_commands.json`. With workspace trust and refresh enabled, it may run the root's `plan` under confinement. A project with a `tasks.silk` builds and starts its tasks program under the same confinement; without a `Plan` variant that program runs nothing and the built-in plan is used. An unavailable or refused refresh retains the last usable requests and reports that the developer should run `silk build` or `silk plan`. `check`, `format`, `doc`, `hash` and `pack` do not run project tasks.
 
 ## Package code generation and platforms
 
