@@ -12,9 +12,9 @@ These pages cover how Silk code is organized and built, from a single file up to
 | **Dependencies** | Path, git and URL dependencies, `silk add` and `silk remove`, and how names resolve. |
 | **Libraries and exports** | Building a library, the `exports` list, and linking a Silk library from C. |
 | **Workspaces** | Member packages, commands run from the root, `-p` and `--workspace`, and the shared output directory. |
-| **Targets and profiles** | The six accepted targets (WASI included), cross builds, optimization levels, named profiles and profile-guided optimization. |
+| **Targets and compilation settings** | Supported targets, cross builds, source facts and per-package code generation. |
 | **Build outputs and native linking** | Artifact kinds, stages, the output layout, native link inputs, C sources and prebuilt archives. |
-| **Build plans and generated code** | Embedding package files, `silk generate`, `build.silk` plans and sandboxed tool steps. |
+| **Build plans and generated code** | Embedding package files, typed `build.silk` plans and sandboxed graph steps. |
 | **Project templates** | `silk init --template` and `--list`, naming a template, writing one, and its `[[post-init]]` commands. |
-| **Hooks and scripts** | Every command a package can have Silk run, when each runs, and how to write a hook script. |
+| **Tasks and build graphs** | Root task commands, deferred graph inputs, caching and editor requests. |
 | **Packaging releases** | `silk pack`: the source archive, documentation, binaries, checksums and minisign signatures to attach to a release, and `publish = false`. |

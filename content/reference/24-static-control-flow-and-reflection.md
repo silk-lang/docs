@@ -116,7 +116,7 @@ fn double(shape: &mut Shape) -> () {
 
 ## Target and build queries
 
-All of these are fixed by the build request (`--target`, `--release`, `--profile`, `--profile-input`) before static evaluation starts. They have no runtime storage. Each query is a `static fn` or `const`, so it can appear in a `static if` condition or in ordinary expressions.
+All of these are fixed by the build request (standard command options and explicit compilation settings) before static evaluation starts. They have no runtime storage. Each query is a `static fn` or `const`, so it can appear in a `static if` condition or in ordinary expressions.
 
 `silk/core/target`, through `import silk.core.target { Target, ... }`:
 

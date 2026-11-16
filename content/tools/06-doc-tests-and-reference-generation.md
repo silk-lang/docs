@@ -58,7 +58,7 @@ Each line names the file and the line where the example's fence opens. At a work
 What a check does:
 
 - Each example is type-checked as a complete module of its own, with every declaration and import checked.
-- An example that declares a `main` is then built for your machine with the package's default profile and run in the package directory. It passes when `main` returns 0. Any other status fails it, and its output is printed under the result line.
+- An example that declares a `main` is then built for your machine with the package's default compilation settings and run in the package directory. It passes when `main` returns 0. Any other status fails it, and its output is printed under the result line.
 - An example without a `main` is only type-checked, and so is one marked `silk,no_run`, such as a server that never stops.
 - Results are printed in source order. A `silk,ignore` fence counts as skipped. A fence with any other attribute fails without being checked.
 - With `--target <triple>` for another platform, or with `-i` or `--stdlib`, examples are only type-checked, not run.

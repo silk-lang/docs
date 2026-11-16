@@ -183,7 +183,7 @@ and add `| version` to the end of the usage line. Build and ask:
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks version
+./build/x86_64-unknown-linux-gnu/dev/tasks version
 ```
 
 ```
@@ -193,7 +193,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   4,645 functions                   0.93s
   borrow    918 bodies                        0.06s
   link      clang                             0.81s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.36s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 3.36s
 tasks 0.11 (linux, debug build)
 tasks file /tasks.txt, reminders wait 250ms
 ```
@@ -204,180 +204,45 @@ A release build changes the optimization, so it selects the other branch:
 
 ```sh
 silk build --release
-./build/llvm/x86_64-unknown-linux-gnu/release/tasks version
+./build/x86_64-unknown-linux-gnu/release/tasks version
 ```
 
 ```
 Compiling tasks (x86_64-unknown-linux-gnu, release)
   ...
-Finished build/llvm/x86_64-unknown-linux-gnu/release/tasks in 9.04s
+Finished build/x86_64-unknown-linux-gnu/release/tasks in 9.04s
 tasks 0.11 (linux, release build)
 tasks file /tasks.txt, reminders wait 250ms
 ```
 
 Release builds go to their own `release` directory, and their progress has one more row, `optimize`, where Clang optimizes the whole program before the `link` row. See **Static control flow and reflection** in the reference for every target and build query.
 
-## Setting parameters in silk.toml
+## Setting parameters in a build command
 
-Say you find 250 ms a bit short. You could edit the default, but the default is the library author's choice. The person building the program sets their own value in `silk.toml`, under `[config]`:
-
-```toml
-[package]
-name = "tasks"
-version = "0.1.0"
-silk-version = "0.1.0"
-
-[config]
-main.remindBudgetMs = 300
-```
-
-The key reads like an import: the root module `main`, then the parameter. The value is plain TOML. Silk checks it against the parameter's declared type, so a string here, or a number too big for an `i32`, is refused.
-
-```sh
-silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks version
-```
-
-```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
-  load      180 modules, 1 in package         0.03s
-  check     1 module                          1.48s
-  codegen   4,645 functions                   1.03s
-  borrow    918 bodies                        0.06s
-  link      clang                             0.15s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.73s
-tasks 0.11 (linux, debug build)
-tasks file /tasks.txt, reminders wait 300ms
-```
-
-The `remind` command picks up the new default with no other change. With the four tasks from chapter 10:
-
-```sh
-TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks remind
-```
-
-```
-reminder: #2 Write the Silk book
-reminder: #1 Buy milk
-1 cancelled when the time ran out
-time 0.302s
-```
-
-The `where` clause guards values from `silk.toml` too. Change the value to `90000` and check:
-
-```
-Checking tasks (x86_64-unknown-linux-gnu)
-  load      failed: 1 error                   0.03s
-[x86_64-unknown-linux-gnu]
-src/main.silk:245:43: error[SEM0214] Invalid compilation configuration: the bound value of package parameter `remindBudgetMs` does not satisfy its `where` predicate
-Failed tasks in 0.05s
-```
-
-Line 245 is the `param` declaration, and column 43 is its predicate. The error points at the rule the value broke, not at `silk.toml`.
-
-A typo in the parameter name is a different mistake, so it points somewhere else. With `main.remindBudget = 300`:
-
-```
-Checking tasks (x86_64-unknown-linux-gnu)
-  load      failed: 1 error                   0.03s
-/home/you/tasks/silk.toml:7: error[SEM0214] invalid package parameter binding: module `main.silk` declares no package parameter `remindBudget`
-Failed tasks in 0.04s
-```
-
-It is the same code as before, but this time the location is line 7 of `silk.toml`, the line that sets the value, and the message names the module and the name it could not find. Put the value back to `300` and the name to `remindBudgetMs`.
-
-## Profiles
-
-A profile is a named set of build settings with its own parameter values. Add a `demo` profile that keeps its tasks in a separate file:
-
-```toml
-[profiles.demo]
-config.main.fileName = "/demo-tasks.txt"
-```
-
-A profile builds for your machine unless it names a `target`. Its `config` values win over the ones in `[config]`, and the `[config]` ones still apply, so the budget stays 300. Build with `--profile`:
-
-```sh
-silk build --profile demo
-./build/llvm/x86_64-unknown-linux-gnu/demo/tasks version
-./build/llvm/x86_64-unknown-linux-gnu/demo/tasks add 'Try the demo profile'
-ls *.txt
-```
-
-```
-Compiling tasks (x86_64-unknown-linux-gnu, demo)
-  load      180 modules, 1 in package         0.04s
-  check     1 module                          1.44s
-  codegen   4,645 functions                   1.07s
-  borrow    918 bodies                        0.06s
-  link      clang                             0.71s
-Finished build/llvm/x86_64-unknown-linux-gnu/demo/tasks in 3.29s
-tasks 0.11 (linux, debug build)
-tasks file /demo-tasks.txt, reminders wait 300ms
-added #1
-demo-tasks.txt
-tasks.txt
-```
-
-A profile build goes to a directory named after the profile, `demo/tasks`, next to `debug` and `release`. The demo binary starts a fresh board in its own file, and your real tasks are untouched. So is your normal binary:
-
-```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks version
-```
-
-```
-tasks 0.11 (linux, debug build)
-tasks file /tasks.txt, reminders wait 300ms
-```
-
-The profile only changed the file name, so the demo binary still says `debug build`: a profile turns on optimization only when it says so, with a line such as `optimization = "speed"`.
-
-There is a third value, `optimization = "size"`, which optimizes for a small program instead of a fast one. It suits a WebAssembly module or a tool you ship to many machines. `Compilation.optimization()` reports it as `Optimization.Size`. Add a profile for it:
-
-```toml
-[profiles.small]
-optimization = "size"
-debug = false
-```
-
-`buildKind` tests only for `Speed`, so a size build takes the `else` arm and calls itself a debug build:
-
-```sh
-silk build --profile small
-./build/llvm/x86_64-unknown-linux-gnu/small/tasks version
-```
-
-```
-Compiling tasks (x86_64-unknown-linux-gnu, small)
-  load      180 modules, 1 in package         0.08s
-  check     1 module                          1.31s
-  codegen   4,645 functions                   1.16s
-  borrow    918 bodies                        0.05s
-  link      clang                             5.30s
-Finished build/llvm/x86_64-unknown-linux-gnu/small/tasks in 7.89s
-tasks 0.11 (linux, debug build)
-tasks file /tasks.txt, reminders wait 300ms
-```
-
-To name the third kind, nest a second `static if` inside the `else` block:
+The library author provides defaults. The command building the application may bind different values through `Package.set`:
 
 ```silk
-fn buildKind() -> string<'static> {
-  static if Compilation.optimization() == Optimization.Speed {
-    return "release"
-  } else {
-    static if Compilation.optimization() == Optimization.Size {
-      return "size"
-    } else {
-      return "debug"
-    }
-  }
-}
+let parameters = Package.make()
+  |> Package.set("main.silk", "remindBudgetMs", run Deferred<i32>.value(300))
+  |> Package.set("main.silk", "fileName", run Deferred<String>.value(run String.copy("/demo-tasks.txt")))
+let compilation = run Compilation.fromPackage(options)
+  |> Compilation.package("self", move parameters)
 ```
 
-The `small` binary now prints `tasks 0.11 (linux, size build)`, and the default build still prints `debug build`.
+The task imports `Package`, `Deferred`, `String` and `Compilation`, and its Effect row provides their requirements. `self` names the root package. Silk checks each value against the declared parameter type before writing the request. An out-of-range integer or wrong type fails resolution.
 
-See **Package parameters** in the reference for every value kind, precedence and `--profile-input`.
+Different task variants can build the same source with different parameters. Each constructs its graph and explicitly calls `Compilation.build` or `Build.compile`. The saved request captures the choices for editor use and replay. See **Tasks and build graphs** for a complete command structure.
+
+## Optimization choices
+
+The standard options select `none`, `speed` or `size`, with independent debug information:
+
+```sh
+silk build --release
+silk build --optimization size --debug false
+```
+
+`Compilation.optimization()` exposes the program-wide source fact. `Package.optimize` can optimize a dependency without changing that fact, including the dependency's generic instances. Use this for a fast library inside an otherwise unoptimized development build.
 
 ## A function per width
 
@@ -425,7 +290,7 @@ Call it at the end of `showBoard`. Add `import silk.num.i32` for the conversion:
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks list
+./build/x86_64-unknown-linux-gnu/dev/tasks list
 ```
 
 ```
@@ -435,7 +300,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   4,645 functions                   2.00s
   borrow    829 bodies                        0.04s
   link      clang                             0.07s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.26s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 2.26s
 [ ] #2 Write the Silk book (high)
 [ ] #1 Buy milk (normal)
 [ ] #3 Water the plants (low)
@@ -616,7 +481,7 @@ and make the usage line end with `| remind [ms] | export | version`.
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks export
+./build/x86_64-unknown-linux-gnu/dev/tasks export
 ```
 
 ```
@@ -626,7 +491,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   4,645 functions                   0.93s
   borrow    918 bodies                        0.06s
   link      clang                             0.81s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.36s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 3.36s
 id,title,priority,done
 1,Buy milk,normal,no
 2,Write the Silk book,high,no
@@ -645,7 +510,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   4,675 functions                   2.05s
   borrow    840 bodies                        0.05s
   link      clang                             0.44s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 2.77s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 2.77s
 id,title,priority,done
 1,Buy milk,normal,false
 2,Write the Silk book,high,false
@@ -732,7 +597,7 @@ Time   1 ms
 
 ## Summary
 
-- You can declare package parameters with `param`, give them defaults and `where` checks, and bind them in `silk.toml` or in a profile selected with `--profile`.
+- You can declare package parameters with `param`, give them defaults and `where` checks, and bind them through `Package.set` in a root build command.
 - You can choose declarations with module-level `static if` (including `else static if`) and choose statements with `static if` inside a function.
 - You can ask the build about itself through `Target` and `Compilation`, and see the result change with `--release`.
 - You can write `static` parameters, which compile one copy per value, and refuse bad values with `compileError`.

@@ -5335,7 +5335,7 @@ src/main.silk:4:20: error[SEM0244] simd<f32, 8> crosses the C boundary in one ve
 
 For an imported function the column is the callee's name; each call is reported, and a declaration that is never called is not. An `export "C"` function is checked at its declaration, by `silk check` as well as `silk build`, at the vector type. On x86-64, 128-bit vectors need nothing, 256-bit ones `avx` and 512-bit ones `avx512f`. A width the target's C ABI has no register for prints the other form, as for `simd<u8, 8>` on x86-64: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width". A function's own `features` list does not count.
 
-Fix: Select the feature in the profile, as in `[profiles.fast.cpu] features = ["avx"]` or `model = "x86-64-v3"`, and build with `--profile fast`. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and profiles.
+Fix: Select the feature with `Compilation.cpuFeatures` or a suitable `Compilation.cpu` value. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and compilation settings.
 
 ### SEM0246
 

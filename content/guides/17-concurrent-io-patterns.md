@@ -540,8 +540,8 @@ Build, start a server for four connections, and ask four words with a budget of 
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/fanout serve 7272 4 &
-./build/llvm/x86_64-unknown-linux-gnu/debug/fanout ask 7272 1000 hello hi concurrency silk
+./build/x86_64-unknown-linux-gnu/dev/fanout serve 7272 4 &
+./build/x86_64-unknown-linux-gnu/dev/fanout ask 7272 1000 hello hi concurrency silk
 ```
 
 ```

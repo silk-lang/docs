@@ -83,7 +83,7 @@ Packages that depend on a library compile its source with their own. The file ma
 | `"shared-library"` | `lib<name>.so`, or `lib<name>.dylib` on macOS | Not built yet: `SILK_GAP artifact-form: the shared-library form is not native yet`, exit 2. |
 | `"executable"` (default) | `<name>` | A program. |
 
-Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`. A profile's `artifact` must name the same form as `[package].kind`, or the manifest is refused. See **Targets and profiles**.
+Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`. A profile's `artifact` must name the same form as `[package].kind`, or the manifest is refused. See **Targets and compilation settings**.
 
 - A library has no runtime. Its roots are its `export "C"` functions and statics, plus what they reach. A library with no C exports builds an empty archive: the build's `codegen` row reads `0 functions`.
 - The archive holds the compiled Silk code, not libc. Link it with a C toolchain that supplies libc.
@@ -141,7 +141,7 @@ Compiling text-utils (x86_64-unknown-linux-gnu, debug)
   codegen   2 functions                       0.00s
   borrow    2 bodies                          0.00s
   link      clang                             0.13s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a in 0.19s
+Finished build/x86_64-unknown-linux-gnu/dev/libtext-utils.a in 0.19s
 ```
 
 The symbol map next to the archive shows the C name and the Silk declaration it comes from:
@@ -172,7 +172,7 @@ int main(void) {
 ```
 
 ```sh
-clang main.c ../text-utils/build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a -o demo
+clang main.c ../text-utils/build/x86_64-unknown-linux-gnu/dev/libtext-utils.a -o demo
 ./demo
 ```
 

@@ -235,7 +235,7 @@ The body limits allow 1 KiB of payload, which is plenty for a task title. Two ot
 The limits are only checked when a connection arrives, not at build time. If you set `head.maxOwnedBytes` to 8192, too small for 8192 bytes of head plus the header records, everything builds. Then each request fails:
 
 ```sh
-silk build >/dev/null 2>&1; (../build/llvm/x86_64-unknown-linux-gnu/debug/tasks serve 18414 1 & sleep 0.5; curl -s -i http://127.0.0.1:18414/tasks; echo "[curl exit $?]"; wait)
+silk build >/dev/null 2>&1; (../build/x86_64-unknown-linux-gnu/dev/tasks serve 18414 1 & sleep 0.5; curl -s -i http://127.0.0.1:18414/tasks; echo "[curl exit $?]"; wait)
 ```
 
 ```
@@ -486,7 +486,7 @@ effect fn startServer<'text>(words: &'text Words) -> i32
 `main.silk` has `import Http` with no braces, so it calls the function by its module name, `Http.serve`. `serverFailed` turns a `UsageError` into the usage text, which now mentions `serve`:
 
 ```sh
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks serve abc
+../build/x86_64-unknown-linux-gnu/dev/tasks serve abc
 ```
 
 ```
@@ -508,11 +508,11 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   7,945 functions                   2.83s
   borrow    1,452 bodies                      0.11s
   link      clang                             1.07s
-Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 5.54s
+Finished /home/you/tasks-workspace/build/x86_64-unknown-linux-gnu/dev/tasks in 5.54s
 ```
 
 ```sh
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks serve 18413 12 &
+../build/x86_64-unknown-linux-gnu/dev/tasks serve 18413 12 &
 ```
 
 Start with an empty board. `-i` shows the response head:
@@ -675,7 +675,7 @@ GET /version -> 200
 The server saved to the same `tasks.txt` as the command line, so the CLI sees the same board:
 
 ```sh
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks list
+../build/x86_64-unknown-linux-gnu/dev/tasks list
 ```
 
 ```
@@ -688,7 +688,7 @@ The server saved to the same `tasks.txt` as the command line, so the CLI sees th
 If the port is already in use, here by another running server, `serve` says so and exits with status 1:
 
 ```sh
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks serve 18413 1
+../build/x86_64-unknown-linux-gnu/dev/tasks serve 18413 1
 ```
 
 ```

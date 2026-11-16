@@ -518,7 +518,7 @@ This is how you join text in Silk. Instead of `"a" + "b"`, you write a template 
 
 ## Run it
 
-Start with an empty directory again. As before, `tasks` stands for `./build/llvm/x86_64-unknown-linux-gnu/debug/tasks`.
+Start with an empty directory again. As before, `tasks` stands for `./build/x86_64-unknown-linux-gnu/dev/tasks`.
 
 ```sh
 silk run -- list

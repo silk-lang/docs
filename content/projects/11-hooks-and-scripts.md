@@ -1,188 +1,96 @@
-# Hooks and scripts
+# Tasks and build graphs
 
-A package can keep its own commands as tasks written in Silk, run them with `silk task`, and have Silk run them around its own commands. It can also ask Silk to run programs at three more moments: when you run `silk generate`, on every build, and once when `silk init` creates a project from a template. This page compares them and shows where each is set up. The pages linked from each section have the full rules.
+A manifest identifies a package and declares its dependencies. A command constructs compilations and steps in ordinary Silk, then explicitly passes the graph to the runner. The runner resolves each compilation into a versioned TOML request before invoking `silkc compile --request <file>`.
 
-| Hook | Written in | Runs | Who runs it | Environment |
-| --- | --- | --- | --- | --- |
-| Tasks | `src/tasks.silk` | When you run `silk task <name>` | You, in the package's directory, with your rights | Yours, plus `SILK_PROJECT_ROOT`, `SILK_INVOCATION_DIRECTORY` and `SILK_COMPILER` |
-| `[tasks]` hooks | `silk.toml` | Before or after `silk build`, `run`, `test` and `pack`, in the package you run them in | The command, as `silk task <name>` | As for tasks, plus `SILK_HOOK` and, after `silk pack`, `SILK_HOOK_RESULT` |
-| `[[generate]]` | `silk.toml` | When you run `silk generate`, never during a build | You, in the manifest's directory | Yours, plus `SILK_GENERATE=1` |
-| `build.silk` plan | `build.silk` beside `silk.toml` | Every build, inside the compiler | The compiler; it starts no program | None: the plan can only read package files |
-| `build.silk` tool step | `build.silk`, with `Plan.tool` | Every build that needs it, before the package is analyzed | The build, in an operating-system sandbox | `HOME`, `TMPDIR`, `PATH`, `SILK_TOOL=1` and `SILK_PACKAGE_DIR` only |
-| `[[post-init]]` | A template's `silk.toml` | Once, when `silk init --template` creates a project | `silk init`, in the new project's directory, in the same sandbox as tool steps | `PATH`, `HOME`, `TMPDIR` and `SILK_VERSION` only |
+## Commands
 
-Every hook that starts a program names it the same way: a path with a `/` is a file of the package, and a bare name is searched on `PATH`, which for a sandboxed command is `/usr/local/bin:/usr/bin:/bin`. The program must exit 0, or the command that ran it fails.
+`build`, `run`, `test` and `plan` are reserved task names. Each has a built-in implementation. A variant in the root package's `tasks.silk` replaces that built-in. Other variants are project commands, invoked with `silk task <name>`.
 
-Tasks and `[tasks]` hooks run only in the package you are working in. Where the package is a dependency, Silk never builds its tasks, never fetches their dependencies, and never reads its `[tasks]` table.
+A tasks module implements `CommandLine` and `TaskSet` for its command union, exposes `pub const COMMANDS: string = Task.commands<Tasks>()`, and calls `Task.main<Tasks>()` from its entry. The metadata describes available commands without running the task entry. Only the root package's tasks run. Dependencies contribute static `build.silk` plans and ordinary modules the root may import.
 
-## Tasks: silk task
+Commands embed `silk.build.options.Options` and flatten it in their `CommandLine` description. It owns `--target`, `--release`, `--optimization`, `--debug` and `--unsandboxed-tools`. Commands may add flags but cannot redefine these. A command building several targets creates a compilation for each target.
 
-A package's tasks are a Silk program in `src/tasks.silk`, built by the package's `tasks` profile. Write them there instead of keeping shell, Python or JavaScript scripts beside the package. The tasks are the variants of a union that describes the command line with `silk.cli`, so each task gets typed options, `silk task` with no name lists them, and a misspelled name gets a suggestion.
+`Compilation.fromPackage(&options)` starts with the package's default compilation. Artifact constructors are `executable`, `loadableModule`, `staticArchive`, `object` and `test`. Every setting that can depend on a step takes a `Deferred<T>`.
 
 ```silk
-import silk.cli.command { Command, CommandLine, Opt }
-import silk.cli.task { Task, TaskError, TaskSet }
-import silk.io.writer { WriterError }
-import silk.mem.allocator { Allocator, OutOfMemoryError }
-import silk.system.child_process { ChildProcess, ProcessError }
-import silk.system.filesystem { FileError, FileSystem }
-import silk.system.host_input { HostInput, HostInputError }
-import silk.text.string { String }
+import silk.build.graph { Build, Compilation, Options, BuildError }
+import silk.build.step { Deferred }
+import silk.build.package { Package }
+import silk.build.options { Optimize }
+import silk.mem.allocator { Allocator }
+import silk.system.filesystem { FileSystem }
+import silk.system.host_input { HostInput }
 
-union Tasks {
-  Codegen,
-  Release { pub version: String },
-}
-
-impl CommandLine for Tasks {
-  static fn command() -> Command<Tasks> {
-    return Command<Tasks>.make("tasks", "This project's tasks")
-      |> Command.variant("Codegen", "Regenerate the tables")
-      |> Command.variant("Release", "Test and pack a release")
-      |> Command.arg("version", Opt.about("The version") |> Opt.required)
-  }
-}
-
-impl TaskSet for Tasks {
-  effect fn perform(self: Tasks) -> ()
-    ! TaskError | ProcessError | FileError | HostInputError | OutOfMemoryError | WriterError
-    ? &mut HostInput | &mut Allocator | &mut ChildProcess | &mut FileSystem {
-    match move self {
-      Tasks.Codegen => run Task.exec("scripts/generate", &["--pinned"])
-      Tasks.Release { version: _ } => {
-        run Task.silk(&["test"])
-        run Task.silk(&["pack"])
-      }
-    }
-  }
-}
-
-pub effect fn main() -> i32 ? &mut HostInput {
-  return run Task.main<Tasks>()
+// Called by a task's perform method.
+effect fn graph(options: &Options) -> Build
+  ! BuildError
+  ? &mut Allocator | &mut FileSystem | &mut HostInput {
+  let dependency = Package.make()
+    |> Package.optimize(run Deferred<Optimize>.value(Optimize.Speed))
+  let base = run Compilation.fromPackage(options)
+  let app = run base.package("renderer", move dependency)
+  let build = run Build.make()
+  return run build.add(move app)
 }
 ```
 
-```sh
-silk task                     # lists the tasks
-silk task codegen
-silk task release 1.2.0
-```
+The dependency alias must exist in the manifest. A graph cannot introduce an undeclared package. `Compilation.without(alias)` excludes a declared dependency from that compilation. Dependencies are fetched as selected imports reach them; `silk fetch` downloads all declared pins without evaluating package code.
 
-`silk task` builds the `tasks` profile, then runs the program from the package's directory with the arguments after the task's name. Compiler options, such as `--stdlib`, go before the name. The build is cached like any other, so a task that has not changed starts at once.
+## Completing a graph
 
-| Name | Value |
-| --- | --- |
-| `SILK_PROJECT_ROOT` | The package's directory, where the task runs |
-| `SILK_INVOCATION_DIRECTORY` | The directory you ran `silk task` in |
-| `SILK_COMPILER` | The compiler that built the tasks, for running `silk` again |
+- `Compilation.build()` builds one compilation and returns its `Built` result.
+- `Build.compile()` runs reachable steps and compiles the graph's compilations.
+- `Build.write()` writes the graph's request files. It runs only prerequisites needed to resolve request values and does not compile the requested roots.
 
-The `tasks` profile needs no table in `silk.toml`: when the manifest declares none, it builds an executable for this machine, in debug mode, from `tasks.silk` below `[package].source`. Declare `[profiles.tasks]` to change any of that, such as its `main`, and `[profiles.tasks.dependencies]` to give the tasks dependencies of their own; they are fetched only when the tasks build. See "Named profiles" in **Targets and profiles**.
+A `Plan` command ends with `Build.write()`. Other commands choose their final operation explicitly. `Built.write` copies artifacts to a destination; `Built.launch` uses the configured runner. WASI programs use Wasmtime by default. A graph may configure a different runner for a foreign target.
 
-`Task.main` reads the command line, runs the chosen task, and turns a `TaskError` into a one-line report and an exit status. `Task.exec` runs a program with the terminal and environment of the task, `Task.silk` runs the compiler that built the tasks, and `Task.capture` answers what a program wrote. A task that needs another task calls it, because tasks are ordinary functions. See `silk.cli.task` in the standard library reference.
+Artifacts live under `build/<target>/<mode>/<name>`, relative to the enclosing workspace's `output-dir` when set. Request files and their index live under `build/requests`. Consumers read that index instead of scanning artifact directories or reconstructing filenames.
 
-## Hooks: [tasks]
+## Steps and deferred values
 
-The root manifest's `[tasks]` table names tasks that run around Silk's own commands, each as `silk task <name>` from the package's directory:
+`Deferred.source`, `Deferred.external`, `Deferred.value` and `Deferred.map` describe inputs. A deferred result cannot be inspected while constructing the graph. `Step.output` names a step's output; `Compilation.artifact`, `emittedHeader` and `emittedImportLibrary` expose compilation outputs. Passing these values to `linkArtifact`, `embed`, `moduleFile` or `Run.artifact` creates dependency edges.
 
-```toml
-[tasks]
-before-build = ["codegen"]
-before-pack = ["check-licenses"]
-after-pack = ["upload"]
-```
+A custom `Step` implements `key` and `make`. Its key declares every file, directory, environment variable and value it reads. `Make` grants access to those inputs and the step's output directory. The runner hashes inputs and toolchain contents, reuses complete cached outputs, executes independent misses on fibers and observes its memory budget. `Key.always` opts a step out of reuse.
 
-| Key | Runs |
-| --- | --- |
-| `before-build` | Before `silk build` does any work |
-| `after-build` | After `silk build` succeeds |
-| `before-run` | Before `silk run` or `silk debug` builds |
-| `before-test` | Before `silk test` builds |
-| `after-test` | After `silk test` passes |
-| `before-pack` | Before `silk pack` writes anything |
-| `after-pack` | After `silk pack` succeeds |
+`Run` describes an external command with declared inputs and outputs. `WriteFiles` creates files from deferred values. `Package.path(alias, subpath)` resolves a dependency's included file; the package must publish that file or its parent directory in `include`.
 
-Each key holds task names, which run in order. A failing task stops the command with the task's exit status. While a hook runs, `SILK_HOOK` holds its key, such as `before-build`; after `silk pack`, `SILK_HOOK_RESULT` holds the object `silk pack --json` prints, so an `after-pack` task can read where the archive is.
+## Package parameters and plans
 
-Only the manifest of the package you run the command in is read, so a dependency's `[tasks]` never runs. `--no-hooks` skips the hooks, and a Silk command that a hook starts, such as a `Task.silk(&["build"])` in a `before-pack` task, runs none.
+A package may declare `pub param` values in source or `build.silk`. The consumer binds them with `Package.set`. Values retain their declared type, including enums and nested options. A parameter without a default is required when resolving the compilation. `Package.supplyPath` authorizes an external path; ordinary plan paths remain inside the declaring package.
 
-## Generators: [[generate]]
-
-A generator writes files you commit, such as a table built from a data file. `silk generate` runs it; builds and dependents never do, so building the package needs neither the generator nor its inputs.
-
-```toml
-[[generate]]
-run = ["scripts/generate-unicode", "--pinned"]
-outputs = ["src/generated_tables.silk", "src/generated_*.silk"]
-```
-
-| Key | Value | Meaning |
-| --- | --- | --- |
-| `run` | array of strings | The program, then its arguments |
-| `outputs` | array of strings | The files it writes, below the manifest's directory. A `*` in the last segment matches any run of bytes |
-
-The command runs in the manifest's directory with your environment plus `SILK_GENERATE=1`, so one script can tell whether `silk generate` started it. `silk generate --check` runs every generator but leaves the tree as it was, and exits 1 when a committed output is stale; run it in CI. A workspace root's generators run first, then each member's.
-
-See "Committed generators: silk generate" in **Build plans and generated code**, and `generate` in the Command-line reference.
-
-## Build scripts: build.silk
-
-`build.silk` is the package's build script. It is Silk code that the compiler evaluates on every build, and it declares a plan: modules to add, C files to compile, libraries to link. A plan runs inside the compiler, can only read the package's files, and starts no program, so a dependency's plan is always safe to evaluate.
+`build.silk` exports `pub const PLAN: Plan`. The compiler evaluates it statically, with standard-library imports and the package's parameters. The plan contributes generated modules, native sources and link inputs. Target conditions are ordinary static code.
 
 ```silk
 import silk.build.plan { Plan }
-import silk.build.source { Source }
-import silk.core.static_text { StaticText }
+import silk.build.step { sourcePath }
 
-static fn plan() -> string<'static> {
-  let mut plan = Plan.empty()
-  plan = Plan.module(plan, "limits", StaticText.concat("pub const LIMIT: i32 = ", Source.text("limit.txt")))
-  return plan
+static fn plan() -> Plan {
+  let mut result = Plan.empty()
+  result = result |> Plan.compileC(sourcePath("native/codec.c"))
+  result = result |> Plan.includePath(sourcePath("include"))
+  if Intrinsic.targetOperatingSystem() == "linux" {
+    result = result |> Plan.linkLibrary("m", "dynamic", false, false)
+  }
+  return result
 }
 
-pub const PLAN: string = plan()
+pub const PLAN: Plan = plan()
 ```
 
-When a build needs a real program, such as a code generator you cannot write in Silk, the plan declares a tool step with `Plan.tool`, its inputs and its outputs. A tool step:
+Native archive pins and local overrides remain manifest data. `Plan.archivePath(name, path)` names a file in a pinned archive. Per-file flags and include directories belong to `Plan.compileNative`; `compileSources` selects a declared glob. Root compilations expose equivalent native operations.
 
-- Runs in an empty output directory, `<output-dir>/tools/<package>/<step>`, in an operating-system sandbox that lets it read its inputs and write only that directory.
-- Runs again only when its program, arguments, inputs or outputs change.
-- Of a dependency, runs only when the root manifest lists the dependency in `[build].tools`.
+A dependency's tool steps require `tools = true` on its dependency entry. Tools execute in a sandbox. On a host without confinement, only an explicit `--unsandboxed-tools` argument authorizes execution. The language server never supplies that argument.
 
-See "Build plans: build.silk" and "Tool steps" in **Build plans and generated code**.
+## Requests and editors
 
-## Template setup: [[post-init]]
+`silkc request-schema` prints the JSON Schema derived from the request's Silk schema. `silkc resolve --definition <file> --output <file>` resolves a graph definition. `silkc compile --request <file|->` consumes the resulting explicit request without discovering manifests, fetching dependencies or evaluating plans.
 
-A template's `[[post-init]]` entries run once, in the new project's directory, after `silk init --template` has copied the template. `silk init` removes them from the new manifest, so they never run again.
+Requests contain absolute source and native paths, all package parameters, generated modules, compiler settings and platform inputs. Replaying a request uses these captured values even when an ambient manifest changes.
 
-```toml
-[[post-init]]
-run = ["scripts/setup", "--greeting", "hello"]
-arguments = true
-```
+The language server reads saved requests and `compile_commands.json`. With workspace trust and refresh enabled, it may run the root's `plan` under confinement. A project without a `Plan` variant uses the built-in compilation without running its task entry. An unavailable or refused refresh retains the last usable requests and reports that the developer should run `silk build` or `silk plan`. `check`, `format`, `doc`, `hash` and `pack` do not run project tasks.
 
-Each command runs in the build tool sandbox: it can write only the new project and a scratch `HOME`, and it has no network. `SILK_VERSION` is set to the release of the compiler creating the project. It gets only the arguments in its `run`, unless it sets `arguments = true`: then it also gets the arguments given to `silk init` after `--`:
+## Package code generation and platforms
 
-```sh
-silk init site -t acme/starters/web -- --port 8080
-```
+`Package.optimize` and `Package.debug` affect backend code generation for the defining package, including its generic instances. Source-visible compilation facts stay program-wide. Mixed package modes produce separate units without cross-package inlining, including when emitting LLVM IR, bitcode, assembly or objects.
 
-```
-scripts/setup --greeting hello --port 8080
-```
-
-On a host with no sandbox, `silk init` refuses a template with entries unless you pass `--unsandboxed-post-init`. When a command fails, `silk init` removes the project it was creating. See "[[post-init]]" in **Project templates**.
-
-## Writing a hook script
-
-A script works in any hook that starts a program. These rules apply to all of them:
-
-- Commit the executable bit with the script: `git update-index --chmod=+x scripts/setup`. A template keeps the bits it finds, and a dependency fetched from git does too.
-- Start it with a `#!` line, such as `#!/bin/sh`. Silk starts the file itself, never through a shell.
-- The path in `run` is relative to the package's directory, without `.` or `..` segments. A program elsewhere goes on `PATH` and is named by its bare name.
-- On Windows, which has no sandbox for tool steps and `[[post-init]]` entries, the program must be one Windows can start, such as an `.exe`. Run a script through its interpreter instead, as in `run = ["python", "scripts/setup.py"]`.
-- Print what you want the user to see. `silk generate` and `silk init` show a command's output, and a failing tool step's output is part of the build error.
-- Exit with a status other than 0 to stop. `silk generate` keeps every output as it was, a build stops with the step's output, and `silk init` removes the project.
-
-## See also
-
-Build plans and generated code, Project templates, Targets and profiles, The manifest; `task`, `generate` and `init` in the Command-line reference; `silk.cli.task` in the standard library reference.
+`Compilation.windows` selects the subsystem, manifest and resource scripts. `Compilation.macos` selects a dylib install name and signing entitlements. `Compilation.wasm` selects imported or shared memory, table export and command or reactor execution. `Compilation.header` emits a C header for exported C declarations, and `Compilation.importLibrary` names a Windows import library. Shared native libraries require dynamic linking and position-independent code.

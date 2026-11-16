@@ -87,8 +87,8 @@ pub effect fn main() -> () ! LogError {
 ```
 
 ```sh
-silk build --profile web --quiet
-node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/llvm/wasm32-unknown-unknown/web/greeter
+silk build --target wasm32-unknown-unknown --quiet
+node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/wasm32-unknown-unknown/web/greeter
 ```
 
 ```
@@ -119,8 +119,8 @@ silk run --target wasm32-wasip2 --quiet
 ```
 
 ```
-Finished build/llvm/wasm32-wasip2/debug/component in 0.92s
-Error: failed to run main module `/home/you/component/build/llvm/wasm32-wasip2/debug/component`
+Finished build/wasm32-wasip2/dev/component in 0.92s
+Error: failed to run main module `/home/you/component/build/wasm32-wasip2/dev/component`
 
 Caused by:
     0: component imports instance `wasi:logging/logging@0.1.0-draft`, but a matching implementation was not found in the linker
@@ -224,7 +224,7 @@ Make an input file with an empty line, an accented word, one invalid byte and no
 ```sh
 silk build
 printf 'first line\nsecond line\n\ncaf\xc3\xa9\nbad \xff here\nno newline at end' > input.txt
-./build/llvm/x86_64-unknown-linux-gnu/debug/numberlines < input.txt
+./build/x86_64-unknown-linux-gnu/dev/numberlines < input.txt
 ```
 
 ```
@@ -240,7 +240,7 @@ info: 6 lines, 58 bytes
 Line 5 has `\xff` at byte 4 and is skipped with a warning. The last line has no newline and is still counted. Send standard error away and only the numbered lines remain:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/numberlines < input.txt 2>/dev/null
+./build/x86_64-unknown-linux-gnu/dev/numberlines < input.txt 2>/dev/null
 ```
 
 ```
@@ -254,7 +254,7 @@ Line 5 has `\xff` at byte 4 and is skipped with a warning. The last line has no 
 With empty input, the first read reports the end:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/numberlines < /dev/null
+./build/x86_64-unknown-linux-gnu/dev/numberlines < /dev/null
 ```
 
 ```

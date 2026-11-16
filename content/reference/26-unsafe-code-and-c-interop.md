@@ -343,15 +343,16 @@ int check_add(void) {
 }
 ```
 
-Compile it and list the object in the manifest, as in Build outputs and native linking:
+Compile it and link the object in `build.silk`, as in Build outputs and native linking:
 
 ```sh
 clang -c -fPIC native/vec.c -o native/vec.o
 ```
 
-```toml
-[native]
-link = [{ object = "native/vec.o" }]
+```silk
+import silk.build.plan { Plan }
+import silk.build.step { sourcePath }
+pub const PLAN: Plan = Plan.empty() |> Plan.linkObject(sourcePath("native/vec.o"))
 ```
 
 ```silk
@@ -383,7 +384,7 @@ silk run; echo "exit $?"
 exit 110
 ```
 
-The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way under a profile with `[profiles.avx.cpu] features = ["avx"]`, run with `silk run --profile avx`, and with the C file compiled with `-mavx`. Under the default profile, its call is SEM0244.
+The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way with a compilation whose `cpuFeatures` includes `"avx"`, and with the C file compiled with `-mavx`. Under the default profile, its call is SEM0244.
 
 Callbacks in three modes, with a nullable function pointer. C calls `notify`'s callback before it returns, keeps the listener's handler, and calls it later from `pump`. The C file `native/events.c`:
 
@@ -415,7 +416,7 @@ int32_t notify(Handler maybe, int32_t *total) {
 }
 ```
 
-Compile it and link the object as above (`clang -c -fPIC native/events.c -o native/events.o`, then `link = [{ object = "native/events.o" }]` under `[native]`):
+Compile it and link the object as above (`clang -c -fPIC native/events.c -o native/events.o`, then `Plan.linkObject(sourcePath("native/events.o"))` in `build.silk`):
 
 ```silk
 import silk.mem.pointer { Pointer }
@@ -506,7 +507,7 @@ console.log(`main returned ${instance.exports.main()} after ${ticks} tick`);
 ```
 
 ```sh
-node host.mjs build/llvm/wasm32-unknown-unknown/debug/w
+node host.mjs build/wasm32-unknown-unknown/dev/w
 ```
 
 ```

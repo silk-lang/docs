@@ -780,7 +780,7 @@ impl TaskSet for Tasks {
         if !skipTests {
           run Task.silk(&["test"])
         }
-        run Task.silk(&["build", "--release", "--no-hooks"])
+        run Task.silk(&["build", "--release"])
         let mut out = StdoutWriter.make()
         run Format.format("released site {version}\n", &.{ version: String.view(&version) })
           |> Effect.provideMut<Writer>(&mut out)
@@ -877,7 +877,7 @@ $ silk task relase 1.0
 error: unknown command relase for tasks; did you mean release?
 ```
 
-`release` calls `codegen` first, then runs two more commands. `Task.silk` runs the compiler that built the tasks, so `silk test` and `silk build --release` use the same compiler as the `silk task` that started them. The build gets `--no-hooks` because `release` has just run `codegen` itself; the next section explains hooks. Their output goes straight to the terminal:
+`release` calls `codegen` first, then runs two more commands. `Task.silk` runs the compiler that built the tasks, so `silk test` and `silk build --release` use the same compiler as the `silk task` that started them. The command calls its maintenance function explicitly before compiling. Their output goes straight to the terminal:
 
 ```
 $ silk task release 1.0.0
@@ -903,58 +903,11 @@ A task that needs another task calls it: tasks are ordinary functions.
 
 `Task.abort(message)` fails the task with a message and status 1. `Task.main` writes the message after `error: ` on standard error and exits with the status. A `TaskError` you build yourself carries any nonzero status, and `Task.exec` uses the status of the program that failed. Any other failure, such as a `FileError`, is reported in one general line with status 1.
 
-### Hooks
+### Build commands
 
-The `[tasks]` table in the root manifest runs tasks around the compiler's own commands. `site` runs `codegen` before every build:
+A `Build` variant replaces the built-in `silk build`. It embeds standard `Options`, constructs the graph and ends with `Build.compile`. A `Plan` variant constructs the editor graph and ends with `Build.write`. Generated modules should be `WriteFiles` or `Run` outputs passed as deferred paths, so the runner can order, cache and describe them.
 
-```toml
-[package]
-name = "site"
-version = "0.1.0"
-
-[tasks]
-before-build = ["codegen"]
-```
-
-`silk build` now builds the tasks, runs `codegen`, and then builds the program. This output keeps the progress rows to show the order:
-
-```
-$ silk build
-Compiling site (x86_64-unknown-linux-gnu, tasks)
-  load      212 modules, 1 in package         0.00s
-  check     1 module                          0.00s
-  codegen   0 functions                       0.00s
-  link      clang                             0.00s
-Finished build/llvm/x86_64-unknown-linux-gnu/tasks/site in 0.02s
-wrote src/Pages.silk
-Compiling site (x86_64-unknown-linux-gnu, debug)
-  load      166 modules, 2 in package         0.00s
-  check     2 modules                         0.09s
-  codegen   531 functions                     0.11s
-  borrow    215 bodies                        0.00s
-  link      clang                             0.25s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/site in 0.48s
-```
-
-The hooks are `before-build`, `after-build`, `before-run`, `before-test`, `after-test`, `before-pack` and `after-pack`, each a list of task names that run in order. A failing hook stops the command:
-
-```
-$ : > pages.txt
-$ silk build
-error: pages.txt lists no pages
-silk: before-build task `codegen` failed
-```
-
-`--no-hooks` skips them. Here, without `codegen`, the generated module is missing:
-
-```
-$ silk build --no-hooks
-[x86_64-unknown-linux-gnu]
-src/main.silk:5:8: error[MOD0001] Unknown module Pages
-Failed site in 0.13s
-```
-
-Only the root manifest of a command is read, so a dependency's tasks never run in your build. A command that a hook starts runs no hooks of its own. `check`, `hash`, `format`, `doc`, `generate` and the editor never run them.
+Expose `pub const COMMANDS: string = Task.commands<Tasks>()` beside the task entry. The compiler reads this metadata to select reserved commands without invoking the task entry. Dependencies never run their own tasks.
 
 ### What a task can see
 
@@ -965,10 +918,8 @@ The task starts in the package directory, with the user's rights and environment
 | `SILK_PROJECT_ROOT` | The package directory; `Task.root()` answers it as a `Path` |
 | `SILK_INVOCATION_DIRECTORY` | Where the user typed the command; `Task.invocationDirectory()` |
 | `SILK_COMPILER` | The compiler that built the tasks; `Task.silk` runs it |
-| `SILK_HOOK` | In a hook, its name, such as `before-build` |
-| `SILK_HOOK_RESULT` | In `after-pack`, the object `silk pack --json` writes |
 
-The tasks profile is an ordinary profile. Add `[profiles.tasks]` to choose another root module with `main`, and `[profiles.tasks.dependencies]` for dependencies that only the tasks need; they are fetched only when the tasks build.
+The task program imports from the package's one dependency table. Dependencies are fetched when selected imports reach them. Compiler options precede the task name; command options follow it.
 
 ## API reference
 

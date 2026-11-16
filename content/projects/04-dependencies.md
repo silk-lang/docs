@@ -115,7 +115,7 @@ Compiling app (x86_64-unknown-linux-gnu, debug)
   codegen   720 functions                     0.15s
   borrow    233 bodies                        0.01s
   link      clang                             0.38s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/app in 0.82s
+Finished build/x86_64-unknown-linux-gnu/dev/app in 0.82s
 length 42
 ```
 
