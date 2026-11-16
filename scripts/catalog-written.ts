@@ -29,6 +29,7 @@ export const sections: ReadonlyArray<
   { directory: 'get-started', title: 'Get started' },
   { directory: 'book', title: 'The Silk book' },
   { directory: 'reference', title: 'Language reference' },
+  { directory: 'intrinsics', title: 'Intrinsics' },
   { directory: 'projects', title: 'Projects and packages' },
   { directory: 'tools', title: 'Tools' },
   { directory: 'guides', title: 'Guides' },

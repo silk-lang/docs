@@ -321,6 +321,73 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
     ],
   },
   {
+    key: 'intrinsics',
+    title: 'Intrinsics',
+    showCount: true,
+    pages: [
+      page(
+        'intrinsics',
+        'overview',
+        'Overview',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/00-overview.md',
+      ),
+      page(
+        'intrinsics',
+        'pointers',
+        'Pointers',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/01-pointers.md',
+      ),
+      page(
+        'intrinsics',
+        'memory-and-storage',
+        'Memory and storage',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/02-memory-and-storage.md',
+      ),
+      page(
+        'intrinsics',
+        'atomics',
+        'Atomics',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/03-atomics.md',
+      ),
+      page(
+        'intrinsics',
+        'scalars',
+        'Scalar operations',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/04-scalars.md',
+      ),
+      page(
+        'intrinsics',
+        'simd',
+        'SIMD',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/05-simd.md',
+      ),
+      page(
+        'intrinsics',
+        'architecture',
+        'Architecture operations',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/06-architecture.md',
+      ),
+      page(
+        'intrinsics',
+        'static-evaluation',
+        'Static evaluation',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/07-static-evaluation.md',
+      ),
+      page(
+        'intrinsics',
+        'effects-and-execution',
+        'Effects and execution',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/08-effects-and-execution.md',
+      ),
+      page(
+        'intrinsics',
+        'types',
+        'Types and properties',
+        'https://github.com/silk-lang/docs/blob/main/content/intrinsics/09-types.md',
+      ),
+    ],
+  },
+  {
     key: 'projects',
     title: 'Projects and packages',
     showCount: true,

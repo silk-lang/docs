@@ -1,6 +1,6 @@
 # Intrinsics
 
-`Intrinsic` is the compiler-provided namespace of primitive operations and types. The whole namespace is public: any module may use any member. Some members are unsafe. Most programs reach them through standard library wrappers. This page also covers directives, the `@name` lines that tell the compiler how to build a function.
+`Intrinsic` is the compiler-provided namespace of primitive operations and types. The whole namespace is public: any module may use any member. Some members are unsafe. Most programs reach them through standard library wrappers. This page also covers directives, the `@name` lines that tell the compiler how to build a function. The [Intrinsics](/docs/intrinsics/overview) section documents every member one by one.
 
 ## Syntax
 
@@ -20,37 +20,23 @@ DirectiveLit    = TextLiteral | '-'? DecimalInteger | 'true' | 'false' | '(' ( D
 - No declaration can take the name: `struct Intrinsic {}` is a binding conflict (SEM0016).
 - Members are fixed by the compiler. An unknown member name is SEM0010.
 - A member is a value (called like a function), a type, or a property used as a bound.
-- Type arguments are never inferred. Write exactly the number the member takes, or it is SEM0051: `Intrinsic.pointerFromMutRef<i32>(&mut v)`.
+- Most members need their type arguments written, all of them, or it is SEM0051: `Intrinsic.pointerFromMutRef<i32>(&mut v)`. A few infer them from their arguments, such as `Intrinsic.replace(place, value)` and `Intrinsic.borrowField(owner, field)`; each member's entry shows which.
 - A call's result converts to an annotated binding, a parameter or a declared result like any other value: `let p: ?*const i32 = Intrinsic.pointerNull<i32>()`.
 
 ## Value members by category
 
-| Category | Count | Members |
-| --- | --: | --- |
-| Scalar operations | 618 | `<scalar><Operation>`, see below |
-| Pointers | 22 | `pointerFromRef`, `pointerFromMutRef`, `pointerFromSlice`, `pointerFromMutSlice`, `pointerAt`, `pointerAtMut`, `pointerRead`, `pointerWrite`, `pointerReadUnaligned`, `pointerWriteUnaligned`, `pointerRequalify`, `pointerReinterpret`, `pointerBytes`, `pointerAddress`, `pointerIsNull`, `pointerNull`, `pointerNullFunction`, `pointerTake`, `pointerBorrow`, `pointerBorrowMut`, `pointerBorrowMany`, `pointerBorrowManyMut` |
-| SIMD vectors | 46 | `simdSplat`, `simdFromArray`, `simdToArray`, `simdExtract`, `simdInsert`, `simdLoad`, `simdStore`, `simdPointerLoad`, `simdPointerStore`, `simdLanesEqual` and the other `simdLanes*` comparisons, `simdSelect`, `simdMinimum`, `simdMaximum`, `simdShuffle`, `simdWrapping*`, `simdSaturating*`, `simdShift*`, `simdRotate*`, `simdSqrt`, `simdMulAdd`, `simdReduce*`, `simdMask*`, `simdConvert`, `simdBitcast` |
-| Architecture operations | 31 | `x86ShuffleBytes`, `x86MultiplyAddBytes`, `x86MultiplyAddWords`, `x86PackUnsignedSaturate`, `x86PackSignedSaturate`, `x86SumAbsoluteDifferences`, `x86AesEncrypt`, `x86AesEncryptLast`, `x86AesDecrypt`, `x86AesDecryptLast`, `x86AesInverseMixColumns`, `x86CarrylessMultiply`, `x86Sha256Rounds2`, `x86Sha256Message1`, `x86Sha256Message2`, `aarch64TableLookup`, `aarch64DotProduct`, `aarch64PairwiseAdd`, `aarch64AesEncrypt`, `aarch64AesDecrypt`, `aarch64AesMixColumns`, `aarch64AesInverseMixColumns`, `aarch64Sha256Hash`, `aarch64Sha256Hash2`, `aarch64Sha256ScheduleUpdate0`, `aarch64Sha256ScheduleUpdate1`, `wasmSwizzle`, `wasmRelaxedSwizzle`, `wasmDot`, `wasmNarrowUnsigned`, `wasmNarrowSigned` |
-| Atomics | 13 | `atomicLoad`, `atomicStore`, `atomicSwap`, `atomicCompareExchange`, `atomicCompareExchangeWeak`, `atomicFetchAdd`, `atomicFetchSubtract`, `atomicFetchBitAnd`, `atomicFetchBitOr`, `atomicFetchBitXor`, `atomicFetchMinimum`, `atomicFetchMaximum`, `atomicFence` |
-| Allocation and raw storage | 17 | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBufferEmpty`, `rawBufferFrom`, `rawBufferSlot`, `rawBufferCount`, `rawBufferRead`, `rawBufferCopy`, `rawBufferFill`, `rawBufferView`, `rawBufferViewMut`, `slotWrite`, `slotTake`, `slotDrop`, `slotCopy`, `slotAddress` |
-| Shared ownership | 4 | `sharedLayout`, `sharedFromAllocation`, `sharedClone`, `sharedWithMut` |
-| Execution | 11 | `executionLayout`, `executionFromAllocation`, `executionDrive`, `relinquish`, `executionCurrent`, `executionRefOf`, `executionLoad`, `executionStore`, `executionCompareExchange`, `executionNotify`, `executionLive` |
-| Effect composition | 8 | `bindRequirement`, `bindRequirementMut`, `bindRequirementOwned`, `catchFailure`, `suspendEffect`, `finalizeEffect`, `finalizeEffectNonParking`, `useReleaseNonParking` |
-| Text and slices | 5 | `stringUtf8Bytes`, `stringFromUtf8Unchecked`, `stringByteLength`, `stringEqualsExact`, `sliceView` |
-| Places | 3 | `replace`, `borrowField`, `borrowFieldMut` |
-| Target queries | 7 | `targetPointerBits`, `targetPointerAlignment`, `targetArchitecture`, `targetOperatingSystem`, `targetAbi`, `targetObjectFormat`, `targetEndianness` |
-| Profile queries | 3 | `profileText`, `profileFlag`, `profileContains` |
-| Static text | 4 | `staticTextByteLength`, `staticTextByteAt`, `staticTextConcat`, `staticTextSlice` |
-| Static sequences | 5 | `staticSequenceEmpty`, `staticSequenceAppend`, `staticSequenceConcat`, `staticSequenceLength`, `staticSequenceAt` |
-| Reflection | 11 | `reflectType`, `reflectTypeKind`, `reflectFields`, `reflectFieldKind`, `reflectFieldLabel`, `reflectFieldOrdinal`, `reflectVariants`, `reflectVariantLabel`, `reflectVariantFields`, `makeVariant`, `isVariant` |
-| Tests | 3 | `tests`, `testInfo`, `testFunction` |
-| Diagnostics | 3 | `observeUnhandled`, `observeHandled`, `observeDiagnostics` |
-| Traps | 1 | `trap` |
-| Machine code and stack | 3 | `assembly`, `frameAddress`, `stackAllocate` |
-| Cache hints | 1 | `prefetch` |
-| Enums | 1 | `enumValue` |
+Every member has an entry with its signature, its rules and a runnable example in the [Intrinsics](/docs/intrinsics/overview) section. This page gives the rules for the namespace as a whole.
 
-The inventory holds 830 members: 628 scalar operations and the 202 in the table.
+| Category | Members | Entries |
+| --- | --- | --- |
+| Pointers | `pointerFromRef`, `pointerAt`, `pointerRead`, `pointerWrite`, `pointerBorrow` and the other `pointer*` members, `frameAddress`, `processWord`, `variadicArguments`, `stackAllocate`, `prefetch` | [Pointers](/docs/intrinsics/pointers) |
+| Allocation, raw storage, shared ownership, text and slices | `layoutOf`, `systemAllocationAcquire`, `allocationAdopt`, `rawBuffer*`, `slot*`, `shared*`, `sliceView`, `replace`, `string*`, `wasmMemorySize`, `wasmMemoryGrow` | [Memory and storage](/docs/intrinsics/memory-and-storage) |
+| Atomics | `atomic*`, `wasmAtomicWait32`, `wasmAtomicNotify` | [Atomics](/docs/intrinsics/atomics) |
+| Scalar operations | `<scalar><Operation>`, see below | [Scalars](/docs/intrinsics/scalars) |
+| SIMD vectors | `simd*` | [SIMD](/docs/intrinsics/simd) |
+| Architecture operations | `x86*`, `aarch64*`, `wasm*` instructions | [Architecture](/docs/intrinsics/architecture) |
+| Target, profile, static text, embedded files, static sequences, reflection, tests | `target*`, `profile*`, `staticText*`, `embed*`, `staticSequence*`, `reflect*`, `borrowField`, `makeVariant`, `isVariant`, `functionRef`, `tests`, `testInfo`, `testFunction` | [Static evaluation](/docs/intrinsics/static-evaluation) |
+| Effect composition, failure reports, traps, assembly, execution packages | `catchFailure`, `finalizeEffect`, `bindRequirement*`, `suspendEffect`, `interruptibleEffect`, `observe*`, `trap`, `assembly`, `execution*`, `relinquish` | [Effects and execution](/docs/intrinsics/effects-and-execution) |
 
 ## Scalar operations
 
@@ -68,7 +54,7 @@ A scalar operation is named by a scalar type followed by an operation: `i32Wrapp
 | Conversion | 150 | `To<Type>` between numeric types, `f32ToBits`, `f32FromBits` and `f64` forms, `charToU32`, `charFromU32` |
 | Checked conversion | 100 | `CheckedTo<Type>` between integer types |
 | Float classification | 12 | `IsNaN`, `IsInfinite`, `IsFinite`, `IsNormal`, `IsSubnormal`, `IsSignNegative` |
-| Float math | 6 | `Sqrt`, `Sin`, `Cos` |
+| Float math | 2 | `Sqrt` |
 | Logical | 1 | `boolNot` |
 
 - Integer scalars are `i8` to `i64`, `isize`, `u8` to `u64` and `usize`. Floats are `f32` and `f64`. `bool` and `char` have equality, comparison and conversion members.
@@ -138,13 +124,17 @@ Each architecture member stands for one instruction of one target that the porta
 
 ## Type members
 
+Each has an entry on the [Types and properties](/docs/intrinsics/types) page.
+
 | Category | Members |
 | --- | --- |
 | Storage types | `Allocation`, `RawBuffer<T>`, `Slot<'storage, T>`, `SharedCore<T>`, `StorageFailure`, `Execution<A>`, `ExecutionRef` |
-| Static-only types | `Type<Owner>`, `Field<Owner, Value>`, `Fields<Owner>`, `Variant<Union>`, `Variants<Union>`, `StaticSequence`, `Test`, `Tests`, `TestInfo` |
+| Static-only types | `Type<Owner>`, `Field<Owner, Value>`, `Fields<Owner>`, `FieldName<Owner>`, `Variant<Union>`, `Variants<Union>`, `VariantName<Union>`, `FunctionRef`, `StaticSequence<Element>`, `Test<F>`, `Tests`, `TestInfo` |
 | Ownership properties | `Copy`, `Drop` |
+| Thread properties | `Transferable`, `Concurrent` |
 | Execution properties | `NonParking`, `Detached` (used as bounds) |
 | Operator interfaces | `Add`, `Subtract`, `Multiply`, `Divide`, `Remainder`, `Negate`, `BitAnd`, `BitOr`, `BitXor`, `BitNot`, `Not`, `Equal`, `Order`, and the enum `Ordering` |
+| Literal fields | `Omittable` |
 | Module | `application`, imported by entry modules as `import Intrinsic.application` |
 
 - `impl Intrinsic.Copy for T {}` and `impl Copy for T {}` (with `Copy` from `silk/core/ownership`) are the same conformance. The same holds for `Drop`.
@@ -574,7 +564,6 @@ Values and primitive types · Interfaces and impls · Ownership and moves · Uns
 
 ## Open questions
 
-- `enumValue` is in the runtime intrinsic catalog, but no compiler or standard library code calls it. Its contract is unconfirmed.
 - SEM0093 (intrinsic unavailable on the requested target) has no producer in the compiler.
 - A repeated `@foreign` on an `extern "C"` function, such as `@foreign(memory: "none")` on two lines, passes `silk check`. `silk build` then stops at the declaration with `unsupported[foreign-contract] not supported by the native compiler yet` (exit status 2) instead of SEM0250.
 - `@features(NAME)`, a name where a text literal belongs, is PAR0002 at the name, followed by SEM0242 "`@features` lists no CPU feature", although the directive did name one.
