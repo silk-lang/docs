@@ -197,7 +197,7 @@ That is *elision*: leaving out lifetimes the compiler can work out from simple r
 - Otherwise, if the parameters show exactly one lifetime, the result borrows with that one. A `&Task<'_>` shows two: the reference's and the task's.
 - Otherwise you must write it.
 
-A reference, a slice or a `string` may leave its lifetime out. A struct with lifetime parameters, like `Task<'text>`, may not: a signature writes each of them, by name or as `'_`, so a reader always sees that the value borrows. A function type such as `fn(&Task) -> bool`, and a function literal's parameters, may still leave them out.
+A reference, a slice or a `string` may leave its lifetime out. A struct with lifetime parameters, like `Task<'text>`, may not: a signature writes each of them, by name or as `'_`, so a reader always sees that the value borrows. A function type such as `fn(&Task) -> bool`, and a lambda's parameters, may still leave them out.
 
 `utf8Bytes` shows exactly one lifetime, the one in `value`, so its result borrows from `value`. Your `part` shows exactly one lifetime too, so you could write it with no lifetimes at all:
 

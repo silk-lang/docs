@@ -167,7 +167,7 @@ where VirtualClock provides MonotonicClock from R {
 effect fn attempt(label: string, station: &mut Station, retryOn: i32) -> () ! LogError ? &mut Logger {
   run Effect.log("{label}\n", &.{ label: label })
   let mut checked = 0
-  let transient = fn(error: &(StationDown | LogError)) -> bool {
+  let transient = |error: &(StationDown | LogError)| -> bool {
     checked = checked + 1
     return match &error.* {
       StationDown down => down.code == retryOn
@@ -267,7 +267,7 @@ effect fn budgetedRead(station: &mut Station) -> Timed<i32>
 effect fn attempt(label: string, station: &mut Station, retryOn: i32) -> () ! LogError ? &mut Logger {
   run Effect.log("{label}\n", &.{ label: label })
   let mut checked = 0
-  let transient = fn(error: &(StationDown | LogError | TimedOut)) -> bool {
+  let transient = |error: &(StationDown | LogError | TimedOut)| -> bool {
     checked = checked + 1
     return match &error.* {
       StationDown down => down.code == retryOn

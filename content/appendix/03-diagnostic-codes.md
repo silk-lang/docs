@@ -515,7 +515,7 @@ Fix: Add a final `else { ... }`, or write the `if` as a statement. See Control f
 
 ### PAR0010
 
-A spelling from another language that Silk writes differently: `+=`, `++`, `for ... in`, `var`, `c ? a : b`, `=> return x`, a prefix `*n`, `<<` or `>>`, `Pair { 0: a }`, a comma between match arms, a plain name as a whole-value pattern or a bare `{ ... }` block.
+A spelling from another language that Silk writes differently: `+=`, `++`, `for ... in`, `var`, `c ? a : b`, `=> return x`, a prefix `*n`, `<<` or `>>`, `Pair { 0: a }`, a comma between match arms, a plain name as a whole-value pattern, a bare `{ ... }` block or an anonymous `fn(x: T) -> R { ... }`.
 
 ```silk
 pub fn main() -> i32 {
@@ -538,6 +538,7 @@ The message names the Silk form of each spelling, such as a `while` loop with a 
 - `Pair { 0: 1, 1: 2 }` for `tuple Pair(i32, i32)` prints ``A tuple's elements have no field names; build it by position, as in `Pair(first, second)` ``, at the `{`.
 - A `,` after a match arm prints ``Match arms are not separated by commas; remove the `,` ``, at the comma.
 - A match arm whose pattern is a bare name, `value => value`, prints ``A pattern that takes the whole value names its type, as in `i32 value`, or is `_` ``, at the name.
+- `let f = fn(x: i32) -> i32 { return x }` prints ``An anonymous function is a lambda in Silk; write `fn(x: T) -> R { ... }` as `|x: T| -> R { ... }`, or `|x| x + 1` when the context supplies the types``, at `fn`.
 
 Fix: Write the Silk form the message names. See Bindings and statements.
 
@@ -1146,7 +1147,7 @@ Returning a callable or Effect that borrows storage owned by the returning funct
 ```silk
 fn leak() -> mut fn<'static>() -> i32 {
   let mut cell = 40
-  return fn() -> i32 {
+  return || -> i32 {
     cell = cell + 1
     return cell
   }
@@ -2627,7 +2628,7 @@ A closure that assigns a captured variable is a `mut fn`, and passing it for a p
 fn apply(f: fn() -> i32) -> i32 { return f() }
 pub fn main() -> i32 {
   let mut n = 0
-  return apply(fn() -> i32 {
+  return apply(|| -> i32 {
     n = n + 1
     return n
   })
@@ -2649,7 +2650,7 @@ Invoking a stored callable through a place without the access its contract requi
 ```silk
 pub fn main() -> i32 {
   let mut total = 0
-  let add = fn(n: i32) -> () { total = total + n }
+  let add = |n: i32| -> () { total = total + n }
   add(2)
   drop add
   return total
@@ -3134,7 +3135,7 @@ An opaque realization whose inline captures contain that same family.
 ```silk
 fn nest(n: i32) -> some<F: once fn<'static>() -> i32> F {
   let inner = nest(n)
-  return fn() -> i32 {
+  return || -> i32 {
     let g = move inner
     return g()
   }
@@ -5346,7 +5347,7 @@ fn apply<F: fn() -> i32>(f: mut F) -> i32 {
 }
 
 pub fn main() -> i32 {
-  return apply(fn() -> i32 { return 1 })
+  return apply(|| -> i32 { return 1 })
 }
 ```
 
