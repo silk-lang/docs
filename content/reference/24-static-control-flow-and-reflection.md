@@ -141,7 +141,7 @@ All of these are fixed by the build request (standard command options and explic
 | `Compilation.link()` | `Link`: `Static`, `Dynamic` |
 | `Compilation.codeModel()` | `CodeModel`: `Small`, `Large` |
 | `Compilation.relocation()` | `Relocation`: `Static`, `Pic` |
-| `Compilation.optimization()` | `Optimization`: `None`, `Speed`, `Size` (a profile with `optimization = "size"`) |
+| `Compilation.optimization()` | `Optimization`: `None`, `Speed`, `Size` (selected with `Optimize.Size`) |
 | `Compilation.safety()` | `Safety`: `Checked`, `Unchecked` |
 | `Compilation.threading()` | `Threading`: `Single`, `Multi` |
 | `Compilation.unwind()` | `Unwind`: `None`, `Native` |
@@ -150,7 +150,7 @@ All of these are fixed by the build request (standard command options and explic
 | `debug` | `bool` constant: whether debug information is requested |
 
 - These enums are scalar enums, so they compare with `==` and `!=`.
-- A named profile sets them from its fields, for example `optimization = "speed"` and `debug = false`. The native compiler refuses a profile that sets `safety`, `threading`, `unwind`, `sanitizers` or `entry` away from its default, so those queries return the defaults in every build that compiles. See Package parameters for profiles.
+- The graph's `Compilation` settings choose these program-wide facts. `Package.optimize` and `Package.debug` affect backend generation only: generic code still observes the program's settings. See **Tasks and build graphs**.
 
 ## Exact function types
 

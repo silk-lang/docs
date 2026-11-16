@@ -180,7 +180,7 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 - Any other width, such as `simd<u8, 8>` on x86-64, is SEM0244: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width".
 - A width whose feature the profile does not select is also SEM0244: "simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`".
 - For a foreign function, SEM0244 is reported at each call, at the callee's name. A declaration that is never called is not checked. For an `export "C"` function, it is reported at the vector type in the declaration, by `silk check` as well as `silk build`.
-- Only the profile's `cpu` counts. An `@features` directive on the calling function does not satisfy SEM0244. See Targets and profiles for `cpu`.
+- Only the compilation's selected CPU and features count. An `@features` directive on the calling function does not satisfy SEM0244. See Targets and compilation settings for `cpu`.
 - A C function-pointer type cannot carry a vector: `extern "C" fn(simd<f32, 4>) -> f32` is SEM0187.
 
 ## Native symbols
@@ -543,7 +543,7 @@ main returned 0 after 1 tick
 
 ## See also
 
-Values and primitive types (SIMD vectors and masks) · Targets and profiles · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/mem/pointer`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/layout`
+Values and primitive types (SIMD vectors and masks) · Targets and compilation settings · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/mem/pointer`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/layout`
 
 ## Open questions
 

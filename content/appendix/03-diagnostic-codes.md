@@ -644,7 +644,7 @@ shapes = { path = "../shapes" }
 name = "shapes"
 version = "0.1.0"
 silk-version = "0.1.0"
-kind = "static-library"
+kind = "library"
 exports = ["lib"]
 ```
 
@@ -5261,7 +5261,7 @@ src/main.silk:3:17: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with s
 
 The default x86-64 profile has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
 
-Fix: Call the architecture wrapper, here `x86.shuffleBytes` from `silk.simd.x86`, which falls back to portable code. Or select the feature in the profile (`cpu.model = "x86-64-v2"`) and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` written with `@features("ssse3")` on the line before it. See Intrinsics and Targets and profiles.
+Fix: Call the architecture wrapper, here `x86.shuffleBytes` from `silk.simd.x86`, which falls back to portable code. Or select the feature in the profile (`cpu.model = "x86-64-v2"`) and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` written with `@features("ssse3")` on the line before it. See Intrinsics and Targets and compilation settings.
 
 ### SEM0242
 
@@ -5286,7 +5286,7 @@ src/main.silk:1:11: error[SEM0242] neon is not a CPU feature of x86_64-unknown-l
 
 The column is the entry. An empty list, `@features()`, prints `` `@features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the directive ``, at the `@`. Level names such as `"x86-64-v3"` are refused too: they are CPU models, not features.
 
-Fix: List features from the target's catalog in Targets and profiles, as text literals. Put a function for another architecture under `static if Intrinsic.targetArchitecture() == "aarch64"` or the like, so other targets never check it.
+Fix: List features from the target's catalog in Targets and compilation settings, as text literals. Put a function for another architecture under `static if Intrinsic.targetArchitecture() == "aarch64"` or the like, so other targets never check it.
 
 ### SEM0243
 

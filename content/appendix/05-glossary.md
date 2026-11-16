@@ -77,5 +77,5 @@ Terms the book and the reference use, with the reference page that defines each 
 | Unit | The type `()` and its only value `()`. | Values and primitive types |
 | Unsafe | Code whose memory safety the compiler cannot check: `unsafe` blocks, functions and calls. | Unsafe code and C interop |
 | `Without` | A row operator, `Without<R, S>`: row `R` with the entries of `S` removed. | Typed failures, Services and providers |
-| WASI | The WebAssembly System Interface, the host API a WebAssembly program uses outside a browser. `--target wasm32-wasip1` builds a preview 1 module; `wasm32-wasip2` builds a preview 2 component and needs `wasm-tools`. | Targets and profiles |
+| WASI | The WebAssembly System Interface, the host API a WebAssembly program uses outside a browser. `--target wasm32-wasip1` builds a preview 1 module; `wasm32-wasip2` builds a preview 2 component and needs `wasm-tools`. | Targets and compilation settings |
 | Witness | The conformance selected to supply an interface operation for one instance. | Generics |

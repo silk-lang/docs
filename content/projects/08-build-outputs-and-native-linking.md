@@ -21,8 +21,8 @@ The runner writes artifacts to `build/<target>/<mode>/<name>`, under the workspa
 - Static archives use `SILK_LLVM_AR` when set, else the `llvm-ar` in Clang's directory.
 - Clang runs with only `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL` and `LC_CTYPE` from your environment. `CFLAGS`, `LDFLAGS` and similar are not passed.
 - An executable link adds `-lc -lm` after everything else.
-- On Linux, an executable links with the `ld.lld` in Clang's installation directory (the `InstalledDir` line of `clang --version`) when there is one, through `--ld-path`. Otherwise Clang uses the system linker. A `platform-supply` that names a linker, and a no-libc build, keep their own linker. The bundled Clang has its `ld.lld` beside it. The progress row reads `link      clang` either way.
-- On Linux, an executable is not position independent unless its profile sets `relocation = "pic"`: the default links with `-fno-pic` and `-no-pie`. See Targets and profiles.
+- On Linux, an executable links with the `ld.lld` in Clang's installation directory (the `InstalledDir` line of `clang --version`) when there is one, through `--ld-path`. Otherwise Clang uses the system linker. An explicit platform supply that names a linker, and a no-libc build, keep their own linker. The bundled Clang has its `ld.lld` beside it. The progress row reads `link      clang` either way.
+- On Linux, an executable is not position independent unless `Compilation.relocation` selects `pic`: the default links with `-fno-pic` and `-no-pie`. See Targets and compilation settings.
 
 | Problem | Message |
 | --- | --- |

@@ -124,4 +124,4 @@ Use `silk check --target <name>` to see what a target offers before you build fo
 
 ## See also
 
-Modules and imports, Targets and profiles; **Intrinsics** and **Static control flow and reflection** in the reference; the Std lib API reference index.
+Modules and imports, Targets and compilation settings; **Intrinsics** and **Static control flow and reflection** in the reference; the Std lib API reference index.

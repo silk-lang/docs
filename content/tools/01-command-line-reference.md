@@ -37,7 +37,7 @@ An option a command does not take is named, with the closest option it does take
 ```
 $ silk check --relase
 silk check: unknown option `--relase`; did you mean `--release`?
-usage: silk check [--manifest-path <path>] [--package <name>]... [--workspace] [--target <host|triple>]... [--release] [--optimization <profile>] [--debug true|false] [--stdlib <directory>] [--progress auto|live|plain|never] [--quiet] [--timings] [--json] [--replay <script> [--differential]]
+usage: silk check [--manifest-path <path>] [--package <name>]... [--workspace] [--target <host|triple>]... [--release] [--optimization <none|speed|size>] [--debug true|false] [--stdlib <directory>] [--progress auto|live|plain|never] [--quiet] [--timings] [--json] [--replay <script> [--differential]]
 ```
 
 ## Finding the project
@@ -62,14 +62,14 @@ A manifest that has `[workspace]` and no `[package]` is a workspace root. At a r
 | `-p <name>`, `--package <name>` | Select a workspace member by package name. Repeatable. `run` takes one |
 | `--workspace` | Select every member of the enclosing workspace |
 | `--target <host\|triple>` | Build for this target. Repeatable for `check` and `build`. `run` and `test` need a target the host can run |
-| `--release` | Use the `release` optimization profile (optimized, no debug information) |
-| `--optimization <debug\|release\|release-with-debug>` | Pick the optimization profile. `--release` with any other value exits 2 |
+| `--release` | Select speed optimization; use `--debug` to choose debug information |
+| `--optimization <none\|speed\|size>` | Choose the optimization level. `--release` selects `speed` |
 | `--stdlib <directory>` | Use this std lib instead of the one installed beside `silk`. A directory without `compositions.json` exits 1 |
 | `--backend <llvm\|direct>` | `build` and `run` only. `direct` builds a WebAssembly target without Clang. See **Targets and compilation settings** |
 | `--clang <path>` | `build`, `run` and `test` only. Use this Clang; a bare name is looked up on `PATH`. See **Build outputs and native linking** |
 | `--ignore-warnings` | Let the command succeed with warnings. Without it, a warning fails the command as an error does. See **Diagnostics and silk check** |
 
-Without `--target`, a command uses the targets the manifest selects, or the host. Targets, profiles and output paths are described in **Targets and compilation settings** and **Build outputs and native linking**.
+Without `--target`, built-in commands select the host. A custom command can construct several target compilations. Targets, settings and output paths are described in **Targets and compilation settings** and **Build outputs and native linking**.
 
 ## init
 
