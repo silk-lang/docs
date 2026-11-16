@@ -329,7 +329,7 @@ effect fn remind(reminder: Reminder, fired: Shared<Fired>) -> ()
 ? &mut Scheduler | &mut MonotonicClock {
   run Effect.sleep(reminder.delay)
   let id = reminder.id
-  Shared.withMut(&fired, fn(state: &mut Fired) -> () { record(state, id) })
+  Shared.withMut(&fired, |state: &mut Fired| -> () { record(state, id) })
 }
 ```
 
@@ -347,7 +347,7 @@ Failed tasks in 1.00s
 A `&mut` is a unique loan, so passing it on as it is moves it, and Silk wants every move written out. Silk does not quietly reborrow a `&mut` for you, as you saw in chapter 9. The message offers both ways out: `&mut state` lends it again for the length of the call, and `move state` gives it away. The closure has no further use for `state`, so give it away:
 
 ```silk
-  Shared.withMut(&fired, fn(state: &mut Fired) -> () { record(move state, id) })
+  Shared.withMut(&fired, |state: &mut Fired| -> () { record(move state, id) })
 ```
 
 ## The root fiber

@@ -56,7 +56,7 @@ OpaqueResult     = 'some' '<' Identifier ':' Type '>' Type
 - The failure row is the union of the block's `fail` payloads and the failures of its `run`s. The requirement row is inferred the same way.
 - The block captures the locals it uses. Reading a local borrows it while the Effect is alive. `move x` inside the block moves `x` into the Effect at construction.
 - Assigning to a local that a live effect block borrows is OWN0011, even if the Effect never runs.
-- `effect fn(params) -> T ! E ? R { ... }` is an anonymous effect function. Calling it returns an Effect. Its success type is mandatory.
+- `effect |params| -> T ! E ? R { ... }` is an effect lambda. Calling it returns an Effect. When it leaves out `-> T`, its success, failure and requirements come from the context or from its body.
 
 ## The Effect type
 
@@ -216,7 +216,7 @@ pub fn main() -> i32 {
     }
     return 0
   }
-  let recover = effect fn(error: Oops) -> i32 {
+  let recover = effect |error: Oops| -> i32 {
     return error.code
   }
   let job = Job { work: take(Token { value: 3 }) }

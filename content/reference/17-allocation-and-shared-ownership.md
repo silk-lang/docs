@@ -141,7 +141,7 @@ effect fn useCell() -> i32
   let step = 2
   let after = Shared<Counter>.withMut<i32>(
     &alias,
-    fn(c: &mut Counter) -> i32 {
+    |c: &mut Counter| -> i32 {
       c.value = c.value + step
       return c.value
     },
@@ -149,7 +149,7 @@ effect fn useCell() -> i32
   drop alias
   let seen = Shared<Counter>.with<i32>(
     &cell,
-    fn(c: &Counter) -> i32 {
+    |c: &Counter| -> i32 {
       return c.value
     },
   )

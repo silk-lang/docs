@@ -370,7 +370,7 @@ fn countWhere(board: &Board<'_>, keep: fn(&Task) -> bool) -> i32 {
 }
 ```
 
-You can pass a named function, or write one in place with a function literal. Extend `report`:
+You can pass a named function, or write one in place with a lambda. Extend `report`:
 
 ```silk
 effect fn report() -> () ! LogError ? &mut Logger {
@@ -380,7 +380,7 @@ effect fn report() -> () ! LogError ? &mut Logger {
 
   let important = count(&board, &AtLeast { priority: Priority.Normal })
   let wanted = Priority.High
-  let urgentOpen = countWhere(&board, fn(task: &Task) -> bool {
+  let urgentOpen = countWhere(&board, |task: &Task| -> bool {
     return task.isOpen() && task.priority == wanted
   })
   run Effect.log("{important} normal or higher, {urgent} urgent and open\n", &.{
@@ -390,7 +390,7 @@ effect fn report() -> () ! LogError ? &mut Logger {
 }
 ```
 
-The literal `fn(task: &Task) -> bool { ... }` uses `wanted`, a local of `report`. A function literal that uses outer locals is a closure, and those locals are its captures. There is no capture list. The compiler picks a mode for each capture from how the body uses it:
+The lambda `|task: &Task| -> bool { ... }` writes its parameters between bars and uses `wanted`, a local of `report`. A lambda that uses outer locals is a closure, and those locals are its captures. There is no capture list. The compiler picks a mode for each capture from how the body uses it:
 
 | The body | The capture |
 | --- | --- |
@@ -401,20 +401,20 @@ The literal `fn(task: &Task) -> bool { ... }` uses `wanted`, a local of `report`
 
 `wanted` is a `Priority`, which is `Copy`, so the closure holds its own copy.
 
-`countWhere` already says what `keep` takes and returns, so the literal does not have to repeat it. A lambda writes its parameters between bars, leaves out their types and the result, and takes them from where it is used. Its body can be a single expression:
+`countWhere` already says what `keep` takes and returns, so the lambda does not have to repeat it. It can leave out its types and the result and take them from where it is used, and its body can be a single expression:
 
 ```silk
   let urgentOpen = countWhere(&board, |task| task.isOpen() && task.priority == wanted)
 ```
 
-This is the same closure as the `fn(task: &Task) -> bool` literal, with the same captures. When nothing around a lambda gives its types, as in a plain `let double = |value| value * 2`, write them: `|value: i32| value * 2`. See **Closures and callable types** in the reference.
+This is the same closure as the fully typed one, with the same captures. When nothing around a lambda gives its types, as in a plain `let double = |value| value * 2`, write them: `|value: i32| value * 2`. See **Closures and callable types** in the reference.
 
 Assigning to a capture changes what the closure is. Here is a counter that bumps an outer local:
 
 ```silk
 pub fn main() -> i32 {
   let mut added = 0
-  let next = fn() -> i32 {
+  let next = || -> i32 {
     added = added + 1
     return added
   }
@@ -438,7 +438,7 @@ The fix is `let mut next`. There is a second detail. While `next` is alive, it h
 ```silk
 pub fn main() -> i32 {
   let mut added = 0
-  let mut next = fn() -> i32 {
+  let mut next = || -> i32 {
     added = added + 1
     return added
   }
