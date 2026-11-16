@@ -656,6 +656,32 @@ pub fn main() -> i32 {
 }
 ```
 
+### `Intrinsic.reflectDeclarationName`
+
+```silk signature
+static fn reflectDeclarationName<Owner>(descriptor: Type<Owner>) -> string<'static>
+```
+
+Returns a nominal type's defining package, module, and owner names separated by `/`. The name is independent of import aliases and type arguments. A non-nominal type returns empty text.
+
+- Wrapper: [`Reflect.declarationName`](/docs/std/core-reflect#Reflect.impl.declarationName).
+
+```silk
+struct Boxed<T> {
+  pub value: T,
+}
+
+const first: string = Intrinsic.reflectDeclarationName<Boxed<u8>>(Intrinsic.reflectType<Boxed<u8>>())
+const second: string = Intrinsic.reflectDeclarationName<Boxed<u32>>(Intrinsic.reflectType<Boxed<u32>>())
+
+pub fn main() -> i32 {
+  if first == "" || first != second {
+    return 1
+  }
+  return 0
+}
+```
+
 ### `Intrinsic.reflectTypeDoc`
 
 ```silk signature
@@ -1033,6 +1059,70 @@ pub fn main() -> i32 {
   let check = first()
   let five: i64 = 5
   if !check(&five) {
+    return 1
+  }
+  return 0
+}
+```
+
+## Reflection of scalar enums
+
+### `Intrinsic.reflectEnumMembers`
+
+```silk signature
+static fn reflectEnumMembers<Enum>() -> StaticSequence<Enum>
+```
+
+Returns the scalar enum values visible from the calling module in declaration order, preserving their declared discriminants. The result is a static sequence for `static for`; the sequence has no runtime representation. A type that is not a scalar enum is rejected.
+
+- Wrapper: [`Reflect.enumMembers`](/docs/std/core-reflect#Reflect.impl.enumMembers).
+
+```silk
+pub enum Mode {
+  Fast,
+  Small,
+}
+
+pub fn main() -> i32 {
+  let mut count = 0
+  static for mode in Intrinsic.reflectEnumMembers<Mode>() {
+    if mode == Mode.Fast || mode == Mode.Small {
+      count = count + 1
+    }
+  }
+  if count != 2 {
+    return 1
+  }
+  return 0
+}
+```
+
+### `Intrinsic.reflectEnumLabel`
+
+```silk signature
+static fn reflectEnumLabel<Enum>(value: Enum) -> string<'static>
+```
+
+Returns the declared member name of a scalar enum value during static evaluation. The argument must be a static value of that enum.
+
+- Wrapper: [`Reflect.enumLabel`](/docs/std/core-reflect#Reflect.impl.enumLabel).
+
+```silk
+pub enum Mode {
+  Fast,
+  Small,
+}
+
+static fn names() -> string {
+  let mut text = ""
+  static for mode in Intrinsic.reflectEnumMembers<Mode>() {
+    text = Intrinsic.staticTextConcat(text, Intrinsic.reflectEnumLabel<Mode>(mode))
+  }
+  return text
+}
+
+pub fn main() -> i32 {
+  if names() != "FastSmall" {
     return 1
   }
   return 0
