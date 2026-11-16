@@ -1,16 +1,14 @@
 # Closures and callable types
 
-A callable is a value you can call. Silk has four sources of callables: function literals and lambdas, named functions used as values, staged calls that supply only some arguments, and bound methods. This page also covers callable types, which state how a callable may be invoked and how long its captured environment lives.
+A callable is a value you can call. Silk has four sources of callables: lambdas, named functions used as values, staged calls that supply only some arguments, and bound methods. This page also covers callable types, which state how a callable may be invoked and how long its captured environment lives.
 
 ## Syntax
 
 ```
-FunctionLiteral = 'effect'? 'fn' '(' Parameters? ')' '->' Type FailureRow? RequirementRow? Block
-Lambda          = 'effect'? '|' LambdaParams? '|' ( Expression | Block | '->' Type Block )
+Lambda          = 'effect'? '|' LambdaParams? '|' LambdaBody
+LambdaBody      = Expression | Block | '->' Type FailureRow? RequirementRow? Block
 LambdaParams    = LambdaParam (',' LambdaParam)* ','?
 LambdaParam     = 'mut'? Identifier (':' Type)?
-Parameters      = Parameter (',' Parameter)* ','?
-Parameter       = 'mut'? Identifier ':' Type
 
 CallableType    = HigherRanked? Qualifiers 'fn' Environment? '(' (Type (',' Type)*)? ')' '->' Type
 HigherRanked    = 'for' '<' Binder (',' Binder)* '>'
@@ -22,18 +20,9 @@ StagedCall      = Expression '(' Arguments? ')'      (fewer arguments than param
 BoundMethod     = Expression '.' Identifier          (not followed by '(')
 ```
 
-## Function literals
-
-- `fn(x: i32) -> i32 { return x + 1 }` is an expression that builds a callable.
-- Every parameter needs a type. The `-> T` result is required, even for `()`.
-- The body is an ordinary block. It may refer to locals of the enclosing function; those are its captures.
-- Each literal and each named function has its own distinct type. Two different callables cannot be assigned to one binding, even with the same signature (SEM0037).
-- A literal may be nested inside another literal.
-- `effect fn(...) -> T { ... }` builds a callable that returns an Effect instead of running its body. See Effects and run.
-
 ## Lambdas
 
-A lambda is a function literal that may leave out its types. Its parameters go between bars, and its body follows them.
+A lambda is Silk's only anonymous function. Its parameters go between bars, and its body follows them. It may leave out its types and take them from where it is used.
 
 ```silk
 fn apply(transform: fn(i32) -> i32, value: i32) -> i32 {
@@ -63,13 +52,17 @@ pub fn main() -> i32 {
 ```
 
 - `|value| value + 1` has an expression body, which is its result. A braced block is an ordinary body with `return`. `->` writes the result type, and then the body must be a block.
-- `||` is a lambda with no parameters. A parameter may be `mut name`. A parameter type is a single type; parenthesize a union.
+- `||` is a lambda with no parameters. A parameter may be `mut name`. A parameter type is a single type; parenthesize a union or a callable type, as in `|f: (fn(i32) -> i32)|`.
+- A lambda that writes every type, like `|x: i32| -> i32 { return x + 1 }`, has exactly that signature. An `effect` lambda may write failure and requirement rows after its result, as a named `effect fn` does: `effect |x: i32| -> i32 ! Problem ? &Source { ... }`.
+- The body may refer to locals of the enclosing function; those are its captures. A lambda may be nested inside another.
+- Each lambda and each named function has its own distinct type. Two different callables cannot be assigned to one binding, even with the same signature (SEM0037).
+- The old `fn(x: i32) -> i32 { ... }` anonymous form is not Silk: it reports PAR0010 and names the lambda spelling.
 - A missing parameter type is the matching parameter type of the callable the context expects: an annotated binding, a call parameter or a pipeline target. A missing result is the expected result, or else what the body returns.
 - In a generic call, a lambda whose parameter types use type parameters the call has not inferred yet is checked after the other arguments. `applyTwice(|value| value + 1, 40)` gets `T = i32` from `40`, then types `value` as `i32`.
 - When the context gives no type, write it: `let double = |value| value * 2` is SEM0252, "Cannot infer the type of lambda parameter `value` from where the lambda is used; write it, as in `|value: T|`".
 - An inferred type must be one a signature could name. A type that holds a loan of the enclosing body, or a type parameter the enclosing call is still inferring, cannot be inferred; write it.
 - `effect |value| ...` is an effect lambda, an anonymous `effect fn`. When it leaves out its result, its success, failure and requirements come from the Effect the context expects, or else from its body, as for an `effect { }` block. A lambda without `effect` whose body returns an Effect is an ordinary function that returns that Effect; `effect |value| run next(value)` and `|value| next(value)` both satisfy `fn(i32) -> Effect<i32>`.
-- Otherwise a lambda is a function literal: it captures, has an invocation mode and has its own distinct type exactly as below. Code that uses no lambdas pays nothing for inference.
+- Code that uses no lambdas pays nothing for inference.
 
 ## Capture modes
 
@@ -85,7 +78,7 @@ The compiler picks one capture mode per outer binding from how the body uses it.
 - The strongest use wins: Move over Mutable over Shared over Copy.
 - `move x` of a `Copy` binding is still a Copy capture.
 - Moving a non-`Copy` capture needs an explicit `move` (OWN0003). Moving a field out of a captured or temporary aggregate is an error (OWN0003, OWN0002).
-- A Move capture happens when the literal is built, even if the callable is never called. Using the binding afterwards is OWN0001.
+- A Move capture happens when the lambda is built, even if the callable is never called. Using the binding afterwards is OWN0001.
 - While a Shared or Mutable capture is live, conflicting access to the outer binding is OWN0011. The loan ends after the callable's last use or at `drop`.
 
 ## Invocation modes
@@ -103,9 +96,9 @@ A callable's invocation mode follows from its captures:
 - Callable types appear as parameter types, as result types, and as bounds on type parameters: `F: fn(i32) -> i32`.
 - A callable parameter type is implicitly generic: each distinct argument callable gets its own instance. Passing a callable whose signature does not match is reported as SEM0052 at the call. A mismatch against a type-parameter bound is SEM0076.
 - A callable parameter may be wider than the type asks for. When it is a closed structural union that holds every member the type passes, the callable fits: `fn score(pet: Cat | Dog) -> i32` is accepted where `fn(Cat) -> i32` is expected, and each call widens its argument into the union. The same holds for a union argument such as `A | B` into `A | B | C`, and for `Effect.catch` and `Effect.catchAll` handlers. A parameter that lacks a member is still a mismatch.
-- A local binding may be annotated with a callable type: `let f: fn(i32) -> i32 = inc`. The initializer may be a named function or a literal whose parameters, result and environment lifetime match. A mismatch is SEM0037.
+- A local binding may be annotated with a callable type: `let f: fn(i32) -> i32 = inc`. The initializer may be a named function or a lambda whose parameters, result and environment lifetime match. A mismatch is SEM0037.
 - The initializer's invocation mode must be at least as strong as the written one. A `fn` fits `mut fn` and `once fn`, and a `mut fn` fits `once fn`. A `mut fn` for `fn`, or a `once fn` for `mut fn`, is SEM0037.
-- `fn<'static>` in an annotation rejects a literal that borrows a local (SEM0037).
+- `fn<'static>` in an annotation rejects a lambda that borrows a local (SEM0037).
 - The annotation checks the initializer but does not erase its type. Assigning a different function to the binding later is still SEM0037.
 - The binding keeps the callable's own invocation mode. A `fn` annotated `once fn` can be called twice. A `mut fn` annotated `once fn` still needs a `let mut` binding (SEM0077).
 - A struct may declare a field of bare callable type, such as `struct H { f: fn(i32) -> i32 }`, but constructing a value of it is not supported. Make the struct generic: `struct Holder<F: fn<'static>(i32) -> i32> { step: F }`.
@@ -123,7 +116,7 @@ A callable's invocation mode follows from its captures:
 
 ## Returning callables
 
-- A function may return a literal, a named function, a staged call or a bound method.
+- A function may return a lambda, a named function, a staged call or a bound method.
 - `-> fn<'static>(i32) -> i32` returns a callable that owns or copies all it captured.
 - `-> some<F: fn<'static>(i32) -> i32> F` returns an opaque callable. Every return must produce the same construction (SEM0113). See Generics.
 - `-> typeof(name)` returns the exact type of the named function `name`. See Generics.
@@ -170,17 +163,17 @@ pub fn main() -> i32 {
   let mut counter = 0
   let owned = Token { value: 17 }
 
-  let add = fn(x: i32) -> i32 {
+  let add = |x: i32| -> i32 {
     return x + offset
   }
-  let read = fn() -> i32 {
+  let read = || -> i32 {
     return shared.value
   }
-  let mut bump = fn() -> i32 {
+  let mut bump = || -> i32 {
     counter = counter + 1
     return counter
   }
-  let take = fn() -> i32 {
+  let take = || -> i32 {
     return consume(move owned)
   }
 
@@ -210,7 +203,7 @@ fn apply(f: fn(i32) -> i32, x: i32) -> i32 {
 }
 
 fn adder(n: i32) -> fn<'static>(i32) -> i32 {
-  return fn(x: i32) -> i32 {
+  return |x: i32| -> i32 {
     return x + n
   }
 }
@@ -274,7 +267,7 @@ pub fn main() -> i32 {
     return 2
   }
   let mut holder = Holder {
-    step: fn() -> i32 {
+    step: || -> i32 {
       return 5
     },
   }
@@ -344,5 +337,5 @@ Functions and methods · Generics · Ownership and moves · Borrowing · Lifetim
 
 ## Open questions
 
-- The declaration `struct H { f: fn(i32) -> i32 }` checks and builds, but constructing it, as in `H { f: inc }` or with a callable literal, prints "unsupported: this construct is not supported by the native compiler yet" rather than SEM0103.
+- The declaration `struct H { f: fn(i32) -> i32 }` checks and builds, but constructing it, as in `H { f: inc }` or with a lambda, prints "unsupported: this construct is not supported by the native compiler yet" rather than SEM0103.
 - A mismatched callable argument to a `fn(...)` parameter reports SEM0052 ("A generic call whose type arguments its values do not determine"), not SEM0076.

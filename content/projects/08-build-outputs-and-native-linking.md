@@ -289,6 +289,7 @@ strip = 1
 - A build that links the package fetches the file once into `$SILK_HOME/archives/<sha256>` (`~/.silk/archives` by default), checks its SHA-256 before reading it, and extracts it if it is a tar file, gzip-compressed or not. Later builds reuse the extraction.
 - Extraction writes only directories and regular files, skips links, and refuses a member path that is absolute or holds `..`.
 - `silk check` fetches nothing. With `SILK_OFFLINE` set, a build that needs an archive it does not have fails, naming it.
+- `SILK_ARCHIVE_MIRROR` fetches archives from a mirror or a local directory by replacing URL prefixes, and the SHA-256 is still checked. See "Fetching archives from a mirror" in **Dependencies**.
 - Only the declaring manifest may use its archives, and two packages of one build may not declare the same name. A build for a target the archive has no `url` for refuses the reference.
 
 ### Using your own copy

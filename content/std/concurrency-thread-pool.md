@@ -112,7 +112,7 @@ import silk.concurrency.thread_pool { Pool, PoolTask, ThreadPool }
 
 // Parks and drops its Wake, so nothing ever resumes it.
 effect fn forever() -> i32 {
-  run Execution.parkTransferable(fn(wake: TransferableWake) -> () {
+  run Execution.parkTransferable(|wake: TransferableWake| -> () {
     drop wake
     return ()
   })
@@ -158,7 +158,7 @@ import silk.concurrency.thread_pool { Pool, ThreadPool }
 
 // Parks and drops its Wake, so nothing ever resumes it.
 effect fn forever() -> i32 {
-  run Execution.parkTransferable(fn(wake: TransferableWake) -> () {
+  run Execution.parkTransferable(|wake: TransferableWake| -> () {
     drop wake
     return ()
   })

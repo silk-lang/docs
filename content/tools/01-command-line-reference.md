@@ -556,7 +556,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | Variable | Used for |
 | --- | --- |
 | `PATH` | Finding `clang`, `git` (to fetch git dependencies) and the `silk` tool |
-| `SILK_CLANG` | The Clang executable, when `--clang` is not given |
+| `SILK_CLANG` | The Clang executable, when `--clang` is not given. Clang itself runs with only `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL` and `LC_CTYPE` from the environment (and `SystemRoot`, `USERPROFILE` and `LOCALAPPDATA` on Windows), so a `--clang` wrapper script does not see `SILK_CLANG` |
 | `SILK_LLVM_AR` | The archiver for static libraries; default is `llvm-ar` beside Clang |
 | `SDKROOT`, `DEVELOPER_DIR` | macOS SDK selection; an invalid `SDKROOT` is an error |
 | `SILK_PROGRESS` | The progress style for `check`, `build` and `run` when `--progress` is not given: `auto`, `live`, `plain` or `never`. An invalid value is ignored |
@@ -564,6 +564,7 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `COLUMNS` | The width of live progress output; default 80 |
 | `TERM` | `dumb` turns live progress output into plain rows |
 | `SILK_RECEIPTS` | Set, makes the single-file `silk build` print diagnostics as `SILK_BUILD_ERROR=` JSON records |
+| `SILK_ARCHIVE_MIRROR` | Space-separated `<prefix>=<replacement>` entries: an archive URL that starts with a prefix is fetched with the longest matching prefix replaced by an `https://` or `file:///` URL. The pinned SHA-256 is still checked |
 | `SILK_OFFLINE` | Set, a build that needs a `[native.archive.<name>]` archive or a URL dependency it has not fetched fails instead of downloading it |
 | `SILK_SIGNING_KEY` | The text of a minisign secret key file, for `silk pack` to sign with when `--sign` is not given |
 | `SILK_SIGNING_PASSWORD` | The password of an encrypted signing key, for `silk pack`; with `--new-key`, encrypts the new key |

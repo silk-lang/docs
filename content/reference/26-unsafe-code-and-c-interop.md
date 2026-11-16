@@ -98,6 +98,7 @@ Unsafe operations (the caller proves the storage contract):
 - Any other type is rejected at the declaration (SEM0187): `bool`, `char`, `string` and references are "not admitted by the C ABI", and the message for a struct without `extern "C"` says it has no C layout and to declare it `extern "C" struct`.
 - A trailing `...` declares a C variadic function. Variadic arguments follow the named ones.
 - A foreign function cannot be used as a value; it can only be called (SEM0189).
+- A C function that unwinds, such as one that throws a C++ exception, stops the program at the Silk function that called it. That function stays out of line unless it is written `@inline` or `@inlineAlways`; inlined, its callers stop the program the same way.
 
 ## Foreign directives
 

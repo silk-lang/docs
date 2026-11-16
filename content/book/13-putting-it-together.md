@@ -333,7 +333,7 @@ curl exit 52 means "empty reply from server".
 The natural first try is a closure, passed as the last argument of `respond`, that captures `reply.body`:
 
 ```silk
-    effect fn(writer: &mut ResponseWriter<Connection>) -> u16 ! ServerError ? &mut MonotonicClock {
+    effect |writer: &mut ResponseWriter<Connection>| -> u16 ! ServerError ? &mut MonotonicClock {
       drop run ResponseWriter.writeAll(&mut writer.*, Bytes.asSlice(&reply.body), Option<Instant>.none())
       let none: [Header<'static>; 0] = []
       let trailers = match move Headers.make(&none, valueLimits()) {
