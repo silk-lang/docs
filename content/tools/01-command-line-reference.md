@@ -273,7 +273,7 @@ Builds the test runner under `build/test/` and runs the selected tests. When not
 
 `silk task [compiler options] <command> [command options]` builds the root package's `tasks.silk` and invokes its `TaskSet`. With no command it lists available variants. Dependencies contribute modules and static plans; their task entries never run.
 
-`build`, `run`, `test` and `plan` each have a built-in. A root variant with that name replaces it. Commands embed standard `Options`; task metadata is exposed with `Task.commands<Tasks>()`. `silk plan` writes requests without compiling graph roots.
+`build`, `run`, `test` and `plan` each have a built-in. A root variant with that name replaces it. A reserved command without a variant runs its built-in. Commands embed standard `Options`. `silk plan` writes requests without compiling graph roots.
 
 The task receives `SILK_PROJECT_ROOT`, `SILK_INVOCATION_DIRECTORY` and `SILK_COMPILER`. `Task.silk` invokes the same compiler. A command that compiles its graph uses `Build.compile`, `Compilation.build` or `Build.write`.
 
