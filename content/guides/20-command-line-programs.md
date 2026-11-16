@@ -907,7 +907,7 @@ A task that needs another task calls it: tasks are ordinary functions.
 
 A `Build` variant replaces the built-in `silk build`. It embeds standard `Options`, constructs the graph and ends with `Build.compile`. A `Plan` variant constructs the editor graph and ends with `Build.write`. Generated modules should be `WriteFiles` or `Run` outputs passed as deferred paths, so the runner can order, cache and describe them.
 
-Expose `pub const COMMANDS: string = Task.commands<Tasks>()` beside the task entry. The compiler reads this metadata to select reserved commands without invoking the task entry. Dependencies never run their own tasks.
+A package with a `tasks.silk` sends `build`, `run`, `test` and `plan` to its tasks program. For one of them the union has no variant for, `Task.main` runs nothing and the toolchain runs its built-in. Dependencies never run their own tasks.
 
 ### What a task can see
 

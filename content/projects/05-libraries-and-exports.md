@@ -150,7 +150,6 @@ impl TaskSet for Tasks {
     drop run archive.build()
   }
 }
-pub const COMMANDS: string = Task.commands<Tasks>()
 pub effect fn main() -> i32 ? &mut HostInput {
   return run Task.main<Tasks>()
 }
