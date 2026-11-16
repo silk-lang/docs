@@ -134,6 +134,7 @@ A duration literal is a number followed by a unit, and has type `u64` in nanosec
 - Each unit appears at most once (LEX0010) and units must descend (LEX0011).
 - After the first unit, amounts must stay below the next unit up: days below 7, hours below 24, minutes and seconds below 60, sub-second units below 1000 (LEX0012).
 - Amounts are whole decimal numbers (LEX0008). An unknown unit is LEX0009.
+- Every amount needs a unit. `1h30` is LEX0015, and the message suggests the next smaller unit: ``Duration amount `30` has no unit; add one, as in `1h30m` ``.
 
 ## Text literals
 
@@ -216,6 +217,7 @@ first
 | LEX0012 | Duration amount too large for its unit |
 | LEX0013 | Digit outside the base of a prefixed integer |
 | LEX0014 | Type suffix on a numeric literal, such as `7u8` |
+| LEX0015 | Duration amount with no unit, such as the `30` of `1h30` |
 | PAR0011 | A `with` clause after a declaration header, or `module with ...`; write a directive before the declaration |
 | SEM0002 | Integer literal outside its type's range, including a `usize` or `isize` literal outside the target's word size |
 
