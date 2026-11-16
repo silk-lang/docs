@@ -330,7 +330,7 @@ pub fn main() -> i32 {
 src/main.silk:2:17: error[LEX0015] Duration amount `30` has no unit; add one, as in `1h30m`
 ```
 
-The column is the amount without a unit. The suggestion adds the unit one step smaller than the one before it, so `2s500` suggests `2s500ms`. Nothing is smaller than `ns`, so `1ns5` is LEX0008 instead.
+The column is the amount without a unit. The suggestion adds the unit one step smaller than the one before it, so `2s500` suggests `2s500ms`. When there is no such unit or the amount does not fit under it, as in `1ns5` or `1h90`, the message only says "every amount in a duration needs one".
 
 Fix: Write the unit you meant: `1h30m`. See Lexical structure.
 
