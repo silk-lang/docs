@@ -32,3 +32,37 @@ jobs:
         env:
           # Raises the GitHub API rate limit for the releases page.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Every Intrinsic member has an entry in content/intrinsics, and every
+  # example there runs, with the newest silk release and its source.
+  intrinsics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: newest
+        # Every silk release so far is a prerelease, which releases/latest
+        # leaves out, so this takes the first of the list.
+        run: echo "tag=$(gh api 'repos/silk-lang/silk/releases?per_page=1' --jq '.[0].tag_name')" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: silk-lang/silk
+          ref: ${{ steps.newest.outputs.tag }}
+          path: .silk
+          sparse-checkout: |
+            compiler/src/semantic
+            stdlib/intrinsic
+            reference/stdlib
+      - name: Install the release
+        run: |
+          gh release download "$TAG" -R silk-lang/silk -p 'silk-*-x86_64-unknown-linux-gnu.tar.gz' -D "$RUNNER_TEMP"
+          tar -xzf "$RUNNER_TEMP"/silk-*-x86_64-unknown-linux-gnu.tar.gz -C "$RUNNER_TEMP"
+          echo "$(ls -d "$RUNNER_TEMP"/silk-*-x86_64-unknown-linux-gnu)/bin" >> "$GITHUB_PATH"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.newest.outputs.tag }}
+      - run: node scripts/check-intrinsics.ts .silk --run
