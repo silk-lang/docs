@@ -70,7 +70,7 @@ pub effect fn main() -> ()
 
 ```sh
 silk build
-TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks
+TIMEFORMAT='time %Rs'; time ./build/x86_64-unknown-linux-gnu/dev/tasks
 ```
 
 ```
@@ -80,7 +80,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   2,555 functions                   0.46s
   borrow    484 bodies                        0.02s
   link      clang                             0.58s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.53s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 1.53s
 115 minutes in total
 time 0.603s
 ```
@@ -107,7 +107,7 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   2,792 functions                   0.84s
   borrow    518 bodies                        0.02s
   link      clang                             0.20s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 1.25s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 1.25s
 115 minutes in total
 time 0.303s
 ```
@@ -577,11 +577,11 @@ Build, add a few tasks of different priorities, and finish one:
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Buy milk'
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Write the Silk book' high
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Water the plants' low
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Call the plumber' high
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks done 4
+./build/x86_64-unknown-linux-gnu/dev/tasks add 'Buy milk'
+./build/x86_64-unknown-linux-gnu/dev/tasks add 'Write the Silk book' high
+./build/x86_64-unknown-linux-gnu/dev/tasks add 'Water the plants' low
+./build/x86_64-unknown-linux-gnu/dev/tasks add 'Call the plumber' high
+./build/x86_64-unknown-linux-gnu/dev/tasks done 4
 ```
 
 ```
@@ -595,7 +595,7 @@ finished #4
 Three tasks are open: one high (100 ms), one normal (200 ms), one low (400 ms). Run the reminders with the default budget of 250 ms:
 
 ```sh
-TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks remind
+TIMEFORMAT='time %Rs'; time ./build/x86_64-unknown-linux-gnu/dev/tasks remind
 ```
 
 ```
@@ -610,7 +610,7 @@ The high-priority reminder fired first, then the normal one. The low one was sti
 Give it more time:
 
 ```sh
-TIMEFORMAT='time %Rs'; time ./build/llvm/x86_64-unknown-linux-gnu/debug/tasks remind 500
+TIMEFORMAT='time %Rs'; time ./build/x86_64-unknown-linux-gnu/dev/tasks remind 500
 ```
 
 ```
@@ -624,7 +624,7 @@ time 0.503s
 All three fired. The run still takes the full 0.5 s, because the root sleeps for the whole budget. With too little time, nothing fires:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks remind 50
+./build/x86_64-unknown-linux-gnu/dev/tasks remind 50
 ```
 
 ```
@@ -634,7 +634,7 @@ All three fired. The run still takes the full 0.5 s, because the root sleeps for
 And a budget that is not a number is a usage error, exit code 2:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks remind soon
+./build/x86_64-unknown-linux-gnu/dev/tasks remind soon
 ```
 
 ```

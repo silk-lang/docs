@@ -370,7 +370,7 @@ silk build
 Connect to the server that presents `good.pem`, trusting only the private CA:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tlsget 127.0.0.1 8443 /home/you/pki/ca.pem
+./build/x86_64-unknown-linux-gnu/dev/tlsget 127.0.0.1 8443 /home/you/pki/ca.pem
 ```
 
 ```
@@ -409,7 +409,7 @@ tlsget: the certificate does not name this host
 And the system bundle does not know the private CA:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tlsget 127.0.0.1 8443 system
+./build/x86_64-unknown-linux-gnu/dev/tlsget 127.0.0.1 8443 system
 ```
 
 ```
@@ -422,7 +422,7 @@ The anchor count depends on your system.
 Against a public host with system trust, the same code works unchanged:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tlsget example.com 443 system
+./build/x86_64-unknown-linux-gnu/dev/tlsget example.com 443 system
 ```
 
 ```
@@ -441,7 +441,7 @@ The suite, anchor and dates you see will differ. The machine this was run on sen
 Now the offline checks. A good chain:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tlsget check 127.0.0.1 /home/you/pki/good.pem /home/you/pki/ca.pem
+./build/x86_64-unknown-linux-gnu/dev/tlsget check 127.0.0.1 /home/you/pki/good.pem /home/you/pki/ca.pem
 ```
 
 ```

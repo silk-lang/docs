@@ -102,7 +102,7 @@ These types exist only during static evaluation. A value of one is phase-only: i
 type Type<Owner>
 ```
 
-The descriptor of one aggregate type, from [`reflectType`](/docs/intrinsics/static-evaluation#intrinsicreflecttype). [`reflectTypeKind`](/docs/intrinsics/static-evaluation#intrinsicreflecttypekind), [`reflectTypeName`](/docs/intrinsics/static-evaluation#intrinsicreflecttypename), [`reflectTypeDoc`](/docs/intrinsics/static-evaluation#intrinsicreflecttypedoc) and [`reflectPrivateField`](/docs/intrinsics/static-evaluation#intrinsicreflectprivatefield) read it.
+The descriptor of one aggregate type, from [`reflectType`](/docs/intrinsics/static-evaluation#intrinsicreflecttype). [`reflectTypeKind`](/docs/intrinsics/static-evaluation#intrinsicreflecttypekind), [`reflectTypeName`](/docs/intrinsics/static-evaluation#intrinsicreflecttypename), [`reflectDeclarationName`](/docs/intrinsics/static-evaluation#intrinsicreflectdeclarationname), [`reflectTypeDoc`](/docs/intrinsics/static-evaluation#intrinsicreflecttypedoc) and [`reflectPrivateField`](/docs/intrinsics/static-evaluation#intrinsicreflectprivatefield) read it.
 
 ### `Intrinsic.StaticSequence`
 

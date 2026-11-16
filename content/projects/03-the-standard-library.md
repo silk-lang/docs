@@ -120,8 +120,8 @@ src/main.silk:3:32: error[SEM0014] Module silk.io.logger_native has no member St
 Failed hello in 0.07s
 ```
 
-Use `silk check --target <name>` to see what a target offers before you build for it. See **Targets and profiles**.
+Use `silk check --target <name>` to see what a target offers before you build for it. See **Targets and compilation settings**.
 
 ## See also
 
-Modules and imports, Targets and profiles; **Intrinsics** and **Static control flow and reflection** in the reference; the Std lib API reference index.
+Modules and imports, Targets and compilation settings; **Intrinsics** and **Static control flow and reflection** in the reference; the Std lib API reference index.

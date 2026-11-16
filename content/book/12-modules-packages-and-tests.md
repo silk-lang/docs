@@ -323,7 +323,7 @@ silk add ../taskcore
 Added dependency taskcore = { path = "../taskcore" } to /home/you/tasks-workspace/tasks/silk.toml
 ```
 
-`silk add` reads the library's manifest first, so a wrong path or a dependency cycle is refused before anything is written. `silk remove taskcore` takes the line out again, and the table too once it is empty. Here is `tasks/silk.toml` now. `silk add` puts the new `[dependencies]` table right after `[package]`; the `[config]` value and the profile come from chapter 11:
+`silk add` reads the library's manifest first, so a wrong path or a dependency cycle is refused before anything is written. `silk remove taskcore` takes the line out again, and the table too once it is empty. Here is `tasks/silk.toml` now. `silk add` puts the new `[dependencies]` table right after `[package]`; parameter settings now live in the build command described in chapter 11:
 
 ```
 [package]
@@ -334,11 +334,6 @@ silk-version = "0.1.0"
 [dependencies]
 taskcore = { path = "../taskcore" }
 
-[config]
-main.remindBudgetMs = 300
-
-[profiles.demo]
-config.main.fileName = "/demo-tasks.txt"
 ```
 
 `path` is relative to the manifest. Now the program imports the library's modules with the package name in front:
@@ -501,17 +496,17 @@ Compiling tasks (x86_64-unknown-linux-gnu, debug)
   codegen   4,645 functions                   1.43s
   borrow    924 bodies                        0.06s
   link      clang                             0.75s
-Finished /home/you/tasks-workspace/build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 3.50s
+Finished /home/you/tasks-workspace/build/x86_64-unknown-linux-gnu/dev/tasks in 3.50s
 ```
 
 The program now lives in the workspace's shared `build` folder, so from `tasks/` you start it as `../build/...`. The old `tasks/build` folder from earlier chapters is no longer used, and you can delete it.
 
 ```sh
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Buy milk'
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Write the Silk book' high
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks add 'Water the plants' low
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks done 1
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks list
+../build/x86_64-unknown-linux-gnu/dev/tasks add 'Buy milk'
+../build/x86_64-unknown-linux-gnu/dev/tasks add 'Write the Silk book' high
+../build/x86_64-unknown-linux-gnu/dev/tasks add 'Water the plants' low
+../build/x86_64-unknown-linux-gnu/dev/tasks done 1
+../build/x86_64-unknown-linux-gnu/dev/tasks list
 ```
 
 ```
@@ -526,7 +521,7 @@ finished #1
 ```
 
 ```sh
-../build/llvm/x86_64-unknown-linux-gnu/debug/tasks version
+../build/x86_64-unknown-linux-gnu/dev/tasks version
 ```
 
 ```

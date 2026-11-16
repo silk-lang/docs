@@ -47,32 +47,93 @@ runtimes = [
   { name = "wasi", module = "silk/platform/wasi/start" },
 ]
 defaults = ["hosted"]
+components = [
+  { capability = "execution-storage", bindings = [
+    { operation = "create", module = "silk/concurrency/execution_storage", declaration = "silk_execution_storage_create" },
+    { operation = "acquire", module = "silk/concurrency/execution_storage", declaration = "silk_execution_storage_acquire" },
+    { operation = "release", module = "silk/concurrency/execution_storage", declaration = "silk_execution_storage_release" },
+    { operation = "destroy", module = "silk/concurrency/execution_storage", declaration = "silk_execution_storage_destroy" },
+  ] },
+]
 
-[profiles.bare]
-target = "x86_64-unknown-linux-gnu"
-libc = "none"
-runtime = { kind = "named", name = "raw" }
-
-[profiles.web]
-target = "wasm32-unknown-unknown"
-runtime = { kind = "named", name = "standalone" }
-
-[profiles.wasi]
-target = "wasm32-wasip1"
-runtime = { kind = "named", name = "wasi" }
 ```
 
-A target alone does not say how a program starts. The runtime module does that, and the std lib's catalog knows three: `silk/platform/native/start` for hosted targets, `silk/platform/wasm/start` for `wasm32-unknown-unknown` and `silk/platform/wasi/start` for both WASI targets. For Linux without libc there is no default, so you list the runtimes yourself in `[unstable.composition]` and pick one per profile:
+A target alone does not say how a program starts. The runtime module does that, and the std lib's catalog knows three: `silk/platform/native/start` for hosted targets, `silk/platform/wasm/start` for `wasm32-unknown-unknown` and `silk/platform/wasi/start` for both WASI targets. For Linux without libc there is no default, so you list the runtimes yourself in `[unstable.composition]` and select one in each compilation:
 
-- `hosted` (`silk/platform/native/start`) is the default, used by `silk run` and by any profile that names no runtime.
+- `hosted` (`silk/platform/native/start`) is the default, used by `silk run` and by any compilation that names no runtime.
 - `raw` (`silk/platform/linux/start`) enters at `_start` straight from the kernel. It calls `pub fn main(inputs: &ProcessInputs) -> i32` and turns the result into the exit status.
 - `standalone` (`silk/platform/wasm/start`) exports `main` from the WebAssembly module. The host calls it with no arguments and receives an `i32`: an `i32` result passes through, a unit result is 0, and a typed failure is 1. It gives the program no host services.
 - `wasi` (`silk/platform/wasi/start`) exports `_start`, the WASI command entry. `main` may return `i32` or `()`, or be an `effect fn` with either result; it may require `&mut HostInput`, which reads the WASI arguments and environment. A failure exits with status 1. Other services need providers you create in `main`, as on a hosted target.
 
-The `bare` profile selects Linux with `libc = "none"`, `web` selects bare wasm32, and `wasi` selects WASI Preview 1. **Targets and profiles** in the Projects section lists every profile key. Without the composition, `silk check --profile bare` stops with `silk: the build selects no single runtime (ARTIFACT-001)`. Once a composition is present it replaces the catalog, so it must list `wasi` too. If it does not, `silk check --profile wasi` and `silk build --profile wasi` stop before compiling anything. A profile that names the missing `wasi` runtime gets `silk: the build selects no single runtime (ARTIFACT-001)`. A profile with no `runtime` line gets the default, `hosted`, which the catalog refuses for this target:
+A root command can construct separate compilations for raw Linux, standalone WebAssembly and WASI. Use `Compilation.target` with the concrete target and `Compilation.runtime` with `"raw"`, `"standalone"` or `"wasi"`. The raw Linux compilation also sets `Compilation.libc` to `"none"`. These operations take deferred strings. A command named `bare` can compile the raw Linux graph; a `Plan` command publishes its request for the editor.
 
-```
-silk: the runtime module silk/platform/native/start does not support the target wasm32-wasip1; list silk/platform/wasi/start in [unstable.composition].runtimes and select it for this profile with `runtime = { kind = "named", name = ... }` (ARTIFACT-001)
+The execution-storage component supports the task runner's fibers. The task program uses the hosted default while its graph selects the application runtime. Once a composition is present it replaces the catalog. Include each runtime the graph selects. A missing runtime is refused before code generation. Standard standalone and WASI builds can use the target's catalog when no custom composition is needed.
+
+## Selecting the runtime in a command
+
+Save this as `src/tasks.silk`. The shared options select the target; `--bare` selects raw Linux without libc. Each command constructs the same compilation, and `plan` publishes it without compiling the application.
+
+```silk
+import silk.build.graph { Build, Compilation, Deferred, Options, BuildError }
+import silk.cli.command { Command, CommandLine, Opt }
+import silk.cli.task { Task, TaskSet, TaskError }
+import silk.mem.allocator { Allocator }
+import silk.system.filesystem { FileSystem }
+import silk.system.host_input { HostInput }
+import silk.text.string { String }
+
+union Tasks {
+  Build { pub options: Options, pub bare: bool },
+  Run { pub options: Options, pub bare: bool },
+  Plan { pub options: Options, pub bare: bool },
+}
+impl CommandLine for Tasks {
+  static fn command() -> Command<Tasks> {
+    return Command<Tasks>.make("tasks", "Build squares for a selected runtime")
+      |> Command.flatten("options")
+      |> Command.option("bare", Opt.about("Use the raw Linux runtime without libc"))
+  }
+}
+effect fn graph(options: &Options, bare: bool) -> Build
+  ! BuildError ? &mut Allocator | &mut FileSystem | &mut HostInput {
+  let mut compilation = run Compilation.fromPackage(options)
+  let mut target = ""
+  if options.target.length() > 0 { target = options.target.asSlice()[0].view() }
+  let runtime = if bare { "raw" }
+    else if target == "wasm32-unknown-unknown" { "standalone" }
+    else if target == "wasm32-wasip1" || target == "wasm32-wasip2" { "wasi" }
+    else { "hosted" }
+  let original = move compilation
+  compilation = run original.runtime(run Deferred<String>.value(run String.copy(runtime)))
+  if bare {
+    let configured = move compilation
+    compilation = run configured.libc(run Deferred<String>.value(run String.copy("none")))
+  }
+  let build = run Build.make()
+  return run build.add(move compilation)
+}
+impl TaskSet for Tasks {
+  effect fn perform(self: Self) -> () ! BuildError | TaskError
+    ? &mut Allocator | &mut FileSystem | &mut HostInput {
+    match move self {
+      Tasks.Build { options, bare } => {
+        let build = run graph(&options, bare)
+        drop run build.compile()
+      }
+      Tasks.Run { options, bare } => {
+        let build = run graph(&options, bare)
+        let built = run build.compile()
+        run built.launch(&[])
+      }
+      Tasks.Plan { options, bare } => {
+        let build = run graph(&options, bare)
+        drop run build.write()
+      }
+    }
+  }
+}
+pub const COMMANDS: string = Task.commands<Tasks>()
+pub effect fn main() -> i32 ? &mut HostInput { return run Task.main<Tasks>() }
 ```
 
 ## The program
@@ -175,10 +236,10 @@ silk run
 sum of squares to 10: 385
 ```
 
-`silk check` takes a profile, so each arm gets type-checked against its own target's std lib:
+`silk plan` writes the selected compilation request. `silk check` reads that request and checks the corresponding target:
 
 ```sh
-silk check --profile bare
+silk plan
 ```
 
 ```
@@ -190,7 +251,8 @@ Finished squares in 0.13s
 ```
 
 ```sh
-silk check --profile web
+silk plan --target wasm32-unknown-unknown
+silk check --target wasm32-unknown-unknown
 ```
 
 ```
@@ -202,7 +264,8 @@ Finished squares in 0.06s
 ```
 
 ```sh
-silk check --profile wasi
+silk plan --target wasm32-wasip1
+silk check --target wasm32-wasip1
 ```
 
 ```
@@ -220,7 +283,8 @@ Finished squares in 0.14s
 Copy the hosted `main`, with its `StdoutWriter` import, into the `Freestanding` arm in place of the one there. The host and WASI builds are unaffected, but the `web` check fails:
 
 ```sh
-silk check --profile web
+silk plan --target wasm32-unknown-unknown
+silk check --target wasm32-unknown-unknown
 ```
 
 ```
@@ -232,14 +296,14 @@ src/main.silk:25:34: error[SEM0014] Module silk.io.writer_native has no member S
 Failed squares in 0.11s
 ```
 
-`silk/io/writer_native` exists on `wasm32-unknown-unknown`, but declares nothing there. Now try a provider that is declared everywhere but refuses a target. Put `let _random = OsRandom.make()` at the top of the raw Linux `main`, with `import silk.system.random_native { OsRandom }` among that arm's imports. `silk check --profile bare` and the build both stop:
+`silk/io/writer_native` exists on `wasm32-unknown-unknown`, but declares nothing there. Now try a provider that is declared everywhere but refuses a target. Put `let _random = OsRandom.make()` at the top of the raw Linux `main`, with `import silk.system.random_native { OsRandom }` among that arm's imports. `silk plan` and the build both stop:
 
 ```sh
-silk build --profile bare
+silk build --bare
 ```
 
 ```
-Compiling squares (x86_64-unknown-linux-gnu, bare)
+Compiling squares (x86_64-unknown-linux-gnu, dev)
   load      162 modules, 1 in package         0.00s
   check     1 module                          0.00s
   codegen   failed: 97 functions, 1 error     0.07s
@@ -253,17 +317,17 @@ SEM0177 means library code asked the compiler to stop. The test runs inside `OsR
 ## Build and run the bare WebAssembly module
 
 ```sh
-silk build --profile web
+silk build --target wasm32-unknown-unknown
 ```
 
 ```
-Compiling squares (wasm32-unknown-unknown, web)
+Compiling squares (wasm32-unknown-unknown, dev)
   load      139 modules, 1 in package         0.02s
   check     1 module                          0.00s
   codegen   31 functions                      0.03s
   borrow    24 bodies                         0.00s
   link      clang                             0.15s
-Finished build/llvm/wasm32-unknown-unknown/web/squares in 0.22s
+Finished build/wasm32-unknown-unknown/dev/squares.wasm in 0.22s
 ```
 
 The output is a WebAssembly module, built on any host with Clang and `wasm-ld`. It imports nothing, since this program reads no random bytes and no clock, and exports its `memory`, `main`, and the report buffer described below, `silk_report` and `silk_report_length`. The compiler links in a small runtime of its own: an allocator over linear memory and the byte routines LLVM calls. So `Allocator.systemAllocatorProvider()` works here too. Freed memory is reused, and neighbouring free blocks are merged. The module grows its memory only when no free block is large enough.
@@ -273,7 +337,7 @@ Any WebAssembly host can instantiate the module and call `main()`. In Node, save
 ```js
 import { readFile } from 'node:fs/promises'
 
-const bytes = await readFile('build/llvm/wasm32-unknown-unknown/web/squares')
+const bytes = await readFile('build/wasm32-unknown-unknown/dev/squares.wasm')
 const { instance } = await WebAssembly.instantiate(bytes, {})
 console.log(instance.exports.main())
 ```
@@ -289,7 +353,7 @@ node run.mjs
 The std lib also ships a runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`. It runs `main` and exits with its result as the process status, which keeps only the low 8 bits: 385 becomes 129.
 
 ```sh
-node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/llvm/wasm32-unknown-unknown/web/squares
+node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/wasm32-unknown-unknown/dev/squares.wasm
 echo $?
 ```
 
@@ -337,7 +401,7 @@ A wasm32 profile may also set `threading = "multi"`. The module then imports a s
 ## Build and run a WASI module
 
 ```sh
-silk build --profile wasi
+silk build --target wasm32-wasip1
 ```
 
 ```
@@ -347,12 +411,12 @@ Compiling squares (wasm32-wasip1, wasi)
   codegen   218 functions                     0.18s
   borrow    148 bodies                        0.00s
   link      clang                             0.25s
-Finished build/llvm/wasm32-wasip1/wasi/squares in 0.49s
+Finished build/wasm32-wasip1/wasi/squares in 0.49s
 ```
 
 This is a WASI Preview 1 command, about 113 KiB. It exports `memory` and `_start`, and imports only what it uses from `wasi_snapshot_preview1`: here `args_get`, `args_sizes_get`, `environ_get`, `environ_sizes_get`, `fd_write` and `proc_exit`. The `StdoutWriter` arm of `main` runs, so the program prints its line itself.
 
-`silk run --profile wasi` builds it and runs it with Wasmtime, giving the program the current directory as `/`. A trap or an unhandled error prints the same report as on a native target, followed for a trap by Wasmtime's trace with each frame's Silk name and source line; see **Debugging**. Without Wasmtime it builds and then stops with status 2:
+`silk run --target wasm32-wasip1` builds it and runs it with Wasmtime, giving the program the current directory as `/`. A trap or an unhandled error prints the same report as on a native target, followed for a trap by Wasmtime's trace with each frame's Silk name and source line; see **Debugging**. Without Wasmtime it builds and then stops with status 2:
 
 ```
 silk: running WASI needs wasmtime on PATH or SILK_WASMTIME
@@ -365,7 +429,7 @@ import { readFile } from 'node:fs/promises'
 import { WASI } from 'node:wasi'
 
 const wasi = new WASI({ version: 'preview1', returnOnExit: true })
-const bytes = await readFile('build/llvm/wasm32-wasip1/wasi/squares')
+const bytes = await readFile('build/wasm32-wasip1/wasi/squares')
 const { instance } = await WebAssembly.instantiate(bytes, wasi.getImportObject())
 process.exitCode = wasi.start(instance)
 ```
@@ -404,27 +468,16 @@ Only Preview 2 has networking. These modules exist on `wasm32-wasip2` and declar
 
 This guide checked them against `wasm32-wasip2` but could not run a component, since that needs Wasmtime.
 
-## Building without libc
+## Checking raw Linux code
 
-The no-libc profile checks but does not build yet:
+Publish the raw Linux request before checking that branch of the source:
 
 ```sh
-silk build --profile bare
+silk plan --bare
+silk check
 ```
 
-```
-Compiling squares (x86_64-unknown-linux-gnu, bare)
-  load      131 modules, 1 in package         0.03s
-  check     1 module                          0.00s
-  codegen   failed: 95 functions, 1 error     0.12s
-[x86_64-unknown-linux-gnu]
-<silk>/lib/silk/stdlib/silk/platform/linux/start.silk:31:5: unsupported[foreign-contract] not supported by the native compiler yet
-Failed squares in 0.17s
-```
-
-The command exits with status 2.
-
-The compiler cannot generate the raw runtime's entry point yet. Until it can, use the `bare` profile to check code, and keep the code it checks portable.
+The raw runtime can emit its `_start` entry, but the current Linux link path still includes the host startup objects. `silk build --bare` therefore fails with a duplicate `_start` symbol. Use the request to check portable raw Linux code; hosted Linux and the WebAssembly builds above can produce executable artifacts.
 
 ## API reference
 

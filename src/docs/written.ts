@@ -437,7 +437,7 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
       page(
         'projects',
         'targets-and-profiles',
-        'Targets and profiles',
+        'Targets and compilation settings',
         'https://github.com/silk-lang/docs/blob/main/content/projects/07-targets-and-profiles.md',
       ),
       page(
@@ -461,7 +461,7 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
       page(
         'projects',
         'hooks-and-scripts',
-        'Hooks and scripts',
+        'Tasks and build graphs',
         'https://github.com/silk-lang/docs/blob/main/content/projects/11-hooks-and-scripts.md',
       ),
       page(

@@ -7,7 +7,8 @@ import silk.core.effect { Effect }
 import silk.concurrency.fiber { Fiber, Cancelled }
 import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
 import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
-import silk.system.monotonic_clock { MonotonicClock }
+import silk.system.monotonic_clock { MonotonicClock, ReadyWatch }
+import silk.core.option { Option }
 import silk.system.system_clock { Instant, SystemClock }
 import silk.num.u64
 
@@ -62,6 +63,18 @@ impl MonotonicClock for PageClock {
     unsafe page_clock_wait(unsafe page_clock_now() + u64.toI64(howLong))
     return ()
   }
+
+  effect fn waitReady(self: &mut Self, watch: &mut [ReadyWatch], until: Option<Instant>) -> usize {
+    if watch.length != 0 {
+      Intrinsic.trap("the browser clock cannot wait on native handles")
+    }
+    match move until {
+      Option<Instant>.Some { value } => { unsafe page_clock_wait(toNanoseconds(&value)) }
+      Option<Instant>.None => Intrinsic.trap("the browser clock requires a deadline")
+    }
+    return 0
+  }
+
 }
 
 effect fn program() -> i32

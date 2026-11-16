@@ -179,7 +179,7 @@ Other admitted shapes, such as `simd<u8, 64>`, `simd<u32, 2>` or `simd<usize, 2>
 
 Vectors of every admitted shape compile on every target, whatever its preferred width. On wasm32 without `simd128` they compile to scalar code. Test `preferredBytes()` in a `static if` to pick a block width, and `hardware()` to keep a plain loop where vectors would only be emulated.
 
-The features come from the profile's `cpu` table; see Targets and profiles. With the default x86-64 model, `preferredBytes()` is `16`. `cpu.model = "x86-64-v3"` or `features = ["avx2"]` makes it `32`, and `cpu.model = "x86-64-v4"` or `features = ["avx512bw"]` makes it `64`. A wasm32 profile turns on hardware vectors with `features = ["simd128"]`.
+The features come from `Compilation.cpu` and `Compilation.cpuFeatures`; see Targets and compilation settings. With the default x86-64 model, `preferredBytes()` is `16`. The `x86-64-v3` model or the `avx2` feature makes it `32`, and the `x86-64-v4` model or the `avx512bw` feature makes it `64`. A wasm32 compilation turns on hardware vectors with the `simd128` feature.
 
 ### Architecture instructions
 
@@ -199,7 +199,7 @@ Some instructions do in one step what takes several portable operations: byte ta
 - `x86.sha256Rounds2` does two rounds on the state split as A, B, E, F and C, D, G, H, highest lane first. `aarch64.sha256Hash` and `sha256Hash2` do four rounds on A to D and E to H in lane order. The message schedule takes one extra add on x86 (see the example below). The std lib digests in `silk/crypto/sha2` do not call these functions.
 - Index rules differ. `x86.shuffleBytes` uses the low four bits of an index and gives `0` when bit 7 is set; `aarch64.tableLookup` and `wasm.swizzle` give `0` for any index of 16 or more. `wasm.relaxedSwizzle` leaves those lanes unspecified, and they may differ between engines.
 
-To run a faster path on machines that have a feature the build does not select, see Targets and profiles, under CPU features at run time. The underlying members are in Intrinsics, under Architecture members.
+To run a faster path on machines that have a feature the build does not select, see Targets and compilation settings, under CPU features at run time. The underlying members are in Intrinsics, under Architecture members.
 
 ## Examples
 

@@ -180,7 +180,7 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 - Any other width, such as `simd<u8, 8>` on x86-64, is SEM0244: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width".
 - A width whose feature the profile does not select is also SEM0244: "simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`".
 - For a foreign function, SEM0244 is reported at each call, at the callee's name. A declaration that is never called is not checked. For an `export "C"` function, it is reported at the vector type in the declaration, by `silk check` as well as `silk build`.
-- Only the profile's `cpu` counts. An `@features` directive on the calling function does not satisfy SEM0244. See Targets and profiles for `cpu`.
+- Only the compilation's selected CPU and features count. An `@features` directive on the calling function does not satisfy SEM0244. See Targets and compilation settings for `cpu`.
 - A C function-pointer type cannot carry a vector: `extern "C" fn(simd<f32, 4>) -> f32` is SEM0187.
 
 ## Native symbols
@@ -343,15 +343,16 @@ int check_add(void) {
 }
 ```
 
-Compile it and list the object in the manifest, as in Build outputs and native linking:
+Compile it and link the object in `build.silk`, as in Build outputs and native linking:
 
 ```sh
 clang -c -fPIC native/vec.c -o native/vec.o
 ```
 
-```toml
-[native]
-link = [{ object = "native/vec.o" }]
+```silk
+import silk.build.plan { Plan }
+import silk.build.step { sourcePath }
+pub const PLAN: Plan = Plan.empty() |> Plan.linkObject(sourcePath("native/vec.o"))
 ```
 
 ```silk
@@ -383,7 +384,7 @@ silk run; echo "exit $?"
 exit 110
 ```
 
-The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way under a profile with `[profiles.avx.cpu] features = ["avx"]`, run with `silk run --profile avx`, and with the C file compiled with `-mavx`. Under the default profile, its call is SEM0244.
+The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way with a compilation whose `cpuFeatures` includes `"avx"`, and with the C file compiled with `-mavx`. Under the default profile, its call is SEM0244.
 
 Callbacks in three modes, with a nullable function pointer. C calls `notify`'s callback before it returns, keeps the listener's handler, and calls it later from `pump`. The C file `native/events.c`:
 
@@ -415,7 +416,7 @@ int32_t notify(Handler maybe, int32_t *total) {
 }
 ```
 
-Compile it and link the object as above (`clang -c -fPIC native/events.c -o native/events.o`, then `link = [{ object = "native/events.o" }]` under `[native]`):
+Compile it and link the object as above (`clang -c -fPIC native/events.c -o native/events.o`, then `Plan.linkObject(sourcePath("native/events.o"))` in `build.silk`):
 
 ```silk
 import silk.mem.pointer { Pointer }
@@ -506,7 +507,7 @@ console.log(`main returned ${instance.exports.main()} after ${ticks} tick`);
 ```
 
 ```sh
-node host.mjs build/llvm/wasm32-unknown-unknown/debug/w
+node host.mjs build/wasm32-unknown-unknown/dev/w
 ```
 
 ```
@@ -542,7 +543,7 @@ main returned 0 after 1 tick
 
 ## See also
 
-Values and primitive types (SIMD vectors and masks) · Targets and profiles · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/mem/pointer`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/layout`
+Values and primitive types (SIMD vectors and masks) · Targets and compilation settings · Build outputs and native linking · Functions and methods · Closures and callable types · Structs, tuples and arrays · Ownership and moves · Allocation and shared ownership · Intrinsics · Effects and run · Typed failures · Services and providers · `silk/mem/pointer`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/layout`
 
 ## Open questions
 

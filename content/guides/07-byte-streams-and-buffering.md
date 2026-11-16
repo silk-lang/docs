@@ -519,7 +519,7 @@ Build, start the server, and send it three lines with the `ask` program from the
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/numbered serve 7300 &
+./build/x86_64-unknown-linux-gnu/dev/numbered serve 7300 &
 ask send 127.0.0.1 7300 $'roses are red\nviolets are blue\nno newline at the end'
 ```
 
@@ -533,8 +533,8 @@ ask send 127.0.0.1 7300 $'roses are red\nviolets are blue\nno newline at the end
 (The blank line is `ask` ending the reply with a newline of its own.) Through a relay:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/numbered serve 7300 &
-./build/llvm/x86_64-unknown-linux-gnu/debug/numbered relay 7301 7300 &
+./build/x86_64-unknown-linux-gnu/dev/numbered serve 7300 &
+./build/x86_64-unknown-linux-gnu/dev/numbered relay 7301 7300 &
 ask send 127.0.0.1 7301 $'through\nthe relay'
 ```
 
