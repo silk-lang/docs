@@ -313,6 +313,27 @@ The column is the start of the literal, and the message repeats its digits and s
 
 Fix: Drop the suffix and give the type where the value is used: `let value: u8 = 7`, or pass `7` to a `u8` parameter. See Lexical structure and Values and primitive types.
 
+### LEX0015
+
+A duration whose last amount has no unit.
+
+```silk
+pub fn main() -> i32 {
+  let value = 1h30
+  return 0
+}
+```
+
+`silk check` prints:
+
+```text
+src/main.silk:2:17: error[LEX0015] Duration amount `30` has no unit; add one, as in `1h30m`
+```
+
+The column is the amount without a unit. The suggestion adds the unit one step smaller than the one before it, so `2s500` suggests `2s500ms`. Nothing is smaller than `ns`, so `1ns5` is LEX0008 instead.
+
+Fix: Write the unit you meant: `1h30m`. See Lexical structure.
+
 The well-formed spellings `0x0F`, `1_000_000`, `1.5e3`, `'a'`, `"hello"`, `b"hello"`, `1500ms`, `1h15m` and `2m30s` all pass `silk check`. See Lexical structure and Values and primitive types.
 
 ## PAR: parsing
