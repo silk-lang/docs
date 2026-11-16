@@ -151,6 +151,7 @@ On `wasm32` targets, `as "module#name"` imports a function from a host module: `
 - The type of an exported static must be a C scalar. `bool` and arrays are SEM0187. The value is evaluated statically.
 - An exported static may be declared in any module of the package that the build includes.
 - Reading a foreign or exported static by name is an unsafe operation (SEM0082 outside `unsafe`). Assigning to one is SEM0036.
+- A foreign static binds the data symbol at link time, so the symbol must be one the linked libraries export. On Linux, `environ` is one. On macOS, a dynamic library cannot bind `environ`; call `_NSGetEnviron()`, which returns its address, as the standard library does.
 
 ## Exported functions
 

@@ -47,9 +47,10 @@ DirectiveLit    = TextLiteral | '-'? DecimalInteger | 'true' | 'false' | '(' ( D
 | Diagnostics | 3 | `observeUnhandled`, `observeHandled`, `observeDiagnostics` |
 | Traps and unreachable points | 2 | `trap`, `unreachable` |
 | Machine code and stack | 3 | `assembly`, `frameAddress`, `stackAllocate` |
+| Cache hints | 1 | `prefetch` |
 | Enums | 1 | `enumValue` |
 
-The inventory holds 832 members: 629 scalar operations and the 203 in the table.
+The inventory holds 833 members: 629 scalar operations and the 204 in the table.
 
 ## Scalar operations
 
@@ -222,6 +223,7 @@ unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> {
 - `Intrinsic.frameAddress()` returns the address of the running function's stack frame as `[*]const u8`. The stack grows down on every target, so a caller's frame is at the same or a higher address. It is safe to call; reading through the address is not.
 - `unsafe Intrinsic.stackAllocate<T>(count)` returns `[*]mut T` storage for `count` values on the running function's stack. The storage is uninitialized, nothing in it is dropped, and it ends when the function returns or suspends. The caller proves it fits in the stack that is left; the compiler does not check. A byte size that overflows `usize` traps.
 - `silk/mem/stack` wraps both: `Stack.frameAddress()` and `unsafe Stack.withStorage<T, A>(count, use)`, which calls `use` once with the storage.
+- `Intrinsic.prefetch<P>(pointer, write, locality, instruction)` hints that the program will soon read the memory at a data pointer `P`, or write it when `write` is `true`. `locality` is a `u32` from 0 (no reuse) to 3 (keep it in every cache level), and `instruction` selects the instruction cache instead of the data cache. All three are static; a locality past 3 is SEM0214. The hint is safe with any pointer, also null: it never reads memory, never faults and never changes the result. It lowers to `llvm.prefetch`, such as `prefetcht0` on x86_64 or `prfm pldl1keep` on AArch64, and to nothing on WebAssembly. `silk/mem/prefetch` wraps it as `Prefetch.hint<T>(pointer, options)` and `Prefetch.hintMany<T>(pointer, options)`, with a static `PrefetchOptions { access, locality, cache }`.
 - `Intrinsic.sliceView<T>(values, offset, length)` returns the subrange `offset..offset + length` with the same loan, and traps when it is out of range. Given a shared `&[T]` it returns `&[T]`. Given an exclusive `&mut [T]` that the caller moves in, as in `Intrinsic.sliceView<T>(move values, 1, 3)`, it returns an exclusive `&mut [T]`. Passing a `&mut [T]` binding without `move` is an error.
 - `Intrinsic.pointerNullFunction<F>()` returns the null value of a nullable C function pointer type `F`, such as `?extern "C" fn(i32) -> ()`. See Unsafe code and C interop.
 
@@ -274,6 +276,7 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 | Architecture operations | `silk/simd/x86`, `silk/simd/aarch64`, `silk/simd/wasm` |
 | Branch weights and stated facts | `silk/core/hint` (`hint.likely`, `hint.unlikely`, `hint.assume`, `hint.unreachable`) |
 | Stack frame and scratch storage | `silk/mem/stack` (`Stack.frameAddress()`, `Stack.withStorage`) |
+| Cache prefetch hints | `silk/mem/prefetch` (`Prefetch.hint`, `Prefetch.hintMany`) |
 | Allocation, raw storage | `silk/mem/allocator`, `silk/mem/arena`, `silk/mem/layout`, `silk/mem/raw_buffer`, `silk/mem/slot`, `silk/mem/box`, `silk/collections/list` |
 | Shared ownership | `silk/mem/shared` |
 | Execution | `silk/concurrency/execution` |
@@ -581,7 +584,8 @@ exit 132
 | SEM0082 | Unsafe member called outside unsafe authority |
 | SEM0093 | Reachable intrinsic unavailable on the selected target |
 | SEM0176 | Static-only member used in runtime code |
-| SEM0215 | Invalid pointer qualifier conversion, such as `pointerRequalify` changing the pointee |
+| SEM0214 | A `prefetch` locality past 3 |
+| SEM0215 | Invalid pointer qualifier conversion, such as `pointerRequalify` changing the pointee, or `prefetch` of a type that is not a data pointer |
 | SEM0235 | Unknown directive or directive argument, such as `@detached` or `@nonParking(strict: true)` |
 | SEM0236 | Known directive on a declaration that does not take it, such as `@naked` on a plain function or `@features` on an `export "C"` one |
 | SEM0237 | An atomic member with a memory order or element type it does not admit, such as `atomicStore` with `"acquire"` |
