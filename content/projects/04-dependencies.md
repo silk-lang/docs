@@ -192,6 +192,23 @@ Invalid Silk project manifest /home/you/app/silk.toml:7: dependency `greet` of a
 
 Once fetched, builds read the store and need no network, even after the URL is gone. With `SILK_OFFLINE` set, a build that needs an archive it does not have fails instead of downloading it. The editor, `silk doc` and `silk doctest` never download; they read what is already in the store. A package read from an archive reaches other packages by path only inside the same archive, as a package from a git commit does.
 
+### Fetching archives from a mirror
+
+When a machine cannot reach an archive's host, such as a sandbox or a CI runner without internet access, set `SILK_ARCHIVE_MIRROR` to fetch archives from a mirror or a local directory instead. The manifest does not change:
+
+```sh
+export SILK_ARCHIVE_MIRROR="https://codeload.github.com/=https://mirror.example.com/github/ https://example.org/=file:///srv/archives/example/"
+```
+
+Each entry is `<prefix>=<replacement>`, and entries are separated by spaces or newlines. A URL that starts with an entry's prefix is fetched with that prefix replaced, so with the setting above `https://codeload.github.com/google/brotli/tar.gz/refs/tags/v1.1.0` is fetched from `https://mirror.example.com/github/google/brotli/tar.gz/refs/tags/v1.1.0`. When several prefixes match, the longest one wins, and a URL no prefix matches is fetched as written.
+
+- The replacement must start with `https://` or `file:///`, as a manifest's `url` must. A `file:///` replacement reads files below that directory, laid out by the rest of the URL.
+- The archive's SHA-256 is still checked against the manifest, so a mirror can only serve the pinned file. The archive is stored under its SHA-256 either way, so a build that already has it fetches nothing.
+- The variable covers `[native.archive.<name>]` archives and `silk add <url>` too. `silk add` writes the URL you gave, not the mirror's.
+- `SILK_OFFLINE` still wins: with it set, nothing is fetched, from a mirror or not.
+
+Git dependencies are fetched by `git`, so mirror them with git's own `url.<base>.insteadOf` setting.
+
 ## Workspace dependencies
 
 In a workspace, a dependency that several members share can be written once in the workspace manifest's `[workspace.dependencies]` table. A member then takes it by name:
@@ -263,6 +280,9 @@ Invalid Silk project manifest /home/you/app/silk.toml:8: dependency `Text-Utils`
 | `path of a url dependency must name a directory inside the archive, relative to its root` | Absolute `path`, or one that leaves the archive |
 | `archive <name> from <url> has SHA-256 <hex>, but its manifest pins <hex>; nothing was extracted` | The download is not the archive `sha256` names |
 | `archive <name> is not in the archive store and SILK_OFFLINE is set; build once online to fetch <url>` | Offline, with the archive not fetched yet |
+| `SILK_ARCHIVE_MIRROR entry <entry> is not <prefix>=<replacement>` | An entry of `SILK_ARCHIVE_MIRROR` has no `=`, or nothing before it |
+| `SILK_ARCHIVE_MIRROR entry <entry> must replace its prefix with an https:// or file:/// URL` | An entry's replacement is not an `https://` or `file:///` URL |
+| `cannot fetch archive <name> from <url>: through SILK_ARCHIVE_MIRROR from <mirror url>: <reason>` | The mirror does not have the archive, or cannot be reached |
 | `fetching commit <rev> of <git> failed: fetching it needs git, and no git is on PATH` | No `git` on `PATH` |
 | `its checkout cannot be written below <store>` | The `git` folder in `SILK_HOME` cannot be written |
 | `a package from a git dependency reaches packages by path only inside its own repository` | A package from a commit names a path outside its repository. The message names that package's manifest |
