@@ -109,7 +109,7 @@ Every directory with a `silk.toml` is a template, unless it is inside another te
    - In a package template, `[package].name` becomes the project's name (the directory name, or `--name`), `silk-version` becomes the running compiler's release, and `description` is removed, because it describes the template and not your project.
    - In a workspace template, a `[workspace].silk-version` pin becomes the running compiler's release. The members are copied as they are.
    - Every `[[post-init]]` entry is removed, so it never runs again.
-4. A workspace, or a package outside a workspace, gets `/build/` in its `.gitignore`. A `.gitignore` from the template is kept, with the line added when it lacks it.
+4. A workspace, or a package outside a workspace, gets `/build/` and `/silk.local.toml` in its `.gitignore`. A `.gitignore` from the template is kept, with each line added when it lacks it.
 5. It runs the template's `[[post-init]]` entries in order, in the project directory.
 6. Inside a workspace, it adds the new package to the root's `members`, as `silk init` always does.
 
