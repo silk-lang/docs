@@ -313,7 +313,24 @@ fn count<F: Filter>(board: &Board<'_>, filter: &F) -> i32 {
 
 `<F: Filter>` declares a type parameter `F` with a bound. Inside the body, the bound is all the compiler knows about `F`, and it is enough: it allows `filter.keep(...)`. At each call, Silk infers `F` from the argument and checks that the type really implements `Filter`.
 
-Why not write `filter: &Filter`? Because an interface is not a type. Silk has no runtime lookup tables for interfaces. Each call with a new type compiles a separate copy of `count`, where `keep` is a direct call to that type's impl. You pay nothing at run time for the abstraction. See **Generics** in the reference for inference rules and bounds.
+An interface bound gives `count` a direct call for each filter type. Keep the generic form when the caller knows which type it is passing.
+
+### Choosing a filter at run time
+
+Suppose a command-line flag picks a filter and you want to pass that choice to the rest of the program. Give the binding the type `&any Filter`. Each branch borrows its own concrete filter. Both filters must live long enough for the call.
+
+```silk
+fn keepSelected(task: &Task<'_>, openOnly: bool) -> bool {
+  let open = OpenTasks {}
+  let important = AtLeast { priority: Priority.Normal }
+  let chosen: &any Filter = if openOnly { &open } else { &important }
+  return chosen.keep(task)
+}
+```
+
+The build sees both conversions and checks that both types implement `Filter`. At the call, Silk reads a tag and selects the corresponding `keep` implementation. The reference points to the original filter. A method that mutates its receiver needs `&mut any Filter` and an exclusive borrow. You can store these references in an array or a struct, subject to the same lifetime rules as other borrows.
+
+A method that returns a function needs special care. Two implementations of `make() -> fn(i32) -> i32` can return closures with different captured data. The caller of a dynamic method needs one exact result type. If the caller immediately applies the returned function, give the interface a method such as `apply(self: &Self, input: i32) -> i32` and return the result directly.
 
 `openCount` can go. `showBoard` counts with the new function:
 
