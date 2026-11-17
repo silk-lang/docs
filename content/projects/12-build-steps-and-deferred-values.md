@@ -102,7 +102,7 @@ Tasks.Build { options } => {
 
 ```
 Compiling squares tasks (x86_64-unknown-linux-gnu, dev)
-Finished build/steps/tasks/x86_64-unknown-linux-gnu/tasks in 4.83s
+Finished build/steps/tasks/squares/x86_64-unknown-linux-gnu/tasks in 4.83s
 Compiling gen (x86_64-unknown-linux-gnu, dev)
 Compiling squares (x86_64-unknown-linux-gnu, dev)
 Finished build/x86_64-unknown-linux-gnu/dev/squares in 2.39s

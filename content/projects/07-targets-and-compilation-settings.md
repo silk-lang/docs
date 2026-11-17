@@ -118,7 +118,7 @@ In that program `Target.hasCpuFeature("avx2")` is `true`.
 Settings are checked when the compilation is resolved, before anything compiles. A value the compiler cannot build, or a combination that does not exist, stops the command with status 1, naming the setting:
 
 ```
-error: cannot resolve the compilation definition: silk: invalid build profile: UnsupportedCombination: cpu.features
+error: cannot resolve the compilation definition: silk: invalid compilation settings: UnsupportedCombination: cpu.features
 ```
 
 | Refused | Names |

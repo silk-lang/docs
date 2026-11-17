@@ -231,7 +231,7 @@ Tasks.Build { options } => {
 | `shared-library` | `Compilation.loadableModule` | `vec.so` |
 | `object` | `Compilation.object` | `vec.o` |
 
-Silk packages that depend on the library are unaffected: they compile it from source, as before. A plan's named libraries, such as `linkLibrary("m", ...)`, are refused in a static archive today; leave them to the program that links it.
+Silk packages that depend on the library are unaffected: they compile it from source, as before. A plan's named libraries, such as `linkLibrary("m", ...)`, add nothing to a static archive: pass them to the final link of the program that uses it.
 
 ## Parameters
 
