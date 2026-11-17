@@ -126,7 +126,7 @@ Checking pricing (x86_64-unknown-linux-gnu)
   check     1 module                          0.03s
   borrow    2 bodies                          0.00s
 Finished pricing in 0.19s
-Compiling store (x86_64-unknown-linux-gnu, debug)
+Compiling store (x86_64-unknown-linux-gnu, dev)
   load      139 modules, 1 in package         0.05s
   check     2 modules                         0.07s
   codegen   486 functions                     0.09s
@@ -203,9 +203,10 @@ All members build into the workspace's output directory, so from inside a member
 ```
 build/cache/pricing/...
 build/cache/store/...
+build/requests/store.x86_64-unknown-linux-gnu.dev.toml
 build/x86_64-unknown-linux-gnu/dev/store
-build/test/llvm/x86_64-unknown-linux-gnu/debug/pricing
-build/test/llvm/x86_64-unknown-linux-gnu/debug/store
+build/x86_64-unknown-linux-gnu/dev/pricing-tests
+build/x86_64-unknown-linux-gnu/dev/store-tests
 ```
 
 `pricing` is a `library`, so `silk build` makes no file for it; its test runner is still built.

@@ -207,10 +207,10 @@ silk run --target wasm32-wasip1 --quiet
 ```
 
 ```
-Finished build/wasm32-wasip1/dev/scores in 0.56s
+Finished build/wasm32-wasip1/dev/scores.wasm in 0.56s
 fatal trap: index out of bounds
   at main.pick (main:2:10)
-Error: failed to run main module `/home/you/scores/build/wasm32-wasip1/dev/scores`
+Error: failed to run main module `/home/you/scores/build/wasm32-wasip1/dev/scores.wasm`
 
 Caused by:
     0: failed to invoke command default
@@ -257,16 +257,16 @@ fatal trap: index out of bounds
   at main.at (main:10:10)
   at main.pick
   at main.work
-Error: failed to run main module `/home/you/fibers/build/wasm32-wasip1/dev/fibers`
+Error: failed to run main module `/home/you/fibers/build/wasm32-wasip1/dev/fibers.wasm`
 ```
 
 A build without debug information, such as `--release`, has neither names nor lines, so its trace shows hashed symbols:
 
 ```
-Finished build/wasm32-wasip1/release/scores in 1.15s
+Finished build/wasm32-wasip1/release/scores.wasm in 1.15s
 fatal trap: index out of bounds
   at main.pick (main:2:10)
-Error: failed to run main module `/home/you/scores/build/wasm32-wasip1/release/scores`
+Error: failed to run main module `/home/you/scores/build/wasm32-wasip1/release/scores.wasm`
 
 Caused by:
     0: failed to invoke command default
@@ -286,7 +286,7 @@ A `wasm32-unknown-unknown` module has no standard error. It writes its report in
 
 ```sh
 silk build --target wasm32-unknown-unknown --quiet
-node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/wasm32-unknown-unknown/web/scores
+node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/wasm32-unknown-unknown/dev/scores.wasm
 ```
 
 ```
@@ -321,7 +321,7 @@ From your own script, `runWasm(bytes, options)` runs the module and resolves to 
 import { readFile } from 'node:fs/promises'
 import { runWasm, SilkError } from './wasm-runner.mjs'
 
-const bytes = await readFile('build/wasm32-unknown-unknown/web/scores')
+const bytes = await readFile('build/wasm32-unknown-unknown/dev/scores.wasm')
 try {
   console.log('status', await runWasm(bytes))
 } catch (error) {
@@ -350,22 +350,24 @@ A host that instantiates the module itself reads the same buffer: after `main` r
 A debug build of a `wasm32-unknown-unknown` executable keeps its DWARF out of the module it ships, so the file you serve stays small. Two files appear beside it:
 
 ```sh
-ls build/wasm32-unknown-unknown/web/
+ls build/wasm32-unknown-unknown/dev/
 ```
 
 ```
-scores
-scores.debug.wasm
-scores.inputs
-scores.map
-scores.symbols
-scores.units
+units
+scores.wasm
+scores.wasm.debug.wasm
+scores.wasm.inputs
+scores.wasm.lock
+scores.wasm.map
+scores.wasm.symbols
+scores.wasm.units
 ```
 
-- `scores.debug.wasm` is the same module with its DWARF. The shipped module names it in an `external_debug_info` custom section, which Chrome's DWARF support follows.
-- `scores.map` is a source map derived from the line table, with each source file's text included. The shipped module names it in a `sourceMappingURL` section, which Firefox and Safari read.
+- `scores.wasm.debug.wasm` is the same module with its DWARF. The shipped module names it in an `external_debug_info` custom section, which Chrome's DWARF support follows.
+- `scores.wasm.map` is a source map derived from the line table, with each source file's text included. The shipped module names it in a `sourceMappingURL` section, which Firefox and Safari read.
 
-Both names are relative, so serve the two files next to the module. A build without debug information, such as `release`, writes neither, and its module has no name section.
+Both names are relative, so serve the two files next to the module. A build without debug information, such as `--release`, writes neither, and its module has no name section.
 
 ## Line tables
 
@@ -466,7 +468,7 @@ silk debug --target wasm32-wasip1 --quiet
 ```
 
 ```
-Finished build/wasm32-wasip1/dev/scores in 0.01s
+Finished build/wasm32-wasip1/dev/scores.wasm in 0.01s
 Debugger: Debugger listening on 127.0.0.1:1234
 Debugger: In LLDB, attach with: process connect --plugin wasm connect://127.0.0.1:1234
 ```

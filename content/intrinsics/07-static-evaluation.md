@@ -1129,6 +1129,40 @@ pub fn main() -> i32 {
 }
 ```
 
+### `Intrinsic.reflectEnumValue`
+
+```silk signature
+static fn reflectEnumValue<Enum, Repr>(value: Enum) -> Repr
+```
+
+Returns the declared discriminant of a scalar enum value, as its representation type `Repr`. The argument must be a static value of that enum, such as a member from `reflectEnumMembers`. Generic code uses it where `Enum.value` cannot be named.
+
+- Wrapper: [`Reflect.enumValue`](/docs/std/core-reflect#Reflect.impl.enumValue). `Reflect.enumFromValue` builds on it to turn a runtime number back into a member, and `Reflect.enumLabelOf` and `Reflect.enumFromLabel` do the same for names.
+- `Repr` must be the enum's representation: `u8` for an enum declared without one. Any other type stops static evaluation at the call.
+- Static evaluation only.
+
+```silk
+pub enum(i16) Code {
+  Ok,
+  Failed = 130,
+}
+
+static fn total() -> i16 {
+  let mut sum: i16 = 0
+  static for code in Intrinsic.reflectEnumMembers<Code>() {
+    sum = sum + Intrinsic.reflectEnumValue<Code, i16>(code)
+  }
+  return sum
+}
+
+pub fn main() -> i32 {
+  if total() != 130 {
+    return 1
+  }
+  return 0
+}
+```
+
 ## Reflection of unions
 
 ### `Intrinsic.reflectVariants`

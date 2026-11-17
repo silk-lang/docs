@@ -35,7 +35,7 @@ Every member has an entry with its signature, its rules and a runnable example i
 | Scalar operations | `<scalar><Operation>`, see below | [Scalar operations](/docs/intrinsics/scalars) |
 | SIMD vectors | `simd*` | [SIMD](/docs/intrinsics/simd) |
 | Architecture operations | `x86*`, `aarch64*`, `wasm*` instructions | [Architecture operations](/docs/intrinsics/architecture) |
-| Target, profile, static text, embedded files, static sequences, reflection, tests | `target*`, `profile*`, `staticText*`, `embed*`, `staticSequence*`, `reflect*`, `borrowField`, `makeVariant`, `isVariant`, `functionRef`, `tests`, `testInfo`, `testFunction` | [Static evaluation](/docs/intrinsics/static-evaluation) |
+| Target, compilation settings, static text, embedded files, static sequences, reflection, tests | `target*`, `profile*`, `staticText*`, `embed*`, `staticSequence*`, `reflect*`, `borrowField`, `makeVariant`, `isVariant`, `functionRef`, `tests`, `testInfo`, `testFunction` | [Static evaluation](/docs/intrinsics/static-evaluation) |
 | Effect composition, failure reports, traps, assembly, execution packages | `catchFailure`, `finalizeEffect`, `bindRequirement*`, `suspendEffect`, `interruptibleEffect`, `observe*`, `trap`, `unreachable`, `assembly`, `execution*`, `relinquish` | [Effects and execution](/docs/intrinsics/effects-and-execution) |
 
 ## Scalar operations
@@ -116,11 +116,11 @@ Each architecture member stands for one instruction of one target that the porta
 - The x86 AES members take the 16-byte state as `simd<u64, 2>`; the AArch64 ones take `simd<u8, 16>`. An x86 encryption round is `aesenc` alone; an AArch64 round is `aesmc` of `aese`, because `aese` adds the key first and stops before MixColumns.
 - The two SHA-256 sets hold the eight working variables differently. On x86, `abef` holds A, B, E and F in lanes 3, 2, 1 and 0, `cdgh` holds C, D, G and H the same way, and one `sha256rnds2` does two rounds with the two message-plus-constant words in lanes 0 and 1 of `wk`; it returns the new `abef`, and the old `abef` becomes the new `cdgh`. On AArch64, `abcd` and `efgh` hold the variables in lane order, and `sha256h` and `sha256h2` do four rounds with all four lanes of `wk`, returning the new `abcd` and `efgh`. Give `sha256h2` the `abcd` from before the `sha256h` call.
 - For the message schedule, `x86Sha256Message1` and `aarch64Sha256ScheduleUpdate0` compute `W[i] + sigma0(W[i + 1])` for four words. On x86 the caller adds `W[9..12]` before `x86Sha256Message2`; `aarch64Sha256ScheduleUpdate1` takes those words itself.
-- A call is admitted only when the selected target is the member's architecture and the feature is enabled, either by the profile (see Targets and compilation settings) or by the `@features` directive of the function that makes the call (below). A feature counts when an enabled feature implies it: `avx2` admits the `ssse3` and `sse4.1` shapes. On arm64, `crypto` admits the `aes` and `sha2` members.
-- Otherwise the call is SEM0241. With the default x86-64 profile, which has SSE2 but not SSSE3, `Intrinsic.x86ShuffleBytes<simd<u8, 16>>(a, a)` prints "Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `@features(...)` directive". An AArch64 member on x86-64 prints "needs aarch64 with neon".
+- A call is admitted only when the selected target is the member's architecture and the feature is enabled, either by the compilation's CPU features (see Targets and compilation settings) or by the `@features` directive of the function that makes the call (below). A feature counts when an enabled feature implies it: `avx2` admits the `ssse3` and `sse4.1` shapes. On arm64, `crypto` admits the `aes` and `sha2` members.
+- Otherwise the call is SEM0241. With the default x86-64 CPU, which has SSE2 but not SSSE3, `Intrinsic.x86ShuffleBytes<simd<u8, 16>>(a, a)` prints "Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `@features(...)` directive". An AArch64 member on x86-64 prints "needs aarch64 with neon".
 - Code for several targets puts each call under a `static if` on `Target.arch()` and `Target.hasCpuFeature`, or in a function with `@features`.
 - A shape the member does not take is SEM0239 at the call, and the message lists the shapes it takes: `x86ShuffleBytes<simd<u16, 8>>` prints ``Intrinsic.x86ShuffleBytes takes a first operand of simd<u8, 16> or simd<u8, 32>, but simd<u16, 8> is not one``. The shape is checked before the target and features, so this is reported on any target.
-- `silk/simd/x86`, `silk/simd/aarch64` and `silk/simd/wasm` wrap each member in a function that compiles to the instruction where the profile enables it and to portable code everywhere else. See Values and primitive types, under SIMD vectors and masks.
+- `silk/simd/x86`, `silk/simd/aarch64` and `silk/simd/wasm` wrap each member in a function that compiles to the instruction where the compilation enables it and to portable code everywhere else. See Values and primitive types, under SIMD vectors and masks.
 
 ## Type members
 
@@ -167,7 +167,7 @@ The class says what removing the directive does. Removing a hint leaves the same
 - A foreign function type takes `@foreign` before `extern`: `@foreign(memory: "none") extern "C" fn(i32) -> i32`.
 - Arguments are literals: text, decimal integers, `true`, `false`, and parenthesized tuples of them. `@features("avx2", "bmi2")` and `@features(("avx2", "bmi2"))` mean the same. A name or a call in an argument is a parse error (PAR0002, and for a call a few more), with no SEM0235 for a known directive. An unknown directive with a name argument is still SEM0235: `@bogus(N)` prints PAR0002 at `N`, then SEM0235 at the `@`. `@features` with a name still adds SEM0242; see the open questions.
 - `@inline`, `@inlineAlways`, `@inlineNever` and `@cold` ask for inlining and code layout. `@cold` keeps the function out of line and lays out the branches that reach it as unlikely. A function takes at most one of the four.
-- `@optimizeSize` builds one function for small code, whatever the build's profile: Clang sees it as `optsize` and `minsize`. It may sit beside any of the four above. It suits setup code, table builders and other rarely run paths in a module that is otherwise optimized for speed, such as a WebAssembly module.
+- `@optimizeSize` builds one function for small code, whatever the build's optimization: Clang sees it as `optsize` and `minsize`. It may sit beside any of the four above. It suits setup code, table builders and other rarely run paths in a module that is otherwise optimized for speed, such as a WebAssembly module.
 - `@nonParking` makes every call owe a proof that the callee never parks its thread. On a function or an operation, a body that can park is SEM0139 at each call that enters it, when `silk build` checks it. See Suspension and cancellation.
 - `@foreign`, the callback directives, `@naked` and `@noReturn` are described in Unsafe code and C interop. `@naked @noReturn` appears only on startup entry points in the standard library.
 - An unknown directive, an argument the directive does not take, or a repeated named argument is SEM0235 at the directive: "This directive, or one of its arguments, is not one the language defines". Examples: `@bogus`, `@detached`, `@nonParking(strict: true)`, `@foreign(bogus: 1)`.
@@ -178,7 +178,7 @@ The class says what removing the directive does. Removing a hint leaves the same
 
 ## Functions compiled for CPU features
 
-`@features("avx2")` compiles one function for CPU features that the profile does not select. The rest of the program keeps the profile's features, so one binary runs everywhere and takes the faster function only on a machine that has the features.
+`@features("avx2")` compiles one function for CPU features that the compilation does not select. The rest of the program keeps the compilation's features, so one binary runs everywhere and takes the faster function only on a machine that has the features.
 
 ```
 @features("avx2")
@@ -190,8 +190,8 @@ unsafe fn lookup(table: simd<u8, 32>, indices: simd<u8, 32>) -> simd<u8, 32> {
 - The arguments are text literals, one per feature: `@features("ssse3", "avx2")`. A name outside the target's feature catalog is SEM0242 at that name: `@features("neon")` on x86-64 prints "neon is not a CPU feature of x86_64-unknown-linux-gnu; `@features` lists text literals from the target's catalog". An empty list, `@features()`, is SEM0242 too: "`@features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the directive". Level names such as `"x86-64-v3"` are models, not features.
 - The function must be declared `unsafe fn`; otherwise SEM0243 at the declaration: "lookup enables CPU features, so it must be declared `unsafe fn`; each caller proves the CPU has them". Each call is an unsafe operation (SEM0082 outside `unsafe`). Running it on a machine without the features is undefined; check first with `CpuFeatures.detect()` from `silk/simd/cpu`.
 - Free functions, methods, generic functions and effect functions take the directive. `@nonParking` and an inline hint may sit beside it. A closure takes no directive.
-- The function is compiled with the listed features, the features they imply and the profile's features. Architecture members that need them are admitted in its body (SEM0241 otherwise). Functions it calls are compiled for the profile, unless the optimizer inlines them into it.
-- `Target.hasCpuFeature` and the other static queries still read the profile inside the function. A `silk/simd/x86` or `silk/simd/aarch64` wrapper called from it takes its portable path unless the profile enables the feature; call the `Intrinsic` member directly instead.
+- The function is compiled with the listed features, the features they imply and the compilation's features. Architecture members that need them are admitted in its body (SEM0241 otherwise). Functions it calls are compiled for the compilation's features, unless the optimizer inlines them into it.
+- `Target.hasCpuFeature` and the other static queries still read the compilation's settings inside the function. A `silk/simd/x86` or `silk/simd/aarch64` wrapper called from it takes its portable path unless the compilation enables the feature; call the `Intrinsic` member directly instead.
 - A `static if` on `Intrinsic.targetArchitecture()` keeps the function out of builds for other targets, where its features would be SEM0242.
 
 ## Unsafe members
@@ -241,7 +241,7 @@ A contract the target does not admit, such as an unknown constraint or an `m` op
 
 ## Static-only members
 
-- Target queries, profile queries, static text, static sequences, reflection descriptors (`reflectType`, `reflectFields`, `reflectVariants` and the queries on them), `tests` and `testInfo` exist only during static evaluation.
+- Target queries, compilation setting queries, static text, static sequences, reflection descriptors (`reflectType`, `reflectFields`, `reflectVariants` and the queries on them), `tests` and `testInfo` exist only during static evaluation.
 - `borrowField`, `borrowFieldMut`, `makeVariant` and `isVariant` run at runtime, but take their field or variant descriptor as a `static` argument.
 - Use them in `const` initializers, `static if` conditions and `static fn` bodies. See Static evaluation.
 - Using one in runtime code is SEM0176: `let bits = Intrinsic.targetPointerBits()` inside `main` prints "Intrinsic.targetPointerBits runs only during static evaluation, so runtime code cannot call it".
@@ -273,7 +273,7 @@ The wrappers below give typed results and documented contracts. Use `Intrinsic` 
 | Effect composition | `silk/core/effect` (`provide`, `provideMut`, `catch`, `catchAll`, finalizers) |
 | Target queries | `silk/core/target` (`Target.arch()`, `Target.operatingSystem()`, `Target.hasCpuFeature(...)`, `pointerBits`) |
 | CPU features of the running machine | `silk/simd/cpu` (`CpuFeatures.detect()`, `has`) |
-| Profile queries | `silk/core/compilation` (`Compilation.libc()`, `debug`, ...) |
+| Compilation setting queries | `silk/core/compilation` (`Compilation.libc()`, `debug`, ...) |
 | Reflection | `silk/core/reflect` (`Reflect.typeOf`, `Reflect.fields`, `Reflect.typeKind`, ...) |
 | Static text and sequences | `silk/core/static_text`, `silk/core/static_sequence` |
 | `sliceView` | `silk/collections/slice` |
@@ -468,7 +468,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Two SHA-256 rounds with `sha256rnds2`, checked against the `silk/simd/x86` wrapper, which takes its portable path under the default profile. The program exits with 0 with or without SHA, and also builds for AArch64:
+Two SHA-256 rounds with `sha256rnds2`, checked against the `silk/simd/x86` wrapper, which takes its portable path under the default CPU. The program exits with 0 with or without SHA, and also builds for AArch64:
 
 ```silk
 import silk.simd.x86

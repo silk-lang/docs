@@ -187,7 +187,7 @@ silk build
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      180 modules, 1 in package         0.08s
   check     1 module                          1.50s
   codegen   4,645 functions                   0.93s
@@ -294,7 +294,7 @@ silk build
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      180 modules, 1 in package         0.04s
   check     1 module                          0.07s
   codegen   4,645 functions                   2.00s
@@ -485,7 +485,7 @@ silk build
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      180 modules, 1 in package         0.08s
   check     1 module                          1.50s
   codegen   4,645 functions                   0.93s
@@ -504,7 +504,7 @@ Add a field to `Row` and both the header and every line grow a column. They cann
 Two changes are worth trying here. First, `done` is a yes-or-no value, so `bool` seems the natural type. Change the field to `pub done: bool` and pass `done: !task.isOpen()`:
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      180 modules, 1 in package         0.04s
   check     1 module                          0.16s
   codegen   4,675 functions                   2.05s

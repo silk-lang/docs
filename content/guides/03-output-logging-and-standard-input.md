@@ -88,7 +88,7 @@ pub effect fn main() -> () ! LogError {
 
 ```sh
 silk build --target wasm32-unknown-unknown --quiet
-node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/wasm32-unknown-unknown/web/greeter
+node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/wasm32-unknown-unknown/dev/greeter.wasm
 ```
 
 ```
@@ -119,8 +119,8 @@ silk run --target wasm32-wasip2 --quiet
 ```
 
 ```
-Finished build/wasm32-wasip2/dev/component in 0.92s
-Error: failed to run main module `/home/you/component/build/wasm32-wasip2/dev/component`
+Finished build/wasm32-wasip2/dev/component.wasm in 0.92s
+Error: failed to run main module `/home/you/component/build/wasm32-wasip2/dev/component.wasm`
 
 Caused by:
     0: component imports instance `wasi:logging/logging@0.1.0-draft`, but a matching implementation was not found in the linker

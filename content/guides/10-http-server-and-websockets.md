@@ -473,7 +473,7 @@ silk build
 ```
 
 ```
-Compiling greeter (x86_64-unknown-linux-gnu, debug)
+Compiling greeter (x86_64-unknown-linux-gnu, dev)
   load      191 modules, 1 in package         0.13s
   check     1 module                          1.06s
   codegen   2,980 functions                   1.00s

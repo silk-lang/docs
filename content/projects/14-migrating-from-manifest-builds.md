@@ -276,7 +276,7 @@ let shipped = run base.when(options.optimize != Optimize.None, |c| c.without("de
 
 ## Tasks
 
-`[profiles.tasks]` configured the program `silk task` built. There is nothing to configure now: `src/tasks.silk` is the tasks program, built for the host in dev mode, with the package's `[dependencies]`. A tasks program written before keeps working as it is, as long as its union has no variant named `Build`, `Run`, `Test` or `Plan` that you did not mean as a replacement. A variant with one of those names now runs for `silk build`, `run`, `test` or `plan`.
+`[profiles.tasks]` configured the program `silk task` built. There is nothing to configure now: `src/tasks.silk` is the tasks program, built for the host in dev mode, with the package's `[dependencies]`. It is built from what `tasks.silk` imports: the package's own modules and its native plan come in only when `tasks.silk` imports one of the package's modules. A tasks program written before keeps working as it is, as long as its union has no variant named `Build`, `Run`, `Test` or `Plan` that you did not mean as a replacement. A variant with one of those names now runs for `silk build`, `run`, `test` or `plan`.
 
 ## Stages
 
@@ -385,7 +385,7 @@ pub const PLAN: Plan = plan()
 | `function-order = p` | `functionOrder(sourcePath(p))`, or `Compilation.functionOrder` for the root |
 | `platform-supply` | `Compilation.platform` in the root's command. Automatic discovery is the default |
 
-New with the plan: `.weak()` and `.needed()` on a library or framework, `frameworkSearchPath` and `rpath`. A path into a pinned archive, which used to be written as the archive's name and a path, is `Plan.archivePath("dawn", "lib/libdawn.a")`.
+New with the plan: `.weak()` and `.needed()` on a library or framework, `frameworkSearchPath` and `rpath`. A dependency's native lists used to reach every program that declared it; now its plan links once a compilation imports one of its modules. A dependency of only C, which nothing imports, needs `Plan.linkDependency("alias")` in the dependent's `build.silk`; see A package of only C in **Build outputs and native linking**. A path into a pinned archive, which used to be written as the archive's name and a path, is `Plan.archivePath("dawn", "lib/libdawn.a")`.
 
 What only the root needs can also go on its `Compilation` in `tasks.silk`, with the same names. See **Build outputs and native linking**.
 

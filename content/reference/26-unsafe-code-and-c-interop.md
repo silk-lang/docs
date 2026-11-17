@@ -167,7 +167,7 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 
 - Lane types are the fixed-width numbers: `i8`, `u8`, `i16`, `u16`, `i32`, `u32`, `i64`, `u64`, `f32`, `f64`.
 - `simd<isize, N>`, `simd<usize, N>` and `mask<N>` do not cross: C has no vector type for them. They are SEM0187, "mask<4> is not admitted by the C ABI", at each call of a foreign function and at the parameter or result type of an `export "C"` function.
-- The vector's total width must be one the target's C ABI passes in a vector register, and the profile must select that register's CPU feature:
+- The vector's total width must be one the target's C ABI passes in a vector register, and the compilation must select that register's CPU feature:
 
 | Target | Width | Needs |
 | --- | --- | --- |
@@ -178,7 +178,7 @@ A `simd<T, N>` parameter or result of an `extern "C"` or `export "C"` function p
 | wasm32 | 128 bits | `simd128` |
 
 - Any other width, such as `simd<u8, 8>` on x86-64, is SEM0244: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width".
-- A width whose feature the profile does not select is also SEM0244: "simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`".
+- A width whose feature the compilation does not select is also SEM0244: "simd<f32, 8> crosses the C boundary in one vector register, which needs the CPU feature `avx`; select it in the profile's `cpu`".
 - For a foreign function, SEM0244 is reported at each call, at the callee's name. A declaration that is never called is not checked. For an `export "C"` function, it is reported at the vector type in the declaration, by `silk check` as well as `silk build`.
 - Only the compilation's selected CPU and features count. An `@features` directive on the calling function does not satisfy SEM0244. See Targets and compilation settings for `cpu`.
 - A C function-pointer type cannot carry a vector: `extern "C" fn(simd<f32, 4>) -> f32` is SEM0187.
@@ -384,7 +384,7 @@ silk run; echo "exit $?"
 exit 110
 ```
 
-The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way with a compilation whose `cpuFeatures` includes `"avx"`, and with the C file compiled with `-mavx`. Under the default profile, its call is SEM0244.
+The exit status is 11 + 22 + 33 + 44. A 256-bit vector such as `simd<f64, 4>` works the same way with a compilation whose `cpuFeatures` includes `"avx"`, and with the C file compiled with `-mavx`. Under the default CPU, its call is SEM0244.
 
 Callbacks in three modes, with a nullable function pointer. C calls `notify`'s callback before it returns, keeps the listener's handler, and calls it later from `pump`. The C file `native/events.c`:
 
@@ -507,7 +507,7 @@ console.log(`main returned ${instance.exports.main()} after ${ticks} tick`);
 ```
 
 ```sh
-node host.mjs build/wasm32-unknown-unknown/dev/w
+node host.mjs build/wasm32-unknown-unknown/dev/w.wasm
 ```
 
 ```
@@ -539,7 +539,7 @@ main returned 0 after 1 tick
 | SEM0215 | Invalid pointer alignment, address space or qualifier conversion |
 | SEM0235 | Unknown directive or directive argument, such as `@foreign(bogus: 1)` |
 | SEM0236 | A C-only directive such as `@foreign` or `@callbacks` on a function without linkage, or on an interface or service operation |
-| SEM0244 | SIMD vector in a foreign call or `export "C"` signature that the target's C ABI cannot pass in a vector register the profile selects |
+| SEM0244 | SIMD vector in a foreign call or `export "C"` signature that the target's C ABI cannot pass in a vector register the compilation's CPU features select |
 
 ## See also
 

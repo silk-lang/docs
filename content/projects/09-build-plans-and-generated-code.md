@@ -204,7 +204,7 @@ With `21` in `limit.txt` and three lines in `colors.txt`, `silk run` prints `42 
 The rules:
 
 - **It is static.** `PLAN` is computed by static evaluation, like any `const`. It reads only the package's own files and paths a consumer supplied, and it can import only the standard library, not the package it builds.
-- **It travels with the package.** Every compilation that reaches the package evaluates its plan, for the compilation's target, so a dependency's C sources and libraries reach every program that uses it. There is nothing to repeat in the consumer.
+- **It travels with the package.** Every compilation that imports one of the package's modules evaluates its plan, for the compilation's target, so a dependency's C sources and libraries reach every program that uses it. There is nothing to repeat in the consumer. Declaring a dependency alone links nothing; a package of only C, which the dependent never imports, is linked with `Plan.linkDependency`.
 - **Conditions are code.** Branch on `Intrinsic.targetOperatingSystem()`, the target or a package parameter with an `if`, or with `Plan.when(condition, transform)`, where `transform` is a plain `fn(Plan) -> Plan`.
 - **Paths are deferred.** `sourcePath("native/twice.c")` is a file of the package, relative to its directory. `suppliedPath(parameter)` is a path a consumer supplied. `Plan.archivePath(name, path)` is a file in a pinned `[native.archive]`. A step's `result(name)` is a file a step writes.
 
@@ -231,6 +231,7 @@ silk: /home/you/vec/build.silk: build.silk computes no plan: its `PLAN` cannot b
 | `searchPath(path)`, `frameworkSearchPath(path)` | A directory the linker searches |
 | `rpath(text)` | A runtime library search path, such as `"@executable_path/../lib"` or `"$ORIGIN"` |
 | `linkerScript(path)`, `functionOrder(path)` | A linker script, or a symbol order file |
+| `linkDependency(alias)` | The plan of a dependency this package declares, in every artifact that links this package, even when nothing imports the dependency |
 
 Flags are limited to defines (`-D`, `-U`), warnings (`-W`, `-w`, `-pedantic`), a language standard (`-std=`), optimization (`-O`), debug information (`-g`) and code generation (`-f`, `-m`). A flag that loads code, reads other files or changes tools is refused:
 

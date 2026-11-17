@@ -156,7 +156,7 @@ The arguments after the command go to your program, so `silk build --release --t
 
 `silk check` does not build or check `src/tasks.silk`. A mistake in it shows when a command first builds the tasks program.
 
-A `tasks.silk` imports the package's own dependencies like any module of the package. A dependency only the tasks use is fetched only when the tasks program is built.
+A `tasks.silk` imports the package's own dependencies like any module of the package. A dependency only the tasks use is fetched only when the tasks program is built. The tasks program is built from what `tasks.silk` imports: the package's own modules, and its `build.silk` plan, come in only when `tasks.silk` imports one of them, so C the application links never reaches the tasks.
 
 ### What a command can use
 

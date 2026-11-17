@@ -74,7 +74,7 @@ silk run
 ```
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.07s
   check     1 module                          0.13s
   codegen   689 functions                     0.14s
@@ -186,7 +186,7 @@ silk build
 ```
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.05s
   check     1 module                          0.18s
   codegen   803 functions                     0.17s

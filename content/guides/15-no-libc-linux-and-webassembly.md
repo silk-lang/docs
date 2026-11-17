@@ -6,7 +6,7 @@ Silk builds for six targets, and the std lib reference documents eight profiles 
 - Bare WebAssembly: `wasm32-unknown-unknown`, which gets nothing from its host.
 - WASI: `wasm32-wasip1` (a core module that imports `wasi_snapshot_preview1`) and `wasm32-wasip2` (a WASI 0.2 component).
 
-This guide writes one program, `squares`, that selects different code for each kind of target, checks it for four profiles, and builds and runs two WebAssembly modules.
+This guide writes one program, `squares`, that selects different code for each kind of target, checks it for four targets, and builds and runs two WebAssembly modules.
 
 ## What changes without libc
 
@@ -391,7 +391,7 @@ A JavaScript host cannot block, so a wait on the monotonic clock, such as `Effec
 
 A module has no standard error, so when `main` fails with an unhandled error, or the program traps, the module writes the same report a native program prints into a buffer in its own memory: `silk_report()` returns its address and `silk_report_length()` its length. The runner prints it. For a trap it also prints the engine's stack, whose frames carry Silk names such as `main.pick`, and exits with 134. From a script, `runWasm` from the same file resolves to `main`'s status and rejects a trap with a `SilkError` whose `report` property holds the report. The error type of the Effect that `main` returns must implement `Debug`, as on every other target.
 
-A dev build has debug information. The module then ships without its DWARF: it is written beside the module as `squares.debug.wasm`, which Chrome's DWARF support reads, with a source map, `squares.map`, for Firefox and Safari. The module names both in custom sections. **Debugging** in the Tools section shows the reports, the runner's API and these files.
+A dev build has debug information. The module then ships without its DWARF: it is written beside the module as `squares.wasm.debug.wasm`, which Chrome's DWARF support reads, with a source map, `squares.wasm.map`, for Firefox and Safari. The module names both in custom sections. **Debugging** in the Tools section shows the reports, the runner's API and these files.
 
 An `export "C" fn` in the program is exported from the module under its name, next to `main`, so the host can call it with numbers. Only scalar and pointer arguments cross that boundary on wasm32; C statics, variadic functions and callbacks are refused.
 
@@ -410,7 +410,7 @@ Compiling squares (wasm32-wasip1, wasi)
   codegen   218 functions                     0.18s
   borrow    148 bodies                        0.00s
   link      clang                             0.25s
-Finished build/wasm32-wasip1/wasi/squares in 0.49s
+Finished build/wasm32-wasip1/dev/squares.wasm in 0.49s
 ```
 
 This is a WASI Preview 1 command, about 113 KiB. It exports `memory` and `_start`, and imports only what it uses from `wasi_snapshot_preview1`: here `args_get`, `args_sizes_get`, `environ_get`, `environ_sizes_get`, `fd_write` and `proc_exit`. The `StdoutWriter` arm of `main` runs, so the program prints its line itself.
@@ -428,7 +428,7 @@ import { readFile } from 'node:fs/promises'
 import { WASI } from 'node:wasi'
 
 const wasi = new WASI({ version: 'preview1', returnOnExit: true })
-const bytes = await readFile('build/wasm32-wasip1/wasi/squares')
+const bytes = await readFile('build/wasm32-wasip1/dev/squares.wasm')
 const { instance } = await WebAssembly.instantiate(bytes, wasi.getImportObject())
 process.exitCode = wasi.start(instance)
 ```

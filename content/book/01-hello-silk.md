@@ -85,7 +85,7 @@ silk run
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.06s
   check     1 module                          0.15s
   codegen   689 functions                     0.17s
@@ -204,7 +204,7 @@ silk run
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.02s
   check     failed: 1 module, 1 error         0.19s
 [x86_64-unknown-linux-gnu]
@@ -258,7 +258,7 @@ silk build
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.06s
   check     1 module                          0.17s
   codegen   709 functions                     0.15s

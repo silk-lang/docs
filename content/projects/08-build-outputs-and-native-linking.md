@@ -139,6 +139,47 @@ Tasks.Build { options } => {
 
 `compilation.linkArtifact(other.artifact())` links what another compilation builds, such as a static archive, and builds it first.
 
+### A package of only C
+
+A dependency's plan links into a program once the program imports one of the dependency's modules. A package that only wraps C sources has nothing to import: the program declares the C functions itself. Its plan links when the dependent names it with `Plan.linkDependency`. Here `cdouble` compiles one C file:
+
+```silk
+// cdouble/build.silk
+import silk.build.plan { Plan }
+import silk.build.step { sourcePath }
+
+pub const PLAN: Plan = Plan.empty() |> Plan.compileC(sourcePath("native/double.c"))
+```
+
+```c
+// cdouble/native/double.c
+int cdouble_twice(int value) { return value * 2; }
+```
+
+The application lists `cdouble = { path = "../cdouble" }` under `[dependencies]` and links it from its own plan:
+
+```silk
+// app/build.silk
+import silk.build.plan { Plan }
+
+pub const PLAN: Plan = Plan.empty() |> Plan.linkDependency("cdouble")
+```
+
+```silk
+// app/src/main.silk
+unsafe extern "C" fn cdouble_twice(value: i32) -> i32
+
+pub fn main() -> i32 {
+  return unsafe cdouble_twice(21) - 42
+}
+```
+
+`silk run` exits with 0. Without the `linkDependency` line the link stops with `ld.lld: error: undefined symbol: cdouble_twice`, and a name the manifest does not declare refuses the plan:
+
+```
+silk: /home/you/app/build.silk: build.silk computes no plan: Plan.linkDependency names `cdoubel`, which the package's manifest does not declare
+```
+
 ## Prebuilt archives
 
 `[native.archive.<name>]` pins a prebuilt archive, such as a vendor's SDK, by `url` and `sha256`. `Plan.archivePath(name, path)` names a file inside it, so the package uses the SDK without copying it in:

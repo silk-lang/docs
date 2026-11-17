@@ -490,7 +490,7 @@ silk build
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      201 modules, 7 in package         0.10s
   check     11 modules                        1.19s
   codegen   4,645 functions                   1.43s

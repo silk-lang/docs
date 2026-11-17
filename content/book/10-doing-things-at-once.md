@@ -74,7 +74,7 @@ TIMEFORMAT='time %Rs'; time ./build/x86_64-unknown-linux-gnu/dev/tasks
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      165 modules, 1 in package         0.07s
   check     1 module                          0.39s
   codegen   2,555 functions                   0.46s
@@ -101,7 +101,7 @@ effect fn total() -> i32
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      165 modules, 1 in package         0.03s
   check     1 module                          0.14s
   codegen   2,792 functions                   0.84s

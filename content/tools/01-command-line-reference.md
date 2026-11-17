@@ -190,13 +190,13 @@ A changed manifest, or a file added to or removed from the package, makes the se
 ## build
 
 ```
-silk build [project options] [--backend llvm|direct] [--progress <mode>] [--quiet] [--timings]
+silk build [project options] [--backend llvm|direct] [--unsandboxed-tools] [--progress <mode>] [--quiet] [--timings] [--costs]
 ```
 
 Builds every planned target. The rows add `codegen` and `link`, and the final line names the program, relative to the current directory, or in full when it is outside it, as from inside a workspace member:
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.03s
   check     1 module                          0.00s
   codegen   689 functions                     0.28s
@@ -205,7 +205,20 @@ Compiling hello (x86_64-unknown-linux-gnu, debug)
 Finished build/x86_64-unknown-linux-gnu/dev/hello in 0.71s
 ```
 
-`--progress`, `--quiet` and `--timings` work as for `check`. `--timings` also lists the slowest functions to emit.
+`--progress`, `--quiet` and `--timings` work as for `check`. `--timings` also lists the slowest functions to emit. `--unsandboxed-tools` lets package tool steps run without the operating-system sandbox for this one command; see **Build plans and generated code**.
+
+`--costs` charges what the build generated to the calls in your package that asked for it: the functions generated, their LLVM text and the static evaluation steps, with the time they took:
+
+```
+  Costliest calls: functions generated, their LLVM text, static evaluation steps, time
+        19   41.7 KB     2,986   12.2ms  src/main.silk:9:7  Effect.log("Hello, world!\n", &()) |> Effect.provideMut(&mut logger)
+         1     433 B         0   0.04ms  src/main.silk:7:20  StdoutLogger.make()
+  Calls in this package asked for 20 of the build's 362 functions (42.1 KB of 845.1 KB); static evaluation ran 3,410 steps in all. Time varies from run to run; the other columns do not.
+```
+
+Use the counts to decide where generic code or static evaluation is worth trimming; the times vary between runs.
+
+A package whose `src/tasks.silk` has a `Build` variant runs that command instead; see **Tasks and build graphs**.
 
 ## run
 
@@ -257,7 +270,7 @@ Builds the executable as `run` does and starts it under a debugger, with the pro
 silk test [project options] [--root <path>] [--file <path>] [--filter <text>] [--timeout <seconds>] [--no-cache]
 ```
 
-Builds the test runner under `build/test/` and runs the selected tests. When nothing the runner was built from has changed, the next run reuses it instead of building it again. Every run executes every selected test.
+Builds the test runner as `build/<target>/<mode>/<package>-tests` and runs the selected tests. When nothing the runner was built from has changed, the next run reuses it instead of building it again. Every run executes every selected test.
 
 | Option | Meaning |
 | --- | --- |
@@ -275,7 +288,15 @@ Builds the test runner under `build/test/` and runs the selected tests. When not
 
 `build`, `run`, `test` and `plan` each have a built-in. A root variant with that name replaces it. A reserved command without a variant runs its built-in. Commands embed standard `Options`. `silk plan` writes requests without compiling graph roots.
 
-The task receives `SILK_PROJECT_ROOT`, `SILK_INVOCATION_DIRECTORY` and `SILK_COMPILER`. `Task.silk` invokes the same compiler. A command that compiles its graph uses `Build.compile`, `Compilation.build` or `Build.write`.
+The task receives `SILK_PROJECT_ROOT`, `SILK_INVOCATION_DIRECTORY`, `SILK_COMPILER` and `SILK_STDLIB`. `Task.silk` invokes the same compiler. A command that compiles its graph uses `Build.compile`, `Compilation.build` or `Build.write`.
+
+## plan
+
+```
+silk plan [project options] [--unsandboxed-tools] [--backend llvm|direct]
+```
+
+Writes the compilation requests a build would compile, without compiling them: one TOML file per compilation in `build/requests/`, named `<name>.<target>.<mode>.toml`, and `build/requests/plan.json`, which lists them. Editors read these files to check code with the same settings a build uses. A `Plan` variant in `src/tasks.silk` replaces it. See The plan command and editors in **Tasks and build graphs**.
 
 ## Requests
 
