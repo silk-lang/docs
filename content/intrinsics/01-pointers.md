@@ -732,7 +732,7 @@ fn processWord() -> *mut u64
 Returns the address of one zero-initialized `u64` that belongs to the calling function instance and lives as long as the process. Every call in that instance returns the same address; another function, or another instance of a generic function, has its own word and cannot name this one.
 
 - Safe to call. Every thread shares the word, so read and write it only with the atomics (which are unsafe). A plain read or write that races with another thread is undefined behavior.
-- It is the only process-wide storage in Silk. A function that caches a value in its word must answer as if it computed it on every call, as `CpuFeatures.machine` does for the CPU features.
+- With `processSlot` and `threadSlot`, it is the only storage in Silk that outlives a call. A function that caches a value in its word must answer as if it computed it on every call, as `CpuFeatures.machine` does for the CPU features.
 - Runtime only.
 
 ```silk
@@ -746,6 +746,65 @@ pub fn main() -> i32 {
   drop calls()
   drop calls()
   return Intrinsic.u64ToI32(calls()) - 3
+}
+```
+
+### `Intrinsic.processSlot`
+
+```silk signature
+fn processSlot<T>() -> *mut T
+```
+
+Returns the address of one zero-initialized `T` that belongs to this call site in the calling function instance and lives as long as the process. Every run of that call returns the same address; another call site, even in the same function, has its own slot. Where `processWord` holds one `u64`, a slot holds any type, so a cache can keep a whole record.
+
+- Safe to call; reading or writing through the pointer is unsafe. Every thread shares the slot, so a slot that more than one thread touches needs atomics or a lock.
+- The slot starts as all zero bytes, which must be a valid `T` for any read before the first write.
+- Runtime only.
+
+```silk
+struct Totals { calls: u64, sum: u64 }
+
+// Remembers every value it was given, in one slot for the whole process.
+fn record(value: u64) -> u64 {
+  let totals = Intrinsic.processSlot<Totals>()
+  unsafe {
+    totals.*.calls = totals.*.calls + 1
+    totals.*.sum = totals.*.sum + value
+    return totals.*.sum
+  }
+}
+
+pub fn main() -> i32 {
+  drop record(2)
+  drop record(3)
+  return Intrinsic.u64ToI32(record(5)) - 10
+}
+```
+
+### `Intrinsic.threadSlot`
+
+```silk signature
+fn threadSlot<T>() -> *mut T
+```
+
+Like `processSlot`, but each thread has its own slot at this call site: zeroed when the thread starts and gone when it ends. No other thread can reach it, so plain reads and writes through the pointer do not race.
+
+- Safe to call; reading or writing through the pointer is unsafe. Do not keep the address past the end of the thread.
+- Runtime only.
+
+```silk
+// Counts calls on the current thread only.
+fn depth() -> u32 {
+  let slot = Intrinsic.threadSlot<u32>()
+  unsafe {
+    slot.* = slot.* + 1
+    return slot.*
+  }
+}
+
+pub fn main() -> i32 {
+  drop depth()
+  return Intrinsic.u32ToI32(depth()) - 2
 }
 ```
 

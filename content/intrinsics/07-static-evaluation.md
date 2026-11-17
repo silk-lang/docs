@@ -1113,7 +1113,7 @@ pub enum Mode {
   Small,
 }
 
-static fn names() -> string {
+static fn names() -> string<'static> {
   let mut text = ""
   static for mode in Intrinsic.reflectEnumMembers<Mode>() {
     text = Intrinsic.staticTextConcat(text, Intrinsic.reflectEnumLabel<Mode>(mode))
