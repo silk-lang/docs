@@ -92,7 +92,13 @@ A template is `<owner>/<repository>[/<directory>...][@<revision>]` on GitHub; on
 
 ```
 Initialized Silk project app at /home/you/app from template silk-lang/examples/default (3d330376eba6f634d1ca384269e46bc3c96727d8)
+
+Next steps:
+  cd app
+  silk run
 ```
+
+Every form ends with the next steps: `cd` into the project (left out when it is the current directory), then `silk run`, or `silk test` for a library. A template replaces the steps after `cd` with its `[template].next-steps`, and `next-steps = []` prints none.
 
 The template's `[[post-init]]` commands then run in the new project, in the build tool sandbox, with `SILK_VERSION` set to the compiler's release. On a host with no sandbox, a template with such commands is refused unless you pass `--unsandboxed-post-init`, which runs them with your full access. The `<arguments>` after `--` go to each entry that sets `arguments = true`; a template with no such entry refuses them. `--template` with `--lib` or `--workspace` exits 2.
 
@@ -103,6 +109,10 @@ Inside a workspace, `silk init` also appends the new package to the root's `memb
 ```
 Initialized Silk project util at /home/you/ws/util
 Added util to the workspace members in /home/you/ws/silk.toml
+
+Next steps:
+  cd util
+  silk run
 ```
 
 `init` refuses to overwrite an existing file and refuses a directory name that is not a valid package name; both exit 2:
