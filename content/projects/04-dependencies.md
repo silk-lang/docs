@@ -109,13 +109,13 @@ pub effect fn main() -> ()
 The fetch prints nothing of its own. Its time is part of the `load` row. The first `silk run`:
 
 ```
-Compiling app (x86_64-unknown-linux-gnu, debug)
+Compiling app (x86_64-unknown-linux-gnu, dev)
   load      147 modules, 1 in package         0.09s
   check     3 modules                         0.15s
   codegen   720 functions                     0.15s
   borrow    233 bodies                        0.01s
   link      clang                             0.38s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/app in 0.82s
+Finished build/x86_64-unknown-linux-gnu/dev/app in 0.82s
 length 42
 ```
 

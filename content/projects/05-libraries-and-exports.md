@@ -1,6 +1,6 @@
 # Libraries and exports
 
-A library is a package that other packages depend on. Its `[package].exports` lists the modules they may import. Its `[package].kind` says what `silk build` makes on its own: nothing for a `library`, or a file for use outside Silk.
+A library is a package that other packages depend on. Its `[package].exports` lists the modules they may import. A `library` is checked by the built-in `silk build`. A command chooses an artifact when a C program or another external consumer needs a compiled file.
 
 ## Exports
 
@@ -9,7 +9,7 @@ A library is a package that other packages depend on. Its `[package].exports` li
 name = "text-utils"
 version = "0.1.0"
 silk-version = "0.1.0"
-kind = "static-library"
+kind = "library"
 exports = ["lib", "Ffi"]
 ```
 
@@ -75,15 +75,14 @@ A package that depends on it writes `2.0 * Vector { x: 1.5, y: 3.0 }`. The rule 
 
 Packages that depend on a library compile its source with their own. The file matters only when something outside Silk links the library. When nothing does, `kind = "library"` makes no file at all: `silk build` checks the package.
 
-| `[package].kind` | File | Status |
-| --- | --- | --- |
-| `"library"` | none | Works. Checked only. |
-| `"static-library"` | `lib<name>.a` | Works. An archive of one object. |
-| `"object"` | `<name>.o` | Works. One relocatable object. |
-| `"shared-library"` | `lib<name>.so`, or `lib<name>.dylib` on macOS | Not built yet: `SILK_GAP artifact-form: the shared-library form is not native yet`, exit 2. |
-| `"executable"` (default) | `<name>` | A program. |
+| Compilation constructor | File |
+| --- | --- |
+| `staticArchive` | `lib<name>.a` |
+| `object` | `<name>.o` |
+| `loadableModule` | `lib<name>.so`, `lib<name>.dylib` or `<name>.dll` |
+| `executable` | `<name>` or `<name>.exe` |
 
-Profiles name the same forms `static-archive`, `loadable-module`, `object` and `executable`. A profile's `artifact` must name the same form as `[package].kind`, or the manifest is refused. See **Targets and profiles**.
+Artifact forms belong to the graph. The manifest has only `library` and `executable` kinds. Shared native libraries require dynamic linking and position-independent code. See **Tasks and build graphs** and **Build outputs and native linking**.
 
 - A library has no runtime. Its roots are its `export "C"` functions and statics, plus what they reach. A library with no C exports builds an empty archive: the build's `codegen` row reads `0 functions`.
 - The archive holds the compiled Silk code, not libc. Link it with a C toolchain that supplies libc.
@@ -127,22 +126,41 @@ export "C" fn tu_is_space(byte: u8) -> i32 {
 }
 ```
 
-With `exports = ["lib", "Ffi"]` and `kind = "static-library"`, as above, build the library on its own. (`silk init --lib` writes `kind = "library"`, which makes no file; a C program needs the archive.)
+Keep `exports = ["lib", "Ffi"]` and `kind = "library"` in the manifest. Add `src/tasks.silk` to build an archive for the C consumer:
+
+```silk
+import silk.build.graph { Compilation, BuildError }
+import silk.cli.command { Command, CommandLine }
+import silk.cli.task { Task, TaskSet }
+import silk.mem.allocator { Allocator }
+import silk.system.filesystem { FileSystem }
+import silk.system.host_input { HostInput }
+
+union Tasks { Archive }
+impl CommandLine for Tasks {
+  static fn command() -> Command<Tasks> {
+    return Command<Tasks>.make("text-utils", "Build the C archive")
+  }
+}
+impl TaskSet for Tasks {
+  effect fn perform(self: Self) -> ()
+    ! BuildError
+    ? &mut Allocator | &mut FileSystem | &mut HostInput {
+    let archive = run Compilation.staticArchive("text-utils", "src/Ffi.silk")
+    drop run archive.build()
+  }
+}
+pub effect fn main() -> i32 ? &mut HostInput {
+  return run Task.main<Tasks>()
+}
+```
 
 ```sh
 cd text-utils
-silk build
+silk task archive
 ```
 
-```
-Compiling text-utils (x86_64-unknown-linux-gnu, debug)
-  load      117 modules, 2 in package         0.04s
-  check     2 modules                         0.00s
-  codegen   2 functions                       0.00s
-  borrow    2 bodies                          0.00s
-  link      clang                             0.13s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a in 0.19s
-```
+The archive is written to `build/<host-target>/dev/libtext-utils.a`.
 
 The symbol map next to the archive shows the C name and the Silk declaration it comes from:
 
@@ -172,7 +190,7 @@ int main(void) {
 ```
 
 ```sh
-clang main.c ../text-utils/build/llvm/x86_64-unknown-linux-gnu/debug/libtext-utils.a -o demo
+clang main.c ../text-utils/build/x86_64-unknown-linux-gnu/dev/libtext-utils.a -o demo
 ./demo
 ```
 

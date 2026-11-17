@@ -17,7 +17,8 @@ Every `silk` command, its options and its exit status. `silk` is the tool you ty
 | `silk task [name] [args]` | Build the package's tasks and run one, or list them |
 | `silk pack` | Check the package and write its release archives, documentation, checksums and signatures |
 | `silk clean` | Delete the build output directory |
-| `silk generate` | Run the package's generators, or check their committed output |
+| `silk plan` | Write compilation requests for editors and tools |
+| `silk fetch` | Fetch every declared dependency without evaluating code |
 | `silk format [paths]` | Rewrite source files in the standard layout |
 | `silk lsp` | Run the language server for an editor |
 | `silk doc` | Write the package's documentation as JSON |
@@ -36,7 +37,7 @@ An option a command does not take is named, with the closest option it does take
 ```
 $ silk check --relase
 silk check: unknown option `--relase`; did you mean `--release`?
-usage: silk check [--manifest-path <path>] [--package <name>]... [--workspace] [--target <host|triple>]... [--release] [--optimization <profile>] [--profile <name>] [--profile-input <json>] [--stdlib <directory>] [--progress auto|live|plain|never] [--quiet] [--timings] [--json] [--replay <script> [--differential]]
+usage: silk check [--manifest-path <path>] [--package <name>]... [--workspace] [--target <host|triple>]... [--release] [--optimization <none|speed|size>] [--debug true|false] [--stdlib <directory>] [--progress auto|live|plain|never] [--quiet] [--timings] [--json] [--replay <script> [--differential]]
 ```
 
 ## Finding the project
@@ -61,17 +62,14 @@ A manifest that has `[workspace]` and no `[package]` is a workspace root. At a r
 | `-p <name>`, `--package <name>` | Select a workspace member by package name. Repeatable. `run` takes one |
 | `--workspace` | Select every member of the enclosing workspace |
 | `--target <host\|triple>` | Build for this target. Repeatable for `check` and `build`. `run` and `test` need a target the host can run |
-| `--release` | Use the `release` optimization profile (optimized, no debug information) |
-| `--optimization <debug\|release\|release-with-debug>` | Pick the optimization profile. `--release` with any other value exits 2 |
-| `--profile <name>` | Use the named `[profiles.<name>]` from the manifest |
-| `--profile-input <json>` | Supply a complete logical profile as JSON |
+| `--release` | Select speed optimization; use `--debug` to choose debug information |
+| `--optimization <none\|speed\|size>` | Choose the optimization level. `--release` selects `speed` |
 | `--stdlib <directory>` | Use this std lib instead of the one installed beside `silk`. A directory without `compositions.json` exits 1 |
-| `--backend <llvm\|direct>` | `build` and `run` only. `direct` builds a WebAssembly target without Clang. See **Targets and profiles** |
+| `--backend <llvm\|direct>` | `build` and `run` only. `direct` builds a WebAssembly target without Clang. See **Targets and compilation settings** |
 | `--clang <path>` | `build`, `run` and `test` only. Use this Clang; a bare name is looked up on `PATH`. See **Build outputs and native linking** |
 | `--ignore-warnings` | Let the command succeed with warnings. Without it, a warning fails the command as an error does. See **Diagnostics and silk check** |
-| `--no-hooks` | `build`, `run`, `debug` and `test` only. Run none of the manifest's `[tasks]` hooks. See **Hooks and scripts** |
 
-Without `--target`, a command uses the targets the manifest selects, or the host. Targets, profiles and output paths are described in **Targets and profiles** and **Build outputs and native linking**.
+Without `--target`, built-in commands select the host. A custom command can construct several target compilations. Targets, settings and output paths are described in **Targets and compilation settings** and **Build outputs and native linking**.
 
 ## init
 
@@ -173,7 +171,7 @@ That is `silk check --target host --target wasm32-wasip1` on the program `silk i
 
 ### The check server
 
-On Linux (GNU) and macOS, the last check of a `silk check` run that checks one package leaves a copy of itself behind, a check server. It keeps everything that check loaded and listens on a Unix socket in `$XDG_RUNTIME_DIR`, or in `/tmp/silk-<uid>` when that is not set. The socket is named after what the check depends on besides the sources: the compiler, the manifest, the profile, the standard library and the output options. The next `silk check` of the same project asks the server first. The server rereads the files that changed, rechecks only what the edit reaches and answers with the diagnostics and the exit status, usually in a few hundredths of a second. A served check prints no phase rows:
+On Linux (GNU) and macOS, the last check of a `silk check` run that checks one package leaves a copy of itself behind, a check server. It keeps everything that check loaded and listens on a Unix socket in `$XDG_RUNTIME_DIR`, or in `/tmp/silk-<uid>` when that is not set. The socket is named after what the check depends on besides the sources: the compiler, the manifest, the build options, the standard library and the output options. The next `silk check` of the same project asks the server first. The server rereads the files that changed, rechecks only what the edit reaches and answers with the diagnostics and the exit status, usually in a few hundredths of a second. A served check prints no phase rows:
 
 ```
 $ silk check
@@ -192,22 +190,35 @@ A changed manifest, or a file added to or removed from the package, makes the se
 ## build
 
 ```
-silk build [project options] [--backend llvm|direct] [--progress <mode>] [--quiet] [--timings]
+silk build [project options] [--backend llvm|direct] [--unsandboxed-tools] [--progress <mode>] [--quiet] [--timings] [--costs]
 ```
 
 Builds every planned target. The rows add `codegen` and `link`, and the final line names the program, relative to the current directory, or in full when it is outside it, as from inside a workspace member:
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.03s
   check     1 module                          0.00s
   codegen   689 functions                     0.28s
   borrow    229 bodies                        0.01s
   link      clang                             0.36s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.71s
+Finished build/x86_64-unknown-linux-gnu/dev/hello in 0.71s
 ```
 
-`--progress`, `--quiet` and `--timings` work as for `check`. `--timings` also lists the slowest functions to emit.
+`--progress`, `--quiet` and `--timings` work as for `check`. `--timings` also lists the slowest functions to emit. `--unsandboxed-tools` lets package tool steps run without the operating-system sandbox for this one command; see **Build plans and generated code**.
+
+`--costs` charges what the build generated to the calls in your package that asked for it: the functions generated, their LLVM text and the static evaluation steps, with the time they took:
+
+```
+  Costliest calls: functions generated, their LLVM text, static evaluation steps, time
+        19   41.7 KB     2,986   12.2ms  src/main.silk:9:7  Effect.log("Hello, world!\n", &()) |> Effect.provideMut(&mut logger)
+         1     433 B         0   0.04ms  src/main.silk:7:20  StdoutLogger.make()
+  Calls in this package asked for 20 of the build's 362 functions (42.1 KB of 845.1 KB); static evaluation ran 3,410 steps in all. Time varies from run to run; the other columns do not.
+```
+
+Use the counts to decide where generic code or static evaluation is worth trimming; the times vary between runs.
+
+A package whose `src/tasks.silk` has a `Build` variant runs that command instead; see **Tasks and build graphs**.
 
 ## run
 
@@ -215,13 +226,13 @@ Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.71s
 silk run [project options] [--backend llvm|direct] [--progress <mode>] [--quiet] [--coredump <path>] [arguments...] [-- arguments...]
 ```
 
-Builds the executable and runs it in the current directory. On a WASI target it runs the module with `wasmtime`; see **Targets and profiles**. The build prints the same progress output as `silk build`, on standard error, and ends with `Finished` before the program starts or `Failed` when it does not build. Standard output carries only the program's output. `--progress` and `--quiet` work as for `check`.
+Builds the executable and runs it in the current directory. On a WASI target it runs the module with `wasmtime`; see **Targets and compilation settings**. The build prints the same progress output as `silk build`, on standard error, and ends with `Finished` before the program starts or `Failed` when it does not build. Standard output carries only the program's output. `--progress` and `--quiet` work as for `check`.
 
 Options are read up to `--`. Any argument that does not start with `-`, and every argument after `--`, is passed to the program in order. The exit status is the program's own. A program whose `main` returns 7 makes `silk run` exit 7. A build that fails exits 1, or 2 when Clang is missing or the construct is not supported yet, and the program does not start.
 
 ```
 $ silk run --quiet -- Ada
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.78s
+Finished build/x86_64-unknown-linux-gnu/dev/hello in 0.78s
 Hello, Ada!
 ```
 
@@ -251,7 +262,7 @@ Builds the executable as `run` does and starts it under a debugger, with the pro
 - On a native target it replaces itself with LLDB, as `lldb -- <program> [arguments...]`. LLDB is `SILK_LLDB`, else `lldb` on `PATH`. Without one, the build finishes and the command stops with `` silk: `debug` needs lldb on PATH or SILK_LLDB `` (exit 2).
 - On a WASI target it runs `wasmtime run -g <port>`, Wasmtime's debugger stub, which waits for LLDB before the program starts. `--port` takes a port or `address:port`; the default is 1234. Attach from LLDB with `process connect --plugin wasm connect://127.0.0.1:1234`.
 
-`--port` matters only on WASI, and `debug` takes no `--coredump`. Use a profile with debug information, such as the default `debug`, so the debugger sees Silk names, lines and variables. See **Debugging**.
+`--port` matters only on WASI, and `debug` takes no `--coredump`. Use a build with debug information, such as the default dev build, so the debugger sees Silk names, lines and variables. See **Debugging**.
 
 ## test
 
@@ -259,7 +270,7 @@ Builds the executable as `run` does and starts it under a debugger, with the pro
 silk test [project options] [--root <path>] [--file <path>] [--filter <text>] [--timeout <seconds>] [--no-cache]
 ```
 
-Builds the test runner under `build/test/` and runs the selected tests. When nothing the runner was built from has changed, the next run reuses it instead of building it again. Every run executes every selected test.
+Builds the test runner as `build/<target>/<mode>/<package>-tests` and runs the selected tests. When nothing the runner was built from has changed, the next run reuses it instead of building it again. Every run executes every selected test.
 
 | Option | Meaning |
 | --- | --- |
@@ -269,21 +280,33 @@ Builds the test runner under `build/test/` and runs the selected tests. When not
 | `--timeout <seconds>` | Fail a test that runs longer than this; 60 by default, `0` for no limit |
 | `--no-cache` | Build the runner again even when nothing changed |
 
-`--root` and `--file` name files of one package, so in a workspace they need `-p`. When the manifest declares `[profiles.test]` and the command names no `--profile`, `--profile-input`, `--target`, `--release` or `--optimization`, the runner builds with that profile, and with its dependencies. See **Testing**, and "Entries, artifacts and dependencies" in **Targets and profiles**.
+`--root` and `--file` name files of one package, so in a workspace they need `-p`. A Test variant can define the project's test graph; the built-in test command otherwise uses the standard options.
 
 ## task
 
+`silk task [compiler options] <command> [command options]` builds the root package's `tasks.silk` and invokes its `TaskSet`. With no command it lists available variants. Dependencies contribute modules and static plans; their task entries never run.
+
+`build`, `run`, `test` and `plan` each have a built-in. A root variant with that name replaces it. A reserved command without a variant runs its built-in. Commands embed standard `Options`. `silk plan` writes requests without compiling graph roots.
+
+The task receives `SILK_PROJECT_ROOT`, `SILK_INVOCATION_DIRECTORY`, `SILK_COMPILER` and `SILK_STDLIB`. `Task.silk` invokes the same compiler. A command that compiles its graph uses `Build.compile`, `Compilation.build` or `Build.write`.
+
+## plan
+
 ```
-silk task [project options] [name] [arguments...]
+silk plan [project options] [--unsandboxed-tools] [--backend llvm|direct]
 ```
 
-Builds the package's `tasks` profile, an executable for this machine from `src/tasks.silk` unless `[profiles.tasks]` says otherwise, and runs it in the package's directory with the task's name and the arguments after it. With no name, it lists the tasks. Options before the name are the compiler's, such as `--stdlib`; everything from the name on is the task's.
+Writes the compilation requests a build would compile, without compiling them: one TOML file per compilation in `build/requests/`, named `<name>.<target>.<mode>.toml`, and `build/requests/plan.json`, which lists them. Editors read these files to check code with the same settings a build uses. A `Plan` variant in `src/tasks.silk` replaces it. See The plan command and editors in **Tasks and build graphs**.
 
-```
-$ silk task release 1.2.0
-```
+## Requests
 
-The program runs with your environment plus `SILK_PROJECT_ROOT`, the package's directory, `SILK_INVOCATION_DIRECTORY`, where you ran the command, and `SILK_COMPILER`, the compiler that built it. The exit status is the task's own; when the tasks do not build, it exits as `silk build` would, and no task runs. `--profile`, `--profile-input`, `--target`, `--release`, `--optimization`, `-p` and `--workspace` are refused, because the `tasks` profile decides the build. Use `--manifest-path` to pick a workspace member's tasks. See "Tasks: silk task" in **Hooks and scripts**.
+`silkc resolve --definition <file> --output <file>` freezes a compilation definition into a versioned request. `silkc compile --request <file|->` consumes it without manifest discovery, network fetching or plan evaluation. `silkc request-schema` prints its derived JSON Schema; `silkc manifest-schema` prints the manifest schema.
+
+`silk package-path --manifest <file> --dependency <alias> --path <subpath>` resolves an explicitly included dependency file and prints its absolute path as a JSON string.
+
+## fetch
+
+`silk fetch [--manifest-path <file>]` downloads all declared dependency pins, including workspace members and transitive dependencies, for offline work. It does not evaluate plans, compile source or run tasks.
 
 ## pack
 
@@ -292,7 +315,7 @@ silk pack [--list] [--output <dir>] [--json] [--bin] [--sign <file>] [shared pro
 silk pack --new-key <path>
 ```
 
-`pack` checks the package as `check` does, then writes its release files in `build/package/`, or `--output`: the source archive `<name>-<version>.tar.gz`, the documentation `<name>-<version>.docs.json`, and `SHA256SUMS`. `--bin` also builds each target's executable, with the release profile unless a profile option chooses another, and writes `<name>-<version>-<target>.tar.gz`. `--sign <file>`, or the key text in `SILK_SIGNING_KEY`, writes a minisign `<file>.minisig` beside every file. `--new-key <path>` writes a new key pair and packs nothing. `--list` prints the files the source archive would hold and writes nothing.
+`pack` checks the package as `check` does, then writes its release files in `build/package/`, or `--output`: the source archive `<name>-<version>.tar.gz`, the documentation `<name>-<version>.docs.json`, and `SHA256SUMS`. `--bin` also builds each target's executable, as a release build unless `--optimization` or `--debug` chooses otherwise, and writes `<name>-<version>-<target>.tar.gz`. `--sign <file>`, or the key text in `SILK_SIGNING_KEY`, writes a minisign `<file>.minisig` beside every file. `--new-key <path>` writes a new key pair and packs nothing. `--list` prints the files the source archive would hold and writes nothing.
 
 ```
 wrote /home/you/greet/build/package/greet-0.1.0.tar.gz (4 files, 432 bytes)
@@ -309,16 +332,6 @@ silk clean [--manifest-path <path>]
 ```
 
 Deletes the build output directory and prints `Removed /home/you/hello/build`. At a workspace root it deletes the shared output directory. When there is nothing to remove, it prints `Nothing to clean: /home/you/hello/build does not exist` and still exits 0.
-
-## generate
-
-```
-silk generate [--check] [--manifest-path <path>]
-```
-
-Runs the `[[generate]]` entries of the located manifest in order, then, at a workspace root, each member's. Each command runs in its manifest's directory with your environment plus `SILK_GENERATE=1`. It prints `Created`, `Updated` or `Removed` for each output that changed, then a summary, as in `Ran 1 generator: 1 changed, 0 unchanged`. An output written with the same bytes keeps its file and modification time.
-
-`--check` leaves the tree as it was and exits 1 naming each output that is stale, would be created or would be removed, ending with `` silk: generated output is stale; run `silk generate` and commit the result ``. A generator that fails, or does not write an output declared without a `*`, leaves every output as it was and exits 1. A manifest it cannot use exits 2. See **Build plans and generated code** in Projects and packages.
 
 ## format
 
@@ -545,7 +558,7 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | --- | --- |
 | 0 | Success. For `format --check`: every file is already formatted |
 | 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, any `silk change` error including a malformed `silk change` command line |
-| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an invalid `--profile-input`, an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target or profile, an unknown workspace member, a source file or folder named `silk` or `Intrinsic`, a dependency or `exports` problem, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
+| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key, such as a removed `[profiles]` table), an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target, an unknown workspace member, a source file or folder named `silk` or `Intrinsic`, a dependency or `exports` problem, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
 | 3, 4, 5 | From the tool: the selected version is not installed, a download failed, or a release failed verification. See "Exit status of the tool" |
 | other | `silk run` only: the program's own status. `silk debug` exits with the debugger's status |
 
@@ -568,8 +581,8 @@ In a workspace, each member gets a status and the command exits with the worst o
 | `SILK_OFFLINE` | Set, a build that needs a `[native.archive.<name>]` archive or a URL dependency it has not fetched fails instead of downloading it |
 | `SILK_SIGNING_KEY` | The text of a minisign secret key file, for `silk pack` to sign with when `--sign` is not given |
 | `SILK_SIGNING_PASSWORD` | The password of an encrypted signing key, for `silk pack`; with `--new-key`, encrypts the new key |
-| `SILK_NO_TOOL_SANDBOX` | Set, the host behaves as one with no sandbox for `build.silk` tool steps, so they are refused unless `[build].unsandboxed-tools = true` |
-| `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and profiles** |
+| `SILK_NO_TOOL_SANDBOX` | Set, the host behaves as one with no sandbox for `build.silk` tool steps, so they are refused unless the invocation explicitly passes `--unsandboxed-tools` |
+| `SILK_PROFILE_GENERATE` | A directory: native builds pass `-fprofile-generate=<dir>` to Clang, for profile-guided optimization. See **Targets and compilation settings** |
 | `SILK_PROFILE_USE` | A merged `.profdata` file: native builds pass `-fprofile-use=<file>` to Clang |
 | `SILK_WASMTIME` | The `wasmtime` that `silk run`, `silk debug` and `silk test` use on a WASI target; default `wasmtime` on `PATH` |
 | `WASMTIME_BACKTRACE_DETAILS` | Passed to Wasmtime by `silk run`, `silk debug` and `silk test` on a WASI target, set to `1` when the environment does not set it, so trap traces show source lines |

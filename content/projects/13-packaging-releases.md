@@ -68,7 +68,7 @@ vector = { workspace = true }
 vector = { git = "https://example.com/geometry.git", rev = "fb09a5d023a80e50a973adb896a198ab4daab4db", path = "vector" }
 ```
 
-Write the entry on one line, as above, in `[dependencies]` or `[profiles.<name>.dependencies]`. A shared path dependency is refused like any other path dependency.
+Write the entry on one line, as above, in `[dependencies]`. A shared path dependency is refused like any other path dependency.
 
 ### Reproducible archives
 
@@ -124,7 +124,7 @@ silk pack --bin
 ```
 Compiling app (x86_64-unknown-linux-gnu, release)
   ...
-Finished build/llvm/x86_64-unknown-linux-gnu/release/app in 0.80s
+Finished build/x86_64-unknown-linux-gnu/release/app in 0.80s
 wrote /home/you/app/build/package/app-0.1.0.tar.gz (2 files, 347 bytes)
 sha256 6b69492dd61486d7e48de0868de1be5f1f9cac78ddc4b3a2de091b16374bdb1e
 wrote /home/you/app/build/package/app-0.1.0.docs.json
@@ -134,8 +134,8 @@ sha256 efbcb10554c5e46ad3835d9b05062ee4f069fe3f4626c9110f205bfd848f8f32
 
 The build progress goes to standard error and the `wrote` lines to standard output.
 
-- The targets are those `silk build` would build: each `--target`, else `[build].targets`, else the host. Cross targets need what `silk build --target` needs.
-- The build uses the release profile (optimized, no debug information) unless `--profile`, `--optimization` or `--profile-input` chooses another. With `--profile <name>`, the profile name follows the target in the file name, as `app-0.1.0-x86_64-unknown-linux-gnu-small.tar.gz`, so two profiles never overwrite each other.
+- The targets are those `silk build` would build: each `--target`, otherwise the host. Cross targets need what `silk build --target` needs.
+- Binary packaging uses speed optimization without debug information unless the standard compilation options choose otherwise. Packaging does not invoke project tasks.
 - A binary archive holds `<name>-<version>-<target>/bin/<executable>` with mode 755, and the `README`, `LICENSE`, `LICENCE`, `COPYING` and `CHANGELOG` files of the package root. It is a `.tar.gz` on every target, Windows included.
 - A library has no binaries: `--bin` packs its source archive only.
 - A target that fails to build is reported as `silk build` reports it and gets no archive. The other targets are still packed.
@@ -225,7 +225,7 @@ There is one entry for each package packed. `documentation` is `null` when no st
 | `--sign <file>` | Sign every file with this minisign secret key file |
 | `--new-key <path>` | Write a new key pair, and pack nothing |
 | `-p <member>`, `--workspace` | Pick workspace members, as for other commands |
-| `--target`, `--profile`, `--release`, `--optimization`, `--profile-input`, `--backend`, `--clang` | As for `silk build`; they matter for `--bin` and for the check |
+| `--target`, `--release`, `--optimization`, `--debug`, `--backend`, `--clang` | As for `silk build`; they matter for `--bin` and for the check |
 | `--manifest-path`, `--stdlib`, `--progress`, `--quiet`, `--timings` | As for other commands |
 
 ## A release workflow

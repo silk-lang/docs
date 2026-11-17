@@ -644,7 +644,7 @@ shapes = { path = "../shapes" }
 name = "shapes"
 version = "0.1.0"
 silk-version = "0.1.0"
-kind = "static-library"
+kind = "library"
 exports = ["lib"]
 ```
 
@@ -4168,7 +4168,7 @@ With a positional template, `"{} has {} tasks, {} open\n"` and `&("Julia", 3)`:
 src/main.silk:7:7: error[SEM0177] template placeholder 3 `{}` has no positional field; the arguments have 2
 ```
 
-Fix: The text is the author's message. Change the static condition, target or profile, or the call that selected the branch. For a template, match each placeholder to a field. See Static control flow and reflection, and Text and formatting.
+Fix: The text is the author's message. Change the static condition, the target or compilation settings, or the call that selected the branch. For a template, match each placeholder to a field. See Static control flow and reflection, and Text and formatting.
 
 ### SEM0178
 
@@ -4841,7 +4841,7 @@ Fix: Pass a borrow that lives long enough, or relax the bound: `x: &i32`. See Li
 
 ### SEM0214
 
-Rejected profile inputs, package schemas, defaults, or predicates.
+Rejected parameter bindings, package schemas, defaults, or predicates.
 
 ```silk
 pub param level: f64 = 1.0
@@ -5259,9 +5259,9 @@ pub fn main() -> i32 {
 src/main.silk:3:17: error[SEM0241] Intrinsic.x86ShuffleBytes needs x86_64 with ssse3, which this profile does not select; guard it with `static if Target.hasCpuFeature(...)` or list the feature in the function's `@features(...)` directive
 ```
 
-The default x86-64 profile has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
+The default x86-64 CPU has SSE2 but not SSSE3. An `aarch64*` or `wasm*` member on x86-64 is refused the same way, as "needs aarch64 with neon" or "needs wasm32 with simd128".
 
-Fix: Call the architecture wrapper, here `x86.shuffleBytes` from `silk.simd.x86`, which falls back to portable code. Or select the feature in the profile (`cpu.model = "x86-64-v2"`) and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` written with `@features("ssse3")` on the line before it. See Intrinsics and Targets and profiles.
+Fix: Call the architecture wrapper, here `x86.shuffleBytes` from `silk.simd.x86`, which falls back to portable code. Or select the feature for the compilation, with `Compilation.cpu` set to `x86-64-v2` or with `Compilation.cpuFeatures`, and guard the call with `static if Target.hasCpuFeature("ssse3")`, or make the call from an `unsafe fn` written with `@features("ssse3")` on the line before it. See Intrinsics and Targets and compilation settings.
 
 ### SEM0242
 
@@ -5286,7 +5286,7 @@ src/main.silk:1:11: error[SEM0242] neon is not a CPU feature of x86_64-unknown-l
 
 The column is the entry. An empty list, `@features()`, prints `` `@features` lists no CPU feature; name at least one text literal from the catalog of x86_64-unknown-linux-gnu, or remove the directive ``, at the `@`. Level names such as `"x86-64-v3"` are refused too: they are CPU models, not features.
 
-Fix: List features from the target's catalog in Targets and profiles, as text literals. Put a function for another architecture under `static if Intrinsic.targetArchitecture() == "aarch64"` or the like, so other targets never check it.
+Fix: List features from the target's catalog in Targets and compilation settings, as text literals. Put a function for another architecture under `static if Intrinsic.targetArchitecture() == "aarch64"` or the like, so other targets never check it.
 
 ### SEM0243
 
@@ -5315,7 +5315,7 @@ Fix: Declare it `unsafe fn fast(...)`, and call it inside `unsafe` after `CpuFea
 
 ### SEM0244
 
-A SIMD vector in a C call that the target's C ABI cannot pass in a vector register the profile selects.
+A SIMD vector in a C call that the target's C ABI cannot pass in a vector register the compilation's CPU features select.
 
 ```silk
 unsafe extern "C" fn total(values: simd<f32, 8>) -> f32
@@ -5335,7 +5335,7 @@ src/main.silk:4:20: error[SEM0244] simd<f32, 8> crosses the C boundary in one ve
 
 For an imported function the column is the callee's name; each call is reported, and a declaration that is never called is not. An `export "C"` function is checked at its declaration, by `silk check` as well as `silk build`, at the vector type. On x86-64, 128-bit vectors need nothing, 256-bit ones `avx` and 512-bit ones `avx512f`. A width the target's C ABI has no register for prints the other form, as for `simd<u8, 8>` on x86-64: "simd<u8, 8> crosses the C boundary in one vector register, but x86_64-unknown-linux-gnu C passes no vector of that width". A function's own `features` list does not count.
 
-Fix: Select the feature in the profile, as in `[profiles.fast.cpu] features = ["avx"]` or `model = "x86-64-v3"`, and build with `--profile fast`. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and profiles.
+Fix: Select the feature with `Compilation.cpuFeatures` or a suitable `Compilation.cpu` value. Or pass the vector in 128-bit halves, or through a pointer. See Unsafe code and C interop and Targets and compilation settings.
 
 ### SEM0246
 

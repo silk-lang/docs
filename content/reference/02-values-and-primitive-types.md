@@ -170,7 +170,7 @@ Other admitted shapes, such as `simd<u8, 64>`, `simd<u32, 2>` or `simd<usize, 2>
 
 ### Choosing a width for the target
 
-`silk.simd.simd` itself answers two static questions about the target CPU of the build. Both read the profile's CPU model and features, not the machine the compiler runs on, and cost nothing at run time.
+`silk.simd.simd` itself answers two static questions about the target CPU of the build. Both read the compilation's CPU model and features, not the machine the compiler runs on, and cost nothing at run time.
 
 | Function | Result |
 | --- | --- |
@@ -179,7 +179,7 @@ Other admitted shapes, such as `simd<u8, 64>`, `simd<u32, 2>` or `simd<usize, 2>
 
 Vectors of every admitted shape compile on every target, whatever its preferred width. On wasm32 without `simd128` they compile to scalar code. Test `preferredBytes()` in a `static if` to pick a block width, and `hardware()` to keep a plain loop where vectors would only be emulated.
 
-The features come from the profile's `cpu` table; see Targets and profiles. With the default x86-64 model, `preferredBytes()` is `16`. `cpu.model = "x86-64-v3"` or `features = ["avx2"]` makes it `32`, and `cpu.model = "x86-64-v4"` or `features = ["avx512bw"]` makes it `64`. A wasm32 profile turns on hardware vectors with `features = ["simd128"]`.
+The features come from `Compilation.cpu` and `Compilation.cpuFeatures`; see Targets and compilation settings. With the default x86-64 model, `preferredBytes()` is `16`. The `x86-64-v3` model or the `avx2` feature makes it `32`, and the `x86-64-v4` model or the `avx512bw` feature makes it `64`. A wasm32 compilation turns on hardware vectors with the `simd128` feature.
 
 ### Architecture instructions
 
@@ -192,14 +192,14 @@ Some instructions do in one step what takes several portable operations: byte ta
 | `silk.simd.wasm` | `swizzle` (`i8x16.swizzle`, simd128), `relaxedSwizzle` (`i8x16.relaxed_swizzle`, relaxed-simd), `dot` (`i32x4.dot_i16x8_s`, simd128), `narrowUnsigned`, `narrowSigned` (`i8x16.narrow_i16x8_u` and `_s`, simd128) |
 
 - Every function compiles on every target. Where the build targets the module's architecture with the feature enabled, it is the one instruction. Elsewhere it computes the same lanes with portable code, which is correct but slower.
-- The choice is made at compile time from the profile, like `simd.preferredBytes()`. With the default x86-64 profile, `x86.shuffleBytes` takes the portable path; with `cpu.model = "x86-64-v2"` (SSSE3 and SSE4.1) it is `pshufb`, and `x86-64-v3` adds the AVX2 forms.
+- The choice is made at compile time from the compilation's CPU, like `simd.preferredBytes()`. With the default x86-64 CPU, `x86.shuffleBytes` takes the portable path; with a compilation whose `cpu` is `x86-64-v2` (SSSE3 and SSE4.1) it is `pshufb`, and `x86-64-v3` adds the AVX2 forms.
 - Code that only pays off with the instruction tests `Target.hasCpuFeature` from `silk/core/target` in a `static if` and keeps a plain loop otherwise.
 - The 256-bit x86 forms work on each 16-byte half separately: a `shuffleBytes256` index picks only within its own half, and `packUnsigned16x256` interleaves the halves of its operands.
 - The AES and SHA-256 functions follow their instructions, so the two modules split the work differently. An x86 AES round is `x86.aesEncrypt(state, key)`; on AArch64 it is `aarch64.aesMixColumns(aarch64.aesEncrypt(state, key))`, because `aese` adds the key first. `silk.crypto.aes_round` has the portable steps (`subBytes`, `shiftRows`, `mixColumns` and their inverses) for checking either. To encrypt data, use `silk/crypto/aes_gcm`.
 - `x86.sha256Rounds2` does two rounds on the state split as A, B, E, F and C, D, G, H, highest lane first. `aarch64.sha256Hash` and `sha256Hash2` do four rounds on A to D and E to H in lane order. The message schedule takes one extra add on x86 (see the example below). The std lib digests in `silk/crypto/sha2` do not call these functions.
 - Index rules differ. `x86.shuffleBytes` uses the low four bits of an index and gives `0` when bit 7 is set; `aarch64.tableLookup` and `wasm.swizzle` give `0` for any index of 16 or more. `wasm.relaxedSwizzle` leaves those lanes unspecified, and they may differ between engines.
 
-To run a faster path on machines that have a feature the build does not select, see Targets and profiles, under CPU features at run time. The underlying members are in Intrinsics, under Architecture members.
+To run a faster path on machines that have a feature the build does not select, see Targets and compilation settings, under CPU features at run time. The underlying members are in Intrinsics, under Architecture members.
 
 ## Examples
 
@@ -344,7 +344,7 @@ pub fn main() -> i32 {
 }
 ```
 
-A sum that uses eight lanes when the profile prefers 32-byte vectors, then masks, `select` and `shuffle`. It exits with 0 under the default profile, with `cpu.model = "x86-64-v3"`, and on wasm32:
+A sum that uses eight lanes when the compilation's CPU prefers 32-byte vectors, then masks, `select` and `shuffle`. It exits with 0 under the default CPU, with a compilation whose `cpu` is `x86-64-v3`, and on wasm32:
 
 ```silk
 import silk.simd.simd
@@ -404,7 +404,7 @@ pub fn main() -> i32 {
 }
 ```
 
-Sixteen nibbles to hex digits with one table lookup. It exits with 0 under the default profile, which runs the portable path, and under `cpu.model = "x86-64-v2"`, which compiles `shuffleBytes` to `pshufb`:
+Sixteen nibbles to hex digits with one table lookup. It exits with 0 under the default CPU, which runs the portable path, and under a compilation whose `cpu` is `x86-64-v2`, which compiles `shuffleBytes` to `pshufb`:
 
 ```silk
 import silk.simd.x86
@@ -432,7 +432,7 @@ pub fn main() -> i32 {
 }
 ```
 
-The next four SHA-256 message words, computed with each module. It exits with 0 under the default profile, where both take their portable paths, and under `cpu.features = ["sha"]`, which compiles the x86 functions to `sha256msg1` and `sha256msg2`. On arm64 with `sha2`, the AArch64 functions are `sha256su0` and `sha256su1`:
+The next four SHA-256 message words, computed with each module. It exits with 0 under the default CPU, where both take their portable paths, and under `cpu.features = ["sha"]`, which compiles the x86 functions to `sha256msg1` and `sha256msg2`. On arm64 with `sha2`, the AArch64 functions are `sha256su0` and `sha256su1`:
 
 ```silk
 import silk.simd.aarch64

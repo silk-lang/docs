@@ -74,13 +74,13 @@ silk run
 ```
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.07s
   check     1 module                          0.13s
   codegen   689 functions                     0.14s
   borrow    229 bodies                        0.01s
   link      clang                             0.38s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.77s
+Finished build/x86_64-unknown-linux-gnu/dev/hello in 0.77s
 Hello, world!
 ```
 
@@ -186,21 +186,21 @@ silk build
 ```
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.05s
   check     1 module                          0.18s
   codegen   803 functions                     0.17s
   borrow    267 bodies                        0.01s
   link      clang                             0.41s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello in 0.84s
+Finished build/x86_64-unknown-linux-gnu/dev/hello in 0.84s
 ```
 
 A build adds two phases: `codegen` generates machine code for the functions the program uses, and `link` runs Clang to produce the executable. The last line names it.
 
-The executable lands at `build/llvm/<target>/debug/<name>`. It runs on its own, with no `silk` involved:
+The executable lands at `build/<target>/dev/<name>`. It runs on its own, with no `silk` involved:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/hello Grace
+./build/x86_64-unknown-linux-gnu/dev/hello Grace
 ```
 
 ```
@@ -211,8 +211,8 @@ Next to it are `hello.symbols`, a table that maps machine-level symbol names bac
 
 | Command | Output |
 | --- | --- |
-| `silk build` | `build/llvm/<target>/debug/<name>`, unoptimized, fast to compile |
-| `silk build --release` | `build/llvm/<target>/release/<name>`, optimized |
+| `silk build` | `build/<target>/dev/<name>`, unoptimized, fast to compile |
+| `silk build --release` | `build/<target>/release/<name>`, optimized |
 | `silk clean` | Deletes `build/` |
 
 The target is your host's: `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` or `aarch64-apple-darwin`.

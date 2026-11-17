@@ -223,7 +223,7 @@ The heading, the phase rows and the final line are progress output. `silk check`
 A phase that fails says so in its row: `check     failed: 2 modules, 1 error`. A row with nothing more to say reads just `failed`, as the `link` row does when the Clang named by `SILK_CLANG` cannot start:
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      166 modules, 1 in package         0.03s
   check     1 module                          0.00s
   codegen   387 functions                     0.14s

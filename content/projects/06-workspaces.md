@@ -94,7 +94,7 @@ pricing = { workspace = true }
 - The name is the key in both tables. `vector = { workspace = true }` takes the workspace's `vector`, and the member imports it as `vector`.
 - A `path` in `[workspace.dependencies]` is relative to the workspace manifest, not to the member. `pricing = { path = "pricing" }` above names `shop/pricing` for every member, whatever folder the member is in.
 - `workspace = true` stands alone. A member cannot add or change a key of the shared entry; a member that needs something else writes its own full entry instead.
-- It works in `[dependencies]` and in a profile's `[profiles.<name>.dependencies]`.
+- It works in `[dependencies]`.
 - A member only gets the dependencies it lists. An entry no member takes is never read or fetched.
 - To change a pin for every member, edit the one line in the workspace manifest.
 
@@ -126,17 +126,17 @@ Checking pricing (x86_64-unknown-linux-gnu)
   check     1 module                          0.03s
   borrow    2 bodies                          0.00s
 Finished pricing in 0.19s
-Compiling store (x86_64-unknown-linux-gnu, debug)
+Compiling store (x86_64-unknown-linux-gnu, dev)
   load      139 modules, 1 in package         0.05s
   check     2 modules                         0.07s
   codegen   486 functions                     0.09s
   borrow    149 bodies                        0.00s
   link      clang                             0.32s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.55s
+Finished build/x86_64-unknown-linux-gnu/dev/store in 0.55s
 Finished 2 packages in 0.63s
 ```
 
-- Each member reports its own phases and ends with its own `Finished` or `Failed` line. `pricing` is a `library`, so it is checked and makes no file. The path in a member's `Finished` line is relative to the folder you ran the command in. Run from inside a member, it is outside that folder, so it is printed in full: `Finished /home/you/shop/build/llvm/x86_64-unknown-linux-gnu/debug/store in 0.48s`.
+- Each member reports its own phases and ends with its own `Finished` or `Failed` line. `pricing` is a `library`, so it is checked and makes no file. The path in a member's `Finished` line is relative to the folder you ran the command in. Run from inside a member, it is outside that folder, so it is printed in full: `Finished /home/you/shop/build/x86_64-unknown-linux-gnu/dev/store in 0.48s`.
 - The last line counts packages. A failing member does not stop the others; the last line then reads like `Failed 1 of 3 packages in 2.10s`, and the command exits 1.
 - On a terminal, each finished member collapses to one line, and the member in progress is labeled with its position, such as `[2/2] store`. See **Diagnostics and silk check** in Tools for how progress output works.
 - `silk test` still prints a `Package <name> (<dir>)` heading for each member and ends with `Workspace summary: 2 packages succeeded, 0 failed`.
@@ -203,20 +203,15 @@ All members build into the workspace's output directory, so from inside a member
 ```
 build/cache/pricing/...
 build/cache/store/...
-build/llvm/x86_64-unknown-linux-gnu/debug/store
-build/test/llvm/x86_64-unknown-linux-gnu/debug/pricing
-build/test/llvm/x86_64-unknown-linux-gnu/debug/store
+build/requests/store.x86_64-unknown-linux-gnu.dev.toml
+build/x86_64-unknown-linux-gnu/dev/store
+build/x86_64-unknown-linux-gnu/dev/pricing-tests
+build/x86_64-unknown-linux-gnu/dev/store-tests
 ```
 
 `pricing` is a `library`, so `silk build` makes no file for it; its test runner is still built.
 
-This holds when you build from inside a member folder too. A member's own `[build].output-dir` is refused:
-
-```
-Invalid Silk project manifest /home/you/shop/pricing/silk.toml: build.output-dir cannot be set in a workspace member; set workspace.output-dir instead
-```
-
-Because members share a directory, their package names must differ. See **Build outputs and native linking** for the layout.
+This holds when you build from inside a member folder too. The enclosing workspace owns the output directory. Artifacts, saved requests and cached steps share that root.
 
 ## See also
 

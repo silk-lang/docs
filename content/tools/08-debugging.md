@@ -26,7 +26,7 @@ silk run --quiet
 ```
 
 ```
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/scores in 0.01s
+Finished build/x86_64-unknown-linux-gnu/dev/scores in 0.01s
 fatal trap: index out of bounds
   at main.pick (main:2:10)
   at main.best
@@ -35,14 +35,14 @@ fatal trap: index out of bounds
 
 The first line is the reason. The next names the function where the trap happened and its site, `module:line:column`: line 2, column 10 of the `main` module, the index expression. The lines below it are the functions that called it, innermost first, by name only. The process then stops with an illegal-instruction signal, so `silk run` exits with status 132.
 
-The calling functions come from an unoptimized build, such as the default `debug` profile. An optimized build names only the trapping function:
+The calling functions come from an unoptimized build, such as the default development compilation. An optimized build names only the trapping function:
 
 ```sh
 silk run --release --quiet
 ```
 
 ```
-Finished build/llvm/x86_64-unknown-linux-gnu/release/scores in 0.94s
+Finished build/x86_64-unknown-linux-gnu/release/scores in 0.94s
 fatal trap: index out of bounds
   at main.pick (main:2:10)
 ```
@@ -207,10 +207,10 @@ silk run --target wasm32-wasip1 --quiet
 ```
 
 ```
-Finished build/llvm/wasm32-wasip1/debug/scores in 0.56s
+Finished build/wasm32-wasip1/dev/scores.wasm in 0.56s
 fatal trap: index out of bounds
   at main.pick (main:2:10)
-Error: failed to run main module `/home/you/scores/build/llvm/wasm32-wasip1/debug/scores`
+Error: failed to run main module `/home/you/scores/build/wasm32-wasip1/dev/scores.wasm`
 
 Caused by:
     0: failed to invoke command default
@@ -257,16 +257,16 @@ fatal trap: index out of bounds
   at main.at (main:10:10)
   at main.pick
   at main.work
-Error: failed to run main module `/home/you/fibers/build/llvm/wasm32-wasip1/debug/fibers`
+Error: failed to run main module `/home/you/fibers/build/wasm32-wasip1/dev/fibers.wasm`
 ```
 
 A build without debug information, such as `--release`, has neither names nor lines, so its trace shows hashed symbols:
 
 ```
-Finished build/llvm/wasm32-wasip1/release/scores in 1.15s
+Finished build/wasm32-wasip1/release/scores.wasm in 1.15s
 fatal trap: index out of bounds
   at main.pick (main:2:10)
-Error: failed to run main module `/home/you/scores/build/llvm/wasm32-wasip1/release/scores`
+Error: failed to run main module `/home/you/scores/build/wasm32-wasip1/release/scores.wasm`
 
 Caused by:
     0: failed to invoke command default
@@ -282,16 +282,11 @@ The `.symbols` file beside the module maps each `silk_...` name back to its decl
 
 ## WebAssembly in a JavaScript host
 
-A `wasm32-unknown-unknown` module has no standard error. It writes its report into a buffer in its own memory and exports it as `silk_report` (a function that returns the address) and `silk_report_length`, next to `memory` and `main`. The std lib's runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`, reads it. Give `scores` a profile for the target:
-
-```toml
-[profiles.web]
-target = "wasm32-unknown-unknown"
-```
+A `wasm32-unknown-unknown` module has no standard error. It writes its report into a buffer in its own memory and exports it as `silk_report` (a function that returns the address) and `silk_report_length`, next to `memory` and `main`. The std lib's runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`, reads it. Select the target in the build command:
 
 ```sh
-silk build --profile web --quiet
-node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/llvm/wasm32-unknown-unknown/web/scores
+silk build --target wasm32-unknown-unknown --quiet
+node <silk>/lib/silk/stdlib/host/wasm-runner.mjs build/wasm32-unknown-unknown/dev/scores.wasm
 ```
 
 ```
@@ -326,7 +321,7 @@ From your own script, `runWasm(bytes, options)` runs the module and resolves to 
 import { readFile } from 'node:fs/promises'
 import { runWasm, SilkError } from './wasm-runner.mjs'
 
-const bytes = await readFile('build/llvm/wasm32-unknown-unknown/web/scores')
+const bytes = await readFile('build/wasm32-unknown-unknown/dev/scores.wasm')
 try {
   console.log('status', await runWasm(bytes))
 } catch (error) {
@@ -355,22 +350,24 @@ A host that instantiates the module itself reads the same buffer: after `main` r
 A debug build of a `wasm32-unknown-unknown` executable keeps its DWARF out of the module it ships, so the file you serve stays small. Two files appear beside it:
 
 ```sh
-ls build/llvm/wasm32-unknown-unknown/web/
+ls build/wasm32-unknown-unknown/dev/
 ```
 
 ```
-scores
-scores.debug.wasm
-scores.inputs
-scores.map
-scores.symbols
-scores.units
+units
+scores.wasm
+scores.wasm.debug.wasm
+scores.wasm.inputs
+scores.wasm.lock
+scores.wasm.map
+scores.wasm.symbols
+scores.wasm.units
 ```
 
-- `scores.debug.wasm` is the same module with its DWARF. The shipped module names it in an `external_debug_info` custom section, which Chrome's DWARF support follows.
-- `scores.map` is a source map derived from the line table, with each source file's text included. The shipped module names it in a `sourceMappingURL` section, which Firefox and Safari read.
+- `scores.wasm.debug.wasm` is the same module with its DWARF. The shipped module names it in an `external_debug_info` custom section, which Chrome's DWARF support follows.
+- `scores.wasm.map` is a source map derived from the line table, with each source file's text included. The shipped module names it in a `sourceMappingURL` section, which Firefox and Safari read.
 
-Both names are relative, so serve the two files next to the module. A build without debug information, such as `release`, writes neither, and its module has no name section.
+Both names are relative, so serve the two files next to the module. A build without debug information, such as `--release`, writes neither, and its module has no name section.
 
 ## Line tables
 
@@ -378,7 +375,7 @@ An unoptimized debug executable, native or wasm, carries line tables, so debugge
 
 ## silk debug
 
-`silk debug` builds the package like `silk run` and starts it under a debugger instead of running it. It takes the options of `silk run` except `--coredump`, plus `--port`, and passes the program's arguments the same way. Use a profile with debug information, such as the default `debug`: a `--release` build has none.
+`silk debug` builds the package like `silk run` and starts it under a debugger instead of running it. It takes the options of `silk run` except `--coredump`, plus `--port`, and passes the program's arguments the same way. Select debug information with `--debug true`: a `--release` build has none.
 
 ### Native programs
 
@@ -412,11 +409,11 @@ silk debug --quiet
 ```
 
 ```
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/shapes in 0.01s
-(lldb) target create "/home/you/shapes/build/llvm/x86_64-unknown-linux-gnu/debug/shapes"
-Current executable set to '/home/you/shapes/build/llvm/x86_64-unknown-linux-gnu/debug/shapes' (x86_64).
+Finished build/x86_64-unknown-linux-gnu/dev/shapes in 0.01s
+(lldb) target create "/home/you/shapes/build/x86_64-unknown-linux-gnu/dev/shapes"
+Current executable set to '/home/you/shapes/build/x86_64-unknown-linux-gnu/dev/shapes' (x86_64).
 (lldb) run
-Process 3293 launched: '/home/you/shapes/build/llvm/x86_64-unknown-linux-gnu/debug/shapes' (x86_64)
+Process 3293 launched: '/home/you/shapes/build/x86_64-unknown-linux-gnu/dev/shapes' (x86_64)
 fatal trap: arithmetic overflow
   at main.area (main:4:16)
   at main.main
@@ -471,7 +468,7 @@ silk debug --target wasm32-wasip1 --quiet
 ```
 
 ```
-Finished build/llvm/wasm32-wasip1/debug/scores in 0.01s
+Finished build/wasm32-wasip1/dev/scores.wasm in 0.01s
 Debugger: Debugger listening on 127.0.0.1:1234
 Debugger: In LLDB, attach with: process connect --plugin wasm connect://127.0.0.1:1234
 ```

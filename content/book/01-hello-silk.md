@@ -85,13 +85,13 @@ silk run
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.06s
   check     1 module                          0.15s
   codegen   689 functions                     0.17s
   borrow    229 bodies                        0.01s
   link      clang                             0.36s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.80s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 0.80s
 Hello, world!
 ```
 
@@ -204,7 +204,7 @@ silk run
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.02s
   check     failed: 1 module, 1 error         0.19s
 [x86_64-unknown-linux-gnu]
@@ -258,19 +258,19 @@ silk build
 ```
 
 ```
-Compiling tasks (x86_64-unknown-linux-gnu, debug)
+Compiling tasks (x86_64-unknown-linux-gnu, dev)
   load      143 modules, 1 in package         0.06s
   check     1 module                          0.17s
   codegen   709 functions                     0.15s
   borrow    234 bodies                        0.01s
   link      clang                             0.34s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/tasks in 0.74s
+Finished build/x86_64-unknown-linux-gnu/dev/tasks in 0.74s
 ```
 
-A build runs the same phases as a check, then two more: `codegen` turns the functions your program uses into machine code, and `link` runs Clang to make the executable. The last line names the file it wrote. The program is a native executable at `build/llvm/<target>/debug/tasks`. On 64-bit Linux the target is `x86_64-unknown-linux-gnu`. `debug` is the default build: compiled quickly, without optimizations. You can run the file directly, with no `silk` involved:
+A build runs the same phases as a check, then two more: `codegen` turns the functions your program uses into machine code, and `link` runs Clang to make the executable. The last line names the file it wrote. The program is a native executable at `build/<target>/dev/tasks`. On 64-bit Linux the target is `x86_64-unknown-linux-gnu`. `dev` is the default build: compiled quickly, without optimizations. You can run the file directly, with no `silk` involved:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/tasks
+./build/x86_64-unknown-linux-gnu/dev/tasks
 ```
 
 ```
@@ -279,7 +279,7 @@ tasks 0.1: nothing to track yet
 
 Next to it you will find `tasks.symbols`, a table that maps the program's machine-level symbol names back to Silk names. `tasks.inputs` records the files the build read, and the `tasks.units` folder caches compiled pieces, so the next build can skip work that has not changed.
 
-Two more commands round out the set for now. `silk build --release` builds an optimized program into `build/llvm/<target>/release/` instead. `silk clean` deletes the `build` folder when you want a fresh start. Chapter 11 returns to build options.
+Two more commands round out the set for now. `silk build --release` builds an optimized program into `build/<target>/release/` instead. `silk clean` deletes the `build` folder when you want a fresh start. Chapter 11 returns to build options.
 
 ## Summary
 
@@ -287,6 +287,6 @@ Two more commands round out the set for now. `silk build --release` builds an op
 - A program starts at `pub fn main` or `pub effect fn main` in the root module named in `silk.toml`.
 - Printing goes through a `Logger`: `Effect.log` describes a message, `Effect.provideMut(&mut logger)` supplies the logger, and `run` performs it.
 - Log templates are checked at compile time. Placeholders like `{version}` are filled from the fields of a borrowed record like `&.{ version: "0.1" }`.
-- `silk check` reports errors fast, without building. `silk run` builds and runs. `silk build` writes the program to `build/llvm/<target>/debug/tasks`.
+- `silk check` reports errors fast, without building. `silk run` builds and runs. `silk build` writes the program to `build/<target>/dev/tasks`.
 
 Next, in chapter 2, the program starts counting: numbers, bindings, functions and loops.

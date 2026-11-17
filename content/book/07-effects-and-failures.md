@@ -579,7 +579,7 @@ silk run -- list
 To save typing, run the built binary through an alias:
 
 ```sh
-alias tasks=./build/llvm/x86_64-unknown-linux-gnu/debug/tasks
+alias tasks=./build/x86_64-unknown-linux-gnu/dev/tasks
 tasks add 'Call the plumber' high
 tasks done 2
 ```

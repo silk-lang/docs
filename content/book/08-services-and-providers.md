@@ -263,7 +263,7 @@ Most of the `silk/system/filesystem` names, and `List`, are for the test fake la
 
 ## Run it
 
-Start in an empty directory. Below, `tasks` is short for the built binary, `./build/llvm/x86_64-unknown-linux-gnu/debug/tasks`.
+Start in an empty directory. Below, `tasks` is short for the built binary, `./build/x86_64-unknown-linux-gnu/dev/tasks`.
 
 ```sh
 silk run -- list

@@ -347,7 +347,7 @@ Build, then resolve a few names:
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/ask resolve example.com
+./build/x86_64-unknown-linux-gnu/dev/ask resolve example.com
 ```
 
 ```
@@ -356,9 +356,9 @@ silk build
 ```
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/ask resolve '[::1]'
-./build/llvm/x86_64-unknown-linux-gnu/debug/ask resolve ::1
-./build/llvm/x86_64-unknown-linux-gnu/debug/ask resolve no-such-host.invalid
+./build/x86_64-unknown-linux-gnu/dev/ask resolve '[::1]'
+./build/x86_64-unknown-linux-gnu/dev/ask resolve ::1
+./build/x86_64-unknown-linux-gnu/dev/ask resolve no-such-host.invalid
 ```
 
 ```
@@ -370,8 +370,8 @@ ask: no such host
 The addresses you see for `example.com` depend on your network. Now start the server in the background and send it a message:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/ask serve 7070 &
-./build/llvm/x86_64-unknown-linux-gnu/debug/ask send 127.0.0.1 7070 'hello over tcp'
+./build/x86_64-unknown-linux-gnu/dev/ask serve 7070 &
+./build/x86_64-unknown-linux-gnu/dev/ask send 127.0.0.1 7070 'hello over tcp'
 ```
 
 ```
@@ -381,7 +381,7 @@ HELLO OVER TCP
 The server handled its one connection and exited, so a second send finds nothing listening:
 
 ```sh
-./build/llvm/x86_64-unknown-linux-gnu/debug/ask send 127.0.0.1 7070 again
+./build/x86_64-unknown-linux-gnu/dev/ask send 127.0.0.1 7070 again
 ```
 
 ```

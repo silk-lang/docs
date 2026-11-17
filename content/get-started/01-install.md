@@ -108,7 +108,7 @@ On macOS, a plain program links with no SDK. A package with C sources or native 
 A build with a Clang older than 22 stops at the link step and names the Clang it found:
 
 ```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
+Compiling hello (x86_64-unknown-linux-gnu, dev)
   load      166 modules, 1 in package         0.03s
   check     1 module                          0.00s
   codegen   387 functions                     0.14s

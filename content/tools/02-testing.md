@@ -55,7 +55,7 @@ Tests  3 passed, 0 failed (0 cached, 3 executed, 3 selected, 3 discovered)
 Time   1 ms
 ```
 
-The runner is a separate executable, built under `build/test/llvm/<target>/<profile>/` with the package's name. It runs on the host, so `--target` must name the host, or a WASI target, whose runner `silk test` starts with `wasmtime` (see **Targets and profiles**). Each test is printed as `module::name`, where the module is the file's path under the source root: `Circle` is `src/Circle.silk`.
+The runner is a separate executable, built as `build/<target>/<mode>/<package>-tests`, with its request in `build/requests/`. It runs on the host, so `--target` must name the host, or a WASI target, whose runner `silk test` starts with `wasmtime` (see **Targets and compilation settings**). Each test is printed as `module::name`, where the module is the file's path under the source root: `Circle` is `src/Circle.silk`.
 
 While it builds the runner, `silk test` prints no progress rows, unlike `silk build`. A compile error is printed as its diagnostic line, and the command exits 1 without running any test.
 

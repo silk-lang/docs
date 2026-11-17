@@ -469,17 +469,17 @@ Build and start the server in the background:
 
 ```sh
 silk build
-./build/llvm/x86_64-unknown-linux-gnu/debug/greeter &
+./build/x86_64-unknown-linux-gnu/dev/greeter &
 ```
 
 ```
-Compiling greeter (x86_64-unknown-linux-gnu, debug)
+Compiling greeter (x86_64-unknown-linux-gnu, dev)
   load      191 modules, 1 in package         0.13s
   check     1 module                          1.06s
   codegen   2,980 functions                   1.00s
   borrow    915 bodies                        0.07s
   link      clang                             0.98s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/greeter in 3.21s
+Finished build/x86_64-unknown-linux-gnu/dev/greeter in 3.21s
 ```
 
 The plain routes, with curl:

@@ -1,78 +1,66 @@
 # Build outputs and native linking
 
-`silk build` turns a package into LLVM IR, then hands it to Clang to produce the file `[package].kind` and `[build].stage` ask for. Every file lands under the output directory, in a folder per target and profile.
+This page covers what a build writes and how Silk code links with C: artifact kinds, the output layout, intermediate stages, Clang, native sources and libraries, prebuilt archives and C headers.
 
-## The build/ layout
+## Artifacts
+
+`[package].kind` says what a package is to its dependents: `executable` (the default) or `library`. The built-in `silk build` links an executable and only checks a library, which other packages compile from source. Every other kind of file is a compilation in a command of `tasks.silk`, chosen by its constructor:
+
+| Constructor | Writes | For |
+| --- | --- | --- |
+| `Compilation.executable(name, root)` | `name`, `name.exe` on Windows, `name.wasm` for WebAssembly | A program |
+| `Compilation.loadableModule(name, root)` | `name.so`, `name.dylib` or `name.dll`; a reactor module for WebAssembly | A plugin, or a library loaded by another language |
+| `Compilation.staticArchive(name, root)` | `name.a`, `name.lib` on Windows | A C program that links Silk code statically |
+| `Compilation.object(name, root)` | `name.o`, `name.obj` on Windows | Another linker |
+| `Compilation.test(name, root)` | A test runner | Tests of a root |
+
+`root` is a path relative to the package directory, such as `"src/lib.silk"`. A library that C programs link builds itself with a command:
+
+```silk
+Tasks.Build { options } => {
+  let archive = run Compilation.staticArchive("vec", "src/lib.silk")
+  let tuned = run archive.optimize(run Deferred<Optimize>.value(options.optimize))
+  let graph = run Build.make()
+  let built = run (run graph.add(move tuned)).compile()
+  drop run built.write("dist")
+}
+```
+
+```
+Compiling vec (x86_64-unknown-linux-gnu, dev)
+Finished build/x86_64-unknown-linux-gnu/dev/vec.a in 0.37s
+```
+
+A static archive holds only code: a plan's named libraries, such as `linkLibrary("m", ...)`, are refused in one today, so leave them to the program that links the archive.
+
+## Output layout
 
 ```
 build/
-  llvm/<target>/<profile>/<file>             silk build, silk run
-  llvm/<target>/<profile>/<file>.symbols     symbol map (every build)
-  llvm/<target>/<profile>/<file>.dSYM/       debug information of a macOS executable built with it
-  llvm/<target>/<profile>/<file>.debug.wasm  the module with its DWARF (wasm32-unknown-unknown executables with debug information)
-  llvm/<target>/<profile>/<file>.map         source map of that module (the same builds)
-  llvm/<target>/<profile>/<file>.inputs      the files the build read, to skip an unchanged rebuild
-  llvm/<target>/<profile>/<file>.units/      cached compiled code, reused by the next build
-  llvm/<target>/<profile>/<file>.lock        held while a build compiles and links this output
-  llvm/<target>/<profile>/<file>.native/     objects compiled from [native].sources
-  test/llvm/<target>/<profile>/<name>        silk test runner
-  cache/<package>/                           the checker's cache, per package
-  tools/<package>/<step>/                    output of a build.silk tool step
-  documentation.json                         silk doc
-  documentation/<member>.json                silk doc at a workspace root
+  <target>/<mode>/<name>          the artifact, with <name>.symbols beside it
+  requests/<name>.<target>.<mode>.toml
+  requests/plan.json              the requests of the last plan
+  steps/<key>/                    each step's cached outputs
+  steps/tasks/<target>/tasks      the tasks program
+  cache/                          the compiler's incremental state
 ```
 
-- `build` is `[build].output-dir`, or `[workspace].output-dir` for workspace members. See **Workspaces**.
-- `<target>` is the full target name, such as `x86_64-unknown-linux-gnu`.
-- `<profile>` is `debug`, `release`, `release-with-debug`, `release-size` or `release-size-with-debug`, or the name of the selected `[profiles.<name>]`. See **Targets and profiles**.
-- The `.inputs`, `.units`, `.native` and `cache` entries only make the next build faster. Deleting them is safe.
-- Two builds of the same output take turns on its `.lock` file, so one never removes objects the other is linking.
-- On macOS, a build with debug information keeps Clang's `<file>.dSYM` bundle beside the executable, so LLDB finds function names and source lines.
-- A `wasm32-unknown-unknown` executable built with debug information ships without its DWARF. The module names `<file>.debug.wasm` in an `external_debug_info` section and `<file>.map` in a `sourceMappingURL` section, so serve them beside it for a browser's debugger. See **Debugging**.
-- `silk clean` deletes the whole output directory.
+The mode is `dev` for `--optimization none`, `release` for `speed` and `size` for `size`. A workspace puts one `build/` at its root, or at its `output-dir`. `built.write(directory)` copies artifacts somewhere else; nothing else writes outside `build/`. Tools read `build/requests/` instead of looking for artifacts.
 
-## File names
+## Intermediate stages
 
-| `[package].kind` | `stage = "final"` (default) |
-| --- | --- |
-| `executable` | `<name>` |
-| `library` | none: the package is checked |
-| `static-library` | `lib<name>.a` |
-| `shared-library` | `lib<name>.so`, `lib<name>.dylib` on macOS (not built yet) |
-| `object` | `<name>.o` |
+`compilation.emit(stage)` writes `final` (the default), `llvm-ir`, `llvm-bitcode`, `assembly`, `object` or `wasm-text` in place of the linked artifact:
 
-| `[build].stage` | File | What Clang does |
-| --- | --- | --- |
-| `llvm-ir` | `<name>.ll` | nothing; the IR as text |
-| `llvm-bitcode` | `<name>.bc` | `-c -emit-llvm` |
-| `assembly` | `<name>.s` | `-S` |
-| `object` | `<name>.o` | `-c` |
-| `final` | as above | compiles and, for an executable, links |
-
-`<name>` is `[package].name`, hyphens kept: `libtext-utils.a`. A non-final stage stops before linking, so it works for any target. For a single file, `silk build <source> -o <output> --emit <stage>` does the same. With `stage = "assembly"` in `[build]`, the package from `silk init hello` builds `hello.s`:
-
-```
-Compiling hello (x86_64-unknown-linux-gnu, debug)
-  load      143 modules, 1 in package         0.06s
-  check     1 module                          0.14s
-  codegen   689 functions                     0.18s
-  borrow    229 bodies                        0.01s
-  link      clang                             0.29s
-Finished build/llvm/x86_64-unknown-linux-gnu/debug/hello.s in 0.71s
+```silk
+let base = run app(&options)
+let ir = run base.emit(run Deferred<String>.value(run String.copy("llvm-ir")))
 ```
 
-The `link` row is the Clang step whatever the stage; for `assembly` it runs `clang -S`.
-
-## The symbol map
-
-Each output of a build has a `.symbols` file beside it, optimized builds included, so a hashed `silk_...` name in a crash report or a profiler can be traced to its declaration. Each line is a native symbol, its kind and the Silk declaration it comes from, separated by tabs:
-
 ```
-main	export	hello@0.1.0:silk/platform/native/start.silk::_._.enter
-silk_e0307b61cbd3a68762f928296596e9cb	function	hello@0.1.0:silk/platform/native/start.silk::_._.enter
+Finished build/x86_64-unknown-linux-gnu/dev/app.ll in 0.00s
 ```
 
-Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file form prints one `Compiled` line instead of progress: `silk build src/main.silk -o hello.s --emit assembly` prints `Compiled src/main.silk -> hello.s (llvm, x86_64-unknown-linux-gnu, 339 symbols)`, with both paths relative to the current directory, or in full when a file is outside it. Its symbol count is the number of lines in this file.
+A single file takes `--emit` directly: `silk build main.silk -o main.ll --emit llvm-ir`. Intermediate output keeps each package's optimization and debug settings and does not include native link inputs.
 
 ## Finding Clang
 
@@ -87,8 +75,8 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 - Static archives use `SILK_LLVM_AR` when set, else the `llvm-ar` in Clang's directory.
 - Clang runs with only `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `LANG`, `LC_ALL` and `LC_CTYPE` from your environment. `CFLAGS`, `LDFLAGS` and similar are not passed.
 - An executable link adds `-lc -lm` after everything else.
-- On Linux, an executable links with the `ld.lld` in Clang's installation directory (the `InstalledDir` line of `clang --version`) when there is one, through `--ld-path`. Otherwise Clang uses the system linker. A `platform-supply` that names a linker, and a no-libc build, keep their own linker. The bundled Clang has its `ld.lld` beside it. The progress row reads `link      clang` either way.
-- On Linux, an executable is not position independent unless its profile sets `relocation = "pic"`: the default links with `-fno-pic` and `-no-pie`. See Targets and profiles.
+- On Linux, an executable links with the `ld.lld` in Clang's installation directory (the `InstalledDir` line of `clang --version`) when there is one, through `--ld-path`. Otherwise Clang uses the system linker. An explicit platform supply that names a linker, and a no-libc build, keep their own linker. The bundled Clang has its `ld.lld` beside it. The progress row reads `link      clang` either way.
+- On Linux, an executable is not position independent unless `Compilation.relocation` selects `pic`: the default links with `-fno-pic` and `-no-pie`. See Targets and compilation settings.
 
 | Problem | Message |
 | --- | --- |
@@ -98,181 +86,105 @@ Kinds are `export` (a C name), `function`, `drop` and `helper`. The single-file 
 
 Each of these fails the target and exits 2. `silk build` and `silk run` print the message, then a `link      failed` row and a `Failed` line.
 
-## macOS SDK and Linux sysroots
+## Platform supplies
 
-A program with no C link inputs links without an SDK or sysroot on any host:
+`compilation.platform(deferred)` names the sysroot, the linker and compiler-support directories for a cross link that needs the target's system libraries, as a `Platform` value from `silk.build.request` with absolute `sysroot` and `linker` paths and a list of `support` installations. Without a supply, the build finds the host's SDK itself and records what it found in the request, so a replay does not find a different one. An object or an intermediate stage needs no SDK.
 
-- On macOS targets, the compiler links against its own stub of `libSystem` with `ld64.lld`, and the default deployment is 12.0.
-- On Linux, a dynamically linked `libc = "gnu"` executable links against stub glibc 2.28 libraries that the compiler writes, with its own `_start`, so it runs on glibc 2.28 or later.
-- On Windows, the compiler writes its own import libraries and links with `lld-link`. Windows never needs an SDK.
+## Native sources and libraries
 
-A macOS program that links C objects, archives, libraries or frameworks needs a real SDK. The compiler resolves it once per build, in this order:
+What a package always needs, wherever it is compiled, goes in its `build.silk` plan, so it reaches every program that uses the package:
 
-1. `[native].platform-supply`, when the manifest sets one.
-2. `SDKROOT`, when set. An invalid `SDKROOT` fails; it never falls back.
-3. `xcrun` discovery, on a Mac. One SDK serves both macOS architectures. Without `xcrun`, the link falls back to the stub.
+```silk
+import silk.build.plan { Library, Plan }
+import silk.build.step { sourcePath }
 
-The SDK reaches Clang as `-isysroot`, with `-mmacosx-version-min` from the profile's `deployment`. With an SDK the default deployment is 11.0, raised to the SDK's minimum when the SDK no longer supports 11.0. A Linux executable with C link inputs, or a static one, needs the target's own libraries: the host's toolchain supplies them for the host's target, and a cross build needs an `explicit` platform supply that names a sysroot.
+pub const PLAN: Plan = Plan.empty()
+  |> Plan.compileC(sourcePath("native/helper.c"))
+  |> Plan.includePath(sourcePath("include"))
+  |> Plan.linkLibrary("m", Library.dynamicSearch())
+```
 
-`[native].platform-supply` takes one of:
+**Build plans and generated code** lists every plan step: one file or a glob of files with their flags and include directories, libraries, frameworks, archives, objects, search paths, runtime search paths, linker scripts and symbol order files.
 
-| Value | Meaning |
+A named library or framework says how it is linked with a value:
+
+| Value | Links |
 | --- | --- |
-| `{ kind = "automatic" }` | The default: the order above. |
-| `{ kind = "native" }` | Host discovery, named explicitly. |
-| `{ kind = "explicit", target = "...", root = "...", linker = "...", origin = "...", support = [...] }` | An installed SDK or sysroot at `root` (`-isysroot` on macOS, `--sysroot` on Linux), the linker at `linker` (`--ld-path`), and optional GCC support installations, each `{ root, target, origin }` (`--gcc-install-dir`). `origin` is a label. |
-| `{ kind = "managed", name = "..." }` | Recognized, not supported: `UnsupportedProvider: x (project)`. |
+| `Library.dynamicSearch()` | The shared library the linker finds, such as `-lm` |
+| `Library.staticSearch()` | The static form of the library |
+| `Framework.make()` | A macOS framework |
+| `.weak()` | So the program still starts when the library or framework is missing |
+| `.needed()` | Kept even when no symbol refers to it |
 
-Each kind takes only the keys shown. A key it does not take, here `name` under `kind = "native"`, is refused at its own line, and so is an extra key in a `support` entry (`native.platform-supply.support.<key>`):
+What only the root program needs, or what depends on the command, goes on its `Compilation`. The same steps take deferred values there, so a source or a library name can come from another step:
 
-```toml
-[native.platform-supply]
-kind = "native"
-name = "x"
-```
-
-```
-Invalid Silk project manifest /home/you/hello/silk.toml:8: native.platform-supply.name is not a supported field
-```
-
-Any other shape, such as an unknown `kind`, a string instead of a table, or an `explicit` supply for a target it cannot serve, is refused at the line that writes `platform-supply`, or at the `[native.platform-supply]` header:
-
-```
-Invalid Silk project manifest /home/you/hello/silk.toml:7: InvalidConfiguration: platform-supply (/home/you/hello/silk.toml:native.platform-supply)
-```
-
-## Extra native link inputs
-
-`[native].link` adds C objects, archives and libraries to the link. Each entry is a table with exactly one kind:
-
-| Entry | Linker argument | Notes |
-| --- | --- | --- |
-| `{ object = "native/scale.o" }` | the path |  |
-| `{ static-archive = "native/libscale.a" }` | the path |  |
-| `{ search-path = "native" }` | `-L<path>` |  |
-| `{ library = "scale", mode = "dynamic" }` | `-lscale` |  |
-| `{ library = "scale", mode = "static" }` | `-Wl,-Bstatic -lscale -Wl,-Bdynamic` | not on macOS |
-| `{ linker-script = "link.ld" }` | `-Xlinker -T -Xlinker <path>` | Linux only |
-| `{ framework = "Security" }` | `-framework Security` | macOS only |
-
-- Paths are relative to the manifest, with no absolute paths and no `..`.
-- Inputs go to the linker in the order listed, before `-lc -lm`.
-- An `object` artifact merges only objects and archives into its `.o`. A `static-library` adds only objects as archive members.
-
-A C function linked into a Silk program:
-
-```c
-int scale(int value) {
-  return value * 3;
+```silk
+Tasks.Build { options } => {
+  let mut flags = List<String>.make()
+  run flags.append(run String.copy("-DTWO=2"))
+  let base = run Compilation.fromPackage(&options)
+  let withC = run base.compileC(
+    run Deferred<Path>.source("native/twice.c"),
+    run Deferred<List<String>>.value(move flags),
+    List<Deferred<Path>>.make(),
+  )
+  let linked = run withC.linkLibrary(
+    run Deferred<String>.value(run String.copy("m")),
+    Library.dynamicSearch(),
+  )
+  let graph = run Build.make()
+  drop run (run graph.add(move linked)).compile()
 }
 ```
 
-```sh
-clang -c -fPIC native/scale.c -o native/scale.o
+`compilation.linkArtifact(other.artifact())` links what another compilation builds, such as a static archive, and builds it first.
+
+### A package of only C
+
+A dependency's plan links into a program once the program imports one of the dependency's modules. A package that only wraps C sources has nothing to import: the program declares the C functions itself. Its plan links when the dependent names it with `Plan.linkDependency`. Here `cdouble` compiles one C file:
+
+```silk
+// cdouble/build.silk
+import silk.build.plan { Plan }
+import silk.build.step { sourcePath }
+
+pub const PLAN: Plan = Plan.empty() |> Plan.compileC(sourcePath("native/double.c"))
 ```
 
-```toml
-[native]
-link = [{ object = "native/scale.o" }]
+```c
+// cdouble/native/double.c
+int cdouble_twice(int value) { return value * 2; }
+```
+
+The application lists `cdouble = { path = "../cdouble" }` under `[dependencies]` and links it from its own plan:
+
+```silk
+// app/build.silk
+import silk.build.plan { Plan }
+
+pub const PLAN: Plan = Plan.empty() |> Plan.linkDependency("cdouble")
 ```
 
 ```silk
-unsafe extern "C" fn scale(value: i32) -> i32
+// app/src/main.silk
+unsafe extern "C" fn cdouble_twice(value: i32) -> i32
 
 pub fn main() -> i32 {
-  return unsafe scale(14)
+  return unsafe cdouble_twice(21) - 42
 }
 ```
 
-```sh
-silk run; echo "exit $?"
-```
+`silk run` exits with 0. Without the `linkDependency` line the link stops with `ld.lld: error: undefined symbol: cdouble_twice`, and a name the manifest does not declare refuses the plan:
 
 ```
-exit 42
+silk: /home/you/app/build.silk: build.silk computes no plan: Plan.linkDependency names `cdoubel`, which the package's manifest does not declare
 ```
-
-A bad entry stops the build with exit status 1 and names the manifest and the entry's index. A path must stay inside the package, so an absolute path, or one with `.` or `..` segments, is refused on purpose:
-
-```
-silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: object /tmp/abs.o must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files
-```
-
-An entry with no kind, or with two, ends in `an entry is exactly one object, static-archive, search-path, linker-script or framework value, or one library with mode "static" or "dynamic"`. A bad `mode` ends in `a library's mode must be "static" or "dynamic"`. A file that does not exist is reported by Clang at link time, `clang: error: no such file or directory: '/home/you/cmix/native/missing.o'`, and the build exits 1.
-
-An entry the target cannot link, such as `{ framework = "Security" }` on Linux, is refused when the build reaches the link. `silk check` accepts it. `silk build` checks and generates code, then fails that package's link and exits 1:
-
-```
-Compiling cmix (x86_64-unknown-linux-gnu, debug)
-  load      135 modules, 1 in package         0.06s
-  check     1 module                          0.09s
-  codegen   484 functions                     0.13s
-  borrow    147 bodies                        0.00s
-[x86_64-unknown-linux-gnu]
-silk: invalid native link input: /home/you/cmix/silk.toml: [native].link[0]: framework Security links only on macOS targets
-  link      failed                            0.02s
-Failed cmix in 0.33s
-```
-
-See **Unsafe code and C interop** in the reference for `extern "C"`.
-
-### Per-platform entries
-
-Any entry may add `os`, one of `"macos"`, `"linux"`, `"windows"` and `"wasi"`, or a list of them. A build for another operating system skips the entry instead of refusing it, so one manifest declares each platform's libraries and frameworks:
-
-```toml
-[native]
-link = [
-  { library = "m", mode = "dynamic" },
-  { framework = "Metal", os = "macos" },
-  { library = "stdc++", mode = "dynamic", os = ["linux", "wasi"] },
-]
-```
-
-### Inputs of dependencies
-
-A library's `[native].link` reaches every executable that depends on it, directly or through other packages, so the executable's manifest repeats none of it.
-
-- The executable's own inputs come first, then each dependency's, with every package before the packages it depends on, so an archive follows the objects and archives that use it.
-- An input that several packages list (the same file, the same library with the same mode, or the same framework) links once, at its last place.
-- A `static-library` or `object` artifact links only its own manifest's inputs.
-
-## Compiling C sources
-
-`[native].sources` lists C, Objective-C, C++ and Objective-C++ files of the package. The build compiles them with the same Clang it links with, so there is no separate `clang -c` step to remember:
-
-```toml
-[native]
-sources = [
-  { c = "native/*.c", include = ["native/include"], flags = ["-DSHIM_VERSION=2", "-Wall"] },
-  { objc = "native/metal/*.m", flags = ["-fno-objc-arc", "-fblocks"], os = "macos" },
-]
-```
-
-| Key | Meaning |
-| --- | --- |
-| `c`, `objc`, `cpp`, `objcpp` | Exactly one: the language and the files, as a path or a list of paths relative to the manifest's directory. A `*` in the last segment matches the files of that directory, in name order; a pattern that matches nothing is refused |
-| `include` | Directories of the package to search for headers |
-| `flags` | Extra Clang flags, from an allowlist |
-| `os` | The systems the entry applies to, as for `link` |
-
-- The objects link ahead of the package's `link` entries and reach dependent executables the same way, so a dependency's C code compiles without any setup in your package. A `static-library` artifact archives them.
-- Each file compiles with the build's target, optimization, debug information, CPU and platform supply.
-- `flags` takes defines (`-D`, `-U`), warnings (`-W`, `-w`, `-pedantic`), a language standard (`-std=`), optimization (`-O`), debug information (`-g`) and code generation flags (`-f`, `-m`). A flag that hands arguments to another tool (`-Wl,`, `-Wa,`, `-Wp,`, `-mllvm`), loads code, or names a file for Clang (`-fplugin`, `-I`, `-include`, `-B`, `@file`, sanitizer and profile lists) is refused, naming the manifest line. Use `include` for header directories.
-
-Objects are cached in `<file>.native` beside the output, named by a digest of the Clang, the flags, the file and the package headers it includes. An edit to one file or header compiles only the objects it reaches, a build that changes none of them starts no Clang at all, and `silk check` compiles nothing.
 
 ## Prebuilt archives
 
-`[native.archive.<name>]` pins a prebuilt archive, such as a vendor's SDK, by `url` and `sha256`. A path written `<name>:<path>` in `link` or `sources` names a file inside it, so the package uses the SDK without copying it in:
+`[native.archive.<name>]` pins a prebuilt archive, such as a vendor's SDK, by `url` and `sha256`. `Plan.archivePath(name, path)` names a file inside it, so the package uses the SDK without copying it in:
 
 ```toml
-[native]
-link = [
-  { static-archive = "dawn:lib/libwebgpu_dawn.a", os = "macos" },
-  { static-archive = "dawn:lib64/libwebgpu_dawn.a", os = "linux" },
-]
-
 [native.archive.dawn.targets.aarch64-apple-darwin]
 url = "https://github.com/google/dawn/releases/download/<version>/Dawn-<commit>-macos-latest-Release.tar.gz"
 sha256 = "d4f419dcbe81de4b86e6fbf172b647f41c67820a925efca55dae3bd43248d8e2"
@@ -303,152 +215,14 @@ path = "../dawn-build"
 
 or, for one machine, in `$SILK_HOME/native-overrides.toml`. An override is never fetched, a relative path is resolved against the file that names it, and the machine's file wins over the root manifest. A dependency's overrides are ignored.
 
-## Function order
+## C libraries and platform metadata
 
-`[native].function-order` names a text file of symbols that a Linux or macOS executable places first, in the order listed, so that code which runs together shares memory pages:
+`Compilation.header` emits a C header describing exported C declarations, including supported aggregates and callbacks. `emittedHeader` exposes that output as a deferred path. Windows `importLibrary` and `emittedImportLibrary` do the same for an import library.
 
-```toml
-[native]
-function-order = "order.txt"
-```
+`Compilation.windows` accepts a subsystem, manifest and resource files. Resources are compiled with the bundled LLVM resource compiler. `Compilation.macos` accepts a dylib install name and signing entitlements; entitlement signing runs on macOS. `Compilation.wasm` controls memory imports, shared memory, table export and command or reactor execution.
 
-```
-# hot path first
-silk_f0247e45df317956d0904dd2e95b51a8
-main
-```
+A native shared library uses dynamic linking and position-independent code. Unsupported combinations are refused before linking.
 
-- One symbol per line, as the symbol map or `nm` spells it. Blank lines and lines starting with `#` are skipped. On macOS the compiler adds the leading `_` itself.
-- Linux links with function sections and passes the file to lld as `--symbol-ordering-file`; macOS passes it as `-order_file`. A wasm32 module ignores it.
-- The path follows the same rule as `[native].link`: `silk: invalid native link input: /home/you/hello/silk.toml: [native].function-order must be a relative path below the manifest's directory, without . or .. segments, so the package names only its own files` (exit 1).
-- A file that cannot be read stops the link: `silk: cannot read the function order file /home/you/hello/order.txt that [native].function-order names` (exit 2).
-- Editing the file relinks the executable, with no other recompilation.
+## Runtime composition
 
-## Runtime composition (advanced)
-
-An executable starts in a runtime module that sets up the process and calls `main`. Without `[unstable].composition`, the compiler takes it from the std lib's catalog (`compositions.json`):
-
-| Targets | libc | Runtime |
-| --- | --- | --- |
-| `aarch64-apple-darwin` | `system` | `silk/platform/native/start` (hosted) |
-| Linux x86-64 and arm64 | `gnu` | `silk/platform/native/start` (hosted) |
-| `wasm32-unknown-unknown` | `none` | `silk/platform/wasm/start` (standalone) |
-| `wasm32-wasip1`, `wasm32-wasip2` | `none` | `silk/platform/wasi/start` (wasi) |
-
-`[unstable].composition` replaces the catalog for one package. Its keys:
-
-| Key | Meaning |
-| --- | --- |
-| `runtimes` | `[{ name = "...", module = "silk/..." }]`: runtimes this package may use. |
-| `defaults` | Exactly one runtime name, used unless the profile's `runtime` names another. An executable needs one. Each entry must be a string: `unstable.composition.defaults entries must be runtime names`. A name not listed in `runtimes` is refused at its line: `unstable.composition.defaults entry "main" names no runtime in unstable.composition.runtimes; it lists "start"`, or `it lists none`. |
-| `components` | `[{ capability = "execution-storage", bindings = [{ operation = "...", module = "...", declaration = "..." }] }]`: the `create`, `acquire`, `release` and `destroy` operations of execution storage, bound to module declarations. `execution-storage` is the only capability; any other is refused, as in `unstable.composition.components.capability = "other" is not supported by the native compiler; the only capability is "execution-storage"`. An `operation` other than those four is refused at its line: `unstable.composition.components.bindings.operation = "frobnicate" is not an operation; use create, acquire, release or destroy`. So is one that is not a string (`unstable.composition.components.bindings.operation must be a string: create, acquire, release or destroy`), and an entry with no `operation` at the entry's line (`unstable.composition.components.bindings entry has no operation; use create, acquire, release or destroy`). |
-| `retention` | `[{ module = "...", declaration = "..." }]`: extra declarations kept in the output. |
-| `requirements` | Must be empty: `unstable.composition.requirements is not supported by the native compiler yet`. |
-
-Any other key is refused at its line, as in `Invalid Silk project manifest /home/you/hello/silk.toml:7: unstable.composition.bogus is not a supported field`. So is a key the entries of these lists do not take, even inside an array written over several lines:
-
-```toml
-[unstable]
-composition = { runtimes = [
-  { name = "synchronous", module = "silk/platform/native/start_sync" },
-  { name = "hosted", modul = "silk/platform/native/start" },
-], defaults = ["synchronous"] }
-```
-
-```
-Invalid Silk project manifest /home/you/hello/silk.toml:9: unstable.composition.runtimes.modul is not a supported field; did you mean unstable.composition.runtimes.module?
-```
-
-Line 9 is the line that writes `modul`. A misspelled key in a `retention` entry is refused the same way (`unstable.composition.retention.decl is not a supported field`), and in a component's `bindings` entry as `unstable.composition.components.bindings.<key>`.
-
-For example, `silk/platform/native/start_sync` is a smaller hosted runtime for a `main` that returns `i32` and needs only `HostInput`:
-
-```toml
-[unstable]
-composition = { runtimes = [{ name = "synchronous", module = "silk/platform/native/start_sync" }], defaults = ["synchronous"] }
-```
-
-```silk
-import silk.system.host_input { HostInput, HostInputError }
-import silk.num.usize
-
-pub effect fn main() -> i32
-  ! HostInputError
-  ? &mut HostInput {
-  let count = run HostInput.argumentCount()
-  if count == usize.ONE {
-    return 0
-  }
-  return 3
-}
-```
-
-```sh
-silk run -- a b; echo "exit $?"
-```
-
-```
-exit 3
-```
-
-A `main` the runtime cannot start is SEM0225. Here `main` is a plain `pub fn main() -> i32`:
-
-```
-Compiling sync (x86_64-unknown-linux-gnu, debug)
-  load      123 modules, 1 in package         0.07s
-  check     1 module                          0.05s
-  codegen   failed: 117 functions, 1 error    0.01s
-[x86_64-unknown-linux-gnu]
-src/main.silk:1:8: error[SEM0225] Entry point `main` has a result or requirement the selected runtime `silk/platform/native/start_sync` cannot start
-Failed sync in 0.15s
-```
-
-A composition that leaves no single runtime, such as one with two runtimes and no `defaults`, is `silk: the build selects no single runtime (ARTIFACT-001)`. A std lib runtime selected for a target its catalog entry does not list, such as `silk/platform/native/start` for `wasm32-wasip1`, is refused before anything compiles, and the message names the runtime to use: ``silk: the runtime module silk/platform/native/start does not support the target wasm32-wasip1; list silk/platform/wasi/start in [unstable.composition].runtimes and select it for this profile with `runtime = { kind = "named", name = ... }` (ARTIFACT-001)``. A default that `runtimes` does not list is refused earlier, at its line in `silk.toml` (see the `defaults` key above). Read a runtime module's page in the Std lib API reference before you select it. Linux without libc in Targets and profiles shows the `silk/platform/linux/start` case.
-
-## Building without a runtime
-
-A profile with `runtime = { kind = "none" }` builds with no runtime module, so nothing calls the Silk `main`. The program starts in a C `main` that you export:
-
-```toml
-[build]
-profile = "bare"
-
-[profiles.bare]
-target = "x86_64-unknown-linux-gnu"
-runtime = { kind = "none" }
-```
-
-```silk
-export "C" fn start() -> i32 as "main" {
-  return 7
-}
-```
-
-```sh
-silk run; echo "exit $?"
-```
-
-```
-exit 7
-```
-
-An executable that exports no C `main` is refused before Clang runs, with exit status 2. Here `main` is a plain `pub fn main() -> i32`, and `silk build` prints:
-
-```
-Compiling tiny (x86_64-unknown-linux-gnu, bare)
-  load      116 modules, 1 in package         0.00s
-  check     1 module                          0.00s
-  codegen   0 functions                       0.00s
-  borrow    1 body                            0.00s
-[x86_64-unknown-linux-gnu]
-silk: an executable built with runtime = { kind = "none" } has no `main`; export one, as `export "C" fn start() -> i32 as "main"` does, or select a runtime
-Failed tiny in 0.01s
-```
-
-- `silk check` does not look for the C `main`; only an executable build does.
-- An `object` or `static-library` artifact, and a non-final stage, need no `main`.
-- When the package has native link inputs, one of them may define `main`, so the compiler leaves the check to the linker. A link without one fails with Clang's ``undefined reference to `main'`` and exit status 1.
-
-## See also
-
-The manifest, Targets and profiles, Libraries and exports, Workspaces, Build plans and generated code; **Unsafe code and C interop** and **Program entry and termination** in the reference.
+`[unstable.composition]` remains package metadata for runtime providers. A root compilation selects a runtime with `Compilation.runtime`. A native executable using runtime `none` must export a C `main` or link an input that provides it. Library artifacts acquire no executable startup.

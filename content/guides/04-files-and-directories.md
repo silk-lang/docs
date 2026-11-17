@@ -298,7 +298,7 @@ import silk.testing.testing { AssertionError, Testing }
 
 ## Run it
 
-Build, then run the binary from an empty directory. Below, `notes` stands for `./build/llvm/x86_64-unknown-linux-gnu/debug/notes`.
+Build, then run the binary from an empty directory. Below, `notes` stands for `./build/x86_64-unknown-linux-gnu/dev/notes`.
 
 ```sh
 silk build
