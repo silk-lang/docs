@@ -31,7 +31,7 @@ Compiling vec (x86_64-unknown-linux-gnu, dev)
 Finished build/x86_64-unknown-linux-gnu/dev/vec.a in 0.37s
 ```
 
-A static archive holds only code: a plan's named libraries, such as `linkLibrary("m", ...)`, are refused in one today, so leave them to the program that links the archive.
+A static archive holds only code. A plan's named libraries, frameworks, search paths and runtime search paths, such as `linkLibrary("m", ...)`, add no member: they belong to the final link of the program that uses the archive, so pass them to that link yourself. A plan's prebuilt archive or linker script is refused in a static archive, with a message that names it.
 
 ## Output layout
 
@@ -41,7 +41,7 @@ build/
   requests/<name>.<target>.<mode>.toml
   requests/plan.json              the requests of the last plan
   steps/<key>/                    each step's cached outputs
-  steps/tasks/<target>/tasks      the tasks program
+  steps/tasks/<package>/<target>/tasks   the tasks program
   cache/                          the compiler's incremental state
 ```
 
@@ -88,7 +88,23 @@ Each of these fails the target and exits 2. `silk build` and `silk run` print th
 
 ## Platform supplies
 
-`compilation.platform(deferred)` names the sysroot, the linker and compiler-support directories for a cross link that needs the target's system libraries, as a `Platform` value from `silk.build.request` with absolute `sysroot` and `linker` paths and a list of `support` installations. Without a supply, the build finds the host's SDK itself and records what it found in the request, so a replay does not find a different one. An object or an intermediate stage needs no SDK.
+Without a supply, the build finds the host's SDK itself and records what it found in the request, so a replay does not find a different one. An object or an intermediate stage needs no SDK. For a cross link that needs the target's system libraries, `compilation.platform(deferred)` names them: a `Platform` value from `silk.build.request` with an absolute `sysroot` and `linker` and a list of `support` installations, each an `Installation` with a target triple and a root directory. Import both with `import silk.build.request { Installation, Platform }`:
+
+```silk
+Tasks.Build { options } => {
+  let sdk = Platform {
+    sysroot: run String.copy("/opt/sysroots/aarch64-linux-gnu"),
+    linker: run String.copy("/opt/llvm/bin/ld.lld"),
+    support: List<Installation>.make(),
+  }
+  let base = run Compilation.fromPackage(&options)
+  let supplied = run base.platform(run Deferred<Platform>.value(move sdk))
+  let graph = run Build.make()
+  drop run (run graph.add(move supplied)).compile()
+}
+```
+
+The request records the supply as `platform = {sysroot = "...", linker = "...", support = []}`. The sysroot and support directories are keyed by their paths, as a host toolchain is, so updating a sysroot in place does not rebuild; the linker is keyed by its contents.
 
 ## Native sources and libraries
 

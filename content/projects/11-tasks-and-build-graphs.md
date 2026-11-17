@@ -117,7 +117,7 @@ Compiling app tasks (x86_64-unknown-linux-gnu, dev)
   codegen   6,209 functions                   3.92s
   borrow    1,606 bodies                      0.10s
   link      clang                             1.18s
-Finished build/steps/tasks/x86_64-unknown-linux-gnu/tasks in 5.42s
+Finished build/steps/tasks/app/x86_64-unknown-linux-gnu/tasks in 5.42s
 Compiling app (x86_64-unknown-linux-gnu, dev)
   load      172 modules, 1 in package         0.04s
   check     2 modules                         0.02s
@@ -131,7 +131,7 @@ The tasks program is cached like any compilation. A second `silk build` with not
 
 ```
 Compiling app tasks (x86_64-unknown-linux-gnu, dev)
-Finished build/steps/tasks/x86_64-unknown-linux-gnu/tasks in 0.00s
+Finished build/steps/tasks/app/x86_64-unknown-linux-gnu/tasks in 0.00s
 Finished build/x86_64-unknown-linux-gnu/dev/app in 0.02s
 ```
 
@@ -152,9 +152,17 @@ The request in `build/requests/app.x86_64-unknown-linux-gnu.dev.toml` now record
 
 The built-ins do not call your variants. A project whose `Build` optimizes the renderer gets the built-in, unoptimized compilation from `silk run` unless it also defines `Run`. Share the graph between commands with an ordinary function, as below.
 
-The arguments after the command go to your program, so `silk build --release --target wasm32-wasip1` reaches `Build` as `options`. The toolchain still reads `--manifest-path`, `--stdlib` and `--clang` before it starts the program. Other toolchain flags, such as `-q`, `--progress`, `--timings`, `--ignore-warnings` and `--backend`, are not accepted by a command of your own: declare them as fields if your command needs them.
+The arguments after the command go to your program, so `silk build --release --target wasm32-wasip1` reaches `Build` as `options`. The toolchain still reads `--manifest-path`, `--stdlib` and `--clang` before it starts the program. It also keeps `-q`, `--progress`, `--timings`, `--ignore-warnings` and `--backend`, and their `=` forms: your program never sees them, and they apply to every compilation its graph builds, so `silk build -q` stays quiet and `silk build --ignore-warnings` gets past a warning with a `Build` of your own. `--backend` and `--ignore-warnings` are part of each compilation's key; the display options are not, so `-q` never forces a rebuild.
 
-`silk check` does not build or check `src/tasks.silk`. A mistake in it shows when a command first builds the tasks program.
+`silk check` also checks `src/tasks.silk`, for the host, as `silk task` builds it. That check comes first and has a cache of its own, and a mistake in it fails the command:
+
+```
+Checking app (x86_64-unknown-linux-gnu)
+  check     failed: 2 modules, 1 error        0.00s
+[x86_64-unknown-linux-gnu]
+src/tasks.silk:105:29: error[SEM0006] Unknown value nope
+Failed app in 0.02s
+```
 
 A `tasks.silk` imports the package's own dependencies like any module of the package. A dependency only the tasks use is fetched only when the tasks program is built. The tasks program is built from what `tasks.silk` imports: the package's own modules, and its `build.silk` plan, come in only when `tasks.silk` imports one of them, so C the application links never reaches the tasks.
 
@@ -357,7 +365,7 @@ silk build --target x86_64-unknown-linux-gnu --target wasm32-wasip1
 
 ```
 Compiling app tasks (x86_64-unknown-linux-gnu, dev)
-Finished build/steps/tasks/x86_64-unknown-linux-gnu/tasks in 0.00s
+Finished build/steps/tasks/app/x86_64-unknown-linux-gnu/tasks in 0.00s
 Compiling app (x86_64-unknown-linux-gnu, dev)
 Compiling app (wasm32-wasip1, dev)
 Finished build/x86_64-unknown-linux-gnu/dev/app in 1.66s

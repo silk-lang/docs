@@ -293,7 +293,7 @@ silk: /home/you/tables/build.silk: build.silk computes no plan: build process fa
 Failed tables in 0.21s
 ```
 
-A step that exits 0 without writing a declared output fails with `the process did not write a declared output`.
+A step that exits 0 without writing a declared output fails with `the process did not write its declared output colors.silk`, naming the file.
 
 ### The sandbox
 
@@ -316,7 +316,7 @@ silk: /home/you/tables/build.silk: build.silk computes no plan: package tools re
 The root package's tool steps always run. A dependency's run only when its entry in the root manifest says `tools = true`, so adding a dependency never starts a program you did not agree to:
 
 ```
-silk: /home/you/greeter/build.silk: build.silk computes no plan: this dependency is not authorized to run package tools
+silk: /home/you/greeter/build.silk: build.silk computes no plan: this dependency runs a package tool without permission; add `tools = true` to its entry under [dependencies] in the root package's silk.toml
 ```
 
 ```toml

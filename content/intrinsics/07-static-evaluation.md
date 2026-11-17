@@ -1105,7 +1105,7 @@ static fn reflectEnumLabel<Enum>(value: Enum) -> string<'static>
 
 Returns the declared member name of a scalar enum value during static evaluation. The argument must be a static value of that enum.
 
-- Wrapper: [`Reflect.enumLabel`](/docs/std/core-reflect#Reflect.impl.enumLabel).
+- Wrapper: [`Reflect.enumLabelOf`](/docs/std/core-reflect#Reflect.impl.enumLabelOf), which also takes a value known only at runtime.
 
 ```silk
 pub enum Mode {
