@@ -16,7 +16,7 @@ Commands embed the standard build `Options`. `--target` selects a platform, `--o
 | `wasm32-wasip1` | WebAssembly with WASI Preview 1, a core module | `none` |
 | `wasm32-wasip2` | WebAssembly with WASI Preview 2, a component | `none` |
 
-The two Linux targets also have a no-libc form: the same target name with a profile that sets `libc = "none"`.
+The two Linux targets also have a no-libc form: the same target name with a compilation whose `libc` setting is `none`.
 
 - `host` means the target the compiler runs on. `--target host` accepts it; resolved requests contain the concrete target.
 - Any other name is refused: `Unsupported target riscv64` (exit 2).
@@ -73,14 +73,14 @@ Optimized executables may use 1 through 256 codegen units. More units can shorte
 
 ## CPU features at run time
 
-A profile's `cpu` features apply to the whole program, and the program needs a machine that has them. To ship one binary that runs everywhere and goes faster where it can, keep the profile at the baseline, compile the hot function for more features, and call it only after the machine reports them.
+A compilation's `cpu` features apply to the whole program, and the program needs a machine that has them. To ship one binary that runs everywhere and goes faster where it can, keep the compilation at the baseline, compile the hot function for more features, and call it only after the machine reports them.
 
-- `silk/simd/cpu`, `CpuFeatures`: `CpuFeatures.detect()` asks the running machine; `CpuFeatures.selected()` is the set the profile selects. `has(&features, "avx2")` tests one name, spelled as in `cpu.features`; `containsAll(&features, &other)` tests a whole set.
+- `silk/simd/cpu`, `CpuFeatures`: `CpuFeatures.detect()` asks the running machine; `CpuFeatures.selected()` is the set the compilation selects. `has(&features, "avx2")` tests one name, spelled as in `cpu.features`; `containsAll(&features, &other)` tests a whole set.
 - `detect()` reads `cpuid` on x86-64 Linux, with or without libc, counting AVX and AVX-512 only when the operating system saves their registers. It reads `getauxval` on arm64 Linux with GNU libc and `sysctlbyname` on arm64 macOS. Elsewhere, such as in a wasm32 module, which cannot ask the engine, it reports the selected set. The result always includes the selected set.
 - Every name in the `cpu.features` table above can be tested, `sha` and `aes` included. The examples in Intrinsics include one that runs `sha256rnds2` only where `detect()` reports `sha`.
 - Detection is not cached. Call `detect()` once at start and keep the value.
-- The directive `@features("avx2")`, on the line before an `unsafe fn`, compiles that function with the listed features, the features they imply and the profile's own. Each call is `unsafe`: the caller has checked the machine. The rules are in Intrinsics, under Functions compiled for CPU features.
-- A detected feature does not change `Target.hasCpuFeature`, which reads the profile at compile time, and neither does a function's `@features` list. The `silk/simd/x86` and `silk/simd/aarch64` wrappers and `simd.preferredBytes()` keep their profile answers inside such a function.
+- The directive `@features("avx2")`, on the line before an `unsafe fn`, compiles that function with the listed features, the features they imply and the compilation's own. Each call is `unsafe`: the caller has checked the machine. The rules are in Intrinsics, under Functions compiled for CPU features.
+- A detected feature does not change `Target.hasCpuFeature`, which reads the compilation's settings at compile time, and neither does a function's `@features` list. The `silk/simd/x86` and `silk/simd/aarch64` wrappers and `simd.preferredBytes()` keep their compilation answers inside such a function.
 
 The same portable loop, compiled twice. In a release build the optimizer inlines `total` into `totalAvx2` and vectorizes it with 32-byte AVX2 registers; the rest of the program stays at the default x86-64 level:
 
@@ -147,4 +147,4 @@ Memory and stack limits in deferred settings and requests are integer byte count
 
 ## Profile-guided optimization
 
-Use an explicit compilation definition and request when a script needs specialized compiler settings. The compiler repository's profile-guided build script resolves those settings and compiles the saved request. It does not create a manifest profile or pass JSON settings on the command line.
+Use an explicit compilation definition and request when a script needs specialized compiler settings. The compiler repository's profile-guided build script resolves those settings and compiles the saved request. It does not write a manifest or pass JSON settings on the command line.

@@ -833,7 +833,7 @@ A `Path` is always absolute, so the task joins its file names to `Task.root()`, 
 
 ### Running a task
 
-`silk task` builds the package's `tasks` profile, an executable for this machine whose root module is `src/tasks.silk`, and runs it from the package directory. It needs no entry in `silk.toml`. Without a task name it prints the list:
+`silk task` builds `src/tasks.silk` as an executable for this machine and runs it from the package directory. It needs no entry in `silk.toml`. Without a task name it prints the list:
 
 ```
 $ silk task
@@ -907,7 +907,7 @@ A task that needs another task calls it: tasks are ordinary functions.
 
 A `Build` variant replaces the built-in `silk build`. It embeds standard `Options`, constructs the graph and ends with `Build.compile`. A `Plan` variant constructs the editor graph and ends with `Build.write`. Generated modules should be `WriteFiles` or `Run` outputs passed as deferred paths, so the runner can order, cache and describe them.
 
-A package with a `tasks.silk` sends `build`, `run`, `test` and `plan` to its tasks program. For one of them the union has no variant for, `Task.main` runs nothing and the toolchain runs its built-in. Dependencies never run their own tasks.
+A package with a `tasks.silk` sends `build`, `run`, `test` and `plan` to its tasks program. For one of them the union has no variant for, `Task.main` runs nothing and the toolchain runs its built-in. Dependencies never run their own tasks. **Tasks and build graphs** in Projects and packages covers graphs in full, and **Migrating from manifest builds** shows how old `[tasks]` hooks and profiles map onto commands.
 
 ### What a task can see
 

@@ -68,7 +68,7 @@ Neither adds a timestamp. `StderrLogger` adds the newline itself, so its templat
 
 Each exists only on its target; elsewhere its module declares nothing. Neither allocates, adds a level name, a timestamp or a newline, or can fail.
 
-`ConsoleLogger.make()` takes no arguments. A module imports `silk.console` only when it provides `ConsoleLogger`, so a module that logs some other way still imports nothing. The std lib's runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`, supplies the import and calls the console method of each level: `console.debug` for trace and debug, then `console.info`, `console.warn` and `console.error`. In a package `greeter` with a `web` profile that targets `wasm32-unknown-unknown`:
+`ConsoleLogger.make()` takes no arguments. A module imports `silk.console` only when it provides `ConsoleLogger`, so a module that logs some other way still imports nothing. The std lib's runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`, supplies the import and calls the console method of each level: `console.debug` for trace and debug, then `console.info`, `console.warn` and `console.error`. In a package `greeter` built with `--target wasm32-unknown-unknown`:
 
 ```silk
 import silk.core.effect { Effect }

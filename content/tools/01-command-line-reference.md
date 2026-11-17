@@ -171,7 +171,7 @@ That is `silk check --target host --target wasm32-wasip1` on the program `silk i
 
 ### The check server
 
-On Linux (GNU) and macOS, the last check of a `silk check` run that checks one package leaves a copy of itself behind, a check server. It keeps everything that check loaded and listens on a Unix socket in `$XDG_RUNTIME_DIR`, or in `/tmp/silk-<uid>` when that is not set. The socket is named after what the check depends on besides the sources: the compiler, the manifest, the profile, the standard library and the output options. The next `silk check` of the same project asks the server first. The server rereads the files that changed, rechecks only what the edit reaches and answers with the diagnostics and the exit status, usually in a few hundredths of a second. A served check prints no phase rows:
+On Linux (GNU) and macOS, the last check of a `silk check` run that checks one package leaves a copy of itself behind, a check server. It keeps everything that check loaded and listens on a Unix socket in `$XDG_RUNTIME_DIR`, or in `/tmp/silk-<uid>` when that is not set. The socket is named after what the check depends on besides the sources: the compiler, the manifest, the build options, the standard library and the output options. The next `silk check` of the same project asks the server first. The server rereads the files that changed, rechecks only what the edit reaches and answers with the diagnostics and the exit status, usually in a few hundredths of a second. A served check prints no phase rows:
 
 ```
 $ silk check
@@ -249,7 +249,7 @@ Builds the executable as `run` does and starts it under a debugger, with the pro
 - On a native target it replaces itself with LLDB, as `lldb -- <program> [arguments...]`. LLDB is `SILK_LLDB`, else `lldb` on `PATH`. Without one, the build finishes and the command stops with `` silk: `debug` needs lldb on PATH or SILK_LLDB `` (exit 2).
 - On a WASI target it runs `wasmtime run -g <port>`, Wasmtime's debugger stub, which waits for LLDB before the program starts. `--port` takes a port or `address:port`; the default is 1234. Attach from LLDB with `process connect --plugin wasm connect://127.0.0.1:1234`.
 
-`--port` matters only on WASI, and `debug` takes no `--coredump`. Use a profile with debug information, such as the default `debug`, so the debugger sees Silk names, lines and variables. See **Debugging**.
+`--port` matters only on WASI, and `debug` takes no `--coredump`. Use a build with debug information, such as the default dev build, so the debugger sees Silk names, lines and variables. See **Debugging**.
 
 ## test
 
@@ -294,7 +294,7 @@ silk pack [--list] [--output <dir>] [--json] [--bin] [--sign <file>] [shared pro
 silk pack --new-key <path>
 ```
 
-`pack` checks the package as `check` does, then writes its release files in `build/package/`, or `--output`: the source archive `<name>-<version>.tar.gz`, the documentation `<name>-<version>.docs.json`, and `SHA256SUMS`. `--bin` also builds each target's executable, with the release profile unless a profile option chooses another, and writes `<name>-<version>-<target>.tar.gz`. `--sign <file>`, or the key text in `SILK_SIGNING_KEY`, writes a minisign `<file>.minisig` beside every file. `--new-key <path>` writes a new key pair and packs nothing. `--list` prints the files the source archive would hold and writes nothing.
+`pack` checks the package as `check` does, then writes its release files in `build/package/`, or `--output`: the source archive `<name>-<version>.tar.gz`, the documentation `<name>-<version>.docs.json`, and `SHA256SUMS`. `--bin` also builds each target's executable, as a release build unless `--optimization` or `--debug` chooses otherwise, and writes `<name>-<version>-<target>.tar.gz`. `--sign <file>`, or the key text in `SILK_SIGNING_KEY`, writes a minisign `<file>.minisig` beside every file. `--new-key <path>` writes a new key pair and packs nothing. `--list` prints the files the source archive would hold and writes nothing.
 
 ```
 wrote /home/you/greet/build/package/greet-0.1.0.tar.gz (4 files, 432 bytes)
@@ -537,7 +537,7 @@ With `SILK_RECEIPTS` set in the environment, a failed build prints each diagnost
 | --- | --- |
 | 0 | Success. For `format --check`: every file is already formatted |
 | 1 | The work ran and failed: compile errors, a failing test, a `--file` or `--filter` that matched no test, files that need formatting, a failing doc test, stale reference pages, a `--stdlib` that is not a std lib, a bad native link input, any `silk change` error including a malformed `silk change` command line |
-| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key or a profile field the native compiler cannot build yet), an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target, an unknown workspace member, a source file or folder named `silk` or `Intrinsic`, a dependency or `exports` problem, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
+| 2 | The command could not start: a malformed command line (it names the argument it refuses, suggests the closest option for a misspelled one, and prints the command's usage lines), an unknown command, no manifest, an invalid manifest (including an unknown key, such as a removed `[profiles]` table), an executable built with `runtime = { kind = "none" }` that exports no C `main`, an unknown target, an unknown workspace member, a source file or folder named `silk` or `Intrinsic`, a dependency or `exports` problem, conflicting options, a refused `init`, `add` or `remove`, a Clang that is missing or does not start, a construct the compiler does not support yet |
 | 3, 4, 5 | From the tool: the selected version is not installed, a download failed, or a release failed verification. See "Exit status of the tool" |
 | other | `silk run` only: the program's own status. `silk debug` exits with the debugger's status |
 

@@ -30,7 +30,7 @@ The default executable root is `src/main.silk`. A library uses `kind = "library"
 | `description`, `license`, `repository`, `homepage`, `readme` | no | string | Publishing metadata. Builds never read it. In a template, `silk init --list` shows the `description`; see Project templates. |
 | `authors`, `keywords` | no | array of strings | Publishing metadata. Builds never read it. |
 
-A `library` is Silk source for other packages to import: `silk build` checks it and makes no file. The other library kinds make an archive or a shared library.
+A `library` is Silk source for other packages to import: `silk build` checks it and makes no file. To make an archive, a shared library or an object, a root command builds a `Compilation.staticArchive`, `loadableModule` or `object`; see Build outputs and native linking.
 
 The package identity is `name@version`, such as `hello@0.1.0`. Diagnostics, resolved parameter bindings and symbol maps use it.
 
@@ -63,7 +63,7 @@ Commands a template runs once, when `silk init --template` creates a project fro
 | `run` | array of strings | The program, then its arguments. A program with a `/` is a path below the manifest's directory; a bare name is searched on `/usr/local/bin:/usr/bin:/bin`. |
 | `arguments` | boolean | When `true`, the command also gets the arguments given to `silk init` after `--`. Default `false`. |
 
-Each command runs in the build tool sandbox, with `SILK_VERSION` set to the creating compiler's release. See Project templates, and Hooks and scripts for every hook a package can have.
+Each command runs in the build tool sandbox, with `SILK_VERSION` set to the creating compiler's release. See Project templates. Work around a build, such as checks before it, is a command in `src/tasks.silk`; see Tasks and build graphs.
 
 ## &#91;component\]
 
@@ -106,4 +106,4 @@ Settings that belong to other tools, such as an editor. The compiler never reads
 
 The compiler derives manifest validation and `silk manifest-schema` from one Silk schema. Unknown tables and fields are refused at their source location. A package source root must be inside the package, dependencies must name valid pins, and exported modules must exist.
 
-Use **Tasks and build graphs** for command implementations and **Build plans and generated code** for package requirements. The manifest contains no compilation profiles, hooks, generators or build settings.
+Use **Tasks and build graphs** for command implementations and **Build plans and generated code** for package requirements. The manifest contains no compilation profiles, hooks, generators or build settings. A manifest written for the old build system stops at the first removed key; **Migrating from manifest builds** shows what replaces each one.

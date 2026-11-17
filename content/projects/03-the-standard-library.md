@@ -16,7 +16,7 @@ The standard library is the package `silk`. Every package can import its modules
 | Effects and `run` helpers | `import silk.core.effect { Effect }` |
 | Logging to standard output | `import silk.io.logger { LogError }`, `import silk.io.logger_native { StdoutLogger }` |
 | Test assertions | `import silk.testing.testing { AssertionError, Testing }` |
-| Build facts (target, profile) | `import silk.core.target { Target }`, `import silk.core.compilation { Compilation }` |
+| Build facts (target, compilation settings) | `import silk.core.target { Target }`, `import silk.core.compilation { Compilation }` |
 
 ## Categories
 

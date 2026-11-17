@@ -1,12 +1,66 @@
 # Build outputs and native linking
 
-A compilation's constructor chooses its artifact: `Compilation.executable`, `loadableModule`, `staticArchive`, `object` or `test`. A manifest's `kind` describes a source package as an executable or library.
+This page covers what a build writes and how Silk code links with C: artifact kinds, the output layout, intermediate stages, Clang, native sources and libraries, prebuilt archives and C headers.
+
+## Artifacts
+
+`[package].kind` says what a package is to its dependents: `executable` (the default) or `library`. The built-in `silk build` links an executable and only checks a library, which other packages compile from source. Every other kind of file is a compilation in a command of `tasks.silk`, chosen by its constructor:
+
+| Constructor | Writes | For |
+| --- | --- | --- |
+| `Compilation.executable(name, root)` | `name`, `name.exe` on Windows, `name.wasm` for WebAssembly | A program |
+| `Compilation.loadableModule(name, root)` | `name.so`, `name.dylib` or `name.dll`; a reactor module for WebAssembly | A plugin, or a library loaded by another language |
+| `Compilation.staticArchive(name, root)` | `name.a`, `name.lib` on Windows | A C program that links Silk code statically |
+| `Compilation.object(name, root)` | `name.o`, `name.obj` on Windows | Another linker |
+| `Compilation.test(name, root)` | A test runner | Tests of a root |
+
+`root` is a path relative to the package directory, such as `"src/lib.silk"`. A library that C programs link builds itself with a command:
+
+```silk
+Tasks.Build { options } => {
+  let archive = run Compilation.staticArchive("vec", "src/lib.silk")
+  let tuned = run archive.optimize(run Deferred<Optimize>.value(options.optimize))
+  let graph = run Build.make()
+  let built = run (run graph.add(move tuned)).compile()
+  drop run built.write("dist")
+}
+```
+
+```
+Compiling vec (x86_64-unknown-linux-gnu, dev)
+Finished build/x86_64-unknown-linux-gnu/dev/vec.a in 0.37s
+```
+
+A static archive holds only code: a plan's named libraries, such as `linkLibrary("m", ...)`, are refused in one today, so leave them to the program that links the archive.
 
 ## Output layout
 
-The runner writes artifacts to `build/<target>/<mode>/<name>`, under the workspace's `output-dir` when configured. `Built.write` copies them to distribution directories. Request files and their index live in `build/requests`; tools read those records instead of scanning build directories.
+```
+build/
+  <target>/<mode>/<name>          the artifact, with <name>.symbols beside it
+  requests/<name>.<target>.<mode>.toml
+  requests/plan.json              the requests of the last plan
+  steps/<key>/                    each step's cached outputs
+  steps/tasks/<target>/tasks      the tasks program
+  cache/                          the compiler's incremental state
+```
 
-`Compilation.emit` selects `final`, `llvm-ir`, `llvm-bitcode`, `assembly`, `object` or `wasm-text`. Intermediate output preserves the defining package's optimization and debug settings. It does not merge native link inputs into the intermediate artifact.
+The mode is `dev` for `--optimization none`, `release` for `speed` and `size` for `size`. A workspace puts one `build/` at its root, or at its `output-dir`. `built.write(directory)` copies artifacts somewhere else; nothing else writes outside `build/`. Tools read `build/requests/` instead of looking for artifacts.
+
+## Intermediate stages
+
+`compilation.emit(stage)` writes `final` (the default), `llvm-ir`, `llvm-bitcode`, `assembly`, `object` or `wasm-text` in place of the linked artifact:
+
+```silk
+let base = run app(&options)
+let ir = run base.emit(run Deferred<String>.value(run String.copy("llvm-ir")))
+```
+
+```
+Finished build/x86_64-unknown-linux-gnu/dev/app.ll in 0.00s
+```
+
+A single file takes `--emit` directly: `silk build main.silk -o main.ll --emit llvm-ir`. Intermediate output keeps each package's optimization and debug settings and does not include native link inputs.
 
 ## Finding Clang
 
@@ -34,25 +88,56 @@ Each of these fails the target and exits 2. `silk build` and `silk run` print th
 
 ## Platform supplies
 
-`Compilation.platform` selects an SDK, sysroot, linker and support installations. Resolution captures automatic host SDK discovery in the request, so replay does not rediscover a different SDK. Cross links requiring system libraries need a suitable target supply. Cross-target object emission does not need a linker SDK.
+`compilation.platform(deferred)` names the sysroot, the linker and compiler-support directories for a cross link that needs the target's system libraries, as a `Platform` value from `silk.build.request` with absolute `sysroot` and `linker` paths and a list of `support` installations. Without a supply, the build finds the host's SDK itself and records what it found in the request, so a replay does not find a different one. An object or an intermediate stage needs no SDK.
 
 ## Native sources and libraries
 
-A package exports `PLAN` from `build.silk`:
+What a package always needs, wherever it is compiled, goes in its `build.silk` plan, so it reaches every program that uses the package:
 
 ```silk
-import silk.build.plan { Plan }
+import silk.build.plan { Library, Plan }
 import silk.build.step { sourcePath }
 
 pub const PLAN: Plan = Plan.empty()
   |> Plan.compileC(sourcePath("native/helper.c"))
   |> Plan.includePath(sourcePath("include"))
-  |> Plan.linkLibrary("m", "dynamic", false, false)
+  |> Plan.linkLibrary("m", Library.dynamicSearch())
 ```
 
-Use `compileCpp`, `compileObjectiveC` and `compileObjectiveCpp` for other source languages. `compileNative` supplies per-file flags and include directories, while `compileSources` declares a glob. `linkObject`, `linkArchive`, `searchPath`, `frameworkSearchPath`, `linkFramework`, `rpath`, `linkerScript` and `functionOrder` describe link inputs. A static target condition selects platform-specific entries.
+**Build plans and generated code** lists every plan step: one file or a glob of files with their flags and include directories, libraries, frameworks, archives, objects, search paths, runtime search paths, linker scripts and symbol order files.
 
-Root `Compilation` values provide equivalent operations using deferred inputs. `linkArtifact` links the output of another compilation and orders it through the graph. Framework and library operations carry weak and needed flags.
+A named library or framework says how it is linked with a value:
+
+| Value | Links |
+| --- | --- |
+| `Library.dynamicSearch()` | The shared library the linker finds, such as `-lm` |
+| `Library.staticSearch()` | The static form of the library |
+| `Framework.make()` | A macOS framework |
+| `.weak()` | So the program still starts when the library or framework is missing |
+| `.needed()` | Kept even when no symbol refers to it |
+
+What only the root program needs, or what depends on the command, goes on its `Compilation`. The same steps take deferred values there, so a source or a library name can come from another step:
+
+```silk
+Tasks.Build { options } => {
+  let mut flags = List<String>.make()
+  run flags.append(run String.copy("-DTWO=2"))
+  let base = run Compilation.fromPackage(&options)
+  let withC = run base.compileC(
+    run Deferred<Path>.source("native/twice.c"),
+    run Deferred<List<String>>.value(move flags),
+    List<Deferred<Path>>.make(),
+  )
+  let linked = run withC.linkLibrary(
+    run Deferred<String>.value(run String.copy("m")),
+    Library.dynamicSearch(),
+  )
+  let graph = run Build.make()
+  drop run (run graph.add(move linked)).compile()
+}
+```
+
+`compilation.linkArtifact(other.artifact())` links what another compilation builds, such as a static archive, and builds it first.
 
 ## Prebuilt archives
 

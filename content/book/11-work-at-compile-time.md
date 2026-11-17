@@ -20,7 +20,7 @@ Start with the file name and the reminder budget. Replace the `FILE` constant wi
 
 ```silk
 // The board lives in `fileName`, inside the FileSystem provider's root.
-// Package parameters: static values the build can set from silk.toml or a profile.
+// Package parameters: static values a build plan or a tasks command can set.
 pub param fileName: string = "/tasks.txt"
 pub param remindBudgetMs: u32 = 250 where remindBudgetMs > 0 && remindBudgetMs <= 60000
 ```

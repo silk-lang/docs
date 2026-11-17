@@ -18,7 +18,7 @@ Terms the book and the reference use, with the reference page that defines each 
 | Suspension | A running Effect stopping at a `run` and resuming later. A suspension point is a `run` whose Effect can suspend; parking an `Execution` is the only external suspension. | Suspension and cancellation |
 | Trap | A fatal runtime error, such as arithmetic overflow, division by zero or an out-of-bounds index. It does not unwind and runs no cleanup, finalizers or `Drop` hooks. | Program entry and termination |
 | Compilation settings | The target and source facts captured by a compilation request, together with backend and platform options. A task constructs these values. | Tasks and build graphs |
-| Target | The machine a build compiles for, given as a triple such as `x86_64-unknown-linux-gnu` by `--target` or a profile. `silk/core/target` exposes its architecture, operating system and other facts to static code. | Static control flow and reflection |
+| Target | The machine a build compiles for, given as a triple such as `x86_64-unknown-linux-gnu` by `--target` or a compilation's `target` setting. `silk/core/target` exposes its architecture, operating system and other facts to static code. | Static control flow and reflection |
 
 ## Other terms
 

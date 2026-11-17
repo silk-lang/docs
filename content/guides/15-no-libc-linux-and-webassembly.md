@@ -2,7 +2,7 @@
 
 Silk builds for six targets, and the std lib reference documents eight profiles of them. Three profiles are ordinary hosted systems with a C library: `aarch64-apple-darwin`, `aarch64-unknown-linux-gnu` and `x86_64-unknown-linux-gnu`. The other five have no C library at all:
 
-- Linux without libc: `x86_64-unknown-linux-gnu-no-libc` and its `aarch64` twin, which are the Linux targets with `libc = "none"` in the profile, not separate target names.
+- Linux without libc: `x86_64-unknown-linux-gnu-no-libc` and its `aarch64` twin, which are the Linux targets with a compilation whose `libc` is `none`, not separate target names.
 - Bare WebAssembly: `wasm32-unknown-unknown`, which gets nothing from its host.
 - WASI: `wasm32-wasip1` (a core module that imports `wasi_snapshot_preview1`) and `wasm32-wasip2` (a WASI 0.2 component).
 
@@ -65,7 +65,7 @@ A target alone does not say how a program starts. The runtime module does that, 
 - `standalone` (`silk/platform/wasm/start`) exports `main` from the WebAssembly module. The host calls it with no arguments and receives an `i32`: an `i32` result passes through, a unit result is 0, and a typed failure is 1. It gives the program no host services.
 - `wasi` (`silk/platform/wasi/start`) exports `_start`, the WASI command entry. `main` may return `i32` or `()`, or be an `effect fn` with either result; it may require `&mut HostInput`, which reads the WASI arguments and environment. A failure exits with status 1. Other services need providers you create in `main`, as on a hosted target.
 
-A root command can construct separate compilations for raw Linux, standalone WebAssembly and WASI. Use `Compilation.target` with the concrete target and `Compilation.runtime` with `"raw"`, `"standalone"` or `"wasi"`. The raw Linux compilation also sets `Compilation.libc` to `"none"`. These operations take deferred strings. A command named `bare` can compile the raw Linux graph; a `Plan` command publishes its request for the editor.
+A root command can construct separate compilations for raw Linux, standalone WebAssembly and WASI. Use `Compilation.target` with the concrete target and `Compilation.runtime` with `"raw"`, `"standalone"` or `"wasi"`. The raw Linux compilation also sets `Compilation.libc` to `"none"`. These operations take deferred strings. A `--bare` option can select the raw Linux compilation; a `Plan` command publishes its request for the editor.
 
 The execution-storage component supports the task runner's fibers. The task program uses the hosted default while its graph selects the application runtime. Once a composition is present it replaces the catalog. Include each runtime the graph selects. A missing runtime is refused before code generation. Standard standalone and WASI builds can use the target's catalog when no custom composition is needed.
 
@@ -279,7 +279,7 @@ Finished squares in 0.14s
 
 ## Mistakes the checks catch
 
-Copy the hosted `main`, with its `StdoutWriter` import, into the `Freestanding` arm in place of the one there. The host and WASI builds are unaffected, but the `web` check fails:
+Copy the hosted `main`, with its `StdoutWriter` import, into the `Freestanding` arm in place of the one there. The host and WASI builds are unaffected, but the `wasm32-unknown-unknown` check fails:
 
 ```sh
 silk plan --target wasm32-unknown-unknown
@@ -391,11 +391,11 @@ A JavaScript host cannot block, so a wait on the monotonic clock, such as `Effec
 
 A module has no standard error, so when `main` fails with an unhandled error, or the program traps, the module writes the same report a native program prints into a buffer in its own memory: `silk_report()` returns its address and `silk_report_length()` its length. The runner prints it. For a trap it also prints the engine's stack, whose frames carry Silk names such as `main.pick`, and exits with 134. From a script, `runWasm` from the same file resolves to `main`'s status and rejects a trap with a `SilkError` whose `report` property holds the report. The error type of the Effect that `main` returns must implement `Debug`, as on every other target.
 
-The `web` profile sets no `debug`, so the build has debug information. The module then ships without its DWARF: it is written beside the module as `squares.debug.wasm`, which Chrome's DWARF support reads, with a source map, `squares.map`, for Firefox and Safari. The module names both in custom sections. **Debugging** in the Tools section shows the reports, the runner's API and these files.
+A dev build has debug information. The module then ships without its DWARF: it is written beside the module as `squares.debug.wasm`, which Chrome's DWARF support reads, with a source map, `squares.map`, for Firefox and Safari. The module names both in custom sections. **Debugging** in the Tools section shows the reports, the runner's API and these files.
 
 An `export "C" fn` in the program is exported from the module under its name, next to `main`, so the host can call it with numbers. Only scalar and pointer arguments cross that boundary on wasm32; C statics, variadic functions and callbacks are refused.
 
-A wasm32 profile may also set `threading = "multi"`. The module then imports a shared memory, plus the wasi-threads `thread-spawn` function when it starts threads, and `silk/concurrency/thread_native` runs each thread as a Worker under `wasm-runner.mjs`. `max-memory` in the profile caps the memory, for example `max-memory = "256MiB"`; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit.
+A wasm32 compilation may also set `threading` to `multi`. The module then imports a shared memory, plus the wasi-threads `thread-spawn` function when it starts threads, and `silk/concurrency/thread_native` runs each thread as a Worker under `wasm-runner.mjs`. The compilation's `maxMemory` setting caps the memory, for example 256 MiB; threaded modules default to 1 GiB. Joining a thread frees its stack, so a program that starts and joins threads in a loop does not use up that limit.
 
 ## Build and run a WASI module
 
@@ -445,7 +445,7 @@ sum of squares to 10: 385
 
 ### Preview 2 components
 
-`wasm32-wasip2` builds the same core module and then turns it into a WASI 0.2 component. That step runs `wasm-tools` (on `PATH`, or named by `SILK_WASM_TOOLS`) with the Preview 1 command adapter that `SILK_WASI_ADAPTER` points to. Without `wasm-tools`, a profile with `target = "wasm32-wasip2"` checks and compiles, then fails at the link step with status 2:
+`wasm32-wasip2` builds the same core module and then turns it into a WASI 0.2 component. That step runs `wasm-tools` (on `PATH`, or named by `SILK_WASM_TOOLS`) with the Preview 1 command adapter that `SILK_WASI_ADAPTER` points to. Without `wasm-tools`, a `wasm32-wasip2` build checks and compiles, then fails at the link step with status 2:
 
 ```
 silk: wasm32-wasip2 needs wasm-tools on PATH or SILK_WASM_TOOLS

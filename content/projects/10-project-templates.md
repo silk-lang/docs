@@ -244,4 +244,4 @@ A script that should not stay in the project can remove itself as its last step.
 
 ## See also
 
-Hooks and scripts, The manifest, Workspaces; `init` in the Command-line reference.
+Tasks and build graphs, The manifest, Workspaces; `init` in the Command-line reference.
