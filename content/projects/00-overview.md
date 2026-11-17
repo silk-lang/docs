@@ -15,7 +15,7 @@ These pages cover how Silk code is organized and built, from a single file up to
 | **Targets and compilation settings** | Supported targets, cross builds, source facts and per-package code generation. |
 | **Build outputs and native linking** | Artifact kinds, where builds write, intermediate stages, C sources, native libraries and frameworks, and prebuilt archives. |
 | **Build plans and generated code** | Embedding package files, a package's typed `build.silk` plan, its tool steps and the tool sandbox. |
-| **Project templates** | `silk init --template` and `--list`, naming a template, writing one, and its `[[post-init]]` commands. |
+| **Project templates** | `silk init --template` and `--list`, naming a template, writing one, and its next steps and `[[post-init]]` commands. |
 | **Tasks and build graphs** | `src/tasks.silk`: replacing `silk build`, `run`, `test` and `plan`, commands of your own, compilations, package overrides and requests. |
 | **Build steps and deferred values** | `Deferred` values, running programs with `Run`, `WriteFiles`, embedding, steps of your own, and the step cache. |
 | **Packaging releases** | `silk pack`: the source archive, documentation, binaries, checksums and minisign signatures to attach to a release, and `publish = false`. |

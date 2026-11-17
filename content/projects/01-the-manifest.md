@@ -65,6 +65,16 @@ Commands a template runs once, when `silk init --template` creates a project fro
 
 Each command runs in the build tool sandbox, with `SILK_VERSION` set to the creating compiler's release. See Project templates. Work around a build, such as checks before it, is a command in `src/tasks.silk`; see Tasks and build graphs.
 
+## &#91;template\]
+
+What `silk init --template` shows after it creates a project from this template. `silk init` removes the table from the new manifest, and builds only check its shape.
+
+| Key | Value | Meaning |
+| --- | --- | --- |
+| `next-steps` | array of strings | The commands printed after `cd <project>`, one per line. `[]` prints none. Without it, `silk test` for a library and `silk run` otherwise. |
+
+See Project templates.
+
 ## &#91;component\]
 
 Only a `wasm32-wasip2` executable reads it. Without the table, the component uses the WASI command world the std lib carries.

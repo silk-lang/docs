@@ -1,6 +1,6 @@
 # Project templates
 
-`silk init` creates a new package from a template: a directory of a GitHub repository that holds a `silk.toml`. Without `--template`, it uses the official `default` template, so even a plain `silk init` fetches one. This page covers naming a template, listing templates, what `silk init` copies and changes, and how to write a template of your own, including the `[[post-init]]` commands a template runs once in the new project.
+`silk init` creates a new package from a template: a directory of a GitHub repository that holds a `silk.toml`. Without `--template`, it uses the official `default` template, so even a plain `silk init` fetches one. This page covers naming a template, listing templates, what `silk init` copies and changes, and how to write a template of your own, including the next steps it suggests and the `[[post-init]]` commands it runs once in the new project.
 
 ## Creating a project from a template
 
@@ -10,9 +10,13 @@ silk init site --template acme/starters/web
 
 ```
 Initialized Silk project site at /home/you/site from template acme/starters/web (491fc724043f612c986fe5edb0a5af87bb58e148)
+
+Next steps:
+  cd site
+  silk run
 ```
 
-`-t` is short for `--template`. The last part of the line is the full hash of the commit the files came from, so you can tell later which version of the template a project started from.
+`-t` is short for `--template`. The last part of the first line is the full hash of the commit the files came from, so you can tell later which version of the template a project started from. The next steps are what to run in the new project; a template can set its own (see [Next steps](#next-steps)).
 
 `silk init` with no `--template` uses `silk-lang/examples/default`:
 
@@ -22,6 +26,10 @@ silk init hello
 
 ```
 Initialized Silk project hello at /home/you/hello from template silk-lang/examples/default (3d330376eba6f634d1ca384269e46bc3c96727d8)
+
+Next steps:
+  cd hello
+  silk run
 ```
 
 | Form | Creates |
@@ -108,10 +116,11 @@ Every directory with a `silk.toml` is a template, unless it is inside another te
 3. It edits the new `silk.toml`:
    - In a package template, `[package].name` becomes the project's name (the directory name, or `--name`), `silk-version` becomes the running compiler's release, and `description` is removed, because it describes the template and not your project.
    - In a workspace template, a `[workspace].silk-version` pin becomes the running compiler's release. The members are copied as they are.
-   - Every `[[post-init]]` entry is removed, so it never runs again.
+   - Every `[[post-init]]` entry and the `[template]` table are removed, so they never run again.
 4. A workspace, or a package outside a workspace, gets `/build/` in its `.gitignore`. A `.gitignore` from the template is kept, with the line added when it lacks it.
 5. It runs the template's `[[post-init]]` entries in order, in the project directory.
 6. Inside a workspace, it adds the new package to the root's `members`, as `silk init` always does.
+7. It prints the next steps.
 
 `silk init` never overwrites a file. If the template holds a file that already exists in the project directory, it stops before writing anything and exits 2:
 
@@ -147,15 +156,46 @@ run = ["git", "init", "--quiet"]
 [[post-init]]
 run = ["scripts/setup", "--greeting", "hello"]
 arguments = true
+
+[template]
+next-steps = ["silk run -- --port 8080"]
 ```
 
 Keep the template itself a working package: `name` can be anything, because `silk init` replaces it, and `silk check` in the template's directory checks it like any other package. Builds read `[[post-init]]` only to check its shape, so a template builds with its entries in place.
 
 `description` is what `silk init --list` shows. It is removed from every project made from the template.
 
+## Next steps
+
+After it creates a project, `silk init` prints what to run next: `cd` into the project, then the template's steps. Set them with `next-steps` in a `[template]` table:
+
+```toml
+[template]
+next-steps = ["silk task dev", "silk task build"]
+```
+
+```
+Initialized Silk project site at /home/you/site from template acme/starters/web (491fc724043f612c986fe5edb0a5af87bb58e148)
+
+Next steps:
+  cd site
+  silk task dev
+  silk task build
+```
+
+| Key | Value | Meaning |
+| --- | --- | --- |
+| `next-steps` | array of strings | The commands to run in the new project, one line each, in order. Each is printed as written, so it must be one nonempty line without control characters. `[]` prints no next steps at all. |
+
+Without `next-steps`, the step is `silk test` for a library package (`kind = "library"`) and `silk run` for anything else. `--lib`, `--workspace` and `-t minimal` print those same defaults.
+
+The `cd` line names the project directory relative to where you ran `silk init`, quoted when your shell needs it, such as `cd 'my site'`. It is left out when you created the project in the current directory, as with `silk init .`. Nothing is printed when `silk init` fails.
+
+`silk init` removes the `[template]` table from the new project's `silk.toml`, because it describes the template. Next steps are only printed, so they need no sandbox. Use them for a step that needs the network or your own tools, such as `npm install`, which a `[[post-init]]` entry cannot run.
+
 ## [[post-init]]
 
-A `[[post-init]]` entry names one command that `silk init` runs after it has copied the template, for adjustments that copying cannot make: renaming a module after the package, filling in a placeholder, or printing next steps. Entries run in the order they are written.
+A `[[post-init]]` entry names one command that `silk init` runs after it has copied the template, for adjustments that copying cannot make: renaming a module after the package, or filling in a placeholder. To tell people what to run next, use `next-steps` instead. Entries run in the order they are written.
 
 | Key | Value | Meaning |
 | --- | --- | --- |
@@ -173,9 +213,11 @@ Each command:
 
 What the commands print to standard output and standard error is shown before the `Initialized` line.
 
+An entry cannot fetch or update dependencies: the sandbox has no network, and the installer puts `silk` in `~/.silk/bin`, which is not on the sandbox's `PATH`. Put such a step in `next-steps`.
+
 ### The sandbox
 
-A template is someone else's code, so its entries run in the same operating-system sandbox as the tool steps of `build.silk`: Landlock on Linux 6.7 and newer, and `sandbox-exec` on macOS. An entry can read the system's programs and libraries and the new project. It can write only the new project and its scratch `HOME`, and it cannot open TCP connections. So a template cannot read your other files, reach the network, or change anything outside the project it creates. A step that needs the network, such as installing packages, belongs in the instructions the template prints, for you to run yourself.
+A template is someone else's code, so its entries run in the same operating-system sandbox as the tool steps of `build.silk`: Landlock on Linux 6.7 and newer, and `sandbox-exec` on macOS. An entry can read the system's programs and libraries and the new project. It can write only the new project and its scratch `HOME`, and it cannot open TCP connections. So a template cannot read your other files, reach the network, or change anything outside the project it creates. A step that needs the network, such as installing packages, belongs in the template's `next-steps`, for you to run yourself.
 
 On a host with no sandbox, such as Windows or an older Linux kernel, `silk init` refuses a template that has `[[post-init]]` entries, before it writes anything, and exits 1:
 
