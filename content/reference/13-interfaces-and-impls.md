@@ -67,7 +67,7 @@ InterfaceType  = Path TypeArguments?
 - An inherent member of the same name wins over the interface member in receiver form. Call the interface member through `Interface.member`.
 - A receiver call that matches members from two bounds of one parameter (SEM0200) or two conformances (SEM0202) is ambiguous. Call it through the interface name.
 - A member supplied by an interface cannot be taken as a value with `value.member`. Call it.
-- The conformance is chosen per specialization. There is no runtime dispatch.
+- A generic call chooses its conformance at specialization. A call through an explicitly written `&any I` or `&mut any I` chooses among the concrete types converted to that interface in the program.
 - A `static fn` operation is called during static evaluation, as `Arg.takesValue()` in a `static fn` bounded by `T: Arg`. A runtime call is SEM0176: "`Arg.takesValue` runs only during static evaluation, so runtime code cannot call it".
 
 ## Operator interfaces
