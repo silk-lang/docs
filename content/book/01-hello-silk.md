@@ -59,7 +59,7 @@ silk-version = "0.1.0"
 
 The `name` is the package name, and it also names the program you build. `version` is your package's own version. `silk-version` is the Silk release the package runs with: an installed `silk` hands every command here to that version. The manifest does not name the root module, the file where the compiler starts reading, because the default is the one `silk init` made: `src/main.silk`. Every other file in the package is found by following imports from there.
 
-`.gitignore` holds one line, `/build/`. The build folder is where compiled output goes, and you never commit it.
+`.gitignore` holds two lines. `/build/` is the build folder, where compiled output goes, and you never commit it. `/silk.local.toml` is a file you may write later to build against your own copy of a dependency; it names folders on your machine, so it stays out of version control too.
 
 `src/main.silk` is your program. Open it:
 

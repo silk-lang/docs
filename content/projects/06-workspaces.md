@@ -18,7 +18,7 @@ Initialized Silk project pricing at /home/you/shop/pricing
 Added pricing to the workspace members in /home/you/shop/silk.toml
 ```
 
-`silk init --workspace` writes a `.gitignore` for `/build/`, the workspace manifest and one starter executable member, so `silk run` works at once. `--name` names that member; without it the member is `app`. Each `silk init` inside the workspace appends the new package to `members`, and gives it no `.gitignore` of its own:
+`silk init --workspace` writes a `.gitignore` for `/build/` and `/silk.local.toml`, the workspace manifest and one starter executable member, so `silk run` works at once. `--name` names that member; without it the member is `app`. Each `silk init` inside the workspace appends the new package to `members`, and gives it no `.gitignore` of its own:
 
 ```toml
 [workspace]
@@ -111,6 +111,8 @@ A package from a git or URL dependency can use `workspace = true` too: its works
 A mistake in the shared entry itself, such as a `rev` that is not a full commit hash, is reported at its line in the workspace manifest.
 
 `silk pack` writes each `workspace = true` entry out in the archive's `silk.toml`, so the archive builds without the workspace. See **Packaging releases**.
+
+To build the members against a local checkout of a shared dependency, write a `silk.local.toml` next to the workspace manifest instead of editing the entry. See "Working on a dependency locally" in **Dependencies**.
 
 ## Running commands from the root
 

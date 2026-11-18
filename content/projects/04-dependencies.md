@@ -220,6 +220,32 @@ vector = { workspace = true }
 
 The entry is read as if the member wrote the workspace's keys itself, except that a `path` there is relative to the workspace manifest. See "Shared dependencies" in **Workspaces**.
 
+## Working on a dependency locally
+
+To try a change to a dependency before it is published, write a `silk.local.toml` next to your `silk.toml`, or next to the workspace's root `silk.toml`, and name a local checkout for the package:
+
+```toml
+[overrides]
+lib-css = { path = "../lib-css" }
+```
+
+Every dependency on `lib-css`, anywhere in the graph, then reads `../lib-css` instead, whether its manifest pins a commit with `git`, an archive with `url`, or another `path`. No manifest changes, so the dependents of `lib-css` in other checkouts keep their pins. Delete the file to build with the pins again.
+
+- The key is the package name, the `[package].name` of the checkout. A dependency asks for the name its `package` key gives, or else for its own name, so `css = { git = "...", package = "lib-css" }` is overridden too.
+- `path` is relative to `silk.local.toml`. The checkout's `[package].name` must be the key; its version may differ from the pin.
+- Nothing is fetched for an overridden package, so a commit that exists only on your machine builds.
+- The checkout's own dependencies come from its manifest, and the overrides apply to them too. Since every dependent reads the one checkout, two packages that pin different commits of `lib-css` share it.
+- Its warnings are reported with yours, as a path dependency's are.
+- Only the file of the package or workspace you build counts. A dependency's `silk.local.toml` is ignored, and `silk pack` leaves the file out of an archive.
+
+`silk build`, `check`, `test`, `run` and `task` print a note for each override, so a forgotten file shows up:
+
+```
+silk: note: /home/you/app/silk.local.toml overrides lib-css with ../lib-css
+```
+
+The file names directories on your machine, so keep it out of version control. `silk init` adds `/silk.local.toml` to the `.gitignore` it writes.
+
 ## Naming rules
 
 - The dependency name (the key) must be an identifier: an ASCII letter or `_`, then letters, digits or `_`. `text-utils` is not one, so `silk add` writes `text_utils`.
@@ -286,6 +312,20 @@ Invalid Silk project manifest /home/you/app/silk.toml:8: dependency `Text-Utils`
 | `fetching commit <rev> of <git> failed: fetching it needs git, and no git is on PATH` | No `git` on `PATH` |
 | `its checkout cannot be written below <store>` | The `git` folder in `SILK_HOME` cannot be written |
 | `a package from a git dependency reaches packages by path only inside its own repository` | A package from a commit names a path outside its repository. The message names that package's manifest |
+
+A fault in `silk.local.toml` is a manifest error (exit 2) that names that file and its line:
+
+```
+Invalid Silk project manifest /home/you/app/silk.local.toml:2: the override of `lib-css` names /home/you/lib-cs, which has no silk.toml
+```
+
+| Reason | Cause |
+| --- | --- |
+| `silk.local.toml is not valid TOML: ...` | Broken file |
+| ``silk.local.toml holds only an [overrides] table, not `<key>` `` | Another table or key, such as `[dependencies]` |
+| `` the override of `<name>` must be { path = "../checkout" }, the directory of the local checkout's silk.toml `` | An entry without `path`, with another key, or written as a bare string |
+| `` the override of `<name>` names <directory>, which has no silk.toml `` | Wrong path |
+| `` silk.local.toml overrides `<name>` with <directory>, whose silk.toml names the package `<other>` `` | The checkout is another package |
 
 A `url` with another scheme, an empty `url`, or a `sha256` that is not 64 lowercase hexadecimal digits fails the manifest's schema first, and the message names the key's path instead of a reason:
 

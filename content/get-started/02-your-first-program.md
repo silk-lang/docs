@@ -47,7 +47,7 @@ silk-version = "0.1.0"
 
 The manifest does not name the root module, because the default is the file `silk init` made: `src/main.silk`. The compiler starts reading there and finds other files through imports. `source` and `main` in `[package]` move it; see The manifest in the Projects section.
 
-`.gitignore` holds one line, `/build/`. Compiled output goes to `build/`, and you don't commit it.
+`.gitignore` holds two lines: `/build/`, where compiled output goes, and `/silk.local.toml`, local dependency overrides (see Dependencies in the Projects section). You don't commit either.
 
 `src/main.silk` is a complete program:
 
