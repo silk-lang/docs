@@ -595,13 +595,13 @@ fn delayText() -> Chain4<
 }
 
 impl Schema for Delay {
-  effect fn read<R: SchemaReader>(reader: &mut R) -> Delay
+  effect fn read(reader: &mut any SchemaReader) -> Delay
     ! Issue | OutOfMemoryError
     ? &mut Allocator {
     return run Schemas.readVia<Delay, String>(&delayText(), &mut reader.*)
   }
 
-  effect fn write<W: SchemaWriter>(self: &Self, writer: &mut W) -> ()
+  effect fn write(self: &Self, writer: &mut any SchemaWriter) -> ()
     ! Issue | WriterError | OutOfMemoryError
     ? &mut Writer | &mut Allocator {
     return run Schemas.writeVia<Delay, String>(&delayText(), self, &mut writer.*)
