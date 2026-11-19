@@ -360,11 +360,17 @@ for (const { name, text } of pages) {
 
 // EXAMPLES
 
-const runExample = (example: Example): string | undefined => {
+const runExample = (
+  example: Example,
+  silkVersion: string,
+): string | undefined => {
   const directory = mkdtempSync(join(tmpdir(), 'silk-intrinsic-'))
   try {
     mkdirSync(join(directory, 'src'))
-    writeFileSync(join(directory, 'silk.toml'), '[package]\nname = "example"\n')
+    writeFileSync(
+      join(directory, 'silk.toml'),
+      `[package]\nname = "example"\nsilk-version = "${silkVersion}"\n`,
+    )
     writeFileSync(join(directory, 'src/main.silk'), example.source)
     const command =
       example.mode === 'run'
@@ -400,8 +406,9 @@ if (runExamples) {
   const version = execFileSync('silk', ['--version'], {
     encoding: 'utf8',
   }).trim()
+  const silkVersion = /\bv?(\d+\.\d+\.\d+(?:-[\w.-]+)?)/.exec(version)?.[1]
   const running = parseVersion(version)
-  if (running === undefined) {
+  if (silkVersion === undefined || running === undefined) {
     throw new Error(`cannot read a version from ${version}`)
   }
   for (const entry of entries) {
@@ -425,7 +432,7 @@ if (runExamples) {
       continue
     }
     ran += 1
-    const failure = runExample(example)
+    const failure = runExample(example, silkVersion)
     if (failure !== undefined) {
       problems.push(failure)
     }

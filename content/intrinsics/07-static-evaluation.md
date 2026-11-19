@@ -1492,6 +1492,14 @@ test fn catalog() -> () {
 }
 ```
 
+### `Intrinsic.benchmarks`
+
+```silk signature
+static fn benchmarks() -> Tests
+```
+
+Returns the static catalog of benchmarks in the discovery root, or in the application when no root is selected. The standard benchmark runner iterates the descriptors with `static for`, reads each name with `Intrinsic.testInfo`, and obtains the callable with `Intrinsic.testFunction`.
+
 ### `Intrinsic.testInfo`
 
 ```silk signature

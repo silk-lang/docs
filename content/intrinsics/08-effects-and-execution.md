@@ -473,6 +473,22 @@ pub fn main() -> i32 {
 }
 ```
 
+## Ambient services
+
+These three intrinsics belong to the standard library. Applications install a shared provider with `Effect.provideAmbient<S>(&handle)`. The execution runtime keeps that provider active when a task parks and resumes.
+
+### `Intrinsic.ambientEntry`
+
+For a shared reference to a provider of ambient service `S`, `ambientEntry<S>(&provider)` returns two `u64` values. The first is the service's table index. The second identifies the concrete provider type for dispatch. Two instances of the same type have the same tags.
+
+### `Intrinsic.ambientSlot`
+
+`ambientSlot<T>()` returns the address of the thread's current ambient table pointer. A null table pointer selects the declared defaults. The runtime saves and restores the pointer when entering a provider scope or driving an execution.
+
+### `Intrinsic.ambientCount`
+
+`ambientCount()` is a static `usize` giving the number of services that need table entries in this program. When every service uses its declared default, the count is zero and executions need no ambient table storage.
+
 ## Execution packages
 
 An **Execution** is one package that holds a lazy Effect body, its stored frames while it is not running, a readiness endpoint, and three control words. Its owner drives it: one drive runs the body until it completes or relinquishes, and a relinquished Execution comes back to the owner, who drives it again later. The compiler provides the package and its operations; parking, wakes, the readiness phases and every scheduler are ordinary Silk in `silk/concurrency/execution`.
