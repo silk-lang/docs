@@ -12,10 +12,10 @@ cd numberlines
 | Service | Module | Native provider | Operation | Failure |
 | --- | --- | --- | --- | --- |
 | `Writer` | `silk/io/writer` | `StdoutWriter`, `StderrWriter` in `silk/io/writer_native` | `writeAll(bytes)`, `flush()` | `WriterError` |
-| `Logger` | `silk/io/logger` | `StderrLogger`, `StdoutLogger` in `silk/io/logger_native` | `log(level, template, args)` | `LogError` |
+| `Logger` | `silk/io/logger` | `StderrLogger`, `StdoutLogger` in `silk/io/logger_native` | `log(level, template, args)` | `never` |
 | `StandardInput` | `silk/io/standard_input` | `OsStandardInput` in `silk/io/standard_input_native` | `read(buffer)` | `StreamReadError` |
 
-A `Writer` moves bytes. A `Logger` receives whole events, each with a level. Use a writer for the program's output and a logger for messages about the run. Code that needs one says so with `? &mut Writer`, `? &mut Logger` or `? &mut StandardInput`, and never names a provider. `main` picks the real ones.
+A `Writer` moves bytes. A `Logger` receives whole events, each with a level. Use a writer for the program's output and a logger for messages about the run. Functions that write or read declare `? &mut Writer` or `? &mut StandardInput`. Logging is ambient. A plain function can run a logging operation, and its callers keep their signatures. The program chooses a logger at the scope where it wants to collect events.
 
 The native providers exist on Linux and macOS with libc, and on the WASI targets `wasm32-wasip1` and `wasm32-wasip2`. On `wasm32-unknown-unknown` and Linux without libc the `*_native` modules are empty, and you supply your own provider. Two more loggers serve WebAssembly hosts: `ConsoleLogger` for JavaScript hosts and `WasiLogger` for `wasi:logging`; see **Logging on WebAssembly** below.
 
@@ -25,7 +25,7 @@ The native providers exist on Linux and macOS with libc, and on the WASI targets
 
 ```silk
 // Writes one numbered line: the number right-aligned in four columns.
-effect fn emit(number: u32, line: &[u8]) -> () ! WriterError | LogError ? &mut Writer | &mut Logger {
+effect fn emit(number: u32, line: &[u8]) -> () ! WriterError ? &mut Writer {
   match String.fromUtf8(line) {
     Result.Success { value } => {
       run Format.format("{number:>4}  {text}\n", &.{ number: number, text: value })
@@ -40,7 +40,7 @@ effect fn emit(number: u32, line: &[u8]) -> () ! WriterError | LogError ? &mut W
 }
 ```
 
-`Format.format` writes to the ambient `Writer`. For bytes with no template, use `Writer.writeString(text)` or `Writer.writeAll(bytes)`. The guide "Text and formatting" covers templates and options in full.
+`Format.format` writes to its `Writer` provider. For bytes with no template, use `Writer.writeString(text)` or `Writer.writeAll(bytes)`. The guide "Text and formatting" covers templates and options in full.
 
 `StdoutWriter` and `StderrWriter` have no buffer of their own: each write goes straight to the descriptor, and `flush` does nothing. Each `StderrWriter` write holds the standard error lock, described below, for its duration. A failed write may already have written a prefix. **Buffering standard output** below shows how to put a buffer in front of them.
 
@@ -48,7 +48,7 @@ effect fn emit(number: u32, line: &[u8]) -> () ! WriterError | LogError ? &mut W
 
 `Effect.logWarning` from `silk/core/effect` sends one event at level `Warning` to the ambient `Logger`. There is one helper per level of `LogLevel`: `logTrace`, `logDebug`, `logInfo`, `logWarning` and `logError`. `Effect.log` is `logInfo`, and `Effect.logAt(level, ...)` takes the level as a value. The template rules are the same as for `Format.format`.
 
-What a message looks like is the provider's choice. `silk/io/logger_native` has two:
+The default emits warnings and errors to standard error on native and WASI targets and to the console on web targets. Other levels are quiet. A program can install another provider to collect all levels. `silk/io/logger_native` has two:
 
 | Provider | Writes to | Each message becomes |
 | --- | --- | --- |
@@ -68,20 +68,23 @@ Neither adds a timestamp. `StderrLogger` adds the newline itself, so its templat
 
 Each exists only on its target; elsewhere its module declares nothing. Neither allocates, adds a level name, a timestamp or a newline, or can fail.
 
-`ConsoleLogger.make()` takes no arguments. A module imports `silk.console` only when it provides `ConsoleLogger`, so a module that logs some other way still imports nothing. The std lib's runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`, supplies the import and calls the console method of each level: `console.debug` for trace and debug, then `console.info`, `console.warn` and `console.error`. In a package `greeter` built with `--target wasm32-unknown-unknown`:
+`ConsoleLogger.make()` takes no arguments. The default web logger and an explicitly installed `ConsoleLogger` both write through `silk.console`. The std lib's runner, `<silk>/lib/silk/stdlib/host/wasm-runner.mjs`, supplies the import and calls the console method of each level: `console.debug` for trace and debug, then `console.info`, `console.warn` and `console.error`. In a package `greeter` built with `--target wasm32-unknown-unknown`:
 
 ```silk
 import silk.core.effect { Effect }
-import silk.io.logger { LogError, Logger }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { Logger }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.io.logger_console { ConsoleLogger }
 
-pub effect fn main() -> () ! LogError {
-  let mut logger = ConsoleLogger.make()
+pub effect fn main() -> () ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<ConsoleLogger>.make(ConsoleLogger.make()) |> Effect.provideMut<Allocator>(&mut allocator)
   let values = .{ name: "silk", count: 3 }
   run Effect.logInfo("{name} started {count} workers", &values)
-    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideAmbient<Logger>(&logger)
   run Effect.logWarning("{name} is running low on memory", &values)
-    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideAmbient<Logger>(&logger)
   return ()
 }
 ```
@@ -102,14 +105,17 @@ In Node, `console.info` writes to standard output and `console.warn` to standard
 
 ```silk
 import silk.core.effect { Effect }
-import silk.io.logger { LogError, Logger }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { Logger }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.io.logger_wasi { WasiLogger }
 
-pub effect fn main() -> i32 ! LogError {
-  let mut logger = WasiLogger.make("startup")
+pub effect fn main() -> i32 ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<WasiLogger>.make(WasiLogger.make("startup")) |> Effect.provideMut<Allocator>(&mut allocator)
   let values = .{ count: 3 }
   run Effect.logInfo("started {count} workers", &values)
-    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideAmbient<Logger>(&logger)
   return 0
 }
 ```
@@ -137,8 +143,8 @@ Caused by:
 ```silk
 // Reads standard input to the end and numbers every line.
 effect fn numberLines() -> u32
-! StreamReadError | WriterError | LogError | OutOfMemoryError
-? &mut StandardInput | &mut Writer | &mut Logger | &mut Allocator {
+! StreamReadError | WriterError | OutOfMemoryError
+? &mut StandardInput | &mut Writer | &mut Allocator {
   let mut buffer: [u8; 64] = [0; 64]
   let mut line = Bytes.make()
   let mut number: u32 = 0
@@ -185,28 +191,29 @@ The signature lists four services. Reading, writing and logging are three of the
 ## Wiring it in main
 
 ```silk
-pub effect fn main() -> i32 ! StreamReadError | WriterError | LogError | OutOfMemoryError {
+pub effect fn main() -> i32 ! StreamReadError | WriterError | OutOfMemoryError {
   let mut input = OsStandardInput.make()
   let mut out = StdoutWriter.make()
-  let mut logger = StderrLogger.make()
   let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<StderrLogger>.make(StderrLogger.make()) |> Effect.provideMut<Allocator>(&mut allocator)
   drop run numberLines()
     |> Effect.provideMut<StandardInput>(&mut input)
     |> Effect.provideMut<Writer>(&mut out)
-    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideAmbient<Logger>(&logger)
     |> Effect.provideMut<Allocator>(&mut allocator)
   return 0
 }
 ```
 
-The program keeps standard output clean for the numbered lines, so the logger is `StderrLogger`. Making the providers does no I/O. `OsStandardInput.make()` reads nothing until the first `receive`. The imports for the program and its tests:
+The program keeps standard output clean for the numbered lines, so the logger is `StderrLogger`. `OsStandardInput.make()` reads nothing until the first `receive`. The imports for the program and its tests:
 
 ```silk
 import silk.mem.allocator { Allocator, OutOfMemoryError, SystemAllocator }
 import silk.collections.bytes { Bytes }
 import silk.core.effect { Effect }
 import silk.text.format { Format }
-import silk.io.logger { Logger, LogError, LogLevel }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { InMemoryLogger, Logger, LogLevel }
 import silk.io.logger_native { StderrLogger }
 import silk.io.standard_input_native { OsStandardInput }
 import silk.io.writer_native { StdoutWriter }
@@ -267,16 +274,16 @@ info: 0 lines, 0 bytes
 
 ```silk
 pub effect fn main() -> i32
-! StreamReadError | WriterError | LogError | BufferError | OutOfMemoryError {
+! StreamReadError | WriterError | BufferError | OutOfMemoryError {
   let mut allocator = Allocator.systemAllocatorProvider()
   let mut input = OsStandardInput.make()
   let mut out = run BufferedWriter<StdoutWriter>.make(StdoutWriter.make(), 4096)
     |> Effect.provideMut<Allocator>(&mut allocator)
-  let mut logger = StderrLogger.make()
+  let logger = run Arc<StderrLogger>.make(StderrLogger.make()) |> Effect.provideMut<Allocator>(&mut allocator)
   drop run numberLines()
     |> Effect.provideMut<StandardInput>(&mut input)
     |> Effect.provideMut<Writer>(&mut out)
-    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideAmbient<Logger>(&logger)
     |> Effect.provideMut<Allocator>(&mut allocator)
   drop run BufferedWriter<StdoutWriter>.finish(move out)
   return 0
@@ -399,46 +406,48 @@ impl Writer for CapturingWriter {
 }
 ```
 
-**Logs.** `Logger.inMemoryProvider()` from `silk/io/logger` keeps the events. `Logger.length` counts them, `Logger.levelAt` gives an event's level, and `messageLengthAt` and `messageByteAt` read its text. It holds at most eight events and 64 message bytes in total. A log past either limit fails with `LogError` and is not kept. `Logger.inMemoryProviderFailAt(n)` makes the n-th call fail, for testing how your code handles a broken logger.
+**Logs.** `Logger.inMemoryProvider()` from `silk/io/logger` keeps the events. `Logger.length` counts them, `Logger.levelAt` gives an event's level, and `messageLengthAt` and `messageByteAt` read its text. It holds at most eight events and 64 message bytes in total. The provider discards a whole event when it exceeds either limit. `Logger.attempts` counts every call. `Logger.inMemoryProviderFailAt(n)` drops the event at zero-based attempt `n`, so tests can check that the program continues.
 
 Now the tests. `sameBytes` is a small loop that compares two byte slices:
 
 ```silk
 test effect fn numbersEveryLine()
-! AssertionError<'static> | StreamReadError | WriterError | LogError | OutOfMemoryError {
+! AssertionError<'static> | StreamReadError | WriterError | OutOfMemoryError {
   let mut input = ScriptedInput { text: b"one\ntwo\nthree", position: 0, step: 3 }
   let mut out = CapturingWriter { out: Bytes.make(), allocator: Allocator.systemAllocatorProvider() }
-  let mut logger = Logger.inMemoryProvider()
   let mut allocator = Allocator.systemAllocatorProvider()
+  let provider = run Logger.inMemoryProvider() |> Effect.provideMut<Allocator>(&mut allocator)
+  let logger = run Arc<InMemoryLogger>.make(move provider) |> Effect.provideMut<Allocator>(&mut allocator)
   let lines = run numberLines()
     |> Effect.provideMut<StandardInput>(&mut input)
     |> Effect.provideMut<Writer>(&mut out)
-    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideAmbient<Logger>(&logger)
     |> Effect.provideMut<Allocator>(&mut allocator)
   run Testing.expect(lines == 3, "three lines")
   run Testing.expect(sameBytes(out.out.asSlice(), b"   1  one\n   2  two\n   3  three\n"), "numbered output")
-  run Testing.expect(Logger.length(&logger) == 1, "one summary event")
-  run Testing.expect(Logger.levelAt(&logger, 0) == LogLevel.Info, "the summary is info")
+  run Testing.expect(Logger.length(logger.get()) == 1, "one summary event")
+  run Testing.expect(Logger.levelAt(logger.get(), 0) == LogLevel.Info, "the summary is info")
 }
 
 test effect fn warnsAboutInvalidUtf8()
-! AssertionError<'static> | StreamReadError | WriterError | LogError | OutOfMemoryError {
+! AssertionError<'static> | StreamReadError | WriterError | OutOfMemoryError {
   let mut input = ScriptedInput { text: b"ok\n\xFF\n", position: 0, step: 64 }
   let mut out = CapturingWriter { out: Bytes.make(), allocator: Allocator.systemAllocatorProvider() }
-  let mut logger = Logger.inMemoryProvider()
   let mut allocator = Allocator.systemAllocatorProvider()
+  let provider = run Logger.inMemoryProvider() |> Effect.provideMut<Allocator>(&mut allocator)
+  let logger = run Arc<InMemoryLogger>.make(move provider) |> Effect.provideMut<Allocator>(&mut allocator)
   drop run numberLines()
     |> Effect.provideMut<StandardInput>(&mut input)
     |> Effect.provideMut<Writer>(&mut out)
-    |> Effect.provideMut<Logger>(&mut logger)
+    |> Effect.provideAmbient<Logger>(&logger)
     |> Effect.provideMut<Allocator>(&mut allocator)
   run Testing.expect(sameBytes(out.out.asSlice(), b"   1  ok\n"), "only the valid line is printed")
-  run Testing.expect(Logger.length(&logger) == 2, "a warning and a summary")
-  run Testing.expect(Logger.levelAt(&logger, 0) == LogLevel.Warning, "the first event is a warning")
+  run Testing.expect(Logger.length(logger.get()) == 2, "a warning and a summary")
+  run Testing.expect(Logger.levelAt(logger.get(), 0) == LogLevel.Warning, "the first event is a warning")
 }
 ```
 
-`provideMut` lends each provider for one `run` and gives it back, so after the run the test can look inside `out` and `logger`. Run the test:
+`provideMut` lends the input and writer for the run. The test retains its own `Arc` to inspect the captured log messages afterward. Run the test:
 
 ```sh
 silk test
@@ -477,13 +486,13 @@ The guide "Testing with providers" goes further with fakes, and chapter 8 of the
 - `silk/io/writer`: `Writer`, `WriterError`
 - `silk/io/writer_native`: `StdoutWriter`, `StderrWriter` (`print`, `lock`), `LockedStderr`
 - `silk/io/buffered_output`: `BufferedWriter`; `silk/io/buffered_input`: `BufferError`
-- `silk/io/logger`: `Logger`, `LogLevel`, `LogError`, `InMemoryLogger`
+- `silk/io/logger`: `Logger`, `LogLevel`, `InMemoryLogger`, `WarningsToStderr`
 - `silk/io/logger_native`: `StderrLogger`, `StdoutLogger`
 - `silk/io/logger_console`: `ConsoleLogger` (`wasm32-unknown-unknown` only)
 - `silk/io/logger_wasi`: `WasiLogger` (`wasm32-wasip2` only)
 - `silk/io/standard_input`: `StandardInput`, `ReadOutcome`, `StreamReadError`
 - `silk/io/standard_input_native`: `OsStandardInput`
-- `silk/core/effect`: `Effect` (`log`, `logInfo`, `logWarning`, `provideMut`, `catchAll`)
+- `silk/core/effect`: `Effect` (`log`, `logInfo`, `logWarning`, `provideAmbient`, `provideMut`, `catchAll`)
 - `silk/text/format`: `Format`
 - `silk/testing/testing`: `Testing`, `AssertionError`
 - `silk/collections/bytes`: `Bytes`
