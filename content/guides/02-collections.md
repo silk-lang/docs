@@ -17,6 +17,7 @@ cd wordfreq
 | `List<T>` | `silk/collections/list` | An ordered sequence of any element type | `append`, `insert` |
 | `HashSet<T>` | `silk/collections/hash_set` | Unique values and fast membership | `insert` |
 | `HashMap<K, V>` | `silk/collections/hash_map` | Looking a value up by key | `insert` |
+| `ColumnList<T>` | `silk/collections/column_list` | Many rows of a small struct, one column for each field ([Rows in columns](/docs/guides/rows-in-columns)) | `append`, `insert` |
 
 Every operation that may grow a collection is an `effect fn` that needs `? &mut Allocator` and can fail with `OutOfMemoryError`. `make()` never allocates, so an empty collection costs nothing. A failed growth leaves the collection as it was. You can see from a signature alone which code may allocate.
 
