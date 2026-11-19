@@ -682,6 +682,12 @@ export const writtenGroups: ReadonlyArray<DocGroup> = [
         'Regular expressions',
         'https://github.com/silk-lang/docs/blob/main/content/guides/21-regular-expressions.md',
       ),
+      page(
+        'guides',
+        'rows-in-columns',
+        'Rows in columns',
+        'https://github.com/silk-lang/docs/blob/main/content/guides/22-rows-in-columns.md',
+      ),
     ],
   },
   {
