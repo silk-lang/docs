@@ -17,7 +17,7 @@ cd numberlines
 
 A `Writer` moves bytes. A `Logger` receives whole events, each with a level. Use a writer for the program's output and a logger for messages about the run. Functions that write or read declare `? &mut Writer` or `? &mut StandardInput`. Logging is ambient. A plain function can run a logging operation, and its callers keep their signatures. The program chooses a logger at the scope where it wants to collect events.
 
-The native providers exist on Linux and macOS with libc, and on the WASI targets `wasm32-wasip1` and `wasm32-wasip2`. On `wasm32-unknown-unknown` and Linux without libc the `*_native` modules are empty, and you supply your own provider. Two more loggers serve WebAssembly hosts: `ConsoleLogger` for JavaScript hosts and `WasiLogger` for `wasi:logging`; see **Logging on WebAssembly** below.
+The native providers exist on hosted Linux, macOS and Windows, and on the WASI targets `wasm32-wasip1` and `wasm32-wasip2`. On `wasm32-unknown-unknown` and Linux without libc the `*_native` modules are empty, and you supply your own provider. Two more loggers serve WebAssembly hosts: `ConsoleLogger` for JavaScript hosts and `WasiLogger` for `wasi:logging`; see **Logging on WebAssembly** below.
 
 ## Writing output
 
@@ -186,7 +186,7 @@ A few rules make this loop correct:
 
 The 64-byte buffer is deliberately small: a line may be split across reads, so the program collects the current line in a `Bytes` and handles it at each `\n`. A line can also be split in the middle of a UTF-8 sequence. Collecting whole lines before calling `String.fromUtf8` sidesteps that. To decode as you go, use `Utf8Decoder`, shown in "Text and formatting".
 
-The signature lists four services. Reading, writing and logging are three of them, and `Bytes.append` needs the allocator.
+The signature lists three services. The loop reads from `StandardInput`, writes through `Writer`, and uses `Allocator` for `Bytes.append`. Its summary goes to the current ambient logger.
 
 ## Wiring it in main
 
@@ -308,7 +308,7 @@ For a stream protocol with deadlines, use `BufferedOutput` from the same module,
 
 ## A quick message on standard error
 
-While you look for a bug, you often want to see one value without threading a logger through the code. `StderrWriter.print` from `silk/io/writer_native` formats a template and writes it to standard error. It is a plain function, so it needs no service and no `run`. Add one line to the read loop of `numberLines`, and import `StderrWriter`:
+While debugging, you can print a value directly to standard error. `StderrWriter.print` from `silk/io/writer_native` formats a template and writes it to standard error. It is a plain function, so it needs no service and no `run`. Add one line to the read loop of `numberLines`, and import `StderrWriter`:
 
 ```silk
     total = total + count
@@ -411,6 +411,16 @@ impl Writer for CapturingWriter {
 Now the tests. `sameBytes` is a small loop that compares two byte slices:
 
 ```silk
+fn sameBytes(left: &[u8], right: &[u8]) -> bool {
+  if left.length != right.length { return false }
+  let mut i: usize = 0
+  while i < left.length {
+    if left[i] != right[i] { return false }
+    i = i + 1
+  }
+  return true
+}
+
 test effect fn numbersEveryLine()
 ! AssertionError<'static> | StreamReadError | WriterError | OutOfMemoryError {
   let mut input = ScriptedInput { text: b"one\ntwo\nthree", position: 0, step: 3 }
@@ -468,16 +478,16 @@ When an expectation fails, the runner prints its message under the test's name, 
 ```
   main::numbersEveryLine
     assertion failed: three lines
-      at main.numbersEveryLine (main:146:3)
-    FAIL  102 us
+      at main.numbersEveryLine (main:144:3)
+    FAIL  82 us
   main::warnsAboutInvalidUtf8
-    PASS  45 us
+    CACHED
 
-Tests  1 passed, 1 failed (0 cached, 2 executed, 2 selected, 2 discovered)
+Tests  1 passed, 1 failed (1 cached, 1 executed, 2 selected, 2 discovered)
 Time   1 ms
 ```
 
-The message is the text you passed to `expect`, unchanged, which is why it still says three. `main:146:3` is the line and column of that `Testing.expect` call in `src/main.silk`. Put the 3 back.
+The message is the text you passed to `expect`, unchanged, which is why it still says three. `main:144:3` is the line and column of that `Testing.expect` call in `src/main.silk`. Put the 3 back.
 
 The guide "Testing with providers" goes further with fakes, and chapter 8 of the book introduces services and providers.
 
