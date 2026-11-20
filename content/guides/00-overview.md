@@ -27,3 +27,4 @@ The guides sit between the book and the reference. The book teaches the language
 19. **Schemas**: reading and writing your own types as JSON with `silk.schema`, wire names, rules and defaults, every problem at once with source snippets, codecs for custom wire forms, commands read by name, and JSON Schema for validators and models.
 20. **Command-line programs**: describing a command line as a type with `silk.cli`, subcommands, defaults, environment variables, choices and checks, help and errors, testing, shell completions, and project tasks with `silk.cli.task`.
 21. **Regular expressions**: the ECMAScript pattern language, patterns checked against a struct at compile time with `Regex.typed`, groups by number and by name, and patterns that do not compile.
+22. **Tracing requests** follows a checkout across functions and services with ambient spans, logs, metrics and an OpenTelemetry collector.

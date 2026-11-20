@@ -351,6 +351,34 @@ pub effect fn main() -> i32 {
 }
 ```
 
+## Ambient providers
+
+The standard library uses these members to install providers and carry them with an execution. Applications install a provider with `Effect.provideAmbient`.
+
+### `Intrinsic.ambientEntry`
+
+```silk signature
+fn ambientEntry<S>(provider: &P) -> [u64; 2]
+```
+
+The compiler checks that the concrete provider type `P` implements ambient service `S`. The result contains the service's table index and the implementation tag for that provider. The library uses the pair to install a provider in the current scope.
+
+### `Intrinsic.ambientSlot`
+
+```silk signature
+fn ambientSlot<T>() -> *mut ?*const T
+```
+
+Returns the address of the slot that points to the current ambient provider table. A null table selects the ambient service defaults. The runtime saves and restores the slot when an execution suspends or resumes.
+
+### `Intrinsic.ambientCount`
+
+```silk signature
+static fn ambientCount() -> usize
+```
+
+Returns the number of ambient service slots required by the build. The library uses it to size the table at compile time. If no ambient provider is reachable, the count is zero.
+
 ## Failure reports
 
 ### `Intrinsic.observeUnhandled`
