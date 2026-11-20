@@ -87,6 +87,7 @@ union Tasks {
   Run { pub options: Options, pub bare: bool },
   Plan { pub options: Options, pub bare: bool },
 }
+
 impl CommandLine for Tasks {
   static fn command() -> Command<Tasks> {
     return Command<Tasks>.make("tasks", "Build squares for a selected runtime")
@@ -94,26 +95,47 @@ impl CommandLine for Tasks {
       |> Command.option("bare", Opt.about("Use the raw Linux runtime without libc"))
   }
 }
-effect fn graph(options: &Options, bare: bool) -> Build
-  ! BuildError ? &mut Allocator | &mut FileSystem | &mut HostInput {
-  let mut compilation = run Compilation.fromPackage(options)
-  let mut target = ""
-  if options.target.length() > 0 { target = options.target.asSlice()[0].view() }
-  let runtime = if bare { "raw" }
-    else if target == "wasm32-unknown-unknown" { "standalone" }
-    else if target == "wasm32-wasip1" || target == "wasm32-wasip2" { "wasi" }
-    else { "hosted" }
-  let original = move compilation
-  compilation = run original.runtime(run Deferred<String>.value(run String.copy(runtime)))
+
+fn runtimeName(options: &Options, bare: bool) -> string {
   if bare {
-    let configured = move compilation
-    compilation = run configured.libc(run Deferred<String>.value(run String.copy("none")))
+    return "raw"
+  }
+  if options.target.length() == 0 {
+    return "hosted"
+  }
+  let target = options.target.asSlice()[0].view()
+  if target == "wasm32-unknown-unknown" {
+    return "standalone"
+  }
+  if target == "wasm32-wasip1" || target == "wasm32-wasip2" {
+    return "wasi"
+  }
+  return "hosted"
+}
+
+effect fn setting(value: string) -> Deferred<String>
+  ! BuildError
+  ? &mut Allocator {
+  return run Deferred<String>.value(run String.copy(value))
+}
+
+effect fn graph(options: &Options, bare: bool) -> Build
+  ! BuildError
+  ? &mut Allocator | &mut FileSystem | &mut HostInput {
+  let package = run Compilation.fromPackage(options)
+  let selected = run package.runtime(run setting(runtimeName(options, bare)))
+  let compilation = if bare {
+    run selected.libc(run setting("none"))
+  } else {
+    move selected
   }
   let build = run Build.make()
   return run build.add(move compilation)
 }
+
 impl TaskSet for Tasks {
-  effect fn perform(self: Self) -> () ! BuildError | TaskError
+  effect fn perform(self: Self) -> ()
+    ! BuildError | TaskError
     ? &mut Allocator | &mut FileSystem | &mut HostInput {
     match move self {
       Tasks.Build { options, bare } => {
@@ -132,8 +154,14 @@ impl TaskSet for Tasks {
     }
   }
 }
-pub effect fn main() -> i32 ? &mut HostInput { return run Task.main<Tasks>() }
+
+pub effect fn main() -> i32
+  ? &mut HostInput {
+  return run Task.main<Tasks>()
+}
 ```
+
+`runtimeName` maps the requested target to one of the runtimes in the manifest. `setting` wraps a string as the deferred value that the `Compilation` operations take. `graph` starts from the package's own compilation, selects the runtime, and sets `libc` to `none` only for the raw Linux build. Each operation consumes the compilation and returns the updated one.
 
 ## The program
 
