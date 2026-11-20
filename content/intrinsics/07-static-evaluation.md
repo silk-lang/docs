@@ -1492,6 +1492,24 @@ test fn catalog() -> () {
 }
 ```
 
+### `Intrinsic.benchmarks`
+
+```silk signature
+static fn benchmarks() -> Tests
+```
+
+Returns a static catalog of the `bench fn` declarations in modules reachable from the discovery root within its package. In an ordinary program the application is the root. Walk the catalog with `static for`, use `Intrinsic.testInfo` for each benchmark's identity and name, and use `Intrinsic.testFunction` for its callable.
+
+```silk
+pub fn main() -> i32 {
+  let mut count: i32 = 0
+  static for _descriptor in Intrinsic.benchmarks() {
+    count = count + 1
+  }
+  return count
+}
+```
+
 ### `Intrinsic.testInfo`
 
 ```silk signature

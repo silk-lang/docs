@@ -1,6 +1,6 @@
 # Intrinsics
 
-`Intrinsic` is the compiler-provided namespace of primitive operations and types. The whole namespace is public: any module may use any member. Some members are unsafe. Most programs reach them through standard library wrappers. This page also covers directives, the `@name` lines that tell the compiler how to build a function. The [Intrinsics](/docs/intrinsics/overview) section documents every member one by one.
+`Intrinsic` is the compiler-provided namespace of primitive operations and types. The ambient provider table operations are reserved for the standard library. Some members are unsafe. Most programs reach them through standard library wrappers. This page also covers directives, the `@name` lines that tell the compiler how to build a function. The [Intrinsics](/docs/intrinsics/overview) section documents every member one by one.
 
 ## Syntax
 
