@@ -3,9 +3,10 @@
 //! has found a shortest path. Each cell remembers the cell it came from, and
 //! walking those back from the cheese draws the path.
 import silk.core.effect { Effect }
-import silk.text.format { Format }
-import silk.io.writer { Writer, WriterError }
-import silk.io.writer_native { StdoutWriter }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { Logger }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.logger_native { StdoutLogger }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 import silk.text.string { String }
@@ -56,36 +57,33 @@ fn isOpen(cell: usize) -> bool {
   return String.utf8Bytes(MAZE[cell / WIDTH])[cell % WIDTH] != b"#"[0]
 }
 
-effect fn draw(marks: &[i32]) -> ()
-  ! WriterError
-  ? &mut Writer {
+effect fn draw(marks: &[i32]) -> () {
   let mut cell: usize = 0
   while cell < CELLS {
     if cell == START {
-      run Format.format("🐭", &())
+      run Effect.log("🐭", &())
     } else if cell == EXIT {
-      run Format.format("🧀", &())
+      run Effect.log("🧀", &())
     } else if !isOpen(cell) {
-      run Format.format("⬛", &())
+      run Effect.log("⬛", &())
     } else if marks[cell] == PATH {
-      run Format.format("🟩", &())
+      run Effect.log("🟩", &())
     } else if marks[cell] == FRONTIER {
-      run Format.format("🟨", &())
+      run Effect.log("🟨", &())
     } else if marks[cell] == REACHED {
-      run Format.format("🟦", &())
+      run Effect.log("🟦", &())
     } else {
-      run Format.format("⬜", &())
+      run Effect.log("⬜", &())
     }
     cell = cell + 1
     if cell % WIDTH == 0 {
-      run Format.format("\n", &())
+      run Effect.log("\n", &())
     }
   }
 }
 
 effect fn solve() -> ()
-  ! WriterError
-  ? &mut Writer | &mut MonotonicClock {
+  ? &mut MonotonicClock {
   let mut marks = [UNSEEN; CELLS]
   let mut cameFrom = [NONE; CELLS]
   let mut queue: [usize; CELLS] = [0; CELLS]
@@ -98,7 +96,7 @@ effect fn solve() -> ()
   // One frame per ring: the frontier in yellow, what it came from in blue.
   let mut ring = 0
   while head < tail && cameFrom[EXIT] == NONE {
-    run Format.format("{}Ring {}: {} cells reached\n\n", &(CLEAR, ring, tail))
+    run Effect.log("{}Ring {}: {} cells reached\n\n", &(CLEAR, ring, tail))
     run draw(&marks)
     run Effect.sleep(60ms)
     let ringEnd = tail
@@ -138,7 +136,7 @@ effect fn solve() -> ()
   }
 
   if cameFrom[EXIT] == NONE {
-    run Format.format("The mouse cannot reach the cheese.\n", &())
+    run Effect.log("The mouse cannot reach the cheese.\n", &())
     return ()
   }
 
@@ -148,12 +146,12 @@ effect fn solve() -> ()
   while cell != START {
     marks[cell] = PATH
     steps = steps + 1
-    run Format.format("{}Walking back: {} steps\n\n", &(CLEAR, steps))
+    run Effect.log("{}Walking back: {} steps\n\n", &(CLEAR, steps))
     run draw(&marks)
     run Effect.sleep(30ms)
     cell = cameFrom[cell]
   }
-  run Format.format(
+  run Effect.log(
     "{}The shortest way to the cheese takes {} steps. The search reached {} cells in {} rings.\n\n",
     &(CLEAR, steps + 1, tail, ring),
   )
@@ -161,10 +159,12 @@ effect fn solve() -> ()
 }
 
 pub effect fn main() -> ()
-  ! WriterError {
-  let mut stdout = StdoutWriter.make()
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
+    |> Effect.provideMut<Allocator>(&mut allocator)
   let mut clock = OsMonotonicClock.make()
   run solve()
-    |> Effect.provideMut<Writer>(&mut stdout)
+    |> Effect.provideAmbient<Logger>(&logger)
     |> Effect.provideMut<MonotonicClock>(&mut clock)
 }

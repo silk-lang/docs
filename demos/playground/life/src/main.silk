@@ -5,9 +5,10 @@
 //!
 //! 🐣 hatched this generation, 🐥 survived from the last one.
 import silk.core.effect { Effect }
-import silk.text.format { Format }
-import silk.io.writer { Writer, WriterError }
-import silk.io.writer_native { StdoutWriter }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { Logger }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.logger_native { StdoutLogger }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 
@@ -60,22 +61,20 @@ fn step(board: &[bool]) -> [bool; CELLS] {
   return next
 }
 
-effect fn show(board: &[bool], previous: &[bool], generation: i32) -> ()
-  ! WriterError
-  ? &mut Writer {
-  run Format.format("{}Generation {}\n\n", &(CLEAR, generation))
+effect fn show(board: &[bool], previous: &[bool], generation: i32) -> () {
+  run Effect.log("{}Generation {}\n\n", &(CLEAR, generation))
   let mut cell: usize = 0
   while cell < CELLS {
     if board[cell] && previous[cell] {
-      run Format.format("🐥", &())
+      run Effect.log("🐥", &())
     } else if board[cell] {
-      run Format.format("🐣", &())
+      run Effect.log("🐣", &())
     } else {
-      run Format.format("⬜", &())
+      run Effect.log("⬜", &())
     }
     cell = cell + 1
     if cell % WIDTH == 0 {
-      run Format.format("\n", &())
+      run Effect.log("\n", &())
     }
   }
 }
@@ -111,8 +110,7 @@ fn sameBoard(left: &[bool], right: &[bool]) -> bool {
 }
 
 effect fn play() -> ()
-  ! WriterError
-  ? &mut Writer | &mut MonotonicClock {
+  ? &mut MonotonicClock {
   let mut board = [false; CELLS]
   let mut state = randomize(&mut board, 2026)
 
@@ -138,10 +136,12 @@ effect fn play() -> ()
 }
 
 pub effect fn main() -> ()
-  ! WriterError {
-  let mut stdout = StdoutWriter.make()
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
+    |> Effect.provideMut<Allocator>(&mut allocator)
   let mut clock = OsMonotonicClock.make()
   run play()
-    |> Effect.provideMut<Writer>(&mut stdout)
+    |> Effect.provideAmbient<Logger>(&logger)
     |> Effect.provideMut<MonotonicClock>(&mut clock)
 }

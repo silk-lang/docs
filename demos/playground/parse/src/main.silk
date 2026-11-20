@@ -3,31 +3,29 @@
 //! use the value.
 import silk.core.effect { Effect }
 import silk.core.result { Result }
-import silk.io.writer { Writer, WriterError }
-import silk.io.writer_native { StdoutWriter }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { Logger }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.logger_native { StdoutLogger }
 import silk.text.format { Format, NotANumber, OutOfRange, ParseError }
 
-effect fn read(text: string) -> ()
-  ! WriterError
-  ? &mut Writer {
+effect fn read(text: string) -> () {
   match move Format.i32Value(text) {
     Result<i32, ParseError>.Success { value } => {
-      run Format.format("{:>14?} -> {}, doubled {}\n", &(text, value, value * 2))
+      run Effect.log("{:>14?} -> {}, doubled {}\n", &(text, value, value * 2))
     }
     Result<i32, ParseError>.Failure { error } => match move error.reason {
       NotANumber { offset } => {
-        run Format.format("{:>14?} -> not a number, at byte {}\n", &(text, offset))
+        run Effect.log("{:>14?} -> not a number, at byte {}\n", &(text, offset))
       }
       OutOfRange {} => {
-        run Format.format("{:>14?} -> does not fit in an i32\n", &.(text))
+        run Effect.log("{:>14?} -> does not fit in an i32\n", &.(text))
       }
     }
   }
 }
 
-effect fn readAll() -> ()
-  ! WriterError
-  ? &mut Writer {
+effect fn readAll() -> () {
   let inputs = ["42", "-17", "12x", "", "3000000000"]
   let mut index: usize = 0
   while index < inputs.length {
@@ -37,7 +35,9 @@ effect fn readAll() -> ()
 }
 
 pub effect fn main() -> ()
-  ! WriterError {
-  let mut stdout = StdoutWriter.make()
-  run readAll() |> Effect.provideMut<Writer>(&mut stdout)
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  run readAll() |> Effect.provideAmbient<Logger>(&logger)
 }

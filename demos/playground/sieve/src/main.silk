@@ -1,15 +1,14 @@
 //! The sieve of Eratosthenes: cross out the multiples of each prime, and the
 //! numbers left standing are the primes.
 import silk.core.effect { Effect }
-import silk.text.format { Format }
-import silk.io.writer { Writer, WriterError }
-import silk.io.writer_native { StdoutWriter }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { Logger }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.io.logger_native { StdoutLogger }
 
 const LIMIT: usize = 100
 
-effect fn printPrimes() -> ()
-  ! WriterError
-  ? &mut Writer {
+effect fn printPrimes() -> () {
   let mut composite = [false; LIMIT]
   let mut number: usize = 2
   while number * number < LIMIT {
@@ -23,24 +22,26 @@ effect fn printPrimes() -> ()
     number = number + 1
   }
 
-  run Format.format("The primes below {}:\n", &.(LIMIT))
+  run Effect.log("The primes below {}:\n", &.(LIMIT))
   let mut count = 0
   let mut candidate: usize = 2
   while candidate < LIMIT {
     if !composite[candidate] {
-      run Format.format("{:>3}", &.(candidate))
+      run Effect.log("{:>3}", &.(candidate))
       count = count + 1
       if count % 10 == 0 {
-        run Format.format("\n", &())
+        run Effect.log("\n", &())
       }
     }
     candidate = candidate + 1
   }
-  run Format.format("\n{} primes in all.\n", &.(count))
+  run Effect.log("\n{} primes in all.\n", &.(count))
 }
 
 pub effect fn main() -> ()
-  ! WriterError {
-  let mut stdout = StdoutWriter.make()
-  run printPrimes() |> Effect.provideMut<Writer>(&mut stdout)
+  ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
+    |> Effect.provideMut<Allocator>(&mut allocator)
+  run printPrimes() |> Effect.provideAmbient<Logger>(&logger)
 }
