@@ -72,8 +72,9 @@ export const LIMITS = {
 
 const SAMPLE = `//! Counts the open tasks and prints how many are left.
 import silk.core.effect { Effect }
-import silk.io.logger { LogError }
-import silk.io.logger_native { StdoutLogger }
+import silk.io.writer { WriterError }
+import silk.io.writer_native { StdoutWriter }
+import silk.text.format { Format }
 
 fn countOpen(finished: &[bool]) -> i32 {
   let mut open = 0
@@ -88,11 +89,11 @@ fn countOpen(finished: &[bool]) -> i32 {
 }
 
 pub effect fn main() -> ()
-  ! LogError {
-  let mut logger = StdoutLogger.make()
+  ! WriterError {
+  let mut out = StdoutWriter.make()
   let open = countOpen(&[true, false, false])
   //  ^?
-  run Effect.log("{} tasks open\\n", &.(open)) |> Effect.provideMut(&mut logger)
+  run Format.format("{} tasks open\\n", &.(open)) |> Effect.provideMut(&mut out)
 }
 `
 

@@ -9,6 +9,7 @@ const url = (bytes: Buffer): string =>
 
 test('the compiler loads ordered gzip parts, including parts decoded by the server', async () => {
   const { compiler } = await loadToolchain({
+    version: '0.1.0-dev.2+8cd8230a9060',
     compilerUrls: [
       url(gzipSync(Buffer.from([0, 97, 115, 109]))),
       url(Buffer.from([1, 0, 0, 0])),

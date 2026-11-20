@@ -5,8 +5,9 @@
 //!
 //! 🐣 hatched this generation, 🐥 survived from the last one.
 import silk.core.effect { Effect }
-import silk.io.logger { LogError, Logger }
-import silk.io.logger_native { StdoutLogger }
+import silk.text.format { Format }
+import silk.io.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
 
@@ -60,21 +61,21 @@ fn step(board: &[bool]) -> [bool; CELLS] {
 }
 
 effect fn show(board: &[bool], previous: &[bool], generation: i32) -> ()
-  ! LogError
-  ? &mut Logger {
-  run Effect.log("{}Generation {}\n\n", &(CLEAR, generation))
+  ! WriterError
+  ? &mut Writer {
+  run Format.format("{}Generation {}\n\n", &(CLEAR, generation))
   let mut cell: usize = 0
   while cell < CELLS {
     if board[cell] && previous[cell] {
-      run Effect.log("🐥", &())
+      run Format.format("🐥", &())
     } else if board[cell] {
-      run Effect.log("🐣", &())
+      run Format.format("🐣", &())
     } else {
-      run Effect.log("⬜", &())
+      run Format.format("⬜", &())
     }
     cell = cell + 1
     if cell % WIDTH == 0 {
-      run Effect.log("\n", &())
+      run Format.format("\n", &())
     }
   }
 }
@@ -110,8 +111,8 @@ fn sameBoard(left: &[bool], right: &[bool]) -> bool {
 }
 
 effect fn play() -> ()
-  ! LogError
-  ? &mut Logger | &mut MonotonicClock {
+  ! WriterError
+  ? &mut Writer | &mut MonotonicClock {
   let mut board = [false; CELLS]
   let mut state = randomize(&mut board, 2026)
 
@@ -137,10 +138,10 @@ effect fn play() -> ()
 }
 
 pub effect fn main() -> ()
-  ! LogError {
-  let mut logger = StdoutLogger.make()
+  ! WriterError {
+  let mut stdout = StdoutWriter.make()
   let mut clock = OsMonotonicClock.make()
   run play()
-    |> Effect.provideMut(&mut logger)
+    |> Effect.provideMut<Writer>(&mut stdout)
     |> Effect.provideMut<MonotonicClock>(&mut clock)
 }
