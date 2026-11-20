@@ -3,9 +3,9 @@
 // archive a Silk release publishes (`silk-<version>-playground.tar.gz`). The
 // examples are the site's own, in demos/playground.
 //
-// The compiler and the standard library become two gzipped assets with hashed
-// names, which the playground worker downloads and unpacks the first time a
-// reader runs a program. `virtual:silk-playground` names them and the release.
+// The compiler parts and standard library are gzipped assets with hashed names.
+// The workers download and unpack them on demand. `virtual:silk-playground`
+// names them and the release.
 //
 // SILK_PLAYGROUND=<directory> uses an unpacked archive instead of the network.
 // Without either, or with SILK_RELEASES=fixture, the playground page says it is
@@ -23,10 +23,12 @@ const DEV_PREFIX = '/@silk-playground/'
 const API_URL =
   'https://api.github.com/repos/silk-lang/silk/releases?per_page=30'
 
+type Asset = Readonly<{ name: string; source: Buffer }>
+
 type Toolchain = Readonly<{
   version: string
-  compiler: Buffer
-  stdlib: Buffer
+  compiler: ReadonlyArray<Asset>
+  stdlib: Asset
 }>
 
 type Manifest = Readonly<{ version: string }>
@@ -121,10 +123,21 @@ const toToolchain = (inside: Map<string, Buffer>): Toolchain => {
     )
   }
   const manifest: Manifest = JSON.parse(manifestFile.toString('utf8'))
+  // Cloudflare limits each static asset to 25 MiB. Split before compression so
+  // every part is a complete gzip file even when the compiler grows.
+  const partSize = 16 * 1024 * 1024
   return {
     version: manifest.version,
-    compiler: gzipSync(compiler, { level: 9 }),
-    stdlib: packStandardLibrary(inside),
+    compiler: Array.from(
+      { length: Math.ceil(compiler.length / partSize) },
+      (_, i) => ({
+        name: `silkc-${i}.bin`,
+        source: gzipSync(compiler.subarray(i * partSize, (i + 1) * partSize), {
+          level: 9,
+        }),
+      }),
+    ),
+    stdlib: { name: 'stdlib.bin', source: packStandardLibrary(inside) },
   }
 }
 
@@ -206,28 +219,15 @@ export const playground = (): Plugin => {
       // The server build only renders the page and never fetches the files,
       // so it names them without emitting them a second time.
       const isClient = this.environment.name === 'client'
-      if (isServe || !isClient) {
-        return `export default ${JSON.stringify({
-          version: toolchain.version,
-          compilerUrl: `${DEV_PREFIX}silkc.wasm.bin`,
-          stdlibUrl: `${DEV_PREFIX}stdlib.bin`,
-        })}`
-      }
-      const compiler = this.emitFile({
-        type: 'asset',
-        name: 'silkc.wasm.bin',
-        source: toolchain.compiler,
-      })
-      const stdlib = this.emitFile({
-        type: 'asset',
-        name: 'stdlib.bin',
-        source: toolchain.stdlib,
-      })
+      const assetUrl = (asset: Asset): string =>
+        isServe || !isClient
+          ? JSON.stringify(`${DEV_PREFIX}${asset.name}`)
+          : `import.meta.ROLLUP_FILE_URL_${this.emitFile({ type: 'asset', ...asset })}`
       return [
         'export default {',
         `  version: ${JSON.stringify(toolchain.version)},`,
-        `  compilerUrl: import.meta.ROLLUP_FILE_URL_${compiler},`,
-        `  stdlibUrl: import.meta.ROLLUP_FILE_URL_${stdlib},`,
+        `  compilerUrls: [${toolchain.compiler.map(assetUrl).join(', ')}],`,
+        `  stdlibUrl: ${assetUrl(toolchain.stdlib)},`,
         '}',
       ].join('\n')
     },
@@ -241,19 +241,17 @@ export const playground = (): Plugin => {
         load().then(
           toolchain => {
             const name = url.slice(DEV_PREFIX.length)
-            const body =
-              name === 'silkc.wasm.bin'
-                ? toolchain?.compiler
-                : name === 'stdlib.bin'
-                  ? toolchain?.stdlib
-                  : undefined
-            if (body === undefined) {
+            const asset =
+              toolchain?.stdlib.name === name
+                ? toolchain.stdlib
+                : toolchain?.compiler.find(part => part.name === name)
+            if (asset === undefined) {
               response.statusCode = 404
               response.end()
               return
             }
             response.setHeader('content-type', 'application/octet-stream')
-            response.end(body)
+            response.end(asset.source)
           },
           (error: unknown) => next(error),
         )
