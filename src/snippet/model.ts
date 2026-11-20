@@ -71,11 +71,10 @@ export const LIMITS = {
 }
 
 const SAMPLE = `//! Counts the open tasks and logs how many are left.
-import silk.concurrency.sync { Arc }
 import silk.core.effect { Effect }
 import silk.io.logger { Logger }
 import silk.io.logger_native { StdoutLogger }
-import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.mem.allocator { OutOfMemoryError }
 
 fn countOpen(finished: &[bool]) -> i32 {
   let mut open = 0
@@ -91,12 +90,10 @@ fn countOpen(finished: &[bool]) -> i32 {
 
 pub effect fn main() -> ()
   ! OutOfMemoryError {
-  let mut allocator = Allocator.systemAllocatorProvider()
-  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let logger = run StdoutLogger.shared()
   let open = countOpen(&[true, false, false])
   //  ^?
-  run Effect.log("{} open\\n", &.(open)) |> Effect.provideAmbient<Logger>(&logger)
+  run Effect.log("{} tasks open\\n", &.(open)) |> Effect.provideAmbient<Logger>(&logger)
 }
 `
 

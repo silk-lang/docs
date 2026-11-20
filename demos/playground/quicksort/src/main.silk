@@ -5,9 +5,8 @@
 //! places, and 🟩 a value in its final place. The row under the columns
 //! names each value, so you can follow a column as it moves.
 import silk.core.effect { Effect }
-import silk.concurrency.sync { Arc }
 import silk.io.logger { Logger }
-import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.mem.allocator { OutOfMemoryError }
 import silk.io.logger_native { StdoutLogger }
 import silk.num.i32
 import silk.system.monotonic_clock { MonotonicClock }
@@ -188,9 +187,7 @@ effect fn sortAll() -> ()
 
 pub effect fn main() -> ()
   ! OutOfMemoryError {
-  let mut allocator = Allocator.systemAllocatorProvider()
-  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let logger = run StdoutLogger.shared()
   let mut clock = OsMonotonicClock.make()
   run sortAll()
     |> Effect.provideAmbient<Logger>(&logger)
