@@ -45,11 +45,15 @@ const unpack = (pack: Uint8Array, root: DirectoryNode): void => {
 }
 
 export const loadToolchain = async (toolchain: Toolchain): Promise<Loaded> => {
-  const [compilerBytes, stdlib] = await Promise.all([
-    download(toolchain.compilerUrl),
+  const [compilerParts, stdlib] = await Promise.all([
+    Promise.all(toolchain.compilerUrls.map(download)),
     download(toolchain.stdlibUrl),
   ])
   const base = directory()
   unpack(stdlib, base)
-  return { compiler: await WebAssembly.compile(compilerBytes), base }
+  const module = new Blob(compilerParts, { type: 'application/wasm' })
+  return {
+    compiler: await WebAssembly.compileStreaming(new Response(module)),
+    base,
+  }
 }
