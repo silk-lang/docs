@@ -3,9 +3,8 @@
 //! has found a shortest path. Each cell remembers the cell it came from, and
 //! walking those back from the cheese draws the path.
 import silk.core.effect { Effect }
-import silk.concurrency.sync { Arc }
 import silk.io.logger { Logger }
-import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.mem.allocator { OutOfMemoryError }
 import silk.io.logger_native { StdoutLogger }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
@@ -160,9 +159,7 @@ effect fn solve() -> ()
 
 pub effect fn main() -> ()
   ! OutOfMemoryError {
-  let mut allocator = Allocator.systemAllocatorProvider()
-  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let logger = run StdoutLogger.shared()
   let mut clock = OsMonotonicClock.make()
   run solve()
     |> Effect.provideAmbient<Logger>(&logger)

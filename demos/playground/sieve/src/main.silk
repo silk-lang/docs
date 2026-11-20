@@ -1,9 +1,8 @@
 //! The sieve of Eratosthenes: cross out the multiples of each prime, and the
 //! numbers left standing are the primes.
 import silk.core.effect { Effect }
-import silk.concurrency.sync { Arc }
 import silk.io.logger { Logger }
-import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.mem.allocator { OutOfMemoryError }
 import silk.io.logger_native { StdoutLogger }
 
 const LIMIT: usize = 100
@@ -40,8 +39,6 @@ effect fn printPrimes() -> () {
 
 pub effect fn main() -> ()
   ! OutOfMemoryError {
-  let mut allocator = Allocator.systemAllocatorProvider()
-  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let logger = run StdoutLogger.shared()
   run printPrimes() |> Effect.provideAmbient<Logger>(&logger)
 }

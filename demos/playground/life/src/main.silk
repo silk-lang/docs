@@ -5,9 +5,8 @@
 //!
 //! 🐣 hatched this generation, 🐥 survived from the last one.
 import silk.core.effect { Effect }
-import silk.concurrency.sync { Arc }
 import silk.io.logger { Logger }
-import silk.mem.allocator { Allocator, OutOfMemoryError }
+import silk.mem.allocator { OutOfMemoryError }
 import silk.io.logger_native { StdoutLogger }
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
@@ -137,9 +136,7 @@ effect fn play() -> ()
 
 pub effect fn main() -> ()
   ! OutOfMemoryError {
-  let mut allocator = Allocator.systemAllocatorProvider()
-  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
-    |> Effect.provideMut<Allocator>(&mut allocator)
+  let logger = run StdoutLogger.shared()
   let mut clock = OsMonotonicClock.make()
   run play()
     |> Effect.provideAmbient<Logger>(&logger)
