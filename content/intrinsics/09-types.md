@@ -590,6 +590,51 @@ enum Ordering {
 
 The result of `Order.compare`. Alias [`Ordering`](/docs/std/core-order#Ordering); name its members through the alias, as in `Ordering.Less`, because `Intrinsic.Ordering.Less` is not a value path.
 
+### `Intrinsic.Rows`
+
+```silk signature
+interface Rows<Index, Row> {
+  fn borrow<'s, V>(self: &'s Self, index: Index, static field: Intrinsic.Field<Row, V>) -> &'s V
+  fn span<'s, V>(self: &'s Self, static field: Intrinsic.Field<Row, V>) -> &'s [V]
+}
+```
+
+Reads a field from a collection of rows. For `cells[i].count`, the compiler selects the `count` field of `Row` at compile time and calls `borrow` with that field and the index. For `&cells[..].count`, it calls `span` to borrow the column as a slice. The standard library implements this sealed interface for collections that store each field in a separate column. The slice follows row order and borrows from the collection. [`ColumnList`](/docs/std/collections-column-list#ColumnList) accepts a `usize` index or an `Id<Row>`.
+
+### `Intrinsic.RowsMut`
+
+```silk signature
+interface RowsMut<Index, Row> {
+  fn borrowMut<'s, V>(self: &'s mut Self, index: Index, static field: Intrinsic.Field<Row, V>) -> &'s mut V
+  fn spanMut<'s, V>(self: &'s mut Self, static field: Intrinsic.Field<Row, V>) -> &'s mut [V]
+}
+```
+
+Writes through a row field or a column. Assigning to `cells[i].count` or taking `&mut cells[i].count` uses `borrowMut`. Taking `&mut cells[..].count` uses `spanMut` and returns a mutable slice of the column. Different fields can be borrowed at the same time because their columns occupy separate storage. In this example, changing the column changes the value read through the row.
+
+```silk
+import silk.collections.column_list { ColumnList }
+import silk.core.effect { Effect }
+import silk.core.ownership { Copy }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
+
+struct Cell { pub count: i32 }
+impl Copy for Cell {}
+
+pub effect fn main() -> i32 ! OutOfMemoryError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let mut cells = ColumnList<Cell>.make()
+  run cells.append(Cell { count: 1 }) |> Effect.provideMut<Allocator>(&mut allocator)
+  cells[0].count = 2
+  let counts = &mut cells[..].count
+  counts[0] = counts[0] + 1
+  if cells[0].count != 3 { return 1 }
+  let values = &cells[..].count
+  if values.length != 1 || values[0] != 3 { return 2 }
+  return 0
+}
+```
+
 ### `Intrinsic.Omittable`
 
 ```silk signature

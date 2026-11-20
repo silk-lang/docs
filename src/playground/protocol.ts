@@ -6,7 +6,7 @@ export type Target = 'wasm32-wasip1' | 'wasm32-unknown-unknown'
 
 export type Toolchain = Readonly<{
   version: string
-  compilerUrl: string
+  compilerUrls: ReadonlyArray<string>
   stdlibUrl: string
 }>
 

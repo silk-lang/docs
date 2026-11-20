@@ -22,6 +22,8 @@ QualifiedCall   = TypePath TypeArguments? '.' Identifier '(' Arguments? ')'
 - Failure and requirement rows (`! E`, `? R`) and `extern`/`export` forms also attach to function headers. They are covered in Typed failures, Services and providers, and Unsafe code and C interop.
 - Directives such as `@inline`, `@inlineNever` or `@cold` go before a function. The formatter puts each on its own line. They tell the compiler how to build the function, not what it means. The full table is in Intrinsics. A leftover `with` clause after the header is PAR0011: "Silk has no `with` clauses; write `@inline` on the line before the declaration".
 
+`@trace` opens a span when a runtime function or method executes. See [Tracing requests](/docs/guides/tracing-requests).
+
 ## Declarations
 
 - Functions are declared at module level. Declaration order does not matter: a function may call one declared later.

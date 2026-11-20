@@ -1,6 +1,6 @@
 # Intrinsics
 
-`Intrinsic` is the compiler-provided namespace of primitive operations and types. The whole namespace is public: any module may use any member. Some members are unsafe. Most programs reach them through standard library wrappers. This page also covers directives, the `@name` lines that tell the compiler how to build a function. The [Intrinsics](/docs/intrinsics/overview) section documents every member one by one.
+`Intrinsic` is the compiler-provided namespace of primitive operations and types. The ambient provider table operations are reserved for the standard library. Some members are unsafe. Most programs reach them through standard library wrappers. This page also covers directives, the `@name` lines that tell the compiler how to build a function. The [Intrinsics](/docs/intrinsics/overview) section documents every member one by one.
 
 ## Syntax
 
@@ -150,6 +150,7 @@ A directive is a line such as `@inline` or `@features("avx2")` written before a 
 | `@inlineNever` | none | a function with a Silk body | hint |
 | `@cold` | none | a function with a Silk body | hint |
 | `@optimizeSize` | none | a function with a Silk body | hint |
+| `@trace` | optional literal `name`, `kind` and parameter tuple `args` | a runtime function or method with a Silk body | hint |
 | `@nonParking` | none | a function with a Silk body, or a service or interface operation | checked contract |
 | `@features("avx2", ...)` | CPU feature names | an `unsafe fn` with a Silk body | target |
 | `@foreign(memory:, locality:, noCapture:)` | named, each at most once | an `extern "C"` or `export "C"` function, or a foreign function type | optimizer fact |
@@ -175,6 +176,19 @@ The class says what removing the directive does. Removing a hint leaves the same
 - A directive before an `import` or a `static if` is a parse error at the `@` (PAR0002), with no other error.
 - On a function with a Silk body or an operation, the same directive twice, or two of the inline hints, is SEM0250 at the second one. `@inline` twice prints ``error[SEM0250] `@inline` is written twice on this declaration; keep one``, and `@cold` then `@inlineNever` prints ``error[SEM0250] `@inlineNever` cannot be written with `@cold`: a function takes at most one of `@inline`, `@inlineAlways`, `@inlineNever` and `@cold` ``.
 - A leftover `with` clause is PAR0011 at the clause. The message names the directive to write: `fn work() -> i32 with Intrinsic.inline() { return 1 }` prints ``Silk has no `with` clauses; write `@inline` on the line before the declaration``. For `with Intrinsic.foreign(...)` and `with Intrinsic.machine(...)` it lists the directives that replace each field. `module with ...` is gone and is PAR0011 too; delete the line, since a module takes no directives.
+
+## Trace a function
+
+Put `@trace` before a runtime function or method to record each execution in an ambient tracer. An effect function opens its span when the effect runs. The optional literal arguments are `name`, `kind` and `args`. The default name is the qualified function name. The default kind is `"internal"`. Other kinds are `"client"`, `"server"`, `"producer"` and `"consumer"`. Select parameters by name in `args` to record their values when the function enters.
+
+```silk
+@trace(name: "line total", args: .("quantity"))
+fn lineTotal(quantity: u64, unitPrice: u64) -> u64 {
+  return quantity * unitPrice
+}
+```
+
+A return closes the span. A typed failure and cancellation both close it with error status. See [Tracing requests](/docs/guides/tracing-requests) for an example with a recorder.
 
 ## Functions compiled for CPU features
 
@@ -584,6 +598,9 @@ exit 132
 | SEM0242 | An `@features` entry that names no CPU feature of the target, or an empty `@features` list |
 | SEM0243 | A function with `@features` that is not declared `unsafe fn` |
 | SEM0250 | The same directive twice on one declaration, or two inline hints |
+| SEM0270 | A traced function requires a compatible trace-directive capability |
+| SEM0271 | A trace directive argument is invalid |
+| SEM0272 | A tracing attribute uses a formatter that can park or suspend |
 
 ## See also
 
