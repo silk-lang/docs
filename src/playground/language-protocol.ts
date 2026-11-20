@@ -6,10 +6,13 @@ import { type ProgramFile, type Toolchain } from './protocol'
 // The package the server analyzes: one file, the playground's source.
 export const WORK_ROOT = '/work'
 export const WORK_FILE = `${WORK_ROOT}/main.silk`
-export const WORK_MANIFEST = `[package]
+// Its manifest pins the compiler's own release, without the build metadata,
+// since a dev release builds only packages written for that exact release.
+export const workManifest = (toolchain: Toolchain): string => `[package]
 name = "playground"
 version = "0.0.0"
 source = "."
+silk-version = "${toolchain.version.replace(/\+.*$/, '')}"
 `
 
 // Starts the server. `input` is its standard input; `files` are the

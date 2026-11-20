@@ -7,8 +7,8 @@ import { makeReader } from './channel'
 import {
   type LanguageRequest,
   type LanguageResponse,
-  WORK_MANIFEST,
   WORK_ROOT,
+  workManifest,
 } from './language-protocol'
 import { loadToolchain } from './toolchain'
 import { Exit, fork, makeWasi, writeFile } from './wasi'
@@ -36,7 +36,11 @@ const serve = async (
   const toolchain = await loadToolchain(request.toolchain)
   const root = fork(toolchain.base)
   const encoder = new TextEncoder()
-  writeFile(root, `${WORK_ROOT}/silk.toml`, encoder.encode(WORK_MANIFEST))
+  writeFile(
+    root,
+    `${WORK_ROOT}/silk.toml`,
+    encoder.encode(workManifest(request.toolchain)),
+  )
   request.files.forEach(file =>
     writeFile(root, `${WORK_ROOT}/${file.name}`, encoder.encode(file.source)),
   )

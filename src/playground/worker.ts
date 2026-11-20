@@ -2,7 +2,7 @@
 // wasm32-wasip1 module, and runs what it builds. Everything happens here, off
 // the page's thread, and nothing goes to a server.
 
-import { WORK_FILE, WORK_MANIFEST, WORK_ROOT } from './language-protocol'
+import { WORK_FILE, WORK_ROOT, workManifest } from './language-protocol'
 import {
   type Chunk,
   type FormatRequest,
@@ -285,7 +285,11 @@ const run = async (
   request.files.forEach(file =>
     writeFile(root, `${WORK_ROOT}/${file.name}`, encoder.encode(file.source)),
   )
-  writeFile(root, `${WORK_ROOT}/silk.toml`, encoder.encode(WORK_MANIFEST))
+  writeFile(
+    root,
+    `${WORK_ROOT}/silk.toml`,
+    encoder.encode(workManifest(request.toolchain)),
+  )
   const compileStart = performance.now()
   const status = (() => {
     try {

@@ -5,8 +5,9 @@
 //! places, and 🟩 a value in its final place. The row under the columns
 //! names each value, so you can follow a column as it moves.
 import silk.core.effect { Effect }
-import silk.io.logger { LogError, Logger }
-import silk.io.logger_native { StdoutLogger }
+import silk.text.format { Format }
+import silk.io.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
 import silk.num.i32
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
@@ -52,36 +53,36 @@ fn plain() -> Marks {
 
 // One column per value, as tall as the value, with its label under it.
 effect fn draw(values: &[i32], placed: &[bool], marks: &Marks) -> ()
-  ! LogError
-  ? &mut Logger {
+  ! WriterError
+  ? &mut Writer {
   let mut level: i32 = 10
   while level > 0 {
     let mut index: usize = 0
     while index < COUNT {
       if values[index] < level {
-        run Effect.log("⬜", &())
+        run Format.format("⬜", &())
       } else if placed[index] {
-        run Effect.log("🟩", &())
+        run Format.format("🟩", &())
       } else if (index == marks.first || index == marks.second) && marks.isSwap {
-        run Effect.log("🟧", &())
+        run Format.format("🟧", &())
       } else if index == marks.first || index == marks.second {
-        run Effect.log("🟥", &())
+        run Format.format("🟥", &())
       } else if index == marks.pivot {
-        run Effect.log("🟨", &())
+        run Format.format("🟨", &())
       } else {
-        run Effect.log("🟦", &())
+        run Format.format("🟦", &())
       }
       index = index + 1
     }
-    run Effect.log("\n", &())
+    run Format.format("\n", &())
     level = level - 1
   }
   let mut index: usize = 0
   while index < COUNT {
-    run Effect.log("{}", &.(LABELS[i32.toUsize(values[index] - 1)]))
+    run Format.format("{}", &.(LABELS[i32.toUsize(values[index] - 1)]))
     index = index + 1
   }
-  run Effect.log("\n", &())
+  run Format.format("\n", &())
 }
 
 fn swap(values: &mut [i32], left: usize, right: usize) -> () {
@@ -99,15 +100,15 @@ effect fn swapShown(
   pivot: usize,
   stats: &mut Stats,
 ) -> ()
-  ! LogError
-  ? &mut Logger | &mut MonotonicClock {
+  ! WriterError
+  ? &mut Writer | &mut MonotonicClock {
   let marks = Marks { pivot: pivot, first: left, second: right, isSwap: true }
-  run Effect.log("{}Swap {} and {}.\n\n", &(CLEAR, values[left], values[right]))
+  run Format.format("{}Swap {} and {}.\n\n", &(CLEAR, values[left], values[right]))
   run draw(&values, placed, &marks)
   run Effect.sleep(250ms)
   swap(&mut values, left, right)
   stats.swaps = stats.swaps + 1
-  run Effect.log("{}Swapped.\n\n", &.(CLEAR))
+  run Format.format("{}Swapped.\n\n", &.(CLEAR))
   run draw(&values, placed, &marks)
   run Effect.sleep(250ms)
 }
@@ -121,15 +122,15 @@ effect fn partition(
   high: usize,
   stats: &mut Stats,
 ) -> usize
-  ! LogError
-  ? &mut Logger | &mut MonotonicClock {
+  ! WriterError
+  ? &mut Writer | &mut MonotonicClock {
   let pivot = values[high]
   let mut boundary = low
   let mut scan = low
   while scan < high {
     stats.comparisons = stats.comparisons + 1
     let marks = Marks { pivot: high, first: scan, second: NONE, isSwap: false }
-    run Effect.log("{}Is {} smaller than the pivot, {}?\n\n", &(CLEAR, values[scan], pivot))
+    run Format.format("{}Is {} smaller than the pivot, {}?\n\n", &(CLEAR, values[scan], pivot))
     run draw(&values, placed, &marks)
     run Effect.sleep(150ms)
     if values[scan] <= pivot {
@@ -153,8 +154,8 @@ effect fn sort(
   high: usize,
   stats: &mut Stats,
 ) -> ()
-  ! LogError
-  ? &mut Logger | &mut MonotonicClock {
+  ! WriterError
+  ? &mut Writer | &mut MonotonicClock {
   if low > high {
     return ()
   }
@@ -164,7 +165,7 @@ effect fn sort(
   }
   let pivot = run partition(&mut values, &placed, low, high, &mut stats)
   placed[pivot] = true
-  run Effect.log("{}{} is in its place.\n\n", &(CLEAR, values[pivot]))
+  run Format.format("{}{} is in its place.\n\n", &(CLEAR, values[pivot]))
   run draw(&values, &placed, &plain())
   run Effect.sleep(400ms)
   if pivot > low {
@@ -174,16 +175,16 @@ effect fn sort(
 }
 
 effect fn sortAll() -> ()
-  ! LogError
-  ? &mut Logger | &mut MonotonicClock {
+  ! WriterError
+  ? &mut Writer | &mut MonotonicClock {
   let mut values = [7, 3, 9, 1, 10, 5, 8, 2, 6, 4]
   let mut placed = [false; COUNT]
   let mut stats = Stats { comparisons: 0, swaps: 0 }
-  run Effect.log("{}Ten values to sort.\n\n", &.(CLEAR))
+  run Format.format("{}Ten values to sort.\n\n", &.(CLEAR))
   run draw(&values, &placed, &plain())
   run Effect.sleep(800ms)
   run sort(&mut values, &mut placed, 0, COUNT - 1, &mut stats)
-  run Effect.log(
+  run Format.format(
     "{}Sorted with {} comparisons and {} swaps.\n\n",
     &(CLEAR, stats.comparisons, stats.swaps),
   )
@@ -191,10 +192,10 @@ effect fn sortAll() -> ()
 }
 
 pub effect fn main() -> ()
-  ! LogError {
-  let mut logger = StdoutLogger.make()
+  ! WriterError {
+  let mut stdout = StdoutWriter.make()
   let mut clock = OsMonotonicClock.make()
   run sortAll()
-    |> Effect.provideMut(&mut logger)
+    |> Effect.provideMut<Writer>(&mut stdout)
     |> Effect.provideMut<MonotonicClock>(&mut clock)
 }

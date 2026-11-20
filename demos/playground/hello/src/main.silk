@@ -1,10 +1,11 @@
 import silk.core.effect { Effect }
-import silk.io.logger { LogError }
-import silk.io.logger_native { StdoutLogger }
+import silk.text.format { Format }
+import silk.io.writer { Writer, WriterError }
+import silk.io.writer_native { StdoutWriter }
 
 pub effect fn main() -> ()
-  ! LogError {
-  let mut logger = StdoutLogger.make()
+  ! WriterError {
+  let mut stdout = StdoutWriter.make()
 
-  run Effect.log("Hello, world!\n", &()) |> Effect.provideMut(&mut logger)
+  run Format.format("Hello, world!\n", &()) |> Effect.provideMut<Writer>(&mut stdout)
 }
