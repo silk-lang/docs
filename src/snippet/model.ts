@@ -93,7 +93,7 @@ pub effect fn main() -> ()
   let logger = run StdoutLogger.shared()
   let open = countOpen(&[true, false, false])
   //  ^?
-  run Effect.log("{} tasks open\\n", &.(open)) |> Effect.provideAmbient<Logger>(&logger)
+  run Effect.log("{} left\\n", &.(open)) |> Effect.provideAmbient<Logger>(&logger)
 }
 `
 
