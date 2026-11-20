@@ -5,14 +5,14 @@
 //! The main fiber draws the track every 50 ms. It asks each fiber whether it
 //! has finished with `Fiber.isFinished`, which never waits, and joins them
 //! only once all three are done.
-import silk.mem.allocator { OutOfMemoryError }
+import silk.mem.allocator { Allocator, OutOfMemoryError }
 import silk.core.effect { Effect }
 import silk.concurrency.fiber { Cancelled, Fiber }
 import silk.concurrency.local_scheduler { LocalScheduler, StalledError }
 import silk.concurrency.scheduler { Scheduler, TaskIdExhaustedError }
-import silk.text.format { Format }
-import silk.io.writer { Writer, WriterError }
-import silk.io.writer_native { StdoutWriter }
+import silk.concurrency.sync { Arc }
+import silk.io.logger { Logger }
+import silk.io.logger_native { StdoutLogger }
 import silk.num.i64
 import silk.system.monotonic_clock { MonotonicClock }
 import silk.system.monotonic_clock_native { OsMonotonicClock }
@@ -47,9 +47,7 @@ fn millisecondsBetween(start: &Mark, end: &Mark) -> i64 {
 
 // A runner moves along by the time that passed and reaches the flag when its
 // fiber has finished.
-effect fn lane(runner: string, name: string, milliseconds: i64, elapsed: i64, isDone: bool) -> ()
-  ! WriterError
-  ? &mut Writer {
+effect fn lane(runner: string, name: string, milliseconds: i64, elapsed: i64, isDone: bool) -> () {
   let estimate = elapsed * (LENGTH - 1) / milliseconds
   let position = if isDone {
     LENGTH - 1
@@ -61,36 +59,31 @@ effect fn lane(runner: string, name: string, milliseconds: i64, elapsed: i64, is
   let mut cell: i64 = 0
   while cell < LENGTH {
     if cell == position {
-      run Format.format("{}", &.(runner))
+      run Effect.log("{}", &.(runner))
     } else if cell < position {
-      run Format.format("🟩", &())
+      run Effect.log("🟩", &())
     } else {
-      run Format.format("⬜", &())
+      run Effect.log("⬜", &())
     }
     cell = cell + 1
   }
   if isDone {
-    run Format.format("🏁 {}, {} ms\n", &(name, milliseconds))
+    run Effect.log("🏁 {}, {} ms\n", &(name, milliseconds))
   } else {
-    run Format.format("🏁 {}\n", &.(name))
+    run Effect.log("🏁 {}\n", &.(name))
   }
 }
 
-effect fn draw(elapsed: i64, isRabbitDone: bool, isTurtleDone: bool, isSnailDone: bool) -> ()
-  ! WriterError
-  ? &mut Writer {
-  run Format.format("{}Three fibers, waiting at the same time: {} ms\n\n", &(CLEAR, elapsed))
+effect fn draw(elapsed: i64, isRabbitDone: bool, isTurtleDone: bool, isSnailDone: bool) -> () {
+  run Effect.log("{}Three fibers, waiting at the same time: {} ms\n\n", &(CLEAR, elapsed))
   run lane("🐇", "rabbit", RABBIT, elapsed, isRabbitDone)
   run lane("🐢", "turtle", TURTLE, elapsed, isTurtleDone)
   run lane("🐌", "snail", SNAIL, elapsed, isSnailDone)
 }
 
 effect fn root() -> ()
-  ! WriterError | OutOfMemoryError | TaskIdExhaustedError | Cancelled
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled
   ? &mut Scheduler | &mut MonotonicClock {
-  // A fiber can ask only for the scheduler and the clock, so the main fiber
-  // writes to its own stdout writer.
-  let mut stdout = StdoutWriter.make()
   let started = run MonotonicClock.now()
   let rabbit = run Fiber.forkChild(runRace(RABBIT))
   let turtle = run Fiber.forkChild(runRace(TURTLE))
@@ -104,7 +97,6 @@ effect fn root() -> ()
       Fiber.isFinished(&turtle),
       Fiber.isFinished(&snail),
     )
-      |> Effect.provideMut<Writer>(&mut stdout)
 
     // Sleeping parks the main fiber, which lets the runners' fibers run.
     run Effect.sleep(50ms)
@@ -116,18 +108,23 @@ effect fn root() -> ()
   let snailTime = run Fiber.join(move snail)
   let finished = run MonotonicClock.now()
   let elapsed = millisecondsBetween(&started, &finished)
-  run draw(elapsed, true, true, true) |> Effect.provideMut<Writer>(&mut stdout)
-  run Format.format(
+  run draw(elapsed, true, true, true)
+  run Effect.log(
     "\nThe race took {} ms. One after another, it would take {} ms.\n",
     &(elapsed, rabbitTime + turtleTime + snailTime),
   )
-    |> Effect.provideMut<Writer>(&mut stdout)
 }
 
 pub effect fn main() -> ()
-  ! WriterError | OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  ! OutOfMemoryError | TaskIdExhaustedError | Cancelled | StalledError {
+  let mut allocator = Allocator.systemAllocatorProvider()
+  let logger = run Arc<StdoutLogger>.make(StdoutLogger.make())
+    |> Effect.provideMut<Allocator>(&mut allocator)
   let mut clock = OsMonotonicClock.make()
   let mut scheduler = LocalScheduler.make()
+
+  // The logger is ambient, so the fibers the scheduler runs log through it too.
   run LocalScheduler.execute(&mut scheduler, root())
     |> Effect.provideMut<MonotonicClock>(&mut clock)
+    |> Effect.provideAmbient<Logger>(&logger)
 }
